@@ -59,11 +59,12 @@ export const CheckoutRequestSchema = z.strictObject({ tripId: TripIdSchema, meth
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 
 /**
- * Phase 0 : `redirectUrl` est un chemin de l'application : commence par `/`, ni `//` ni `/\` en tête, et
- * aucun espace, caractère de contrôle (tabulation, retour à la ligne…) ni antislash nulle part, car
- * l'analyseur d'URL retire les uns et lit l'autre comme `/` (`"/\t/evil.com"` y deviendrait `//evil.com`).
- * Seconde défense : résolu contre une origine fictive, le chemin doit garder cette origine. La tâche de
- * paiement réel l'élargira à une liste fermée d'origines du prestataire, jamais à une adresse libre.
+ * `redirectUrl` (décision 0020 § 1.3, amendée par 0140 § 4) est **soit** un chemin de l'application (adaptateurs
+ * `mock` et `simulated`) : commence par `/`, ni `//` ni `/\` en tête, et aucun espace, caractère de contrôle
+ * (tabulation, retour à la ligne…) ni antislash nulle part, car l'analyseur d'URL retire les uns et lit l'autre comme
+ * `/` (`"/\t/evil.com"` y deviendrait `//evil.com`) ; seconde défense : résolu contre une origine fictive, le chemin
+ * doit garder cette origine. **Soit** une adresse du prestataire admise par `adressePrestataireAdmise` (adaptateur
+ * `stripe`), seule fonction de la liste fermée des origines, jamais une adresse libre.
  */
 const APP_PATH_ORIGIN = "http://app.invalid";
 
@@ -81,7 +82,42 @@ export const AppPathSchema = z
   .regex(/^\/(?![/\\])[^\s\\\u0000-\u001f\u007f]*$/, "chemin de l'application attendu")
   .refine(staysOnAppOrigin, { message: "chemin de l'application attendu" });
 
-export const CheckoutStartSchema = z.strictObject({ checkoutId: CheckoutIdSchema, redirectUrl: AppPathSchema });
+/**
+ * Origine du prestataire admise dans `redirectUrl` (0140 § 4) : **seul littéral** de cette origine dans ce fichier ;
+ * ajouter une origine demande un amendement de 0020 § 1.3.
+ */
+export const ORIGINE_PRESTATAIRE = "https://checkout.stripe.com";
+/** Préfixes de la liste fermée, dérivés de l'origine (origine suivie de `/`). */
+export const PREFIXES_PRESTATAIRE: readonly string[] = [`${ORIGINE_PRESTATAIRE}/`];
+/** Plafond de longueur d'une adresse du prestataire (0140 § 4 condition 1 : borne l'analyse, non tiré d'une mesure). */
+export const LONGUEUR_MAX_ADRESSE_PRESTATAIRE = 8192;
+
+/**
+ * Seule fonction qui admet une adresse du prestataire (0020 § 1.3 amendée par 0140 § 4), employée par le raffinement de
+ * `CheckoutStartSchema.redirectUrl` et par l'adaptateur `stripe` sur le champ `url` de la session. Vraie **seulement**
+ * si toutes ces conditions tiennent, dans cet ordre : (1) au plus 8192 caractères ; (2) aucun espace, caractère de
+ * contrôle (U+0000-U+001F, U+007F) ni antislash ; (3) la valeur **commence exactement** (octet pour octet, casse
+ * comprise) par un préfixe de `PREFIXES_PRESTATAIRE` : l'hôte s'écrit en minuscules et **sans port**, même `:443` ;
+ * (4) `new URL(valeur)` réussit sans base ; (5) son origine est exactement `ORIGINE_PRESTATAIRE`, sans identifiants.
+ * La valeur est alors rendue telle quelle par l'appelant (chemin, requête et fragment compris).
+ */
+export function adressePrestataireAdmise(valeur: unknown): boolean {
+  if (typeof valeur !== "string" || valeur.length > LONGUEUR_MAX_ADRESSE_PRESTATAIRE) return false;
+  if (/[\s\\\u0000-\u001f\u007f]/.test(valeur)) return false;
+  if (!PREFIXES_PRESTATAIRE.some((prefixe) => valeur.startsWith(prefixe))) return false;
+  let url: URL;
+  try {
+    url = new URL(valeur);
+  } catch {
+    return false;
+  }
+  return url.origin === ORIGINE_PRESTATAIRE && url.username === "" && url.password === "";
+}
+
+export const CheckoutStartSchema = z.strictObject({
+  checkoutId: CheckoutIdSchema,
+  redirectUrl: z.union([AppPathSchema, z.string().refine(adressePrestataireAdmise, { message: "adresse du prestataire attendue" })]),
+});
 export type CheckoutStart = z.infer<typeof CheckoutStartSchema>;
 
 /** État d'un paiement ; prix pris en instantané à la création (décision 0020 § 1.3). */

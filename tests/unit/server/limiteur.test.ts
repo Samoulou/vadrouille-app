@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FINS_MODELE, MAX_TOKENS } from "@/ai/client";
 import type { RateLimitConfig } from "@/server/config/limites";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
-import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_FICHES_REASONS, LOG_FINISH_REASONS, LOG_POSITIONS_REASONS, LOG_READ_REASONS, logEvent, MAX_JETONS_JOURNAL } from "@/server/log";
+import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_FICHES_REASONS, LOG_FINISH_REASONS, LOG_POSITIONS_REASONS, LOG_PROVIDER_ERROR_CLASSES, LOG_READ_REASONS, logEvent, MAX_JETONS_JOURNAL } from "@/server/log";
 import { createRateLimiter, type RateLimitClient, type RateLimitPool, rateLimitKey, rateLimitMessage } from "@/server/rate-limit";
 
 /**
@@ -380,6 +380,19 @@ describe("module de journal", () => {
     }
   });
 
+  // B4c (PR 863 ; décision 0140 § 1.2) : `errorClass`, liste fermée, admis sur `payment.provider_failed` seulement.
+  it("journal: errorClass, liste fermée sur payment.provider_failed ; toute autre valeur, ou tout autre événement, retiré", () => {
+    const ligne = (event: "payment.provider_failed" | "payment.alert", valeur: unknown) => JSON.parse(formatLogLine(event, { errorClass: valeur }, "warn")) as Record<string, unknown>;
+    expect(LOG_PROVIDER_ERROR_CLASSES).toHaveLength(10);
+    for (const classe of LOG_PROVIDER_ERROR_CLASSES) {
+      expect(ligne("payment.provider_failed", classe)).toEqual({ level: "warn", event: "payment.provider_failed", errorClass: classe });
+      expect(ligne("payment.alert", classe)).toEqual({ level: "warn", event: "payment.alert", dropped: 1 });
+    }
+    for (const refusee of ["StripeError", "stripeapierror", "Invalid API Key provided: sk_x", "", 1, null]) {
+      expect(ligne("payment.provider_failed", refusee), String(refusee)).toEqual({ level: "warn", event: "payment.provider_failed", dropped: 1 });
+    }
+  });
+
   // Verdict 0117 § 4 : aucun compteur de verdict de vérification n'est admis par le journal.
   it("journal: aucun compteur de verdict (verifies, introuvables, fermes, horsZone retirés)", () => {
     const ligne = JSON.parse(
@@ -458,6 +471,8 @@ describe("module de journal", () => {
       "email.transport_refused",
       // B3d (revue de la PR 850, mineur 1) : purge du plafond global en échec, nom d'erreur seulement.
       "email.purge_failed",
+      // M7a : e-mail « propositions prêtes » non envoyé (base, composition ou transport), nom d'erreur seulement.
+      "email.notification_failed",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",
@@ -474,6 +489,8 @@ describe("module de journal", () => {
       "payment.alert",
       "payment.followup_failed",
       "payment.webhook_config_invalid",
+      // B4c (PR 863 ; décision 0140 § 1.2) : échec d'un appel au prestataire Stripe, classe d'erreur de la liste fermée seulement.
+      "payment.provider_failed",
       // B9d (décision 0087 § 1.4) : voyage complet bloqué, identifiants internes et code fermé seulement.
       "generation.full_stuck",
       // M1a-2 (décision 0136 § 2 ; verdict 0139 § 2, attente étendue, Q649) : fin de l'étape e de generateProgramme,

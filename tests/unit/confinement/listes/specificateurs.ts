@@ -378,6 +378,25 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) du module étroit du webhook simulé (B4a, ticket 531 ; décision 0097 B4-TL-3), zone " +
       "sensible, exigé par `ligne/require-server-only` ; verdict Sécurité : approuvé, revue du head d50acfa (PR 582)",
   },
+  // B4c (décision 0140 § 3 point 6) : prédicat de production partagé, importé par les deux modules d'environnement qui
+  // ferment le paiement Stripe en production. Lignes au-delà de 0140 § 6, relevées par `pnpm test` : verdict Sécurité à
+  // rendre à la revue de B4c.
+  {
+    fichier: "src/server/env/index.ts",
+    specificateur: "@/dev/flags",
+    noms: ["isProductionTarget"],
+    motif:
+      "prédicat de production partagé `isProductionTarget` (B4c, décision 0140 § 3 points 3 et 6) : `PAYMENT_ADAPTER=stripe` refusé sur cible de production ; " +
+      "module pur, sans capacité (lecture non secrète de l'objet reçu) ; verdict Sécurité à rendre à la revue de B4c",
+  },
+  {
+    fichier: "src/server/env/payment.ts",
+    specificateur: "@/dev/flags",
+    noms: ["isProductionTarget"],
+    motif:
+      "prédicat de production partagé `isProductionTarget` (B4c, décision 0140 § 3 point 6, § 6 ligne 13) : `productionPaiement` ferme le webhook et la " +
+      "composition Stripe en production ; module pur, sans capacité ; verdict Sécurité à rendre à la revue de B4c",
+  },
   // B3d (M2a ; décision 0138 § 2.4) : ligne au-delà de 0138 § 9, relevée par `pnpm test` ; verdict : approuvé par la Sécurité sur le head 68d6e69.
   {
     fichier: "src/server/env/cle-resend.ts",

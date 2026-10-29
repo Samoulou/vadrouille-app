@@ -26,6 +26,7 @@ import {
 } from "@/contracts";
 import { countToReserve } from "@/contracts/values";
 import type { z } from "zod";
+import { retenirApercu, selectionApercu, servisAvantDeblocage } from "@/domain/apercu";
 import { destinationColor } from "@/domain/calculs";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { modesAdmis } from "@/domain/generation";
@@ -40,6 +41,7 @@ import {
   type SejourDeNuit,
   type SourceRelectures,
 } from "@/domain/relectures";
+import { CHAINE_APERCU, type ChaineApercu } from "@/server/config/generation";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { EchecPositions, lirePositions } from "@/server/positions/lecture";
 import { SQL_DEBLOQUE } from "@/server/presentation/etat";
@@ -75,7 +77,22 @@ export type DependancesLecture = {
    */
   readonly withOrg?: FonctionWithOrg;
   readonly configuration?: ConfigurationMoteur;
+  /**
+   * Chaîne de l'aperçu (décision 0136 § 4.2) : choisit la lecture avant le déblocage (§ 3.5) et le badge « à confirmer » d'une
+   * étape sans lieu (§ 3.6). Absente : voir `chaineDeLecture`.
+   */
+  readonly chaine?: ChaineApercu;
 };
+
+/**
+ * Chaîne d'une lecture (décision 0136 § 4.2), **lue à chaque appel** : celle que nomme le jeu de dépendances ; sinon
+ * `CHAINE_APERCU` pour la composition de l'app, qui ne pose jamais `withOrg` (branchement de `src/instrumentation.ts`), et
+ * `"ancienne"` pour un jeu de test qui injecte `withOrg` sans nommer la chaîne (les tests existants de la lecture passent sans
+ * modification, critère 14).
+ */
+export function chaineDeLecture(dependances: Pick<DependancesLecture, "chaine" | "withOrg">): ChaineApercu {
+  return dependances.chaine ?? (dependances.withOrg === undefined ? CHAINE_APERCU : "ancienne");
+}
 
 /**
  * Transaction de lecture (B6-TL-4, 0086 § 1.4) : `withOrg`, puis `SET TRANSACTION READ ONLY` en première instruction du
@@ -330,7 +347,13 @@ async function relire(
 const joursALire = (etat: Etat, jours: readonly DaySnapshot[]): JourALire[] =>
   jours.map((jour) => ({ jour, mesure: !(etat.enCours && sansEtape(jour)) }));
 
-async function recomposerJours(source: SourceRelectures, etat: Etat, jours: readonly DaySnapshot[], session: PorteeDeSession): Promise<Day[]> {
+async function recomposerJours(
+  source: SourceRelectures,
+  etat: Etat,
+  jours: readonly DaySnapshot[],
+  session: PorteeDeSession,
+  chaine: ChaineApercu,
+): Promise<Day[]> {
   const contexte = { tripId: etat.enTete.id, version: etat.enTete.version };
   // Séjours lus une fois : `stay_missing` même quand aucun jour n'est relu, puis passés à `relire`.
   const sejours = sejoursDe(etat, contexte);
@@ -342,7 +365,15 @@ async function recomposerJours(source: SourceRelectures, etat: Etat, jours: read
     : undefined;
   const verification = datesDeVerification(etat.chaine, etat.enTete.timeZone);
   return aLire.map(({ jour, mesure }) => {
-    const resultat = recomposerJour(jour, { nombreDeNuits: nuits, generating: !mesure, ...(relectures === undefined ? {} : { relectures }), modes, verification });
+    const resultat = recomposerJour(jour, {
+      nombreDeNuits: nuits,
+      generating: !mesure,
+      ...(relectures === undefined ? {} : { relectures }),
+      modes,
+      verification,
+      // Badge « à confirmer » d'une étape sans lieu, sous la chaîne inversée seulement (0136 § 3.6) ; rien n'est écrit.
+      ...(chaine === "inversee" ? { badgeSansLieu: true } : {}),
+    });
     if (!resultat.ok) throw echec(resultat.raison, { ...contexte, dayIndex: jour.index });
     return resultat.valeur;
   });
@@ -358,6 +389,18 @@ function checklistDe(etat: Etat): ChecklistItem[] {
     if (item === null) throw echec("output_invalid", contexte);
     return item;
   });
+}
+
+/**
+ * Journées servies avant le déblocage (décision 0136 § 3.5 ; M1a-PO-2) : sous la chaîne inversée, un voyage sans droit
+ * `tripUnlocked` ne sert que **J1 et les journées des cases de l'aperçu**, celles que rend `selectionApercu` avec **le même**
+ * `retenir` qu'à l'écriture des cases (`retenirApercu`, `src/domain/apercu.ts`) ; `null` : tout est servi (voyage débloqué, ou
+ * ancienne chaîne, dont la version 1 ne porte que J1 et J2).
+ */
+function lisiblesAvantDeblocage(etat: Etat, chaine: ChaineApercu): ReadonlySet<number> | null {
+  if (chaine !== "inversee" || etat.debloque) return null;
+  const jours = etat.snapshot.days;
+  return selectionApercu(jours, retenirApercu(jours)).jours;
 }
 
 type PropositionLue = { readonly record: ProposalRecord; readonly jour: DaySnapshot };
@@ -455,6 +498,8 @@ export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripA
   const withOrg = dependances.withOrg ?? withOrgParDefaut;
   const source = dependances.relectures;
   const configuration = dependances.configuration ?? CONFIGURATION_MOTEUR;
+  /** Chaîne de la lecture, lue à chaque appel (0136 § 4.2). */
+  const chaine = () => chaineDeLecture(dependances);
   /**
    * Transaction de lecture d'un cas d'usage. Toute erreur autre que l'erreur fermée (base injoignable, requête en
    * échec, contexte refusé par `withOrg`) devient `unavailable` (B6-PO-10 ; revue du head 7402324, mineur 8) : ni
@@ -504,14 +549,20 @@ export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripA
 
     async getTrip(ctx, tripId) {
       if (!identifiantLisible(tripId)) return null;
+      const laChaine = chaine();
       const etat = await lire(
         ctx,
         (executeur) => lireEtat(executeur, ctx, tripId, { chaine: true, sejours: true, mobilite: true, enCours: true, debloque: true, checklist: true }),
         tripId,
       );
       if (etat === null) return null;
-      const checklist = checklistDe(etat);
-      const days = await recomposerJours(source, etat, etat.snapshot.days, { ctx, portee: "voyage" });
+      // Contrôle `checklist_orphan` sur l'instantané entier, puis filtre avant le déblocage (0136 § 3.5) : journées et lignes
+      // « À faire » de l'aperçu seulement, **avant** toute relecture (une journée non servie n'est jamais relue).
+      const toutes = checklistDe(etat);
+      const lisibles = lisiblesAvantDeblocage(etat, laChaine);
+      const servis = lisibles === null ? { jours: etat.snapshot.days, aFaire: toutes } : servisAvantDeblocage(etat.snapshot.days, toutes, lisibles);
+      const checklist = servis.aFaire;
+      const days = await recomposerJours(source, etat, servis.jours, { ctx, portee: "voyage" }, laChaine);
       const { enTete } = etat;
       return sortie(
         TripSchema,
@@ -534,10 +585,18 @@ export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripA
 
     async getDay(ctx, tripId, index) {
       if (!identifiantLisible(tripId)) return null;
-      const etat = await lire(ctx, (executeur) => lireEtat(executeur, ctx, tripId, { chaine: true, sejours: true, mobilite: true, enCours: true }), tripId);
+      const laChaine = chaine();
+      const inversee = laChaine === "inversee";
+      const etat = await lire(
+        ctx,
+        (executeur) => lireEtat(executeur, ctx, tripId, { chaine: true, sejours: true, mobilite: true, enCours: true, ...(inversee ? { debloque: true } : {}) }),
+        tripId,
+      );
       const jour = etat?.snapshot.days.find((day) => day.index === index);
       if (etat === null || jour === undefined) return null;
-      const [day] = await recomposerJours(source, etat, [jour], { ctx, portee: "jour" });
+      // Journée hors de l'aperçu d'un voyage non débloqué (chaîne inversée, 0136 § 3.5) : `null`, sans relecture.
+      if (lisiblesAvantDeblocage(etat, laChaine)?.has(index) === false) return null;
+      const [day] = await recomposerJours(source, etat, [jour], { ctx, portee: "jour" }, laChaine);
       const contexte = { tripId, version: etat.enTete.version, dayIndex: index };
       if (day === undefined) throw echec("output_invalid", contexte);
       // Sortie validée ici comme les autres lectures (revue du head 7402324, bloquant 1) : une durée relue invalide
@@ -577,10 +636,13 @@ export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripA
 
     async getDayMap(ctx, tripId, index) {
       if (!identifiantLisible(tripId)) return null;
+      const laChaine = chaine();
       return lire(ctx, async (executeur) => {
-        const etat = await lireEtat(executeur, ctx, tripId, { sejours: true });
+        const etat = await lireEtat(executeur, ctx, tripId, { sejours: true, ...(laChaine === "inversee" ? { debloque: true } : {}) });
         const jour = etat?.snapshot.days.find((day) => day.index === index);
         if (etat === null || jour === undefined || sansEtape(jour)) return null;
+        // Hors de l'aperçu d'un voyage non débloqué (chaîne inversée, 0136 § 3.5) : `null`, **avant** toute lecture de position.
+        if (lisiblesAvantDeblocage(etat, laChaine)?.has(index) === false) return null;
         const contexte = { tripId, version: etat.enTete.version, dayIndex: index };
         const logements = logementsDe(etat, contexte);
         const positions = await positionsDe(executeur, placeIdsDesCartes([jour], logementsDesJours([jour], logements)), contexte);
@@ -590,12 +652,15 @@ export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripA
 
     async getTripMap(ctx, tripId) {
       if (!identifiantLisible(tripId)) return [];
+      const laChaine = chaine();
       return lire(ctx, async (executeur) => {
-        const etat = await lireEtat(executeur, ctx, tripId, { sejours: true });
+        const etat = await lireEtat(executeur, ctx, tripId, { sejours: true, ...(laChaine === "inversee" ? { debloque: true } : {}) });
         if (etat === null) return [];
         const contexte = { tripId, version: etat.enTete.version };
         const logements = logementsDe(etat, contexte);
-        const jours = etat.snapshot.days.filter((jour) => !sansEtape(jour));
+        // Journées de l'aperçu seulement pour un voyage non débloqué (chaîne inversée, 0136 § 3.5), **avant** `positionsDe`.
+        const lisibles = lisiblesAvantDeblocage(etat, laChaine);
+        const jours = etat.snapshot.days.filter((jour) => !sansEtape(jour) && (lisibles === null || lisibles.has(jour.index)));
         // Une seule lecture des positions pour tous les jours (0086 § 1.3 point 1).
         const positions = await positionsDe(executeur, placeIdsDesCartes(jours, logementsDesJours(jours, logements)), contexte);
         return jours.flatMap((jour) => {

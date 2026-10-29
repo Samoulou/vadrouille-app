@@ -23,6 +23,12 @@ export type OptionsPrestataireSimule = {
   readonly cle: Buffer;
   readonly transport: TransportWebhook;
   readonly maintenant: () => number;
+  /**
+   * Adresse de `R9-sim` pour un voyage et l'identifiant **public** d'un paiement (module d'adresses de 0020 § 5 :
+   * `cheminSimulationParDefaut` de `src/adapters/simulated-payment.ts`) : c'est le prestataire qui construit
+   * `redirectUrl` (décision 0140 § 5 point 0).
+   */
+  readonly cheminSimulation: (tripId: string, checkoutId: string) => string;
 };
 
 /** Type d'événement et `payment_status` émis pour chaque issue de `R9-sim` (B4-PO-3). */
@@ -60,8 +66,13 @@ export function evenementSimule(paiement: PaiementAEmettre, issue: CheckoutOutco
 
 export function creerPrestataireSimule(options: OptionsPrestataireSimule): PrestataireSimule {
   return {
-    async creerSession() {
-      return idSessionSimulee();
+    // Session simulée : identifiant `cs_sim_` tiré au hasard (la clé d'idempotence ne sert pas : rien ne sort du
+    // processus) ; adresse de `R9-sim` construite depuis l'identifiant public, sans appel.
+    async creerSession(paiement) {
+      return { ok: true, value: { sessionId: idSessionSimulee(), redirectUrl: options.cheminSimulation(paiement.tripId, paiement.checkoutId) } };
+    },
+    async adresseSession(_sessionId, paiement) {
+      return { ok: true, value: options.cheminSimulation(paiement.tripId, paiement.checkoutId) };
     },
     async emettre(paiement, issue) {
       const secondes = Math.floor(options.maintenant() / 1000);

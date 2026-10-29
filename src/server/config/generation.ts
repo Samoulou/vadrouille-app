@@ -65,10 +65,11 @@ export type ChaineApercu = "inversee" | "ancienne";
 /**
  * Chaîne de l'aperçu de `api` (décision 0136 § 4) : une constante de code, changée par une PR, **ni variable
  * d'environnement, ni variable Vercel**. Lue à l'appel par la composition de l'app (dépendances par défaut de
- * `src/server/creation` et de `src/server/generation`), passée en dépendance `chaine` ; un jeu de dépendances injecté qui ne
- * la nomme pas vaut `"ancienne"`. Posée à `"ancienne"` par M1a-2 (0136 § 12) ; M1a-3 la passe à `"inversee"`, avec son test.
+ * `src/server/creation`, de `src/server/generation` et de la lecture de `src/server/voyages`), passée en dépendance `chaine` ;
+ * un jeu de dépendances injecté qui ne la nomme pas vaut `"ancienne"`. Posée à `"ancienne"` par M1a-2 (0136 § 12), passée à
+ * `"inversee"` par M1a-3 (PR 862), avec son test (attente modifiée (2) de 0136 § 9).
  */
-export const CHAINE_APERCU: ChaineApercu = "ancienne";
+export const CHAINE_APERCU: ChaineApercu = "inversee";
 
 /**
  * Garde technique du récit sur `api` (verdict 0139 § 1.2 point 6 ; décision 0136 § 3 « Récit ») : `false` tant que Samuel

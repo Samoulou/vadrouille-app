@@ -533,7 +533,10 @@ describe("paiement simulé en base (B4a)", () => {
     const { ctx, tripId } = await organisation();
     // Session connue mais sans la forme simulée (écrite par un prestataire de test) : provider_mismatch.
     const sessionStripe = `cs_test_${randomBytes(16).toString("hex")}`;
-    const autrePrestataire = createSimulatedPaymentAdapter({ ...banc.deps, prestataire: { ...banc.prestataire, creerSession: async () => sessionStripe } });
+    const autrePrestataire = createSimulatedPaymentAdapter({
+      ...banc.deps,
+      prestataire: { ...banc.prestataire, creerSession: async () => ({ ok: true, value: { sessionId: sessionStripe, redirectUrl: "/voyages" } }) },
+    });
     const depart = await autrePrestataire.createCheckout(ctx, { tripId, method: "twint", requestId: randomUUID() });
     if (!depart.ok) throw new Error(depart.error.code);
     const p: Paiement = { publicId: depart.value.checkoutId, uuid: depuisIdentifiantPublic(depart.value.checkoutId) as string, session: sessionStripe };

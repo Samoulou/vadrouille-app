@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+import { isProductionTarget } from "@/dev/flags";
 
 import { resolveServerEnvironment, type ServerEnvironment } from "./resolve";
 
@@ -10,7 +11,9 @@ import { resolveServerEnvironment, type ServerEnvironment } from "./resolve";
  * dans 0006 ; décisions 0050, B3-TL-1 et B3-TL-5, et 0051, points 2, 3 et 6.5 ; B3b : 0077 § 5.1). Importé sous le
  * nom `@/server/env`, seulement par `src/instrumentation.ts`, le limiteur (`src/server/rate-limit.ts`), les opérations
  * de connexion (`src/server/auth/index.ts`), la composition du paiement simulé (`src/server/payment/composition.ts`),
- * le webhook simulé (`src/server/routes/simulated-webhook.ts`) et ses tests (`ligne/server-env-imports` ; B4a,
+ * le webhook simulé (`src/server/routes/simulated-webhook.ts`), la composition du paiement Stripe et le webhook Stripe
+ * (B4c, décision 0140 § 6 ligne 10 : `src/server/payment/composition-stripe.ts`, `src/server/routes/stripe-webhook.ts`)
+ * et ses tests (`ligne/server-env-imports` ; B4a,
  * décision 0097 B4-TL-3 point 5 (e)).
  *
  * - `parseServerEnv(env)` : fonction pure, valide l'objet reçu et rend un objet figé, sans aucune chaîne secrète (les
@@ -68,6 +71,9 @@ const VARIABLES = {
   VADROUILLE_DB_ADMIN_URL: 0,
   STRIPE_SECRET_KEY: 0,
   STRIPE_PUBLISHABLE_KEY: 0,
+  // B4c (décision 0140 § 3 point 2) : secret de signature du webhook Stripe, présence et forme seulement (jamais un
+  // champ de `ServerEnv`, lu à l'appel par `secretWebhookStripe`, `./payment.ts`).
+  STRIPE_WEBHOOK_SECRET: 0,
   "STRIPE_*": 0,
   // P0r3b (décision 0055, section 1 point 2) : mode réel du prototype ; `P0_*` est le libellé fixe de toute variable
   // de préfixe `P0_` refusée en production (jamais le nom exact).
@@ -344,15 +350,41 @@ function origineHttp(valeur: string): string | null {
 /** Préfixes de production des clés Stripe, comparés après `trim()` et sans tenir compte de la casse (handover § 2). */
 const PREFIXES_STRIPE_PRODUCTION = ["sk_live_", "pk_live_", "rk_live_"] as const;
 
-/** Garde de préfixe d'une variable `STRIPE_*` présente : la valeur n'est comparée qu'à des préfixes, jamais rendue. */
+/**
+ * Forme stricte de la clé secrète Stripe (décision 0140 § 3 point 1) : `sk_test_` ou `rk_test_` puis 16 à 255 caractères
+ * alphanumériques, **sans `trim()`** (un espace ou un retour à la ligne final refuse). La valeur n'est que comparée :
+ * jamais copiée, rendue, journalisée ni jointe à une erreur.
+ */
+const FORME_CLE_STRIPE = /^(sk|rk)_test_[A-Za-z0-9]{16,255}$/;
+/**
+ * Forme du secret de signature du webhook Stripe (décision 0140 § 3 point 2) : `whsec_` puis 24 à 128 caractères de
+ * `[A-Za-z0-9+/=_-]`, sans `trim()`. Un secret de test et un secret réel ont la même forme : la protection contre un
+ * événement réel est le refus de `livemode` (`src/server/payment/webhook.ts`).
+ */
+const FORME_SECRET_WEBHOOK_STRIPE = /^whsec_[A-Za-z0-9+/=_-]{24,128}$/;
+
+/** Vrai si la valeur reçue a la forme de 0140 § 3 point 1 ; partagé par `parseServerEnv` et `cleStripe` (`./payment.ts`). */
+export function cleStripeBienFormee(valeur: unknown): boolean {
+  return typeof valeur === "string" && FORME_CLE_STRIPE.test(valeur);
+}
+
+/** Vrai si la valeur reçue a la forme de 0140 § 3 point 2 ; partagé par `parseServerEnv` et `secretWebhookStripe`. */
+export function secretWebhookStripeBienForme(valeur: unknown): boolean {
+  return typeof valeur === "string" && FORME_SECRET_WEBHOOK_STRIPE.test(valeur);
+}
+
+/**
+ * Garde d'une variable `STRIPE_*` présente : préfixes de production (toutes), puis forme de la clé secrète, de la clé
+ * publiable et du secret de signature du webhook (0140 § 3 points 1 et 2). La valeur n'est que comparée, jamais rendue.
+ */
 function verifierStripe(nom: string, valeur: string): void {
-  const variable: ServerEnvVariable = nom === V.STRIPE_SECRET_KEY || nom === V.STRIPE_PUBLISHABLE_KEY ? nom : V["STRIPE_*"];
+  const variable: ServerEnvVariable =
+    nom === V.STRIPE_SECRET_KEY || nom === V.STRIPE_PUBLISHABLE_KEY || nom === V.STRIPE_WEBHOOK_SECRET ? nom : V["STRIPE_*"];
   const normalisee = valeur.trim().toLowerCase();
   if (PREFIXES_STRIPE_PRODUCTION.some((prefixe) => normalisee.startsWith(prefixe))) throw new ServerEnvError(variable, "production_prefix");
-  if (nom === V.STRIPE_SECRET_KEY && !valeur.startsWith("sk_test_") && !valeur.startsWith("rk_test_")) {
-    throw new ServerEnvError(variable, "invalid_value");
-  }
+  if (nom === V.STRIPE_SECRET_KEY && !cleStripeBienFormee(valeur)) throw new ServerEnvError(variable, "invalid_value");
   if (nom === V.STRIPE_PUBLISHABLE_KEY && !valeur.startsWith("pk_test_")) throw new ServerEnvError(variable, "invalid_value");
+  if (nom === V.STRIPE_WEBHOOK_SECRET && !secretWebhookStripeBienForme(valeur)) throw new ServerEnvError(variable, "invalid_value");
 }
 
 /** Vrai derrière Vercel : `VERCEL_ENV` présente et `VERCEL` exactement `1` après `trim()` (0051 point 2.2). */
@@ -523,7 +555,8 @@ export function parseServerEnv(env: Env): ServerEnv {
   //   dont le nom commence par `P0_` (préfixe exact, sensible à la casse) refuse le démarrage en production dès que
   //   **la clé** est présente, vide ou faite d'espaces comprise (revue du head 6be9299, mineur 8) ; sa valeur n'est
   //   jamais lue ici ; le refus porte le libellé fixe `P0_*`, jamais le nom exact ni la valeur ;
-  // - `STRIPE_*` : garde des préfixes de production (B3a), sur les valeurs présentes ;
+  // - `STRIPE_*` : garde des préfixes de production (B3a), sur les valeurs présentes, et forme de la clé secrète et du
+  //   secret du webhook (B4c, décision 0140 § 3) ;
   // - `NEXT_PUBLIC_*RESEND*` (B3d, M2a ; décision 0138 § 2.5) : toute variable dont le nom commence par `NEXT_PUBLIC_`
   //   (préfixe exact, celui que Next.js expose au navigateur) et contient `RESEND`, casse ignorée, refuse le démarrage
   //   partout ; **nom seul**, valeur jamais lue ; libellé fixe, jamais le nom exact. Défense en profondeur : la
@@ -538,7 +571,8 @@ export function parseServerEnv(env: Env): ServerEnv {
     }
     if (!nom.startsWith("STRIPE_")) continue;
     const valeur = env[nom];
-    if (presente(valeur)) verifierStripe(nom, valeur);
+    if (!presente(valeur)) continue;
+    verifierStripe(nom, valeur);
   }
 
   // `P0_REAL_RUNS` présente : `enabled` seulement, comparaison exacte, sans `trim()` (0055, section 1 point 2).
@@ -610,6 +644,24 @@ export function parseServerEnv(env: Env): ServerEnv {
     if (betterAuth === null) throw new ServerEnvError(V.AUTH_ADAPTER, "invalid_value");
     if (rateLimitHmacSecret === null) throw new ServerEnvError(V.RATE_LIMIT_HMAC_SECRET, "missing");
     if (simulatedWebhookSecret === null) throw new ServerEnvError(V.SIMULATED_WEBHOOK_SECRET, "missing");
+  }
+
+  // PAYMENT_ADAPTER=stripe (B4c ; décision 0140 § 3 point 3) : refusé (`forbidden`) en `production` ou sur une cible de
+  // production (`isProductionTarget`, prédicat partagé de 0140 § 3 point 6), jusqu'à une décision de Samuel sur le mode
+  // réel ; clé secrète et secret du webhook présents (`missing` ; leur forme est contrôlée plus haut dès qu'ils sont
+  // présents), `DATA_ADAPTER=api`, `AUTH_ADAPTER=better-auth` (donc `APP_URL`, validée plus haut ; en `https://` hors
+  // `local` et `ci`), le secret du limiteur ; et jamais avec le drapeau du webhook simulé, pour qu'aucune configuration
+  // n'ouvre les deux webhooks. Ni la clé ni le secret ne sont rangés dans l'objet rendu (0140 § 3 point 4).
+  if (paymentAdapter === "stripe") {
+    if (environment === "production" || isProductionTarget(env as NodeJS.ProcessEnv)) throw new ServerEnvError(V.PAYMENT_ADAPTER, "forbidden");
+    if (brut.SIMULATED_WEBHOOK_ENABLED?.trim().toLowerCase() === "true") throw new ServerEnvError(V.SIMULATED_WEBHOOK_ENABLED, "forbidden");
+    // Présence seulement (lecture par propriété littérale) : la forme a été contrôlée par `verifierStripe` ci-dessus.
+    if (!presente(env.STRIPE_SECRET_KEY)) throw new ServerEnvError(V.STRIPE_SECRET_KEY, "missing");
+    if (!presente(env.STRIPE_WEBHOOK_SECRET)) throw new ServerEnvError(V.STRIPE_WEBHOOK_SECRET, "missing");
+    if (dataAdapter !== "api") throw new ServerEnvError(V.DATA_ADAPTER, "invalid_value");
+    if (betterAuth === null) throw new ServerEnvError(V.AUTH_ADAPTER, "invalid_value");
+    if (environment !== "local" && environment !== "ci" && !betterAuth.appUrl.startsWith("https://")) throw new ServerEnvError(V.APP_URL, "invalid_value");
+    if (rateLimitHmacSecret === null) throw new ServerEnvError(V.RATE_LIMIT_HMAC_SECRET, "missing");
   }
 
   return Object.freeze({

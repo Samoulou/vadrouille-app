@@ -164,6 +164,56 @@ describe("paymentAvailable avec l'adaptateur simulated (spécification B4, crit�
   });
 });
 
+// B4c (PR 863 ; décision 0140 § 3 point 6 et § 5 point 1, amendement de 0020 § 2.3) : branche `stripe` de la garde,
+// jamais vraie sur une cible de production (`isProductionTarget`).
+describe("paymentAvailable avec l'adaptateur stripe (spécification B4, B4c ; décision 0140 § 5 point 1)", () => {
+  const OUVERT = { PAYMENT_ADAPTER: "stripe", DATA_ADAPTER: "api", AUTH_ADAPTER: "better-auth", VADROUILLE_ENV: "ci", NODE_ENV: "test" } as const;
+
+  it.each([[OUVERT], [{ ...OUVERT, VADROUILLE_ENV: "local" }], [{ ...OUVERT, PAYMENT_ADAPTER: " stripe " }], [{ ...OUVERT, NODE_ENV: "production" }]] as [NodeJS.ProcessEnv][])(
+    "vrai : %j",
+    (env) => {
+      expect(paymentAvailable(env)).toBe(true);
+    },
+  );
+
+  it.each([
+    [{ ...OUVERT, DATA_ADAPTER: "mock" }],
+    [{ ...OUVERT, DATA_ADAPTER: "prototype", VADROUILLE_PROTOTYPE: "1", CI: "true" }],
+    [{ ...OUVERT, AUTH_ADAPTER: "mock" }],
+    [{ ...OUVERT, AUTH_ADAPTER: undefined }],
+    [{ ...OUVERT, VADROUILLE_ENV: "staging" }],
+    [{ ...OUVERT, VADROUILLE_ENV: undefined }],
+    [{ ...OUVERT, VERCEL_ENV: "preview" }],
+    [{ ...OUVERT, VADROUILLE_ENV: "production" }],
+    [{ ...OUVERT, VADROUILLE_ENV: " Production " }],
+    [{ ...OUVERT, VERCEL_ENV: "production" }],
+    [{ ...OUVERT, VERCEL_TARGET_ENV: "production" }],
+    [{ ...OUVERT, VERCEL_TARGET_ENV: " Production " }],
+    [{ ...OUVERT, PAYMENT_ADAPTER: "Stripe" }],
+  ] as [NodeJS.ProcessEnv][])("faux : %j", (env) => {
+    expect(paymentAvailable(env)).toBe(false);
+  });
+
+  it("garde ouverte : getPaymentAdapter rend l'adaptateur stripe branché (non branché : provider_error), getPaymentSimulator null, getTripReader disponible", async () => {
+    const actual = await vi.importActual<typeof import("@/adapters")>("@/adapters");
+    vi.stubEnv("PAYMENT_ADAPTER", OUVERT.PAYMENT_ADAPTER);
+    vi.stubEnv("DATA_ADAPTER", OUVERT.DATA_ADAPTER);
+    vi.stubEnv("AUTH_ADAPTER", OUVERT.AUTH_ADAPTER);
+    vi.stubEnv("VADROUILLE_ENV", OUVERT.VADROUILLE_ENV);
+    vi.stubEnv("NODE_ENV", OUVERT.NODE_ENV);
+    expect(actual.paymentAvailable()).toBe(true);
+    const adapter = actual.getPaymentAdapter();
+    expect(await adapter.createCheckout({ organizationId: "o", userId: "u", role: "owner" }, { tripId: TRIP, method: "twint", requestId: crypto.randomUUID() })).toEqual({
+      ok: false,
+      error: { code: "provider_error", retryable: false },
+    });
+    expect(await adapter.getEntitlement({ organizationId: "o", userId: "u", role: "owner" }, TRIP)).toEqual({ unlocked: false });
+    expect(actual.getPaymentSimulator()).toBeNull();
+    // Lecture disponible : adaptateur de `DATA_ADAPTER=api` (le déblocage simulé ne vaut que pour `PAYMENT_ADAPTER=mock`).
+    expect(Object.keys(actual.getTripReader()).sort()).toEqual(Object.keys(actual.getTripAdapter()).sort());
+  });
+});
+
 describe("filets de sécurité", () => {
   it("getPaymentAdapter lève une erreur si le paiement est indisponible ; getPaymentSimulator renvoie null", async () => {
     const actual = await vi.importActual<typeof import("@/adapters")>("@/adapters");

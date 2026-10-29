@@ -48,6 +48,12 @@
  * premier usage (rien n'est lu ni connecté ici, la clé n'est lue qu'à la construction). Un échec du branchement est
  * journalisé (`voyages.action_failed`, action `branchement-paiement`) sans arrêter le serveur : chaque action du paiement
  * rend `provider_error`.
+ *
+ * B4c (spécification B4, B4c ; décision 0140 § 5 point 1, même modèle) : environnement valide et `PAYMENT_ADAPTER=stripe`
+ * (admis par `parseServerEnv` hors production seulement, avec ses variables), la composition du paiement Stripe
+ * (`composerPaiementStripe`) est branchée sur `src/adapters/stripe-payment-instance.ts` ; elle n'est appelée qu'au premier
+ * usage, et la clé n'est lue qu'à chaque appel au prestataire. Un échec du branchement est journalisé
+ * (`voyages.action_failed`, action `branchement-paiement`) sans arrêter le serveur.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -63,6 +69,7 @@ export async function register(): Promise<void> {
       await brancherCreationApi(logEvent, errorNameOf);
       await brancherTriApi(logEvent, errorNameOf);
       await brancherPaiementSimule(logEvent, errorNameOf);
+      await brancherPaiementStripe(logEvent, errorNameOf);
       return;
     } catch (error) {
       if (!(error instanceof ServerEnvError)) throw error;
@@ -209,6 +216,23 @@ async function brancherPaiementSimule(
     const { brancherPaiementSimule: brancher } = await import("@/adapters/simulated-payment-instance");
     const { composerPaiementSimule } = await import("@/server/payment/composition");
     brancher(() => composerPaiementSimule());
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-paiement", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
+/** Branche la composition du paiement Stripe en mode test (spécification B4, B4c ; décision 0140 § 5 point 1). */
+async function brancherPaiementStripe(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { stripePaymentChosen } = await import("@/adapters/payment-guard");
+    if (!stripePaymentChosen()) return;
+    const { brancherPaiementStripe: brancher } = await import("@/adapters/stripe-payment-instance");
+    const { composerPaiementStripe } = await import("@/server/payment/composition-stripe");
+    brancher(() => composerPaiementStripe());
   } catch (error) {
     const errorName = errorNameOf(error);
     logEvent("voyages.action_failed", { action: "branchement-paiement", ...(errorName === undefined ? {} : { errorName }) }, "error");

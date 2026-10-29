@@ -15,17 +15,18 @@ import type { PaymentAdapter, PaymentSimulator } from "./types";
  * `getPaymentAdapter()` et `getPaymentSimulator()` le rendent alors (B4b, amendement B4-TL-14 de 0020 § 2.3).
  */
 export type OptionsPaiementSimule = DependancesPaiement & {
+  /** Prestataire simulé ; il construit l'adresse de `R9-sim` (`cheminSimulationParDefaut`, décision 0140 § 5 point 0). */
   readonly prestataire: PrestataireSimule;
-  /** Adresse de `R9-sim` (module d'adresses de 0020 § 5 par défaut). */
-  readonly cheminSimulation?: (tripId: string, checkoutId: string) => string;
 };
+
+/** Adresse de `R9-sim` d'un paiement (module d'adresses de 0020 § 5), passée au prestataire simulé par ses fabriques. */
+export const cheminSimulationParDefaut = (tripId: string, checkoutId: string): string => unlockRoutes(tripId).paiementSimule(checkoutId);
 
 export function createSimulatedPaymentAdapter(options: OptionsPaiementSimule): PaymentAdapter & PaymentSimulator {
   const cas = creerCasPaiement(options);
-  const chemin = options.cheminSimulation ?? ((tripId: string, checkoutId: string) => unlockRoutes(tripId).paiementSimule(checkoutId));
   return {
     getOffer: (ctx, tripId) => cas.getOffer(ctx, tripId),
-    createCheckout: (ctx, request) => cas.createCheckout(ctx, request, options.prestataire, chemin),
+    createCheckout: (ctx, request) => cas.createCheckout(ctx, request, options.prestataire),
     getCheckoutStatus: (ctx, checkoutId) => cas.getCheckoutStatus(ctx, checkoutId),
     getEntitlement: (ctx, tripId) => cas.getEntitlement(ctx, tripId),
     simulateOutcome: (ctx, checkoutId, outcome) => cas.simulateOutcome(ctx, checkoutId, outcome, options.prestataire),

@@ -1,7 +1,7 @@
 import "server-only";
 
-import { ProposalRecordSchema, type Day, type ProposalRecord, type Stop, type TripSnapshot } from "@/contracts";
-import { etapeEnCase, selectionApercu } from "@/domain/apercu";
+import { ProposalRecordSchema, type Day, type ProposalRecord, type TripSnapshot } from "@/contracts";
+import { etapeEnCase, retenirApercu, selectionApercu } from "@/domain/apercu";
 
 /**
  * Cases de l'aperçu de la chaîne inversée (décision 0136 § 3.4 ; M1a-2), calculées à l'écriture depuis le voyage assemblé
@@ -29,27 +29,11 @@ export type CaseProgramme = {
   readonly contenu: ProposalRecord;
 };
 
-/** Étape retenue pour une case : un `placeId` et une `reason` non vide. */
-export const etapeAncreeEtRedigee = (stop: Pick<Stop, "placeId" | "reason">): boolean => stop.placeId !== undefined && stop.reason !== undefined && stop.reason.trim() !== "";
-
 /**
- * Fabrique du prédicat `retenir` de `selectionApercu` pour la chaîne inversée (0136 § 3.4 et § 3.5) : une étape ancrée et
- * rédigée (`etapeAncreeEtRedigee`) dont le créneau (jour, heure de début) n'est pas déjà pris par une étape retenue. Le
- * prédicat **garde un état** (les créneaux pris) : une fabrique neuve par sélection, appelée sur les étapes dans l'ordre de
- * `selectionApercu`. Exportée pour la lecture (M1a-3, § 3.5), qui applique le même `retenir`.
+ * `etapeAncreeEtRedigee` et la fabrique `retenirApercu` vivent dans `src/domain/apercu.ts` (règles de l'aperçu écrites une fois,
+ * 0136 § 1.7), pour que la lecture de `src/server/voyages` applique **le même** `retenir` (M1a-3, § 3.5) ; réexportées ici.
  */
-export function retenirApercu(jours: readonly Pick<Day, "index" | "items">[]): (stop: Stop) => boolean {
-  const jourDeLEtape = new Map<string, number>();
-  for (const jour of jours) for (const ligne of jour.items) if (ligne.type === "stop") jourDeLEtape.set(ligne.stop.id, jour.index);
-  const pris = new Set<string>();
-  return (stop) => {
-    if (!etapeAncreeEtRedigee(stop)) return false;
-    const creneau = `${jourDeLEtape.get(stop.id) ?? 0}|${stop.start}`;
-    if (pris.has(creneau)) return false;
-    pris.add(creneau);
-    return true;
-  };
-}
+export { etapeAncreeEtRedigee, retenirApercu } from "@/domain/apercu";
 
 /** Cases de l'aperçu, dans l'ordre du programme, positions 1 à 8 au plus. */
 export function casesDuProgramme(jours: readonly Day[], instantane: TripSnapshot): CaseProgramme[] {
