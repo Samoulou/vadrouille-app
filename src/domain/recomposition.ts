@@ -1,5 +1,6 @@
 import type { Day, DayLineItem, DaySnapshot, Proposal, ProposalRecord, Stop, StopSnapshot, SurpriseIdea } from "@/contracts";
 
+import { avecBadgeSansLieu } from "@/domain/apercu";
 import { aConfirmer, budgetParPersonne, minutesDeTrajet, optionDeRepas, pointsDuJour, voisins } from "@/domain/calculs";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { etapesDuJour } from "@/domain/programme";
@@ -167,6 +168,10 @@ function etapeLue(stop: StopSnapshot, genre: "stop" | "event", jour: DaySnapshot
  * `toConfirm`, `verifiedAt`. Un jour en préparation (`generating`) n'est pas mesuré : `travelMinutes` 0, sans budget,
  * sans `toConfirm`, et un segment y est une incohérence (`travel_unknown`). Une durée inconnue : `travel_unknown`,
  * jamais de valeur inventée.
+ *
+ * `badgeSansLieu` (décision 0136 § 3.6, chaîne inversée seulement ; faux par défaut, donc sans effet sur l'ancienne chaîne) :
+ * chaque ligne `stop` de la journée passe par `avecBadgeSansLieu` (`src/domain/apercu.ts`, la règle du site d'essai) : une
+ * étape sans `placeId` reçoit `toConfirm` dans la limite de 2 badges ; rien n'est écrit, les événements ne sont pas badgés.
  */
 export function recomposerJour(
   jour: DaySnapshot,
@@ -177,6 +182,8 @@ export function recomposerJour(
     readonly relectures?: Relectures;
     readonly modes: readonly ModeTrajet[];
     readonly verification: DateDeVerification;
+    /** Badge « à confirmer » d'une étape sans `placeId` (chaîne inversée, 0136 § 3.6) ; absent : faux. */
+    readonly badgeSansLieu?: boolean;
   },
 ): Assemblage<Day> {
   const relectures = contexte.generating ? undefined : contexte.relectures;
@@ -185,7 +192,8 @@ export function recomposerJour(
   const items: DayLineItem[] = [];
   for (const [rang, item] of jour.items.entries()) {
     if (item.type === "stop") {
-      items.push({ type: "stop", stop: etapeLue(item.stop, "stop", jour, relectures, contexte.verification) });
+      const ligne: DayLineItem = { type: "stop", stop: etapeLue(item.stop, "stop", jour, relectures, contexte.verification) };
+      items.push(contexte.badgeSansLieu === true ? avecBadgeSansLieu(ligne) : ligne);
     } else if (item.type === "segment") {
       const couple = couples.get(rang);
       const duree = relectures === undefined || couple === undefined ? INCONNU : relectures.duree(couple.depuis, couple.vers, item.segment.mode);

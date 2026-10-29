@@ -130,8 +130,8 @@ function voyageDeRome(ancre: (rang: number) => boolean = () => true) {
 }
 
 describe("chaîne inversée : choix de la chaîne (0136 § 4)", () => {
-  it('CHAINE_APERCU vaut "ancienne" dans M1a-2 (M1a-3 la passe à "inversee") ; garde du récit fermée (0139 § 1.2 point 6)', () => {
-    expect(CHAINE_APERCU).toBe("ancienne");
+  it('CHAINE_APERCU vaut "inversee" depuis M1a-3 (attente modifiée (2) de 0136 § 9 : "ancienne" dans M1a-2) ; garde du récit fermée (0139 § 1.2 point 6)', () => {
+    expect(CHAINE_APERCU).toBe("inversee");
     expect(RECIT_API_AUTORISE).toBe(false);
   });
 
