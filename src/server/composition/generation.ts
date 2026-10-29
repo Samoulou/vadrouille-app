@@ -4,6 +4,7 @@ import type { ClientModeles, RequeteModele } from "@/ai/client";
 import { usdEnMicros } from "@/ai/client";
 import { creerCoucheIa, type CoucheIa } from "@/ai/couche";
 import { creerRedigerProgramme } from "@/ai/rediger-programme";
+import { creerRedigerRevision } from "@/ai/rediger-revision";
 import { lieuxDuProgramme, lireProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
 import type { EntreeModeles } from "@/ai/entrees";
 import { ErreurOpenRouter, createOpenRouterClient } from "@/ai/openrouter-client";
@@ -202,6 +203,21 @@ export type BriefDuProgramme = {
 /** Entrée de la requête `programme` (validée par son schéma strict dans `creerRedigerProgramme`). */
 export type EntreeRedaction = Parameters<ReturnType<typeof creerRedigerProgramme>>[0];
 
+/**
+ * Entrée de la requête `revision` (validée par son schéma strict `EntreeRevisionSchema` dans `creerRedigerRevision` : aucun
+ * champ pour une donnée Google ni un verdict ; décision 0126 § 3, portée sur `api` par M1b).
+ */
+export type EntreeRevisionDuProgramme = Parameters<ReturnType<typeof creerRedigerRevision>>[0];
+
+/**
+ * Filet du code de la révision (décision 0126 § 4), passé par l'étape (`retirerEtapesEcartees` de `src/server/programme/`, que
+ * ce pont n'importe pas) : appliqué à la sortie relue **avant** l'ordre écrit et la vérification, il rend la sortie filtrée et
+ * le nombre de créneaux retirés.
+ */
+export type FiltreRevision = <P extends { readonly jours: readonly { readonly creneaux: readonly { readonly lieu?: string }[] }[] }>(
+  programme: P,
+) => { readonly programme: P; readonly retires: number };
+
 /** Vérificateur de statut des sites (forme de `VerificateurSites` et de `VerificateurStatut`). */
 export type VerificateurDesSites = {
   readonly barriereFermee: boolean;
@@ -250,6 +266,13 @@ export interface CapaciteProgramme {
   logements(brief: BriefDuProgramme): Promise<readonly string[]>;
   /** Une requête `programme` (entrée validée par son schéma strict), lecture tolérante et ordre écrit. */
   rediger(entree: EntreeRedaction, sejour: { readonly arrivee: string; readonly depart: string }): Promise<RedactionProgramme>;
+  /**
+   * Révision (décision 0126, portée sur `api` par M1b) : **une** requête `revision` (entrée validée par son schéma strict, `zdr`
+   * et `data_collection: "deny"` imposés, même réglage de modèle que `programme`, comme le site d'essai), lecture tolérante, filet
+   * `filtrer` (étapes écartées retirées, compté dans `creneauxRetires`), puis ordre écrit. Le filet qui vide toutes les journées
+   * rend `programme: null` (sortie illisible, 0126 § 4). Se substitue à `rediger` : `lieux` lit ensuite la sortie filtrée.
+   */
+  reviser(entree: EntreeRevisionDuProgramme, sejour: { readonly arrivee: string; readonly depart: string }, filtrer: FiltreRevision): Promise<RedactionProgramme>;
   /**
    * Lieux distincts du dernier programme rédigé (ordre écrit) : leur nombre, et leur vérification sous `controle` (part et
    * échéance avant chaque appel ; non tenu : les lieux restants sans `placeId`). Rend le `placeId` vérifié de chaque créneau.
@@ -606,6 +629,9 @@ function capaciteFinale(places: ClientsPlaces, routes: ClientRoutes, ia: CoucheI
 function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites: VerificateurDesSites): CapaciteProgramme {
   const ancrage = capacitesAncrage(places);
   const rediger = creerRedigerProgramme(modeles, CONFIGURATION_IA.programme);
+  // Révision (0126 ; M1b) : même réglage que `programme`, comme le site d'essai (`composerP0Reel`) ; `zdr` et
+  // `data_collection: "deny"` imposés par `creerRedigerRevision` quel que soit le réglage reçu.
+  const redigerRevision = creerRedigerRevision(modeles, CONFIGURATION_IA.programme);
   let zone: RectangleZone | undefined;
   let lu: ProgrammeIa | undefined;
   // Positions lues d'une fiche Google de cette étape (logements ancrés, lieux vérifiés), en mémoire ; marquées pour l'écriture
@@ -614,6 +640,27 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
   const retenir = (placeId: string, position: { readonly lat: number; readonly lng: number }) => {
     if (!positions.has(placeId)) positions.set(placeId, { lat: position.lat, lng: position.lng });
   };
+  /** Requête unique, lecture tolérante, filet éventuel (révision), puis ordre écrit, une seule fois (0116 § 1.7, 0126 § 4). */
+  async function lireRedaction(
+    envoyer: () => ReturnType<typeof rediger>,
+    sejour: { readonly arrivee: string; readonly depart: string },
+    filtrer?: FiltreRevision,
+  ): Promise<RedactionProgramme> {
+    const reponse = await envoyer();
+    const lecture = lireProgramme(reponse.texte, sejour);
+    const filtre = lecture.valeur === null || filtrer === undefined ? undefined : filtrer(lecture.valeur);
+    const valeur = filtre === undefined ? lecture.valeur : filtre.retires > 0 && filtre.programme.jours.every((jour) => jour.creneaux.length === 0) ? null : filtre.programme;
+    lu = valeur === null ? undefined : ordreEcrit(valeur);
+    return {
+      programme: lu === undefined ? null : { jours: lu.jours, bonsPlans: lu.bonsPlans },
+      joursRetires: lecture.joursRetires,
+      creneauxRetires: lecture.creneauxRetires + (filtre?.retires ?? 0),
+      champsRetires: lecture.champsRetires,
+      textesCoupes: lecture.textesCoupes,
+      ...(reponse.fin === undefined ? {} : { fin: reponse.fin }),
+      ...(reponse.tokens === undefined ? {} : { tokens: { entree: reponse.tokens.entree, sortie: reponse.tokens.sortie } }),
+    };
+  }
   return {
     async logements(brief) {
       // L'étape passe le `BriefEssai` entier, forme structurelle de `Brief` (`src/prototype/brief.ts`), que ce pont n'importe pas
@@ -624,20 +671,8 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
       for (const logement of issue.logements) retenir(logement.placeId, logement.position);
       return issue.logements.map((logement) => logement.placeId);
     },
-    async rediger(entree, sejour) {
-      const reponse = await rediger(entree);
-      const lecture = lireProgramme(reponse.texte, sejour);
-      lu = lecture.valeur === null ? undefined : ordreEcrit(lecture.valeur);
-      return {
-        programme: lu === undefined ? null : { jours: lu.jours, bonsPlans: lu.bonsPlans },
-        joursRetires: lecture.joursRetires,
-        creneauxRetires: lecture.creneauxRetires,
-        champsRetires: lecture.champsRetires,
-        textesCoupes: lecture.textesCoupes,
-        ...(reponse.fin === undefined ? {} : { fin: reponse.fin }),
-        ...(reponse.tokens === undefined ? {} : { tokens: { entree: reponse.tokens.entree, sortie: reponse.tokens.sortie } }),
-      };
-    },
+    rediger: (entree, sejour) => lireRedaction(() => rediger(entree), sejour),
+    reviser: (entree, sejour, filtrer) => lireRedaction(() => redigerRevision(entree), sejour, filtrer),
     lieux(destination) {
       if (lu === undefined) throw new RangeError("programme : aucun programme rédigé");
       const { lieux, cleDe } = lieuxDuProgramme(lu, destination);
