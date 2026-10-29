@@ -1,4 +1,4 @@
-# État du studio — 2026-10-29 (228e cycle)
+# État du studio — 2026-10-29 (229e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
@@ -21,8 +21,14 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - 2026-10-29 16:15 UTC : aucun nouveau message (#studio : seule l’annonce automatique de la version v2026.10.29-09 ; fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.
 - 2026-10-29 18:10 UTC : aucun nouveau message (#studio et fil du cycle). Rappel envoyé à Samuel à 18:25 UTC pour l’`owner-approved` de #866 puis S3 (un message). Carte Q634 à Q641 sans réponse.
 - 2026-10-29 20:10 UTC : aucun nouveau message (#studio et fil du cycle). #866 attend toujours son `owner-approved` (rappel de 18:25 UTC) ; carte Q634 à Q641 sans réponse.
+- 2026-10-29 22:10 UTC : aucun nouveau message (#studio et fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.
 
 ## Fait
+- **Statut du 228e cycle** (#901) fusionné.
+- **M5-C** (#900, ticket #895) fusionnée : contrats des retouches (`Change` étendu, `changements()` sans `removed` pour un remplacement, `not_unlocked`, `StopReport`, recherche de lieu, `ChecklistItem.kind`), test du remplacement sur l’aperçu M1g d’`api`.
+- **M4-spec** (#876, ticket #872) fusionnée : spécification « plusieurs villes », avec les points reportés à M4-TL par le CEO (Q703, Q712, Q718) et les mineurs restants à reporter à M4-TL ou M4-suite.
+- **PR docs du CEO** (#898) fusionnée : plan aligné (M5-C, M5-D, M5d-1/M5d-2, M5e, M1e/M1h, M4-suite, B4e), CONTEXT.md principe 1, 0078 § 2 et 0097 (Q661).
+- Version v2026.10.29-21 (#902).
 - **Statut du 227e cycle** (#897) fusionné.
 - **M5-D** (#899, ticket #896) fusionnée : migration 0022 (`feedback` durcie : `request_id`, index uniques partiels, `CHECK`, `REVOKE UPDATE` ; colonne `lieux` des compteurs), Tech Lead et Sécurité approuvés sans correction ; ligne `MIGRATIONS_APPROUVEES` par une PR de workflow séparée après #866 (Q713).
 - **Statut du 226e cycle** (#894) fusionné.
@@ -66,7 +72,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
 - **Audit UX « séduire les nouveaux clients »** (#801 à #804, #813) : tout est fusionné et sur le site d'essai depuis la mise en ligne #816 (18:55 UTC).
-- **MVP étape 1 (génération)** : M1a (#847, #854, #862), M1b (#875), M1e (#882), M1g (#877) et M1f (#885) fusionnées. **M1i** = PR #866 (#864) : approuvée, attend l’`owner-approved` de Samuel puis S3. **M4-spec** = PR #876 (Product Owner) : après le report Q703, 1 bloquant restant (la « ville quittée » d’un engagement n’est pas déterminable) → reporté à M4-TL par le CEO (T9 : source de la ville d’un engagement), modification non comptée, en cours. **M5** (décision 0147) : **M5-D (#899) fusionnée** ; **M5-C** = PR #900 (#895, PR de contrat) : UX/UI approuvé, Tech Lead 1 bloquant (test du remplacement sur l’aperçu M1g d’`api`) → correction 1 en cours. Ensuite M5e (M5-C, M1g), M5a, M5b/M5c, M5d-1, M5d-2. **PR docs du CEO** = #898 (alignement du plan : M5-C, M5-D, M5d-1/M5d-2, M5e, M1e/M1h, M4-suite, B4e ; CONTEXT.md principe 1 ; Q661) : 1 bloquant (valeurs provisoires de M4 recopiées) → correction 1 en cours. M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
+- **MVP étape 1 (génération)** : M1a (#847, #854, #862), M1b (#875), M1e (#882), M1g (#877) et M1f (#885) fusionnées. **M1i** = PR #866 (#864) : approuvée, attend l’`owner-approved` de Samuel puis S3. **M4** : spec fusionnée (#876) ; **M4-TL** = ticket #905 (Tech Lead, décision 0148 : T1 à T12, points reportés Q703/Q712/Q718, mineurs de la dernière revue ; agent lancé 22:30 UTC) ; puis M4-suite (Product Owner) et M4a. **M5** (décision 0147) : M5-D (#899) et M5-C (#900) fusionnées ; **M5e** = ticket #903 (liste « À faire », backend avec frontend) et **M5c** = ticket #904 (signaler une erreur, backend avec frontend) lancées 22:30 UTC en parallèle (fichiers distincts). Ensuite M5a (après M5e), M5b, M5d-1, M5d-2 ; tâche « Déplacer une étape sur `api` » (spec M5 § 14) à ouvrir après M5e et M5c (mêmes fichiers). M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
 - **MVP étape 1 (paiement)** : B4b (#836), B4b-ci (#853), 0140 (#848), B4c (#867), B4d reçu simulé (#884) et B4d-TL (#890, décision 0144) fusionnées. **B4e** = ticket #887 (data puis back, migration d’abord) : la partie `data` part au prochain cycle libre de `db/migrations`, après la fusion de #866 (0144 § 7).
 - **MVP étape 2 (e-mails)** : M2-S (#840), M2a (#850) et M7a (#873) fusionnées. Action S1 de Samuel quand M1h sera fusionnée (§ 11 du plan).
 - **Mise en ligne main → p0-reel (#837)** : attend la fusion par Samuel ; ensuite un seul réglage Vercel (protection des préversions, 0135 § 9 : contournement ciblé `/p/` de préférence) pour que son amie ouvre le lien, puis le lien du voyage de Tokyo.
@@ -79,7 +85,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Revues : #900 M5-C (correction 1), #898 docs du CEO (correction 1), #876 (report à M4-TL) ; #866 attend Samuel. Après #900 : M5e (ticket à ouvrir), puis M5a ; M5c dès M5-C (pas dans le même cycle que M5a). Après #876 : M4-TL. Après #866 : B4e-data (#887) et la PR de workflow `MIGRATIONS_APPROUVEES` pour 0022. M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
+1. Revues : M5e (#903), M5c (#904), M4-TL (#905) quand elles sont ouvertes ; #866 attend Samuel. Après M5e : M5a (puis M5b) ; après M5e et M5c : ticket « Déplacer une étape sur `api` ». Après M4-TL : M4-suite (Product Owner). Après #866 : B4e-data (#887) et la PR de workflow `MIGRATIONS_APPROUVEES` pour 0022. M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
 2. Vérifier que Samuel a posé `owner-approved` sur #866 et lancé S3 (rappel envoyé le 2026-10-29 à 18:25 UTC ; pas de second rappel avant le 2026-10-30). Vérifier le lien de partage de Tokyo.
 3. Lire les réponses de Samuel aux questions Q634 à Q641 (carte « Je suis tes recos ») ; Q638 bloque M1c ; Q645 (extension de Q636) bloque M1h.
 4. Zakynthos absent de « Mes voyages » : toujours en attente de la capture de Samuel. #527 : Q438.
@@ -104,7 +110,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q716 à Q720 (CEO : décision écrite de Samuel sur la chaîne inversée à citer au principe 1, report du dernier bloquant de #876 à M4-TL ; Product Owner : prérequis M5d-1 ou M5d-2 de M8-spec et M8b, assurance du jeu simulé en `reservation` ; Tech Lead : écarts de M5-C acceptés ou non).
+- Q721 à Q722 (CEO : tâche « Déplacer une étape sur `api` » à ouvrir après M5e et M5c ; numéro 0148 réservé à M4-TL).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
