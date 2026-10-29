@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import type { SourceRelectures } from "@/domain/relectures";
+import { INCONNU, type SourceRelectures, type VoyageARelire } from "@/domain/relectures";
 import { avecVoyagesGeneresSimules, choisirSourceRelectures, creerSourceLecture, PREFIXE_LIEU_FIXTURES } from "@/server/composition/lecture";
 
 import { voyageARelire } from "../../support/voyage-a-relire";
@@ -92,6 +92,25 @@ describe("composition: lecture des voyages générés par la variante simulée (
     // Aucune base dans ce test : une réservation (`withOrg`) échouerait et rendrait `unavailable`.
     expect(await source.pour(voyageARelire([FIXTURE]), demande)).toMatchObject({ ok: true });
     expect(appels).toBe(0);
+  });
+
+  it("chaîne inversée : un voyage de Rome (logement « quartier ») est relu sur les fixtures de Rome, ville résolue (M1a-3 ; 0136 § 9)", async () => {
+    // Lieu propre au jeu de Rome, logement sans lieu (`area`) résolu par la ville (Text Search « Rome » du double, 0100 § 6.2).
+    const lieu = `${PREFIXE_LIEU_FIXTURES}_030`;
+    const voyageDe = (ville: string): VoyageARelire => ({
+      ...voyageARelire([null]),
+      sejoursParNuit: [{ placeId: null, ville, centre: null, type: "neighbourhood", logement: "area" }],
+    });
+    const demande = { lieux: [{ placeId: lieu, dates: ["2027-05-04"] }], trajets: [{ depuis: { logement: 0 }, vers: { lieu }, modes: ["walk" as const] }] };
+    const source = avecVoyagesGeneresSimules(REPLI, { VADROUILLE_ENV: "ci" });
+    const rome = await source.pour(voyageDe("Rome"), demande);
+    if (!rome.ok) throw new Error("lecture de Rome refusée");
+    expect(rome.relectures.validite(lieu)).toBe("valide");
+    expect(rome.relectures.duree({ logement: 0 }, { lieu }, "walk")).not.toBe(INCONNU);
+    // Une autre ville garde le jeu d'Édimbourg (liste fermée), où « Rome » n'est pas une ville connue : trajet du logement inconnu.
+    const autre = await source.pour(voyageDe("Lisbonne"), demande);
+    if (!autre.ok) throw new Error("lecture refusée");
+    expect(autre.relectures.duree({ logement: 0 }, { lieu }, "walk")).toBe(INCONNU);
   });
 
   it("déclaration de production : le chargeur de fixtures refuse, unavailable, jamais le repli ni un client réel", async () => {
