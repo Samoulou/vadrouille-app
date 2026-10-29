@@ -1,4 +1,4 @@
-# État du studio — 2026-10-29 (225e cycle)
+# État du studio — 2026-10-29 (226e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
@@ -17,9 +17,12 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - 2026-10-29 08:15 UTC : aucun nouveau message (#studio et fil du cycle). Carte Q634 à Q641 sans réponse ; lien de partage de Tokyo : pas de retour de Samuel.
 - 2026-10-29 10:10 UTC : aucun nouveau message (#studio et fil du cycle). Carte Q634 à Q641 sans réponse ; lien de partage de Tokyo : pas de retour.
 - 2026-10-29 12:15 UTC : aucun nouveau message. #866 (M1i) approuvée par le Tech Lead et la Sécurité : demande d'`owner-approved` et marche à suivre S3 (rejeu de `roles.sql`, puis workflow `db-migrate`) envoyées à Samuel dans le fil du cycle à 12:20 UTC.
-- 2026-10-29 14:15 UTC : aucun nouveau message (#studio et fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.
+- 2026-10-29 14:15 UTC : aucun nouveau message (#studio et fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.\n- 2026-10-29 16:15 UTC : aucun nouveau message (#studio : seule l’annonce automatique de la version v2026.10.29-09 ; fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.
 
 ## Fait
+- **Statut du 225e cycle** (#892) fusionné.
+- **M1g** (#877, ticket #869, décision 0145) fusionnée : aperçu de révision avec `candidateId`, journée touchée replanifiée.
+- **M1f** (#885, ticket #880, décision 0146) fusionnée : ville par autocomplétion sur `api`, textes `hors_table`.
 - **Statut du 224e cycle** (#889) fusionné.
 - **M5-spec retouches** (#874) : PR #881 fusionnée à 12:25 UTC (6bd8a6b) après deux corrections et une troisième tentative bornée (Q691) : `specs/M5-retouches.md` (verrou, retour à une version comme exception nommée, lieu à soi, signalement, « À faire ») ; questions T1 à T11 et S1 à S5 reprises par M5-TL (#891).
 - **M1e photos du tri sur `api`** (#879) : PR #882 fusionnée à 13:03 UTC (93ee49a) après une correction et un bloquant tardif : décision 0143 (barrière fermée, lieu lu en base, cadence `photo-tri`, attribution Google, client branché par M1h sous condition de la réponse de Samuel à F13-Q4, Q696).
@@ -55,9 +58,9 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
 - **Audit UX « séduire les nouveaux clients »** (#801 à #804, #813) : tout est fusionné et sur le site d'essai depuis la mise en ligne #816 (18:55 UTC).
-- **MVP étape 1 (génération)** : M1a (#847, #854, #862), M1b (#875) et **M1e (#882) fusionnées**. **M1g** = PR #877 (#869) : **approuvée** (`techlead-approved`, décision 0145) mais plus fusionnable après M1e : fusion de `main` en cours, puis fusion automatique. **M1f** = PR #885 (#880) : après la correction 2, Sécurité favorable et UX conforme ; seul bloquant : conflit avec `main` (M1e), fusion de `main` en cours, non comptée comme correction (Q698) ; décision 0146 (erratum de 0141 : textes `hors_table`). **M1i** = PR #866 (#864) : approuvée, attend l'`owner-approved` de Samuel puis S3. **M4-spec** = PR #876 (Product Owner) : la troisième tentative laisse 5 bloquants → **découpage** décidé par le CEO avec le Tech Lead (Q697) : les règles du jour de changement de ville (§ 3.4) et la carte d'ensemble multi-villes sortent vers une spec M4-suite écrite après M4-TL ; la PR réduite est en cours. **M5-TL** = ticket #891 (Tech Lead : décision 0147, T1 à T11, S1 à S5, découpage M5a à M5e ; agent lancé 14:25 UTC). M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
-- **MVP étape 1 (paiement)** : B4b (#836), B4b-ci (#853), 0140 (#848), B4c (#867) et B4d reçu simulé (#884) fusionnées. **B4d-TL** = PR #890 (#886, décision 0144 : option B pour `receipt_url`, `.npmrc` `minimum-release-age=20160` admis par la Sécurité) : correction 1 en cours (point de jonction du webhook, INSERT non nul refusé, contrôle global du journal). Puis **B4e** = ticket #887 (data puis back).
-- **MVP étape 2 (e-mails)** : M2-S (#840), M2a (#850) et **M7a (#873) fusionnées**. Action S1 de Samuel quand M1h sera fusionnée (§ 11 du plan).
+- **MVP étape 1 (génération)** : M1a (#847, #854, #862), M1b (#875), M1e (#882), **M1g (#877) et M1f (#885) fusionnées**. **M1i** = PR #866 (#864) : approuvée, attend l’`owner-approved` de Samuel puis S3. **M4-spec** = PR #876 (Product Owner) : après le découpage (Q697), la revue laisse 2 bloquants sur le texte nouveau (heure du départ estimé sans valeur ; nom accessible de la rangée de jour) → correction bornée accordée par le CEO avec le Tech Lead, la dernière (Q703) ; si elle bloque encore, fusion avec report des bloquants à M4-TL. **M5-TL** = PR #893 (#891, décision 0147 : T1 à T11, S1 à S5, découpage M5-C ∥ M5-D → M5e → M5a → M5b/M5c → M5d-1 → M5d-2) : Sécurité approuvée, Tech Lead 2 bloquants (`removed` doublant `replaced` ; double écriture des lignes « À faire » par M1c) → correction 1 en cours ; exception CEO « une spécification, plusieurs tâches » accordée pour M5 (Q704). M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
+- **MVP étape 1 (paiement)** : B4b (#836), B4b-ci (#853), 0140 (#848), B4c (#867) et B4d reçu simulé (#884) fusionnées. **B4d-TL** = PR #890 (#886, décision 0144) : les 5 bloquants de la correction 1 sont levés, Sécurité favorable ; 1 bloquant restant (motif `stripe.com` non relevé par l’analyseur de confinement) → correction 2 en cours, la dernière (option retenue : motif à hôte contigu). Puis **B4e** = ticket #887 (data puis back, migration d’abord, après #866).
+- **MVP étape 2 (e-mails)** : M2-S (#840), M2a (#850) et M7a (#873) fusionnées. Action S1 de Samuel quand M1h sera fusionnée (§ 11 du plan).
 - **Mise en ligne main → p0-reel (#837)** : attend la fusion par Samuel ; ensuite un seul réglage Vercel (protection des préversions, 0135 § 9 : contournement ciblé `/p/` de préférence) pour que son amie ouvre le lien, puis le lien du voyage de Tokyo.
 - **Réglages fins du programme (#800)** : en ligne depuis #816. Reste à lire : le journal du prochain lancement de Samuel une fois le quota Google rétabli (`sitesUnchecked`, `retoursDeQuartier`). Questions Q630 à Q633.
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel) ; toujours en échec (dernier passage 20:16 UTC).
@@ -68,8 +71,8 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Revues : #890 (correction 1), #876 (découpage), #885 et #877 (fusion de `main`), M5-TL (#891) quand elle est ouverte ; #866 attend Samuel. Après #890 : B4e (#887, migration d'abord). Après #876 : M4-TL, puis M4-suite (Product Owner). M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
-2. Vérifier que Samuel a posé `owner-approved` sur #866 et lancé S3 ; sinon, un rappel en un message. Vérifier le lien de partage de Tokyo. PR docs du CEO : plan (M5e : prérequis T8 et T9, Q684 ; lignes M1e et M1h alignées sur 0143 § 4 ; M4-suite), CONTEXT.md principe 1 (0115), 0078 § 2 et 0097 (Q661).
+1. Revues : #893 (correction 1), #890 (correction 2, dernière), #876 (correction bornée, dernière) ; #866 attend Samuel. Après #893 : tickets M5-C et M5-D (en parallèle), puis M5e. Après #890 : B4e (#887, migration d’abord, après #866). Après #876 : M4-TL, puis M4-suite (Product Owner). M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
+2. Vérifier que Samuel a posé `owner-approved` sur #866 et lancé S3 ; sinon, un rappel en un message (un cycle s’est écoulé depuis la demande de 12:20 UTC). Vérifier le lien de partage de Tokyo. PR docs du CEO : plan (M5e : prérequis M5-C et M1g, Q684 ; lignes M1e et M1h alignées sur 0143 § 4 ; M4-suite ; exception M5), CONTEXT.md principe 1 (0115), 0078 § 2 et 0097 (Q661).
 3. Lire les réponses de Samuel aux questions Q634 à Q641 (carte « Je suis tes recos ») ; Q638 bloque M1c ; Q645 (extension de Q636) bloque M1h.
 4. Zakynthos absent de « Mes voyages » : toujours en attente de la capture de Samuel. #527 : Q438.
 
@@ -93,7 +96,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q697 à Q702 (décisions du CEO avec le Tech Lead : découpage de la spec M4 après la troisième tentative, fusion de `main` sur #885 non comptée ; B4d-TL #890 : textes du reçu Stripe, paiement sans lien, onglet du lien externe pour le Product Owner ; M1g #877 : décalage de quelques minutes des étapes précédentes et état propre d'une étape liée à « À faire » pour le Product Owner, `StatusBanner` pour l'annulation échouée pour l'UX ; M1f #885 : aide sur la confidentialité du logement sur `api` pour le Product Owner).
+- Q703 à Q710 (décisions du CEO avec le Tech Lead : correction bornée de #876 après le découpage, exception « une spécification, plusieurs tâches » pour M5, options retenues pour #890 et #893 ; Q682 complétée pour Samuel : coût au pire cas de la recherche de lieux ; questions du Product Owner levées par la revue de 0147).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
