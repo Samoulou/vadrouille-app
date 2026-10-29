@@ -90,6 +90,11 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     ["src/workflows/recalcul.ts", SYSTEME],
     ["src/server/presentation/tri.ts", SYSTEME],
     ["scripts/autre.ts", SYSTEME],
+    // PR 879 (M1e) : photos du tri sur api, la seule barrière ; ses voisins restent refusés.
+    ["src/server/photos/api.ts", GENERATION],
+    ["src/server/photos/api.ts", "@/server/generation/garde"],
+    ["src/server/photos/api.ts", COMPOSITION],
+    ["src/server/photos/autre.ts", "@/server/generation/barriere"],
   ])("%s : chargement de %s signalé sous toutes ses formes", async (fichier, source) => {
     for (const code of formes(source)) expect(await signalements(code, fichier), code).not.toHaveLength(0);
   });
@@ -108,6 +113,8 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     ["src/server/presentation/tri.ts", "@/server/generation/lot"],
     ["src/server/presentation/tri.ts", "@/server/generation/expiration"],
     ["src/server/presentation/tri.ts", "@/server/generation/demarrage"],
+    // PR 879 (M1e) : photos du tri sur api, barrière B9-TL-8 seulement.
+    ["src/server/photos/api.ts", "@/server/generation/barriere"],
     ["src/workflows/index.ts", GENERATION],
     // M1a-2 : pont de `generateProgramme` (chaîne inversée, 0136 § 2.1, amende 0101 § 4).
     ["src/workflows/programme.ts", GENERATION],
