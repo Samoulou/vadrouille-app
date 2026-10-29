@@ -17,7 +17,8 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - 2026-10-29 08:15 UTC : aucun nouveau message (#studio et fil du cycle). Carte Q634 à Q641 sans réponse ; lien de partage de Tokyo : pas de retour de Samuel.
 - 2026-10-29 10:10 UTC : aucun nouveau message (#studio et fil du cycle). Carte Q634 à Q641 sans réponse ; lien de partage de Tokyo : pas de retour.
 - 2026-10-29 12:15 UTC : aucun nouveau message. #866 (M1i) approuvée par le Tech Lead et la Sécurité : demande d'`owner-approved` et marche à suivre S3 (rejeu de `roles.sql`, puis workflow `db-migrate`) envoyées à Samuel dans le fil du cycle à 12:20 UTC.
-- 2026-10-29 14:15 UTC : aucun nouveau message (#studio et fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.\n- 2026-10-29 16:15 UTC : aucun nouveau message (#studio : seule l’annonce automatique de la version v2026.10.29-09 ; fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.
+- 2026-10-29 14:15 UTC : aucun nouveau message (#studio et fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.
+- 2026-10-29 16:15 UTC : aucun nouveau message (#studio : seule l’annonce automatique de la version v2026.10.29-09 ; fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.
 
 ## Fait
 - **Statut du 225e cycle** (#892) fusionné.
