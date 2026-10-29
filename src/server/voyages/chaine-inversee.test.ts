@@ -9,7 +9,7 @@ import type { OrgTransaction } from "@/server/with-org";
 import { chaineDeLecture, creerLectureVoyages, type DependancesLecture } from "./lecture";
 
 /**
- * Lecture de `api` sous la chaîne inversée, sans base (M1a-3, ticket 858 ; décision 0136 § 3.5, § 3.6 et § 4.2) : journées
+ * Lecture de `api` sous la chaîne inversée, sans base (M1a-3, PR 862 ; décision 0136 § 3.5, § 3.6 et § 4.2) : journées
  * servies avant le déblocage (J1 et les journées des cases de l'aperçu, même `retenir` qu'à l'écriture), badge « à confirmer »
  * d'une étape sans lieu, chaîne lue à l'appel. Transaction simulée qui rend les lignes de chaque requête (reconnue par sa
  * table) et note les paramètres ; les tests de base (`tests/db/chaine-inversee.test.ts`) font foi pour le SQL. Aucune donnée

@@ -67,7 +67,7 @@ export type ChaineApercu = "inversee" | "ancienne";
  * d'environnement, ni variable Vercel**. Lue à l'appel par la composition de l'app (dépendances par défaut de
  * `src/server/creation`, de `src/server/generation` et de la lecture de `src/server/voyages`), passée en dépendance `chaine` ;
  * un jeu de dépendances injecté qui ne la nomme pas vaut `"ancienne"`. Posée à `"ancienne"` par M1a-2 (0136 § 12), passée à
- * `"inversee"` par M1a-3 (ticket 858), avec son test (attente modifiée (2) de 0136 § 9).
+ * `"inversee"` par M1a-3 (PR 862), avec son test (attente modifiée (2) de 0136 § 9).
  */
 export const CHAINE_APERCU: ChaineApercu = "inversee";
 

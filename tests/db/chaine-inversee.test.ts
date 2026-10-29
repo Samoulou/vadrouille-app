@@ -78,7 +78,7 @@ import { closeAll, createOrg, inTx, type DbClient, type Org } from "./helpers";
  * `generateProgramme` déroulé sans le SDK (étapes `a` puis `e`), variante simulée sur les fixtures de Rome (`rome-1`), aucune
  * clé, aucun appel réel, aucune position écrite. La chaîne est **injectée** (`chaine: "inversee"`) : un jeu de dépendances
  * injecté sans chaîne vaut `"ancienne"`, quelle que soit `CHAINE_APERCU` (`"inversee"` depuis M1a-3, 0136 § 4.2). Lecture
- * (M1a-3, ticket 858) : un test par lecteur du tableau de 0136 § 3.5, badge « à confirmer » (§ 3.6) et critère 9.
+ * (M1a-3, PR 862) : un test par lecteur du tableau de 0136 § 3.5, badge « à confirmer » (§ 3.6) et critère 9.
  */
 
 let base: BaseApercu;
@@ -1113,7 +1113,7 @@ describe("chaine-inversee: voyage complet et recalcul clos sans écriture (0136 
   });
 });
 
-// --- Lecture (M1a-3, ticket 858 ; décision 0136 § 3.5, § 3.6, § 4 ; critère 9) ----------------------------------------------
+// --- Lecture (M1a-3, PR 862 ; décision 0136 § 3.5, § 3.6, § 4 ; critère 9) ----------------------------------------------
 
 /** Lecture de `api` sous une chaîne nommée, sur la base notée par `textes` si on la passe. */
 function lecteur(chaine: "inversee" | "ancienne" = "inversee", textes?: string[], relectures: SourceRelectures = RELECTURES) {

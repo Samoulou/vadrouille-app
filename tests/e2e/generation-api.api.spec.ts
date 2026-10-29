@@ -17,7 +17,7 @@ import { sheet } from "./sejour-helpers";
  * de relectures, complété pour les lieux des fixtures (0100 § 5.3, amendée par 0110 § 1). Aucune clé n'est posée (garde de
  * `playwright.config.ts`).
  *
- * Chaîne inversée (M1a-3, ticket 858 ; spécification M1a, critères 9 et 15 ; décision 0136 § 4 et § 9) : `CHAINE_APERCU` vaut
+ * Chaîne inversée (M1a-3, PR 862 ; spécification M1a, critères 9 et 15 ; décision 0136 § 4 et § 9) : `CHAINE_APERCU` vaut
  * `"inversee"`, donc `createTrip` démarre `generateProgramme` (étapes `a` et `e`) sur la sortie simulée de Rome
  * (`prototype/fixtures/modeles/rome.json`, `places/rome-chaine-inversee.json`).
  *
