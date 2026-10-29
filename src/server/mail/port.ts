@@ -9,12 +9,15 @@ import type { CanonicalEmail } from "@/server/email";
  * message et son envoi appartiennent à l'implémentation (B3b-envoi).
  *
  * Implémentations : `disabledCodeMailer` (`./disabled.ts`), retenue sans `EMAIL_TRANSPORT` ; `createSmtpCodeMailer`
- * (`./smtp.ts`, B3b-envoi), SMTP vers Mailpit seulement, avec `EMAIL_TRANSPORT=smtp` ; un double de capture hors de
- * `src/` pour les tests (`tests/support/capture-code-mailer.ts`). Le port est **injecté**
- * dans la configuration de `src/server/auth`, jamais choisi par une variable d'environnement.
+ * (`./smtp.ts`, B3b-envoi), SMTP vers Mailpit seulement, avec `EMAIL_TRANSPORT=smtp` ; `createResendCodeMailer`
+ * (`./resend.ts`, B3d, décision 0138), envoi réel par l'API de Resend, avec `EMAIL_TRANSPORT=resend` dans le seul cas
+ * admis ; un double de capture hors de `src/` pour les tests (`tests/support/capture-code-mailer.ts`). Le port est
+ * **injecté** dans la configuration de `src/server/auth`, jamais choisi par une variable d'environnement.
  *
  * Contrat : un refus ou une panne **lève** (l'opération de `src/server/auth` rend alors `provider_error`) ; le message
- * de l'erreur levée n'est jamais journalisé (seul `error.name` peut l'être, `src/server/log.ts`).
+ * de l'erreur levée n'est jamais journalisé (seul `error.name` peut l'être, `src/server/log.ts`). Seule exception :
+ * `CodeMailerCapError` (plafond global du jour atteint, ou quota du fournisseur atteint), que `src/server/auth` traduit
+ * en `email_cap_reached` (`retryable: false` ; spécification B3d, point 4).
  */
 export type LoginCodeMessage = {
   readonly to: CanonicalEmail;
@@ -24,4 +27,29 @@ export type LoginCodeMessage = {
 
 export interface CodeMailer {
   sendLoginCode(message: LoginCodeMessage): Promise<void>;
+}
+
+/**
+ * Message du port refusé avant tout appel du transport (adresse, forme du code, enveloppe) ; ne porte aucune valeur (ni
+ * adresse, ni code). Partagé par `./smtp.ts` (qui le réexporte) et `./resend.ts`.
+ */
+export class CodeMailerRefusalError extends Error {
+  override name = "CodeMailerRefusalError";
+
+  constructor() {
+    super("Envoi du code refusé avant le transport.");
+  }
+}
+
+/**
+ * Plafond des envois atteint (spécification B3d, point 4 ; décision 0138 § 7) : plafond global du jour refusé avant tout
+ * appel du transport, ou quota quotidien ou mensuel du fournisseur. Nom fixe, message fixe, aucune valeur ni `cause`.
+ * Défini avec le port pour que `src/server/auth/erreurs.ts` le reconnaisse sans importer une implémentation.
+ */
+export class CodeMailerCapError extends Error {
+  override name = "CodeMailerCapError";
+
+  constructor() {
+    super("Plafond des envois du jour atteint.");
+  }
 }

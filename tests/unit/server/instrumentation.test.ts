@@ -102,8 +102,25 @@ vi.mock("@/server/presentation/tri", () => ({
   cloreTri: casDuTri.cloreTri,
 }));
 
+// B4b : branchement du paiement simulé en base (doubles : aucune composition réelle, aucune base, aucune clé).
+const brancherPaiement = vi.fn();
+const composerPaiementSimule = vi.fn(() => ({ adaptateur: "simule" }));
+let echecPaiement: Error | null = null;
+vi.mock("@/adapters/simulated-payment-instance", () => ({
+  brancherPaiementSimule: (fabrique: unknown) => brancherPaiement(fabrique),
+}));
+vi.mock("@/server/payment/composition", () => ({
+  get composerPaiementSimule() {
+    if (echecPaiement) throw echecPaiement;
+    return () => composerPaiementSimule();
+  },
+}));
+
 beforeEach(() => {
   vi.resetModules();
+  brancherPaiement.mockClear();
+  composerPaiementSimule.mockClear();
+  echecPaiement = null;
   brancherTri.mockClear();
   echecTri = null;
   logEvent.mockClear();
@@ -333,6 +350,38 @@ describe("instrumentation : branchement du tri enregistré api (spécification B
     expect(brancherApi).toHaveBeenCalledTimes(1);
     expect(brancherCreation).toHaveBeenCalledTimes(1);
     expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-tri", errorName: "TypeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
+  });
+});
+
+describe("instrumentation : branchement du paiement simulé en base (spécification B4, B4b point 1)", () => {
+  it("PAYMENT_ADAPTER=simulated : fabrique branchée, la composition n'est construite qu'au premier usage", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    vi.stubEnv("PAYMENT_ADAPTER", "simulated");
+    await register();
+    expect(brancherPaiement).toHaveBeenCalledTimes(1);
+    expect(composerPaiementSimule).not.toHaveBeenCalled();
+    const [fabrique] = brancherPaiement.mock.calls[0] as [() => unknown];
+    expect(fabrique()).toEqual({ adaptateur: "simule" });
+    expect(composerPaiementSimule).toHaveBeenCalledTimes(1);
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "mock", "stripe"])("PAYMENT_ADAPTER=%j : paiement simulé non branché", async (valeur) => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    vi.stubEnv("PAYMENT_ADAPTER", valeur);
+    await register();
+    expect(brancherPaiement).not.toHaveBeenCalled();
+  });
+
+  it("échec du branchement : voyages.action_failed (branchement-paiement) avec le seul nom d'erreur, lecture toujours branchée", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    vi.stubEnv("PAYMENT_ADAPTER", "simulated");
+    echecPaiement = Object.assign(new TypeError("secret du module"), { cause: "secret" });
+    await register();
+    expect(brancherPaiement).not.toHaveBeenCalled();
+    expect(brancherApi).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-paiement", errorName: "TypeError" }, "error");
     expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
   });
 });

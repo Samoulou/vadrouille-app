@@ -94,6 +94,10 @@ export const LECTURES_ENV = [
   { fichier: "src/adapters/context.ts", noms: ["DATA_ADAPTER"] },
   { fichier: "src/adapters/index.ts", noms: ["DATA_ADAPTER", "PAYMENT_ADAPTER"] },
   { fichier: "src/adapters/payment-guard.ts", noms: ["VADROUILLE_DEMO_PAYMENT", "PAYMENT_ADAPTER", "DATA_ADAPTER"] },
+  // B4b (ticket 831 ; spécification B4, B4b point 5 ; amendement B4-TL-14 de 0020 § 2.3) : garde élargie à `simulated`,
+  // noms non secrets lus par propriété littérale et comparés à une valeur exacte, jamais rendus (jamais
+  // `SIMULATED_WEBHOOK_SECRET`). Verdict Sécurité : approuvé (revue de la PR #836, a1a61d7).
+  { fichier: "src/adapters/payment-guard.ts", noms: ["AUTH_ADAPTER", "SIMULATED_WEBHOOK_ENABLED"] },
   // F10c (décision 0039, F10-TL-7) : garde du partage simulé, alignée sur `payment-guard.ts`. Verdict Sécurité : approuvé (PR #236, a1463f6).
   { fichier: "src/adapters/share-guard.ts", noms: ["VADROUILLE_DEMO_SHARE", "DATA_ADAPTER"] },
   // F8b (décision 0017 § 11.2, F8-TL-10) : garde de la connexion simulée, même forme que `share-guard.ts`. Verdict Sécurité : à venir (PR F8b, ticket 259).
@@ -189,6 +193,11 @@ export const LECTURES_ENV = [
   // présence, `staging`, `production` et Vercel refusés, valeur `smtp` exacte, forme stricte de l'URL, liste fermée
   // d'hôtes ; valeur jamais rendue). Lues par propriété littérale, dans ce fichier seulement. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
   { fichier: "src/server/env/index.ts", noms: ["BETTER_AUTH_URL", "APP_URL", "EMAIL_TRANSPORT", "SMTP_URL"] },
+  // B3d (M2a ; décision 0138 § 3 et § 10.7) : prédicat du cas admis de `EMAIL_TRANSPORT=resend` (`resendAdmis`) ;
+  // `VADROUILLE_ENV` (absente ou vide exigée) et `VERCEL_TARGET_ENV` (absente ou exactement `preview`), lues par
+  // propriété littérale, comparées à des constantes, jamais rendues. Ligne au-delà de 0138 § 9 (relevée par `pnpm test`) :
+  // verdict : approuvé par la Sécurité sur le head 68d6e69.
+  { fichier: "src/server/env/index.ts", noms: ["VADROUILLE_ENV", "VERCEL_TARGET_ENV"] },
   // B3b, correction 1 (revue consolidée du head `f0b8c5a`, bloquant 1 ; décision 0082) : variables que Better Auth 1.7.7
   // lit d'elle-même, refusées au démarrage par leur seule présence (`!== undefined`), valeur jamais lue ; le secret de
   // repli `AUTH_*` est dans `donnees/lectures-env-secretes.json`. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
@@ -240,6 +249,11 @@ export const ENV_ENTIER = [
       "argument:isProductionDeployment",
       "argument:paymentDemoAllowed",
       "argument:prototypeAdapterAllowed",
+      // B4b (ticket 831 ; spécification B4, B4b point 5) : webhook simulé ouvert seulement en `local` ou `ci`. Verdict
+      // Sécurité : approuvé (revue de la PR #836, a1a61d7).
+      "argument:betterAuthAllowed",
+      // B4b : choix `simulated` lu par `src/instrumentation.ts` pour brancher la composition du paiement simulé.
+      "defaut:simulatedPaymentChosen",
     ],
   },
   // F10c (décision 0039, F10-TL-7) : même forme que `payment-guard.ts`. Verdict Sécurité : approuvé (PR #236, a1463f6).
@@ -314,6 +328,9 @@ export const ENV_ENTIER = [
   { fichier: "src/server/env/ai.ts", formes: ["defaut:lireCleOpenRouter", "argument:verifierSortie"] },
   { fichier: "src/server/env/grounding.ts", formes: ["defaut:lireCleGoogle", "argument:verifierSortie"] },
   { fichier: "src/server/env/garde-cles.ts", formes: ["defaut:clesDeServicePosees"] },
+  // B3d (M2a), décision 0138 § 4 : environnement lu à l'appel, passé entier à la barrière de sortie et au prédicat du cas
+  // admis. Verdict : approuvé par la Sécurité sur le head 68d6e69.
+  { fichier: "src/server/env/cle-resend.ts", formes: ["defaut:cleResend", "argument:verifierSortie", "argument:resendAdmis"] },
   // P0r3b (ticket 311 ; décision 0055, section 1 point 2) : module étroit du mode réel, environnement lu à l'appel,
   // passé entier à la barrière de sortie et au seul calcul de l'environnement (B3a). Verdict Sécurité à rendre.
   { fichier: "src/server/env/p0.ts", formes: ["defaut:lireEnvP0", "argument:verifierSortie", "argument:resolveServerEnvironment"] },
@@ -331,6 +348,9 @@ export const ENV_ENTIER = [
   // Verdict Sécurité : plafond accepté par 0051 point 6.7, lignes réelles à revoir au head de fusion.
   { fichier: "src/instrumentation.ts", formes: ["argument:parseServerEnv", "argument:assertServerProcessEnv"] },
   { fichier: "src/server/env/index.ts", formes: ["argument:parseServerEnv", "argument:resolveServerEnvironment"] },
+  // B3d (M2a ; décision 0138 § 3, T2) : `parseServerEnv` passe l'objet reçu entier au prédicat du cas admis de
+  // `EMAIL_TRANSPORT=resend`. Ligne au-delà de 0138 § 9 (relevée par `pnpm test`) : verdict : approuvé par la Sécurité sur le head 68d6e69.
+  { fichier: "src/server/env/index.ts", formes: ["argument:resendAdmis"] },
   { fichier: "db/connection.ts", formes: ["argument:resolveServerEnvironment"] },
   // B3a (ticket 293 ; spécification B3, B3a point 3) : copie de l'environnement du lanceur, dont sont retirées
   // `VADROUILLE_DATABASE_URL_MIGRATOR` et `VADROUILLE_DB_ADMIN_URL`, passée au serveur autonome. Ligne au-delà du plafond
@@ -361,6 +381,10 @@ export const PARAMETRES_ENV = [
   { fichier: "src/server/env/index.ts", fonction: "parseServerEnv", parametre: "env" },
   { fichier: "src/server/env/index.ts", fonction: "assertServerProcessEnv", parametre: "env" },
   { fichier: "src/server/env/resolve.ts", fonction: "resolveServerEnvironment", parametre: "env" },
+  // B3d (M2a ; décision 0138 § 3, T2) : prédicat du cas admis, lecture par propriété littérale de `VERCEL`, `VERCEL_ENV`,
+  // `VADROUILLE_ENV` et `VERCEL_TARGET_ENV`. Ligne au-delà de 0138 § 9 (relevée par `pnpm test`) : verdict :
+  // approuvé par la Sécurité sur le head 68d6e69.
+  { fichier: "src/server/env/index.ts", fonction: "resendAdmis", parametre: "env" },
 ] as const satisfies readonly ParametreEnv[];
 
 /**

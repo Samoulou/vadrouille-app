@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ADRESSE_A, ADRESSE_B } from "../support/bout-en-bout-api";
+import { ADRESSE_A, ADRESSE_B, ADRESSE_DEBLOQUER, ADRESSE_DEBLOQUER_REFUS } from "../support/bout-en-bout-api";
 import { convertirVoyagesSimules, ecrireVoyagesSimules } from "../support/voyages-en-base";
 import { closeAll, connect, createOrg, inTx, type DbClient } from "./helpers";
 
@@ -48,8 +48,8 @@ beforeAll(async () => {
 
 afterAll(closeAll);
 
-describe("données de bout en bout de l'adaptateur api (B6b)", () => {
-  it.each([ADRESSE_A, ADRESSE_B])("%s : organisation personnelle et quatre voyages du jeu simulé", async (adresse) => {
+describe("données de bout en bout de l'adaptateur api (B6b ; B4b pour le déblocage)", () => {
+  it.each([ADRESSE_A, ADRESSE_B, ADRESSE_DEBLOQUER, ADRESSE_DEBLOQUER_REFUS])("%s : organisation personnelle et quatre voyages du jeu simulé", async (adresse) => {
     const id = await identite(adresse);
     if ((await nombreDeVoyages(id)) === 0) await ecrireVoyagesSimules(app, id);
     expect(await nombreDeVoyages(id)).toBe(convertirVoyagesSimules().length);
