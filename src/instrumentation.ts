@@ -41,6 +41,12 @@
  * `src/adapters/api-tri-instance.ts`. Rien n'est lu ni connecté ici. Un échec du branchement est journalisé
  * (`voyages.action_failed`, action `branchement-tri`) sans arrêter le serveur : chaque action du tri rend `internal`.
  *
+ * M1e (ticket 879 ; décision 0143, qui généralise 0128, sur le modèle de B10a) : environnement valide et
+ * `DATA_ADAPTER=api`, les photos du tri (`creerPhotosApi`, `src/server/photos/api.ts` : barrière B9-TL-8, lieu lu en base, limiteur, client non
+ * branché) sont branchées sur `src/adapters/api-photos-instance.ts`. Rien n'est lu ni connecté ici. Un échec du
+ * branchement est journalisé (`voyages.action_failed`, action `branchement-photos`) sans arrêter le serveur : les cartes
+ * gardent leur emplacement « Photo du lieu ».
+ *
  * B4b (spécification B4, B4b point 1 ; décision 0097 B4-TL-5, sur le modèle de B10a) : environnement valide et
  * `PAYMENT_ADAPTER=simulated` (admis par `parseServerEnv` en `local` et `ci` seulement, avec `DATA_ADAPTER=api`,
  * `AUTH_ADAPTER=better-auth` et le webhook simulé ouvert, B4-TL-7), la composition du paiement simulé
@@ -68,6 +74,7 @@ export async function register(): Promise<void> {
       await brancherLectureApi(logEvent, errorNameOf);
       await brancherCreationApi(logEvent, errorNameOf);
       await brancherTriApi(logEvent, errorNameOf);
+      await brancherPhotosApi(logEvent, errorNameOf);
       await brancherPaiementSimule(logEvent, errorNameOf);
       await brancherPaiementStripe(logEvent, errorNameOf);
       return;
@@ -202,6 +209,24 @@ async function brancherTriApi(
   } catch (error) {
     const errorName = errorNameOf(error);
     logEvent("voyages.action_failed", { action: "branchement-tri", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
+/** Branche les photos du tri sur l'adaptateur `api` (ticket 879, M1e ; décision 0143, qui généralise 0128). */
+async function brancherPhotosApi(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { isMockAdapter, isPrototypeAdapter } = await import("@/adapters");
+    if (isMockAdapter() || isPrototypeAdapter()) return;
+    const { brancherPhotosApi: brancher } = await import("@/adapters/api-photos-instance");
+    const { creerPhotosApi, photosApiOuvertes } = await import("@/server/photos/api");
+    const photos = creerPhotosApi();
+    brancher({ photo: (lieu) => photos.photo(lieu), ouvertes: () => photosApiOuvertes() });
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-photos", ...(errorName === undefined ? {} : { errorName }) }, "error");
   }
 }
 
