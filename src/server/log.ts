@@ -107,6 +107,12 @@ export const LOG_EVENTS = [
   // le studio), une fois par passage, par l'écrivain dont l'écriture a passé la ligne en `failed`. Niveau `warn` ; champs
   // `tripId`, `organizationId`, `generationRunId` (identifiants internes) et `stopReason` (code fermé) ; aucune donnée de lieu.
   "generation.full_stuck",
+  // Décision 0136 § 2 et verdict Sécurité 0139 § 2 (M1a-2) : fin de l'étape `e` de `generateProgramme` (chaîne inversée sur
+  // `api`), une fois par passage, par l'étape seule ; niveau `info`, `warn` si l'étape lève (`errorName`). Champs : les
+  // compteurs maison de `p0.programme_written` seulement, en **liste fermée par événement** (`CHAMPS_ADMIS_PAR_EVENEMENT`) :
+  // aucun identifiant (ni `tripId`, ni `organizationId`, ni `generationRunId`), aucun verdict de vérification, nom, texte ni
+  // donnée Google.
+  "generation.programme_written",
   // B10b (spécification B10 ; décision 0119 § 1.3 points 4 et 5 ; verdict Sécurité 0120 S1 point 1 et S7) : recalcul d'un tri
   // (workflow 5). `recalcul.not_created` : ligne `batch` attendue absente après `ON CONFLICT DO NOTHING` (collision sur l'index
   // des `request_id`, ou sur l'index « une exécution en cours par voyage »), ou lecture illisible dans `completeDeck` (la
@@ -722,6 +728,36 @@ const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlyS
   ["failureCode", { evenements: new Set(["p0.step_failed", "p0.read_unavailable"]), controle: (v: unknown) => chaine(v) && CODES_ETAPE.has(v) }],
 ]);
 
+/**
+ * Liste fermée des champs **admis** par événement (verdict 0139 § 2 point 3) : pour un événement de cette table, tout champ
+ * hors de son ensemble est retiré et compté dans `dropped`, **avant** le contrôle de sa valeur. C'est l'exclusion par
+ * événement que les contrôles globaux (`CONTROLES`) ne donnent pas ; les événements absents de la table ne changent pas.
+ */
+export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  [
+    "generation.programme_written",
+    new Set([
+      "days",
+      "slots",
+      "placesToVerify",
+      "daysRemoved",
+      "slotsRemoved",
+      "fieldsRemoved",
+      "textsCut",
+      "modelCalls",
+      "unverifiedForCap",
+      "finishReason",
+      "inputTokens",
+      "outputTokens",
+      "sitesProposed",
+      "sitesChecked",
+      "sitesRemoved",
+      "sitesUnchecked",
+      "errorName",
+    ]),
+  ],
+]);
+
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);
 
 /** Nom d'une erreur (`error.name` seulement, jamais `message`, `code` ni `cause`), ou `undefined`. */
@@ -739,7 +775,12 @@ export function errorNameOf(error: unknown): string | undefined {
 export function formatLogLine(event: string, fields: object = {}, level: LogLevel = "info"): string {
   const ligne: Record<string, unknown> = { level, event: EVENEMENTS.has(event) ? event : "log.unknown_event" };
   let retires = 0;
+  const admis = CHAMPS_ADMIS_PAR_EVENEMENT.get(event);
   for (const [cle, valeur] of Object.entries(fields)) {
+    if (admis !== undefined && !admis.has(cle)) {
+      retires += 1;
+      continue;
+    }
     const propre = CHAMPS_PAR_EVENEMENT.get(cle);
     const controle =
       cle === "reason"

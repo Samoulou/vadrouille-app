@@ -286,6 +286,13 @@ describe("configuration ia: valeurs de départ", () => {
             "toursMax": 2,
           },
         },
+        "programme": {
+          "modele": "deepseek/deepseek-v4.1-flash",
+          "routage": {
+            "data_collection": "deny",
+            "zdr": true,
+          },
+        },
         "recherche": {
           "modele": "deepseek/deepseek-v4.1-flash",
           "routage": {

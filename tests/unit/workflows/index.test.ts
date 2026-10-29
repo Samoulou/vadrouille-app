@@ -49,7 +49,9 @@ describe("src/workflows/index.ts", () => {
     // Lot 4 du bout en bout (décision 0126 § 1) : le cinquième est celui de la révision d'un voyage d'essai (`p0Revision`),
     // région fra1, entrée réduite à des identifiants maison.
     expect(source).toContain("start(p0Revision, [entree], { region: REGION_WORKFLOWS })");
-    expect(source.match(/\bstart\(/g)).toHaveLength(5);
+    // M1a-2 (décision 0136 § 2) : le sixième est celui de `generateProgramme` (chaîne inversée), région fra1, même état.
+    expect(source).toContain("start(generateProgramme, [entree], { region: REGION_WORKFLOWS })");
+    expect(source.match(/\bstart\(/g)).toHaveLength(6);
   });
 
   it("getRun : statut seul, ni entrée ni sortie relue", async () => {

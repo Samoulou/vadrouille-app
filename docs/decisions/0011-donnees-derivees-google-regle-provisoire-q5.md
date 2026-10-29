@@ -16,6 +16,14 @@ Statut : proposé · Date : 2026-10-12 (réécriture de la version du 2026-10-08
 
 **§ 7 complété par 0087** (ticket #474) : une étape `l` (contrôle du logement : Text Search éventuel et fiche `details`, Google en mémoire, seul le `placeId` en sort, écrit dans `stays.place_id`) entre a et b ; les étapes a et b restent sans donnée Google.
 
+**§ 7 complété par 0136** (ticket #832, ligne écrite par M1a-2, ticket #851), pour la **chaîne inversée** de `api` seulement (`generateProgramme`, étapes `a` et `e`) ; l'ancienne chaîne garde le tableau tel quel. Ligne de l'étape `e` sous la chaîne inversée :
+
+| Étape | Type | Données Google dans l'étape | Écrit en base | Sortie sérialisée |
+|---|---|---|---|---|
+| e Programme (logements, rédaction, vérification des lieux et des sites, assemblage, publication) | appel externe (Places) pour les logements, **une** requête IA (`programme`), puis appels externes (Places) pour les lieux ; aucun appel Routes | oui, en mémoire : fiches des logements avant la requête IA (seul le `placeId` en sort, jamais dans le prompt), fiches des lieux **après** elle ; jamais dans le prompt (`entreeProgrammeDepuisBrief` n'a aucun champ pour une donnée Google) | à la fin de l'étape, **dans une seule transaction** sous la garde : version 1 (`trip_versions`, sans durée), cases `preview` (`proposals`), `stays.place_id` (`known`, `suggestedLodging`), lignes « À faire » (`checklist_items`), positions au cache (variante réelle seulement, 0081 B9-TL-9) et fin de l'exécution | `{ generationRunId, organizationId, rang }` et le code fermé d'un arrêt |
+
+L'étape `a` reste déterministe, sans donnée Google (relecture, conversion, forfait). Le programme de l'IA reste en mémoire jusqu'à la transaction de fin ; rien n'est écrit avant. **§ 1 à § 6 ne sont pas amendés.**
+
 **§ 5 amendé par 0100** (ticket #544), pour le MVP : `Day.travelMinutes` se lit « `minutesDeTrajet` avec les modes admis » (B8-TL-8, B6-PO-4) ; `Segment.estimated` et `Proposal.travelFromPrevious.estimated` sont vrais si la valeur stockée ou la relecture le dit ; une relecture de fiches en échec rend le jour sans `toConfirm` et sans erreur, l'état d'erreur et « Réessayer » restant ceux d'un échec de Routes (question 10 (b)) ; **exception** : un couple que Routes ne mesure pas, faute de position quand les fiches ont échoué, reste en erreur fermée `travel_unknown` (0100 § 4.1). **§ 6 précisé par 0100** : réécriture des positions des fiches d'une lecture au cache, par une transaction à part. **§ 1 à § 4 et § 7 ne sont pas amendés.**
 
 Numérotation : 0011 était réservé à la PR #27 depuis le découpage de B0 (Q43). La version du 2026-10-08 (« Verdicts d'ancrage et contenu admis dans l'état des workflows ») est remplacée en entier par celle-ci.

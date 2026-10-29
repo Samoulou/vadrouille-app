@@ -1,0 +1,407 @@
+{
+  "lieux": {
+    "Rione Monti (près du Colisée), Rome": {
+      "placeId": "SENTINELLE_PLACE_ID_LOGEMENT",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.89,
+        "lng": 12.49
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Antico Forno ai Serpenti": {
+      "placeId": "SENTINELLE_PLACE_ID_001",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.9,
+        "lng": 12.49
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Colisée": {
+      "placeId": "SENTINELLE_PLACE_ID_002",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.91,
+        "lng": 12.49
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Forum romain": {
+      "placeId": "SENTINELLE_PLACE_ID_003",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.92,
+        "lng": 12.49
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Ai Tre Scalini": {
+      "placeId": "SENTINELLE_PLACE_ID_004",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.93,
+        "lng": 12.49
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Trattoria Vecchia Roma": {
+      "placeId": "SENTINELLE_PLACE_ID_005",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.89,
+        "lng": 12.5
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Musées du Vatican": {
+      "placeId": "SENTINELLE_PLACE_ID_006",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.9,
+        "lng": 12.5
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Pizzarium": {
+      "placeId": "SENTINELLE_PLACE_ID_007",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.91,
+        "lng": 12.5
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Basilique Saint-Pierre": {
+      "placeId": "SENTINELLE_PLACE_ID_008",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.92,
+        "lng": 12.5
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Château Saint-Ange": {
+      "placeId": "SENTINELLE_PLACE_ID_009",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.93,
+        "lng": 12.5
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Il Sorpasso": {
+      "placeId": "SENTINELLE_PLACE_ID_010",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.89,
+        "lng": 12.51
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Settembrini": {
+      "placeId": "SENTINELLE_PLACE_ID_011",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.9,
+        "lng": 12.51
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Panthéon": {
+      "placeId": "SENTINELLE_PLACE_ID_012",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.91,
+        "lng": 12.51
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Place Navone": {
+      "placeId": "SENTINELLE_PLACE_ID_013",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.92,
+        "lng": 12.51
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Fontaine de Trevi": {
+      "placeId": "SENTINELLE_PLACE_ID_014",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.93,
+        "lng": 12.51
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Supplizio": {
+      "placeId": "SENTINELLE_PLACE_ID_015",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.89,
+        "lng": 12.52
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Place d'Espagne": {
+      "placeId": "SENTINELLE_PLACE_ID_016",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.9,
+        "lng": 12.52
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Galerie Doria Pamphilj": {
+      "placeId": "SENTINELLE_PLACE_ID_017",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.91,
+        "lng": 12.52
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Giolitti": {
+      "placeId": "SENTINELLE_PLACE_ID_018",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.92,
+        "lng": 12.52
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Bar del Fico": {
+      "placeId": "SENTINELLE_PLACE_ID_019",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.93,
+        "lng": 12.52
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Roscioli": {
+      "placeId": "SENTINELLE_PLACE_ID_020",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.89,
+        "lng": 12.53
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Palatin": {
+      "placeId": "SENTINELLE_PLACE_ID_021",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.9,
+        "lng": 12.53
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Bouche de la Vérité": {
+      "placeId": "SENTINELLE_PLACE_ID_022",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.91,
+        "lng": 12.53
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Trapizzino Trastevere": {
+      "placeId": "SENTINELLE_PLACE_ID_023",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.92,
+        "lng": 12.53
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Basilique Sainte-Marie-du-Trastevere": {
+      "placeId": "SENTINELLE_PLACE_ID_024",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.93,
+        "lng": 12.53
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Janicule": {
+      "placeId": "SENTINELLE_PLACE_ID_025",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.89,
+        "lng": 12.54
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Freni e Frizioni": {
+      "placeId": "SENTINELLE_PLACE_ID_026",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.9,
+        "lng": 12.54
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Da Enzo al 29": {
+      "placeId": "SENTINELLE_PLACE_ID_027",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.91,
+        "lng": 12.54
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Thermes de Caracalla": {
+      "placeId": "SENTINELLE_PLACE_ID_028",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.92,
+        "lng": 12.54
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Jardin des Orangers": {
+      "placeId": "SENTINELLE_PLACE_ID_029",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.93,
+        "lng": 12.54
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Felice a Testaccio": {
+      "placeId": "SENTINELLE_PLACE_ID_030",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.89,
+        "lng": 12.55
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    }
+  }
+}

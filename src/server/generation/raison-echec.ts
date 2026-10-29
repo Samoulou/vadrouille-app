@@ -101,3 +101,22 @@ export const CODES_REESSAYABLES: readonly CodeArret[] = REESSAYABLES_LITTERAUX;
 export function relancable(code: string | null): boolean {
   return echecDeCode(code).retryable;
 }
+
+/**
+ * Code de plus réessayable sous la chaîne inversée (décision 0136 § 2.6 ; critère 11 de la spécification M1a) : une sortie de
+ * l'IA illisible (`model_output_invalid`, `CODE_PROGRAMME_ILLISIBLE` de `p0Run`) se relance par « Réessayer ». Sous l'ancienne
+ * chaîne, la liste `CODES_REESSAYABLES` (B9-PO-9) ne change pas.
+ */
+export const CODES_REESSAYABLES_CHAINE_INVERSEE: readonly CodeArret[] = [...CODES_REESSAYABLES, "model_output_invalid"];
+
+/** Échec d'une exécution `failed` selon la chaîne de l'aperçu (`retryable` de `getGenerationStatus`, 0136 § 2.6 et § 4.3). */
+export function echecSelonChaine(code: string | null, chaine: "inversee" | "ancienne"): Echec {
+  const echec = echecDeCode(code);
+  if (chaine === "inversee" && code !== null && CODES_REESSAYABLES_CHAINE_INVERSEE.includes(code as CodeArret)) return { reason: echec.reason, retryable: true };
+  return echec;
+}
+
+/** Vrai si l'exécution `failed` de ce code peut être relancée par la personne, selon la chaîne (`retryGeneration`). */
+export function relancableSelonChaine(code: string | null, chaine: "inversee" | "ancienne"): boolean {
+  return echecSelonChaine(code, chaine).retryable;
+}

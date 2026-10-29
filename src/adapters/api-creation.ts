@@ -25,7 +25,8 @@ function sortie<T>(schema: { safeParse(valeur: unknown): { success: true; data: 
   return valide.success ? ok(valide.data) : fail("provider_error");
 }
 
-export function createApiCreationAdapter(options: OptionsAdaptateurCreationApi = {}): CreationAdapter {
+/** `options` absent (branchement de `instrumentation.ts`) : la composition de l'app, dont la chaîne de l'aperçu (0136 § 4.2). */
+export function createApiCreationAdapter(options?: OptionsAdaptateurCreationApi): CreationAdapter {
   const cas = creerCasCreation(options);
   return {
     structureBrief: nonLivre("structureBrief", "B9a"),
