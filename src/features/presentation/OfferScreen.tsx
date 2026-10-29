@@ -44,6 +44,8 @@ export interface OfferScreenProps {
   /** Voyage non débloqué : offre lue par l'adaptateur de paiement ; débloqué : `null` (F9-PO-9). */
   offer: (Offer & { start: string; end: string }) | null;
   failure?: OfferFailure | null;
+  /** Voyage débloqué : adresse du reçu de la personne (`R9-recu`, B4d), ou `null` sans reçu (aucun lien). */
+  receiptHref?: string | null;
   /** Mention permanente de simulation (adaptateur de paiement simulé). */
   simulated?: boolean;
   recorderKind?: RecorderKind;
@@ -118,6 +120,7 @@ function OfferContent({
   programmeHref,
   offer,
   failure = null,
+  receiptHref = null,
   simulated = false,
   start = startCheckout,
 }: Omit<OfferScreenProps, "recorder" | "recorderKind">) {
@@ -186,6 +189,11 @@ function OfferContent({
           <Button asChild className="w-full">
             <Link href={programmeHref}>{t.offre.voirProgramme}</Link>
           </Button>
+          {receiptHref ? (
+            <Button asChild variant="text" className="self-center">
+              <Link href={receiptHref}>{t.offre.voirRecu}</Link>
+            </Button>
+          ) : null}
         </div>
       </main>
     );

@@ -30,5 +30,9 @@ export function createSimulatedPaymentAdapter(options: OptionsPaiementSimule): P
     getCheckoutStatus: (ctx, checkoutId) => cas.getCheckoutStatus(ctx, checkoutId),
     getEntitlement: (ctx, tripId) => cas.getEntitlement(ctx, tripId),
     simulateOutcome: (ctx, checkoutId, outcome) => cas.simulateOutcome(ctx, checkoutId, outcome, options.prestataire),
+    // Reçu maison marqué « simulé » (B4d) : seul cet adaptateur l'expose ; l'adaptateur `stripe` attend la colonne du
+    // lien du reçu de Stripe (migration décrite dans la PR de B4d).
+    getReceipt: (ctx, tripId) => cas.getReceipt(ctx, tripId),
+    listReceipts: (ctx) => cas.listReceipts(ctx),
   };
 }
