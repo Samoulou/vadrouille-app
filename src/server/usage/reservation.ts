@@ -70,7 +70,7 @@ export const CLE_VERROU_USAGE = 0x5e1f0003;
  * Profils d'un forfait de génération (B7-PO-5) et de relecture (B8-TL-4, décision 0100 § 1.3) : `relecture` (un jour, une
  * présentation) et `relectureVoyage` (le voyage), choisis par la **portée** de la lecture, jamais par un contenu.
  */
-export const PROFILS_FORFAIT = ["apercu", "complet", "mini", "lot", "relecture", "relectureVoyage"] as const;
+export const PROFILS_FORFAIT = ["apercu", "complet", "mini", "lot", "programme", "relecture", "relectureVoyage"] as const;
 export type ProfilForfait = (typeof PROFILS_FORFAIT)[number];
 
 /** Actions sans compte (écrans 2 et 3 ; B7-TL-10). */

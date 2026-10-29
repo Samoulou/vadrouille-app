@@ -39,7 +39,21 @@ export type ExecutionOuverte = { readonly tripId: string; readonly requestId: st
 
 /** Commence l'étape : `null` si la garde la refuse (rien n'a été écrit). */
 export async function commencerEtape(executeur: ExecuteurGarde, organizationId: string, generationRunId: string, etape: EtapeApercu, instant: Date): Promise<ExecutionOuverte | null> {
-  const rang = RANG_ETAPE[etape];
+  return commencerEtapeAuRang(executeur, organizationId, generationRunId, etape, RANG_ETAPE[etape], instant);
+}
+
+/**
+ * Variante « au rang » de l'aperçu (décision 0136 § 2.2, `generateProgramme` : `a` = 1, `e` = 2, `RANG_PROGRAMME`) : même
+ * garde `step_seq` sur la ligne `preview`, rang passé par l'appelant, exception de rejeu de `a` inchangée.
+ */
+export async function commencerEtapeAuRang(
+  executeur: ExecuteurGarde,
+  organizationId: string,
+  generationRunId: string,
+  etape: EtapeApercu,
+  rang: number,
+  instant: Date,
+): Promise<ExecutionOuverte | null> {
   const { rows } = await executeur.query(etape === "a" ? SQL_DEBUT_A : SQL_DEBUT, [organizationId, generationRunId, etape, rang, instant.toISOString()]);
   const ligne = rows[0];
   if (ligne === undefined) return null;
@@ -69,7 +83,12 @@ const SQL_ECHEC = `UPDATE public.generation_runs SET phase = 'failed', stop_reas
 
 /** Clôt l'exécution en `failed` sur un code fermé, si elle est toujours à cette étape ; rien de la version n'est écrit. */
 export async function cloreEnEchec(executeur: ExecuteurGarde, organizationId: string, generationRunId: string, etape: EtapeApercu, code: CodeArret | string, instant: Date): Promise<boolean> {
-  const { rows } = await executeur.query(SQL_ECHEC, [organizationId, generationRunId, RANG_ETAPE[etape], codeFerme(code), instant.toISOString()]);
+  return cloreEnEchecAuRang(executeur, organizationId, generationRunId, RANG_ETAPE[etape], code, instant);
+}
+
+/** Variante « au rang » de `cloreEnEchec` (même écriture conditionnelle, rang passé par l'appelant ; 0136 § 2.2). */
+export async function cloreEnEchecAuRang(executeur: ExecuteurGarde, organizationId: string, generationRunId: string, rang: number, code: CodeArret | string, instant: Date): Promise<boolean> {
+  const { rows } = await executeur.query(SQL_ECHEC, [organizationId, generationRunId, rang, codeFerme(code), instant.toISOString()]);
   return rows.length > 0;
 }
 

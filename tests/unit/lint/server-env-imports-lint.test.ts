@@ -56,6 +56,10 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     // B9c (décision 0081 B9-TL-8) : déclarations de la barrière des appels réels, importées par la barrière seule.
     ["src/server/generation/barriere.ts", "@/server/env/generation"],
     ["src/server/env/generation.test.ts", "./generation"],
+    // B3d (M2a ; décision 0138 § 9, ligne 7) : clé de Resend, importée par l'implémentation Resend seule.
+    ["src/server/mail/resend.ts", "@/server/env/cle-resend"],
+    ["src/server/env/cle-resend.test.ts", "./cle-resend"],
+    ["src/server/env/cle-resend.ts", "@/server/env/index"],
   ];
   it.each(ADMIS)("%s peut importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(0);
@@ -95,6 +99,12 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/rate-limit.ts", "@/server/env/resolve"],
     ["src/instrumentation.ts", "@/server/env/payment"],
     ["src/server/actions/paiement.ts", "@/server/env/payment"],
+    // B3d (M2a) : `cle-resend` hors de l'implémentation Resend (autre module d'envoi, connexion, tests hors de src/server/env/).
+    ["src/server/mail/smtp.ts", "@/server/env/cle-resend"],
+    ["src/server/mail/plafond.ts", "./../env/cle-resend"],
+    ["src/server/auth/index.ts", "@/server/env/cle-resend"],
+    ["src/server/mail/resend.test.ts", "@/server/env/cle-resend"],
+    ["tests/unit/server/mail-resend.test.ts", "@/server/env/cle-resend"],
     // B4a : l'entrée `payment` n'admet plus les dossiers entiers (0097 B4-TL-3 point 5 (e)).
     ["src/server/routes/exemple.ts", "@/server/env/payment"],
     ["src/server/payment/exemple.ts", "@/server/env/payment"],

@@ -10,7 +10,8 @@ import { executeurSql } from "@/server/with-org";
 import type { CaseApercu } from "./cases";
 import { ArretEtape } from "./codes";
 import type { DependancesResolues } from "./dependances";
-import { gardeOuverte } from "./garde";
+import type { CaseProgramme } from "./cases-programme";
+import { gardeOuverteAuRang } from "./garde";
 
 /**
  * Publication de l'aperçu, **une seule transaction** (décision 0081 B9-TL-3 points 4 et 6 ; B9-TL-10 ; spécification B9c
@@ -31,10 +32,16 @@ import { gardeOuverte } from "./garde";
 
 export type DonneesPublication = {
   readonly instantane: TripSnapshot;
-  readonly cases: readonly CaseApercu[];
+  readonly cases: readonly (CaseApercu | CaseProgramme)[];
   readonly statut: "ready" | "incomplete";
   /** Écriture des positions de la version dans la transaction de publication ; absente : aucune écriture (suspendue, non autorisée, simulée). */
   readonly ecrirePositions?: (executeur: ExecuteurPublication) => Promise<ResultatEcriturePositions>;
+  /**
+   * Écritures de plus de la chaîne inversée (décision 0136 § 3 points 2 et 3 ; verdict 0139 § 3 point 1) : `stays.place_id` et
+   * lignes « À faire », **dans la même transaction**, après la version et les cases et avant la fin de l'exécution ; rejouées
+   * avec elle. Absentes : l'ancienne chaîne, inchangée.
+   */
+  readonly ecrireDePlus?: (executeur: ExecuteurPublication) => Promise<void>;
 };
 
 export type ContextePublication = {
@@ -43,6 +50,11 @@ export type ContextePublication = {
   readonly tripId: string;
   readonly requestId: string | null;
   readonly echeance: number;
+  /**
+   * Rang `step_seq` de l'étape qui publie (décision 0136 § 2.2) : `RANG_ETAPE.e` (6) par défaut, l'aperçu de l'ancienne
+   * chaîne ; `RANG_PROGRAMME.e` (2) pour `generateProgramme`.
+   */
+  readonly rang?: number;
 };
 
 const SQL_PHASE = `SELECT phase, last_version FROM public.generation_runs WHERE organization_id = $1 AND id = $2`;
@@ -53,6 +65,7 @@ const SQL_FIN = `UPDATE public.generation_runs SET phase = $4, stop_reason = NUL
 
 export async function publier(dependances: DependancesResolues, contexte: ContextePublication, donnees: DonneesPublication): Promise<{ readonly version: number; readonly dejaPubliee: boolean }> {
   const { organizationId, generationRunId, tripId } = contexte;
+  const rang = contexte.rang ?? RANG_ETAPE.e;
   if (contexte.requestId === null) throw new ArretEtape("invalid_input");
   const requestId = contexte.requestId;
   for (let tentative = 1; tentative <= TENTATIVES_PUBLICATION; tentative += 1) {
@@ -60,7 +73,7 @@ export async function publier(dependances: DependancesResolues, contexte: Contex
       return await dependances.transaction(organizationId, async (tx) => {
         const x = executeurSql(tx);
         const instant = new Date(dependances.maintenant());
-        if (!(await gardeOuverte(x, organizationId, generationRunId, "e", instant))) {
+        if (!(await gardeOuverteAuRang(x, organizationId, generationRunId, rang, instant))) {
           const ligne = (await x.query(SQL_PHASE, [organizationId, generationRunId])).rows[0];
           if (ligne !== undefined && (ligne.phase === "ready" || ligne.phase === "incomplete")) {
             const derniere = Number(ligne.last_version);
@@ -92,7 +105,8 @@ export async function publier(dependances: DependancesResolues, contexte: Contex
             throw new ArretEtape("upstream_error");
           }
         }
-        const fin = await x.query(SQL_FIN, [organizationId, generationRunId, RANG_ETAPE.e, donnees.statut, ecrite.version, instant.toISOString()]);
+        if (donnees.ecrireDePlus !== undefined) await donnees.ecrireDePlus(x);
+        const fin = await x.query(SQL_FIN, [organizationId, generationRunId, rang, donnees.statut, ecrite.version, instant.toISOString()]);
         if (fin.rows.length === 0) throw new ArretEtape("step_expired");
         return { version: ecrite.version, dejaPubliee: false };
       });

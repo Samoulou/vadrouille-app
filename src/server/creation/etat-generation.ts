@@ -3,7 +3,7 @@ import "server-only";
 import type { AdapterContext } from "@/adapters/types";
 import { GenerationStatusSchema, fail, ok, type GenerationStatus, type Result } from "@/contracts";
 import { CASES_APERCU, JOURS_APERCU } from "@/server/config/generation";
-import { echecDeCode } from "@/server/generation/raison-echec";
+import { echecSelonChaine } from "@/server/generation/raison-echec";
 import { reconcilierVoyageComplet } from "@/server/generation/reconciliation";
 
 import { contexteValide, executeurSql, identifiantVoyage, transactionDeSession, type Outils } from "./commun";
@@ -16,7 +16,8 @@ import { contexteValide, executeurSql, identifiantVoyage, transactionDeSession, 
  *    l'expiration des exécutions figées du voyage (`expirerExecutions`, horloge injectée) et écrit `generation.full_stuck`
  *    pour une ligne `full` expirée et bloquée ; elle ne relance jamais une ligne `failed` ;
  * 3. dernière exécution `preview` ou `full` du voyage : `queued` et `preparing` → `preparing` ; `ready`, `incomplete` ;
- *    `failed` → `failed` avec la raison et `retryable` de `echecDeCode` ;
+ *    `failed` → `failed` avec la raison et `retryable` de `echecSelonChaine` (`echecDeCode`, plus `model_output_invalid`
+ *    réessayable sous la chaîne inversée, décision 0136 § 2.6) ;
  * 4. propositions prêtes par jour de l'aperçu (cases `proposal` de la dernière exécution `preview`, J1 et J2), qui ne
  *    changent qu'à la publication (étape e, B9-PO-12).
  * Ne lit que `phase`, `stop_reason` et des comptes : aucun nom de lieu, `placeId`, `step` ni `step_seq` ne sort. Sortie
@@ -70,7 +71,7 @@ export async function lireEtatGeneration(o: Outils, ctx: AdapterContext | null |
         case "incomplete":
           return { type: "etat", etat: { phase: derniere.phase, ...champs } };
         case "failed": {
-          const echec = echecDeCode(typeof derniere.stop_reason === "string" ? derniere.stop_reason : null);
+          const echec = echecSelonChaine(typeof derniere.stop_reason === "string" ? derniere.stop_reason : null, o.chaine());
           return { type: "etat", etat: { phase: "failed", ...champs, reason: echec.reason, retryable: echec.retryable } };
         }
         default:

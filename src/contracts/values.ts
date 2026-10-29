@@ -181,6 +181,15 @@ export type SharedException = (typeof SHARED_EXCEPTIONS)[number];
 export const SHARE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 /**
+ * Jeton de partage **signé, sans stockage** (décision 0135, partage d'un voyage réel du site d'essai) :
+ * `v1.<charge>.<mac>`, `charge` = base64url sans remplissage de `voyage~organisation~dernier jour` (14 à 140 octets :
+ * deux identifiants de 1 à 64 caractères, deux séparateurs, une date ISO ; soit 19 à 187 caractères), `mac` =
+ * HMAC-SHA-256 en base64url (43 caractères) : 234 caractères au plus. Seconde forme lue par `parseShareToken` ; la forme
+ * et la signature sont vérifiées par `src/adapters/share-signed-token.ts`, jamais par le navigateur.
+ */
+export const SIGNED_SHARE_TOKEN_PATTERN = /^v1\.[A-Za-z0-9_-]{19,187}\.[A-Za-z0-9_-]{43}$/;
+
+/**
  * Codes d'erreur des actions serveur (format commun de 0017 § 4, `snake_case`). F9a a créé les trois
  * premiers ; F8a ajoute ceux de `structureBrief` (0017 § 4) ; F8b, F8c et B6 l'étendent sans renommer.
  */
@@ -208,6 +217,9 @@ export const API_ERROR_CODES = [
   // B10a (décision 0112 § 1.6 ; B10-PO-14) : écriture du tri refusée pendant un recalcul du voyage, `retryable` vrai ;
   // état `generating` du handover § 4. Ajouté à la fin, sans renommer ni réordonner.
   "generation_in_progress",
+  // B3d (spécification B3d, point 4 ; décision 0138 T4) : plafond global des e-mails du jour atteint, ou quota du
+  // fournisseur ; `retryable` faux (la personne réessaie demain). Ajouté à la fin, sans renommer ni réordonner.
+  "email_cap_reached",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 

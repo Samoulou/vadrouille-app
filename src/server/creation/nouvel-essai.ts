@@ -4,7 +4,9 @@ import type { AdapterContext } from "@/adapters/types";
 import { fail, ok, type CreatedTrip, type Result } from "@/contracts";
 import { RetryGenerationRequestSchema } from "@/contracts/creation";
 import { MAX_REPRISES_PERSONNE } from "@/server/config/generation";
-import { CODES_REESSAYABLES, relancable } from "@/server/generation/raison-echec";
+import { lireVoyage } from "@/server/generation/lecture";
+import { CODES_REESSAYABLES, relancableSelonChaine } from "@/server/generation/raison-echec";
+import { briefDepuisFormulaire } from "@/server/programme/brief";
 import { demarrerReclamee } from "@/server/generation/reconciliation";
 import { reprendreVoyageComplet } from "@/server/generation/reprise";
 import { lireDroitVoyage } from "@/server/payment/paiements";
@@ -27,7 +29,9 @@ import {
  * voyage d'une autre organisation ou inconnu → `not_found` ; `requestId` de `createTrip` → `validation_failed` (ce
  * n'est pas un essai) ; même `requestId` qu'un essai de ce voyage → le même `{ tripId }`
  * sans écriture (idempotence par `generation_runs.request_id`) ; sinon la dernière exécution `preview` du voyage doit
- * être `failed` et réessayable (`relancable`), sinon `validation_failed` ; une autre génération `preview` de
+ * être `failed` et réessayable (`relancableSelonChaine` : `model_output_invalid` de plus sous la chaîne inversée, 0136 § 2.6 ;
+ * sous elle aussi, la conversion du site d'essai est refaite sur le voyage relu, refus `validation_failed` sur son champ,
+ * § 3.8), sinon `validation_failed` ; une autre génération `preview` de
  * l'organisation en cours → `active_preview_exists` ; sinon une **nouvelle** exécution `preview` `queued` du même
  * voyage (jamais un second voyage), puis démarrage du workflow 1 après validation. Cette nouvelle exécution reprend, à son
  * étape `b`, les recherches et les candidats des essais précédents du voyage, ré-ancrés à l'étape `c`, au lieu de chercher à
@@ -96,6 +100,7 @@ type Issue =
   | { readonly type: "rien" }
   | { readonly type: "existant" }
   | { readonly type: "actif"; readonly tripId: string }
+  | { readonly type: "refuse"; readonly champ: string | undefined }
   | { readonly type: "cree"; readonly generationRunId: string };
 
 export async function relancerGeneration(o: Outils, ctx: AdapterContext | null | undefined, entree: unknown): Promise<Result<CreatedTrip>> {
@@ -120,7 +125,14 @@ export async function relancerGeneration(o: Outils, ctx: AdapterContext | null |
       const derniere = (await sql.query(SQL_DERNIERE, [org, tripId])).rows[0];
       if (derniere === undefined || derniere.phase !== "failed") return { type: "rien" };
       const code = typeof derniere.stop_reason === "string" ? derniere.stop_reason : null;
-      if (!relancable(code)) return { type: "rien" };
+      // Codes réessayables choisis par la chaîne (0136 § 2.6) : `model_output_invalid` de plus sous la chaîne inversée.
+      if (!relancableSelonChaine(code, o.chaine())) return { type: "rien" };
+      // Chaîne inversée (0136 § 3.8) : la conversion est refaite avant toute écriture, sur le voyage relu.
+      if (o.chaine() === "inversee") {
+        const lu = await lireVoyage(sql, org, tripId);
+        const conversion = lu === null ? null : briefDepuisFormulaire(lu.draft, lu.brief, undefined);
+        if (conversion === null || !conversion.ok) return { type: "refuse", champ: conversion === null ? undefined : conversion.champ };
+      }
       const actif = (await sql.query(SQL_APERCU_ACTIF, [org])).rows[0];
       if (actif !== undefined) return { type: "actif", tripId: String(actif.trip_id) };
       const execution = (await sql.query(SQL_NOUVELLE_EXECUTION, [org, tripId, requestId, new Date(o.maintenant()).toISOString()])).rows[0];
@@ -136,6 +148,8 @@ export async function relancerGeneration(o: Outils, ctx: AdapterContext | null |
       return fail("not_found");
     case "rien":
       return fail("validation_failed");
+    case "refuse":
+      return fail("validation_failed", issue.champ);
     case "actif":
       return { ok: false, error: { code: "active_preview_exists", activeTripId: issue.tripId } };
     case "cree":

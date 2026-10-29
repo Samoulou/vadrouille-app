@@ -1,9 +1,16 @@
 // @vitest-environment node
 import { randomBytes } from "node:crypto";
+import { readFileSync, realpathSync } from "node:fs";
+import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PaireRelecture } from "@/adapters/prototype";
+import { createPrototypeAdapterReel, type PaireRelecture, type SourceProgrammesReels } from "@/adapters/prototype";
+import { segmentLabel } from "@/components/ligne/DayLine";
+import { TripSchema } from "@/contracts";
+import { daySummary, dayTravelLine } from "@/features/sejour/travel";
+import { ErreurClientGoogle } from "@/grounding/enveloppe-google";
+import { cleTrajet, pairesDistinctes, pairesDuProgramme, ProgrammeReduitSchema, PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { valeurCookieAcces } from "@/server/p0/acces";
 import { creerCadence, ErreurBudgetRoutes } from "@/grounding/budget-routes";
 import type { PointRoutes } from "@/grounding/interfaces";
@@ -372,5 +379,103 @@ describe("p0: relecture, cas limites (mineurs 1 et 2 de la revue du head e79fbed
     expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "unavailable" });
     expect(base.connect).not.toHaveBeenCalled();
     expect(fabrique).not.toHaveBeenCalled();
+  });
+});
+
+describe("p0: Google indisponible à la lecture (ticket n° 826, décision 0137)", () => {
+  const TRIP_ID = "proto_test_20261012_1";
+  const ctx = { organizationId: PROTOTYPE_ORG_ID, userId: "user_test", role: "owner" as const };
+  const DOSSIER = realpathSync(join(process.cwd(), "prototype", "programmes-test"));
+  const programme = ProgrammeReduitSchema.parse(JSON.parse(readFileSync(join(DOSSIER, `${TRIP_ID}.json`), "utf8")));
+
+  /** Client Routes qui refuse chaque requête comme Google le 2026-10-28 (429, `upstream_rate_limited`). */
+  function routesRefusees(code: "upstream_rate_limited" | "upstream_unavailable" | "upstream_timeout" = "upstream_rate_limited") {
+    const requetes: { origines: readonly PointRoutes[]; destinations: readonly PointRoutes[]; mode: string }[] = [];
+    const client: ClientMatrice = {
+      async matrice(requete) {
+        requetes.push(requete);
+        throw new ErreurClientGoogle(code, code === "upstream_rate_limited" ? 429 : undefined);
+      },
+    };
+    return { client, requetes };
+  }
+
+  it.each(["upstream_rate_limited", "upstream_unavailable", "upstream_timeout"] as const)(
+    "%s : refus `unavailable`, journal avec le nom et le code fermé de l'erreur, jamais un lieu ni un message",
+    async (code) => {
+      const { relecteur: r } = relecteur({ pool: () => poolSimule().pool }, routesRefusees(code));
+      expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "unavailable" });
+      // Appel exact et unique : ni statut HTTP, ni message, ni lieu, aucun autre champ.
+      expect(logEvent.mock.calls).toEqual([["p0.read_unavailable", { errorName: "ErreurClientGoogle", failureCode: code }, "warn"]]);
+    },
+  );
+
+  it("ligne du journal : `failureCode` admis sur `p0.read_unavailable`, aucun champ retiré ; une autre erreur n'a pas de code", async () => {
+    const { formatLogLine } = await vi.importActual<typeof import("@/server/log")>("@/server/log");
+    expect(JSON.parse(formatLogLine("p0.read_unavailable", { errorName: "ErreurClientGoogle", failureCode: "upstream_rate_limited" }, "warn"))).toEqual({
+      level: "warn",
+      event: "p0.read_unavailable",
+      errorName: "ErreurClientGoogle",
+      failureCode: "upstream_rate_limited",
+    });
+    const autre = Object.assign(new Error("secret"), { name: "ErreurInterne", code: "upstream_rate_limited" });
+    const { relecteur: r } = relecteur({ pool: () => poolSimule().pool }, { client: { matrice: async () => Promise.reject(autre) }, requetes: [] });
+    expect(await r.relireJournee(PAIRES)).toEqual({ ok: false, raison: "unavailable" });
+    expect(logEvent).toHaveBeenCalledWith("p0.read_unavailable", { errorName: "ErreurInterne" }, "warn");
+  });
+
+  it("décision 0137 § 2 : `failureCode` admis sur `p0.read_unavailable` et `p0.step_failed` seulement, retiré ailleurs", async () => {
+    const { formatLogLine } = await vi.importActual<typeof import("@/server/log")>("@/server/log");
+    const ligne = (evenement: string) => JSON.parse(formatLogLine(evenement, { errorName: "ErreurClientGoogle", failureCode: "upstream_rate_limited" }, "warn")) as unknown;
+    expect(ligne("p0.step_failed")).toEqual({ level: "warn", event: "p0.step_failed", errorName: "ErreurClientGoogle", failureCode: "upstream_rate_limited" });
+    for (const evenement of ["p0.programme_written", "p0.ville_refusee", "p0.research_done", "voyages.action_failed"]) {
+      expect(ligne(evenement)).toEqual({ level: "warn", event: evenement, errorName: "ErreurClientGoogle", dropped: 1 });
+    }
+  });
+
+  it("voyage existant : séjour, journées et carte servis avec ce qui est en base ; durées non conservées absentes, rien d'écrit", async () => {
+    const paires = pairesDistinctes(pairesDuProgramme(programme));
+    expect(paires.length).toBeGreaterThan(1);
+    // Une paire conservée (temps écrit par `p0Run`) : gardée ; toutes les autres seraient relues, Google refuse.
+    const conservee = paires[0]!;
+    const trajets = new Map([[cleTrajet(conservee), 7]]);
+    const conserver = vi.fn(async () => undefined);
+    const source: SourceProgrammesReels = {
+      lister: async () => [{ programme, trajets, conserver }],
+      lire: async (id) => (id === TRIP_ID ? { programme, trajets, conserver } : null),
+    };
+    const routes = routesRefusees();
+    const { relecteur: r } = relecteur({ pool: () => poolSimule().pool }, routes);
+    const adapter = createPrototypeAdapterReel({ programmes: source, relecteurs: { trajets: r } });
+
+    const trip = await adapter.getTrip(ctx, TRIP_ID);
+    expect(trip).not.toBeNull();
+    // Une relecture par journée qui a des paires manquantes, chacune refusée et journalisée une fois : d'où plusieurs
+    // lignes `p0.read_unavailable` par page dans le journal du 2026-10-28, sans page d'erreur.
+    expect(logEvent.mock.calls.length).toBeGreaterThan(1);
+    expect(logEvent.mock.calls.every(([evenement, champs]) => evenement === "p0.read_unavailable" && JSON.stringify(champs) === JSON.stringify({ errorName: "ErreurClientGoogle", failureCode: "upstream_rate_limited" }))).toBe(true);
+    expect(TripSchema.safeParse(trip).success).toBe(true);
+    expect(trip!.days).toHaveLength(programme.trip.days.length);
+    const segments = trip!.days.flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "segment" ? [ligne.segment] : [])));
+    expect(segments.length).toBeGreaterThan(1);
+    // Jamais une durée inventée : la durée conservée (7 min) ou aucune.
+    expect(segments.every((segment) => segment.minutes === null || segment.minutes === 7)).toBe(true);
+    expect(segments.some((segment) => segment.minutes === null)).toBe(true);
+    expect(routes.requetes.length).toBeGreaterThan(0);
+
+    const jour = await adapter.getDay(ctx, TRIP_ID, programme.trip.days[0]!.index);
+    expect(jour).not.toBeNull();
+    expect(jour!.travelMinutes).toBeNull();
+    // Ce que voit la personne : la journée, avec « à confirmer » à la place des durées manquantes (décision 0095).
+    expect(dayTravelLine(jour!)).toMatch(/^Temps de trajet à confirmer/);
+    expect(daySummary(jour!)).toMatch(/temps de trajet à confirmer$/);
+    const sansDuree = jour!.items.find((ligne) => ligne.type === "segment" && ligne.segment.minutes === null);
+    expect(sansDuree?.type === "segment" ? segmentLabel(sansDuree.segment) : null).toMatch(/, durée à confirmer$/);
+    // Positions lues en base (aucun appel Google) : la carte reste servie, carte Google seulement.
+    const carte = await adapter.getDayMap(ctx, TRIP_ID, programme.trip.days[0]!.index);
+    expect(carte?.points.length).toBeGreaterThan(0);
+    expect((await adapter.listTrips(ctx)).map((resume) => resume.id)).toEqual([TRIP_ID]);
+    // Rien n'est conservé après une relecture refusée (0109) : aucune durée fausse écrite.
+    expect(conserver).not.toHaveBeenCalled();
   });
 });

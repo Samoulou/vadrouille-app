@@ -1,4 +1,4 @@
-import type { Category, Commitment, MobilityMode, Pace, StopKind } from "@/contracts";
+import type { Category, MobilityMode, Pace, StopKind } from "@/contracts";
 import type { Brief, Rythme } from "@/prototype/brief";
 import type { Candidat } from "@/prototype/candidat";
 
@@ -188,49 +188,8 @@ export function lieuRetenuDepuisCandidat(candidat: Candidat): LieuRetenuP0 {
   };
 }
 
-/** Forme d'`EntreeProgramme` (`src/ai/entrees.ts`) : toutes les saisies du brief de P0 (décision 0115 § 2). */
-export type EntreeProgrammeP0 = {
-  destination: string;
-  pays: string;
-  arrivee: string;
-  depart: string;
-  heureArrivee: string;
-  heureDepart: string;
-  voyageurs: { adultes: number; enfants: number };
-  rythme: Rythme;
-  envies: Category[];
-  aEviter?: Category[];
-  deplacements: MobilityMode[];
-  budgetRepas?: 1 | 2 | 3;
-  logements: { texte: string; nuits: number }[];
-  engagements?: { libelle: string; date: string; heure: string; type: Commitment }[];
-  recit?: string;
-};
-
 /**
- * Entrée du prompt `programme` depuis le brief de P0 (décision 0115 § 2 ; décision de Samuel du 2026-10-21 : l'IA reçoit
- * **toutes** les saisies du questionnaire, récit et logement compris, **jamais une donnée Google**). Copie champ par
- * champ : ni fuseau (aucun usage par le modèle), ni `schema`. Les catégories « à éviter » (`aEviter`, lot 5 de
- * E2E-essai) sont recopiées quand la personne en a saisi, absentes sinon. Seul chemin de construction, pour `p0Run`.
+ * Entrée du prompt `programme` (décision 0115 § 2) : déplacée dans `src/server/programme/entree.ts` par M1a-1 (décision
+ * 0136 § 1.1), réexportée ici sans changement d'import pour `p0Run`, `pnpm p0` et les tests du prototype.
  */
-export function entreeProgrammeDepuisBrief(brief: Brief): EntreeProgrammeP0 {
-  return {
-    destination: brief.destination,
-    pays: brief.pays,
-    arrivee: brief.arrivee,
-    depart: brief.depart,
-    heureArrivee: brief.heureArrivee,
-    heureDepart: brief.heureDepart,
-    voyageurs: { adultes: brief.voyageurs.adultes, enfants: brief.voyageurs.enfants },
-    rythme: brief.rythme,
-    envies: [...brief.envies],
-    ...(brief.aEviter === undefined ? {} : { aEviter: [...brief.aEviter] }),
-    deplacements: [...brief.deplacements],
-    ...(brief.budgetRepas === undefined ? {} : { budgetRepas: brief.budgetRepas }),
-    logements: brief.logements.map((logement) => ({ texte: logement.texte, nuits: logement.nuits })),
-    ...(brief.engagements === undefined
-      ? {}
-      : { engagements: brief.engagements.map((engagement) => ({ libelle: engagement.libelle, date: engagement.date, heure: engagement.heure, type: engagement.type })) }),
-    ...(brief.recit === undefined ? {} : { recit: brief.recit }),
-  };
-}
+export { entreeProgrammeDepuisBrief, type EntreeProgramme as EntreeProgrammeP0 } from "@/server/programme/entree";

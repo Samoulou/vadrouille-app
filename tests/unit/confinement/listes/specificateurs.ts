@@ -378,6 +378,15 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) du module étroit du webhook simulé (B4a, ticket 531 ; décision 0097 B4-TL-3), zone " +
       "sensible, exigé par `ligne/require-server-only` ; verdict Sécurité : approuvé, revue du head d50acfa (PR 582)",
   },
+  // B3d (M2a ; décision 0138 § 2.4) : ligne au-delà de 0138 § 9, relevée par `pnpm test` ; verdict : approuvé par la Sécurité sur le head 68d6e69.
+  {
+    fichier: "src/server/env/cle-resend.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du module étroit de la clé de Resend (B3d, M2a ; décision 0138 § 2.4 et § 4), zone " +
+      "sensible, exigé par `ligne/require-server-only` ; ligne non listée par 0138 § 9 : verdict : approuvé par la Sécurité sur le head 68d6e69",
+  },
   {
     fichier: "src/adapters/prototype-ecriture.ts",
     specificateur: "server-only",
@@ -502,6 +511,12 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     noms: ["effet"],
     motif: "marqueur `server-only` (sans capacité) du workflow 5 `batchRecompute`, exigé par `ligne/require-server-only` ; B10b-serveur, ticket 662, décision 0119 § 1.8 ; verdict Sécurité 0120 S9 point 1",
   },
+  {
+    fichier: "src/workflows/programme.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif: "marqueur `server-only` (sans capacité) du workflow `generateProgramme` (chaîne inversée), exigé par `ligne/require-server-only` ; M1a-2, ticket 851, décision 0136 § 2.1 ; admis par le verdict Sécurité de la revue du head 3536d13 de la PR 854 (amende 0139 § 6 point 1 d'une ligne, précédent 0120 S9 point 1)",
+  },
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.
   ...["src/adapters/prototype-suivi.ts", "src/workflows/complet.ts"].map((fichier) => ({
@@ -519,6 +534,15 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     motif:
       "marqueur `server-only` (sans capacité) de la source des programmes réels (lecture seule de `prototype.programmes`, " +
       "pool et barrière injectés) ; ticket 403, décision 0074 ; verdict Sécurité : demandé sur le head de la correction 1 de la PR 406",
+  },
+  // B3d (M2a ; spécification B3d, R9) : ligne au-delà de 0138 § 9, relevée par `pnpm test` ; verdict : approuvé par la Sécurité sur le head 68d6e69.
+  {
+    fichier: "src/server/mail/resend.test.ts",
+    specificateur: "node:util",
+    noms: ["inspect"],
+    motif:
+      "`util.inspect(error)` exigé par le critère R9 de B3d (ni la clé sentinelle, ni l'adresse, ni le code dans `util.inspect` de " +
+      "l'erreur levée par l'implémentation Resend) ; B3d (M2a), décision 0138 § 12 ; ligne au-delà de 0138 § 9 : verdict : approuvé par la Sécurité sur le head 68d6e69",
   },
   {
     fichier: "tests/unit/server/env.test.ts",

@@ -4,9 +4,11 @@ import type { AdapterContext } from "@/adapters/types";
 import { TRIP_ID_PATTERN } from "@/contracts/values";
 import { executeurSql, withOrg as withOrgParDefaut, type OrgTransaction } from "@/server/with-org";
 
+import type { ChaineApercu } from "@/server/config/generation";
+import { chaineDe } from "@/server/generation/chaine";
 import type { DemarrerVoyageComplet, TransactionReconciliation } from "@/server/generation/reconciliation";
 
-import { demarrerApercuReel, demarrerVoyageCompletReel, type DemarrerApercu } from "./demarrage";
+import { demarrerApercuReel, demarrerProgrammeReel, demarrerVoyageCompletReel, type DemarrerApercu } from "./demarrage";
 
 /**
  * Dépendances et outils communs des cas d'usage de la création (spécification B9, B9b ; décision 0081 B9-TL-1 :
@@ -25,6 +27,11 @@ export interface DependancesCreation {
   readonly demarrerApercu?: DemarrerApercu;
   /** Démarrage du workflow 4 (B9d) ; `generateFullTrip` par défaut, un double sans appel dans les tests. */
   readonly demarrerVoyageComplet?: DemarrerVoyageComplet;
+  /**
+   * Chaîne de l'aperçu (décision 0136 § 4.2) : un jeu de dépendances injecté qui ne la nomme pas vaut `"ancienne"` ; sans jeu
+   * injecté (adaptateur `api` de production), `CHAINE_APERCU`, lue à chaque appel.
+   */
+  readonly chaine?: ChaineApercu;
 }
 
 export interface Outils {
@@ -32,14 +39,24 @@ export interface Outils {
   readonly maintenant: () => number;
   readonly demarrerApercu: DemarrerApercu;
   readonly demarrerVoyageComplet: DemarrerVoyageComplet;
+  /** Chaîne de l'aperçu, lue **à chaque appel** (0136 § 4.2 : aucune valeur en cache). */
+  chaine(): ChaineApercu;
 }
 
-export function outils(dependances: DependancesCreation): Outils {
+/**
+ * Outils des cas d'usage. `dependances` absent : la composition de l'app (production), qui lit `CHAINE_APERCU` à l'appel ;
+ * présent : un jeu injecté (tests), dont la chaîne vaut `"ancienne"` s'il ne la nomme pas. Le démarrage par défaut suit la
+ * chaîne (`generatePreview` ou `generateProgramme`) ; un démarrage injecté (`demarrerApercu`) sert les deux.
+ */
+export function outils(dependances?: DependancesCreation): Outils {
+  const d = dependances ?? {};
+  const chaine = () => chaineDe(dependances);
   return {
-    withOrg: dependances.withOrg ?? withOrgParDefaut,
-    maintenant: dependances.maintenant ?? Date.now,
-    demarrerApercu: dependances.demarrerApercu ?? demarrerApercuReel,
-    demarrerVoyageComplet: dependances.demarrerVoyageComplet ?? demarrerVoyageCompletReel,
+    withOrg: d.withOrg ?? withOrgParDefaut,
+    maintenant: d.maintenant ?? Date.now,
+    demarrerApercu: d.demarrerApercu ?? ((generationRunId, organizationId) => (chaine() === "inversee" ? demarrerProgrammeReel : demarrerApercuReel)(generationRunId, organizationId)),
+    demarrerVoyageComplet: d.demarrerVoyageComplet ?? demarrerVoyageCompletReel,
+    chaine,
   };
 }
 

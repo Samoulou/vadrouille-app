@@ -82,14 +82,15 @@ describe("p0: modules d'environnement étroits", () => {
 describe("p0: aucune clé dans l'environnement des tests", () => {
   it("la garde signale chaque clé de service posée, par libellé fermé, jamais par sa valeur", () => {
     expect(clesDeServicePosees({})).toEqual([]);
-    expect(clesDeServicePosees({ OPENROUTER_API_KEY: "", GOOGLE_MAPS_SERVER_KEY: "" })).toEqual([]);
+    expect(clesDeServicePosees({ OPENROUTER_API_KEY: "", GOOGLE_MAPS_SERVER_KEY: "", RESEND_API_KEY: "" })).toEqual([]);
     const posees = clesDeServicePosees({
       OPENROUTER_API_KEY: SENTINELLE,
       GOOGLE_MAPS_SERVER_KEY: SENTINELLE,
       AI_GATEWAY_API_KEY: SENTINELLE,
       VERCEL_OIDC_TOKEN: SENTINELLE,
+      RESEND_API_KEY: SENTINELLE,
     });
-    expect(posees).toEqual(["modeles", "google", "passerelle", "oidc"]);
+    expect(posees).toEqual(["modeles", "google", "passerelle", "oidc", "envoi"]);
     expect(JSON.stringify(posees)).not.toContain(SENTINELLE);
   });
 

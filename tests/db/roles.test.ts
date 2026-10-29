@@ -7,8 +7,10 @@ import { BOOTSTRAP_ROLE, BUSINESS_TABLES, closeAll, connect, type DbClient, PURG
 /**
  * Tests `rôles` et `fonctions` de la décision 0007 et de la spécification B1, amendés par la décision 0046 (P0r2 :
  * `place_coordinates`, schéma `prototype`, fonctions de coordonnées et de purge), par la décision 0060 (B8c, § 4 :
- * rôle de purge du MVP) et par B7c (migration 0010_usage_forfait : 18 rôles, `vadrouille_fn_usage`, propriétaire de
- * `usage_forfait_totals()`).
+ * rôle de purge du MVP), par B7c (migration 0010_usage_forfait : `vadrouille_fn_usage`, propriétaire de
+ * `usage_forfait_totals()`), par B3d (décision 0138 § 11, migration 0020_plafond_emails : `vadrouille_mail_counter`,
+ * rôle du plafond global des e-mails) et par M1f-D (migration 0021_compteurs_autocompletion : 20 rôles,
+ * `vadrouille_autocomplete_counter`, rôle des compteurs de la ville par autocomplétion).
  */
 
 const ROLES = {
@@ -20,6 +22,10 @@ const ROLES = {
   vadrouille_webhook: false,
   vadrouille_account_admin: false,
   vadrouille_limiter: false,
+  // B3d (décision 0138 § 11, T1) : rôle du plafond global des e-mails, pris par vadrouille_app par SET LOCAL ROLE.
+  vadrouille_mail_counter: false,
+  // M1f-D (migration 0021_compteurs_autocompletion) : rôle des compteurs de l'autocomplétion, pris par SET LOCAL ROLE.
+  vadrouille_autocomplete_counter: false,
   vadrouille_fn_share: false,
   vadrouille_fn_share_views: false,
   vadrouille_fn_checkout: false,
@@ -37,7 +43,16 @@ const ROLES = {
 /** Attribut LOGIN attendu par rôle, lu par `Map` (clé venue de la base : aucun accès calculé, spécification P0c, 2.6). */
 const LOGIN_BY_ROLE = new Map<string, boolean>(Object.entries(ROLES));
 const FN_ROLES = Object.keys(ROLES).filter((role) => role.startsWith("vadrouille_fn_"));
-const APPLICATIVE_ROLES = ["vadrouille_app", "vadrouille_auth", "vadrouille_share", "vadrouille_webhook", "vadrouille_account_admin", "vadrouille_limiter"];
+const APPLICATIVE_ROLES = [
+  "vadrouille_app",
+  "vadrouille_auth",
+  "vadrouille_share",
+  "vadrouille_webhook",
+  "vadrouille_account_admin",
+  "vadrouille_limiter",
+  "vadrouille_mail_counter",
+  "vadrouille_autocomplete_counter",
+];
 const SHARED_VIEWS = ["shared_checklist", "shared_trip", "shared_trip_version"];
 const TABLE_PRIVILEGES = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"] as const;
 
@@ -91,6 +106,11 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     billing: ["INSERT"],
   },
   vadrouille_limiter: { action_rate_limits: SIUD },
+  // B3d (migration 0020_plafond_emails ; 0138 § 11, T1) : `INSERT` et `UPDATE` par colonnes seulement (droits par
+  // colonne ci-dessous).
+  vadrouille_mail_counter: { email_daily_counts: ["SELECT", "DELETE"] },
+  // M1f-D (migration 0021_compteurs_autocompletion) : même forme que le plafond des e-mails.
+  vadrouille_autocomplete_counter: { autocomplete_daily_counts: ["SELECT", "DELETE"] },
   vadrouille_share: {},
   vadrouille_account_admin: {},
   vadrouille_fn_share: {},
@@ -141,6 +161,11 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     checklist_items: { SELECT: ["booking_url", "done", "id", "kind", "label", "moment", "organization_id", "sponsored", "stop_id", "trip_id"] },
   },
   vadrouille_fn_checkout: { checkouts: { SELECT: ["organization_id", "stripe_checkout_session_id"] } },
+  // B3d (0138 § 11, T1 ; revue de la PR 850, réponse 2) : création de la ligne du jour par sa seule colonne `day` ; mise à
+  // jour des compteurs seulement, jamais de la colonne du jour.
+  vadrouille_mail_counter: { email_daily_counts: { INSERT: ["day"], UPDATE: ["connexion", "notification"] } },
+  // M1f-D (0021) : ligne du jour par sa seule colonne `day` ; mise à jour des deux compteurs seulement.
+  vadrouille_autocomplete_counter: { autocomplete_daily_counts: { INSERT: ["day"], UPDATE: ["choix", "suggestions"] } },
   vadrouille_fn_coords: { place_coordinates: { SELECT: ["expires_at", "organization_id", "place_id"] } },
   // B7c (0010_usage_forfait) : colonnes des sommes seulement, ni id, ni trip_id, ni generation_run_id ; aucune écriture.
   vadrouille_fn_usage: {
@@ -203,7 +228,14 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
 
   it("appartenances accordées à vadrouille_app : INHERIT FALSE, SET TRUE, ADMIN FALSE, et seulement celles-là", async () => {
     const granted = (await memberships()).filter((m) => m.member === "vadrouille_app");
-    expect(granted.map((m) => m.role).sort()).toEqual(["vadrouille_account_admin", "vadrouille_limiter", "vadrouille_share", "vadrouille_webhook"]);
+    expect(granted.map((m) => m.role).sort()).toEqual([
+      "vadrouille_account_admin",
+      "vadrouille_autocomplete_counter",
+      "vadrouille_limiter",
+      "vadrouille_mail_counter",
+      "vadrouille_share",
+      "vadrouille_webhook",
+    ]);
     for (const m of granted) {
       expect(m, m.role).toMatchObject({ inherit_option: false, set_option: true, admin_option: false });
     }
@@ -211,9 +243,11 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
       `SELECT pg_catalog.has_function_privilege('vadrouille_app', 'public.purge_organization_data(uuid)', 'EXECUTE') AS purge,
               pg_catalog.has_table_privilege('vadrouille_app', 'public.entitlements', 'INSERT') AS entitlements,
               pg_catalog.has_table_privilege('vadrouille_app', 'public.billing', 'INSERT') AS billing,
-              pg_catalog.has_table_privilege('vadrouille_app', 'public.action_rate_limits', 'SELECT') AS limiter`,
+              pg_catalog.has_table_privilege('vadrouille_app', 'public.action_rate_limits', 'SELECT') AS limiter,
+              pg_catalog.has_table_privilege('vadrouille_app', 'public.email_daily_counts', 'SELECT') AS mail_counter,
+              pg_catalog.has_table_privilege('vadrouille_app', 'public.autocomplete_daily_counts', 'SELECT') AS autocomplete_counter`,
     );
-    expect(privileges.rows[0]).toEqual({ purge: false, entitlements: false, billing: false, limiter: false });
+    expect(privileges.rows[0]).toEqual({ purge: false, entitlements: false, billing: false, limiter: false, mail_counter: false, autocomplete_counter: false });
   });
 
   it("vadrouille_migrator : seule appartenance avec SET, vadrouille_owner ; ses autres appartenances sont ADMIN seule aux rôles vadrouille_fn_* (décision 0036, amendement de 0007)", async () => {
@@ -224,7 +258,7 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
       expect(FN_ROLES, `vadrouille_migrator→${m.role}`).toContain(m.role);
       expect(m, `vadrouille_migrator→${m.role}`).toMatchObject({ set_option: false, inherit_option: false, admin_option: true });
     }
-    // Seules appartenances utilisables vers un rôle vadrouille_* : migrator → owner, app → ses quatre rôles.
+    // Seules appartenances utilisables vers un rôle vadrouille_* : migrator → owner, app → ses six rôles.
     expect(
       usable
         .filter((m) => m.role.startsWith("vadrouille_"))
@@ -234,7 +268,9 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
       [
         "vadrouille_migrator→vadrouille_owner",
         "vadrouille_app→vadrouille_account_admin",
+        "vadrouille_app→vadrouille_autocomplete_counter",
         "vadrouille_app→vadrouille_limiter",
+        "vadrouille_app→vadrouille_mail_counter",
         "vadrouille_app→vadrouille_share",
         "vadrouille_app→vadrouille_webhook",
       ].sort(),
@@ -456,7 +492,7 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
 
 /**
  * Schéma `prototype` (décision 0046, D15 point 6, D16 points 3 et 5) : droits de table et par colonne exacts, pour
- * chacun des 18 rôles. Tout droit absent est refusé.
+ * chacun des 20 rôles. Tout droit absent est refusé.
  */
 describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
   // `trajets` : temps de trajet conservés des programmes (décision 0092 § 3, migration 0011_trajets_prototype).
@@ -569,7 +605,7 @@ describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
   // (RLS forcée : il ne lit aucune ligne, test « vadrouille_owner lit zéro ligne » étendu ci-dessous).
   const NON_PROPRIETAIRES = Object.keys(ROLES).filter((r) => r !== "vadrouille_owner" && r !== "vadrouille_migrator");
 
-  it("droits de table exactement ceux de 0046, pour chacun des 16 rôles non propriétaires ; TRUNCATE à aucun", async () => {
+  it("droits de table exactement ceux de 0046, pour chacun des 18 rôles non propriétaires ; TRUNCATE à aucun", async () => {
     for (const role of NON_PROPRIETAIRES) {
       const expected = EXPECTED_PROTOTYPE[role] ?? {};
       for (const table of PROTOTYPE_TABLES) {

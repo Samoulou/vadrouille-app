@@ -390,6 +390,15 @@ const sous = (dossier: string) => (chemin: string) => chemin.startsWith(`${dossi
 const MODULES_SERVEUR_P0: readonly string[] = ["src/server/p0/assemblage.ts", "src/server/p0/vers-moteur.ts", "src/server/p0/vers-couche-ia.ts"];
 const TYPES_PROTOTYPE_SERVEUR_P0: readonly string[] = proto("ancrage", "brief", "candidat");
 
+/**
+ * Décision 0136 § 1.5 (M1a-1) : code partagé de la chaîne inversée que `pnpm p0` charge sous Node nu, parce que
+ * `assemblage.ts`, `vers-couche-ia.ts` et `vers-moteur.ts` le réexportent. Contrôlé par la liste d'autorisation de A3.2
+ * comme les fichiers de P0 ; `@/contracts`, `src/domain` et les autres fichiers de cette liste seulement, aucun module
+ * externe (ni `src/prototype`, ni `src/server/p0`). `brief.ts`, `sites.ts` et `apercu.ts` du même dossier ne sont chargés
+ * que sous Next.js.
+ */
+const MODULES_PROGRAMME_P0: readonly string[] = ["src/server/programme/forme.ts", "src/server/programme/entree.ts", "src/server/programme/assemblage.ts"];
+
 type Regle = { projet: (chemin: string) => boolean; externes: readonly string[]; formes?: ReadonlyMap<string, string> };
 
 const contrats = sous("src/contracts");
@@ -485,13 +494,18 @@ function regleDe(fichier: string): Regle | undefined {
 }
 
 function regleDeBase(fichier: string): Regle | undefined {
+  if (MODULES_PROGRAMME_P0.includes(fichier)) {
+    // Décision 0136 § 1.5 (b) : `@/contracts`, `src/domain` et les autres fichiers de `MODULES_PROGRAMME_P0` ; aucun module
+    // externe (ni `src/prototype`, ni `src/server/p0`).
+    return { projet: (c) => contrats(c) || sous("src/domain")(c) || (MODULES_PROGRAMME_P0.includes(c) && c !== fichier), externes: [] };
+  }
   if (MODULES_SERVEUR_P0.includes(fichier)) {
-    // Revue 1 de #632, bloquant 4 (lot 1 du programme par l'IA) : l'assemblage réutilise `rythmeVersPace` de
-    // l'adaptateur du moteur au lieu d'une copie. Arête unique entre deux modules de cette même liste, soumis à la même
-    // règle (aucune capacité nouvelle n'est atteinte).
-    const voisins = fichier === "src/server/p0/assemblage.ts" ? ["src/server/p0/vers-moteur.ts"] : [];
+    // Décision 0136 § 1.5 : `assemblage.ts`, `vers-couche-ia.ts` et `vers-moteur.ts` réexportent
+    // `@/server/programme/{forme,entree,assemblage}` (code déplacé, aucune capacité nouvelle). L'arête de l'assemblage
+    // vers `vers-moteur.ts` (revue 1 de #632, `rythmeVersPace`) est retirée : la fonction est dans `src/server/programme`.
     return {
-      projet: (c) => contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts", ...voisins].includes(c),
+      projet: (c) =>
+        contrats(c) || sous("src/domain")(c) || [...TYPES_PROTOTYPE_SERVEUR_P0, "src/prototype/programme-reduit.ts", ...MODULES_PROGRAMME_P0].includes(c),
       externes: [],
     };
   }
@@ -659,7 +673,7 @@ function fichierAdmis(fichier: string): boolean {
 
 /** Tous les fichiers présents des six dossiers (sur-ensemble des fichiers suivis). */
 const TOUS_FICHIERS_P0 = DOSSIERS_P0.flatMap(tousLesFichiers);
-const FICHIERS_P0 = [...TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts")), ...MODULES_SERVEUR_P0];
+const FICHIERS_P0 = [...TOUS_FICHIERS_P0.filter((fichier) => fichier.endsWith(".ts")), ...MODULES_SERVEUR_P0, ...MODULES_PROGRAMME_P0];
 const SOURCES_P0 = FICHIERS_P0.filter((fichier) => !estTest(fichier));
 
 /** Imports de chaque fichier, analysés une seule fois pour tous les graphes du fichier de test (durée, P0r1). */
@@ -1771,6 +1785,29 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       expect([...atteints("src/workflows/index.ts", voisinsReels)].some(interditPartout)).toBe(true);
     });
 
+    it("chaine-inversee: aucun accès au schéma prototype (graphe) : le chemin api et generateProgramme n'atteignent ni les adaptateurs prototype, ni src/server/p0, ni src/server/essai", () => {
+      // Spécification M1a, critère 6 (décision 0136 § 2.1) : imports **exécutés** (`import()` compris, imports de type
+      // exclus : effacés à la compilation), depuis l'instance de l'adaptateur de création, la fabrique que
+      // `src/instrumentation.ts` y branche (`api-creation.ts`) et le workflow de la chaîne inversée ; parcours arrêté au seul
+      // pont p0Run (workflow distinct, jamais démarré par ce chemin, contrôlé par le test précédent).
+      const voisinsExecutes: Voisins = (fichier) =>
+        importsExecutesDe(fichier, readFileSync(path.join(RACINE, fichier), "utf8")).flatMap((specificateur) => {
+          const cible = resoudre(fichier, specificateur);
+          return cible.type === "projet" ? [cible.chemin] : [];
+        });
+      const interditApi = (chemin: string) =>
+        /^src\/adapters\/prototype[^/]*\.ts$/.test(chemin) || chemin.startsWith("src/server/p0/") || chemin.startsWith("src/server/essai/");
+      const arretP0Run = (chemin: string) => chemin === "src/workflows/p0-run.ts";
+      for (const depart of ["src/adapters/api-creation-instance.ts", "src/adapters/api-creation.ts", "src/workflows/programme.ts"]) {
+        expect([...atteints(depart, voisinsExecutes, arretP0Run)].filter(interditApi), depart).toEqual([]);
+      }
+      // Le parcours n'est pas vide par construction : le chemin api atteint, par l'`import()` du démarrage, le workflow
+      // inversé et ses étapes ; sans l'arrêt à p0Run, il atteindrait src/server/p0 (la frontière est exercée).
+      const depuisApi = [...atteints("src/adapters/api-creation.ts", voisinsExecutes, arretP0Run)];
+      expect(depuisApi).toEqual(expect.arrayContaining(["src/server/creation/demarrage.ts", "src/workflows/index.ts", "src/workflows/programme.ts", "src/server/generation/etapes-programme.ts"]));
+      expect([...atteints("src/adapters/api-creation.ts", voisinsExecutes)].some(interditApi)).toBe(true);
+    });
+
     describe("cas fabriqués", () => {
       const graphe = (aretes: Record<string, string[]>): Voisins => (fichier) => Object.entries(aretes).find(([nom]) => nom === fichier)?.[1] ?? [];
       it.each([
@@ -1899,10 +1936,10 @@ function importsExecutesDe(fichier: string, source: string): string[] {
 
 /**
  * Seuls imports exécutés admis dans le terminal `src/workflows/index.ts` : `./apercu` (B9c, workflow 1), `./voyage-complet`
- * (B9d, workflow 4) et `./recalcul` (B10b, workflow 5, décision 0119 § 1.8), même forme : un pont de `"use step"` vers
- * `src/server/generation/`, jamais dans un paquet client.
+ * (B9d, workflow 4), `./recalcul` (B10b, workflow 5, décision 0119 § 1.8) et `./programme` (M1a-2, `generateProgramme`,
+ * décision 0136 § 2.1), même forme : un pont de `"use step"` vers `src/server/generation/`, jamais dans un paquet client.
  */
-const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./recalcul", "./voyage-complet"];
+const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./programme", "./recalcul", "./voyage-complet"];
 
 /**
  * Seuls imports exécutés admis dans le terminal `src/server/composition/villes.ts` (recherche de ville du site d'essai,
@@ -2195,7 +2232,7 @@ describe("p0: clé côté serveur seulement", () => {
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);
     expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts", "src/server/composition/villes.ts"]);
     for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
-    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./recalcul", "./voyage-complet", "server-only", "workflow/api"]);
+    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./programme", "./recalcul", "./voyage-complet", "server-only", "workflow/api"]);
     // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
     const versIndex = (f: string) => importsClientDe(f, lireDepot(f)).includes("@/workflows");
     expect(versIndex("src/server/p0/lancement.ts") && versIndex("src/server/p0/page-acces.ts")).toBe(true);

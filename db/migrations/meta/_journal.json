@@ -141,6 +141,20 @@
       "when": 1792919883820,
       "tag": "0019_recherche_ville_prototype",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793227456815,
+      "tag": "0020_plafond_emails",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793240142267,
+      "tag": "0021_compteurs_autocompletion",
+      "breakpoints": true
     }
   ]
 }

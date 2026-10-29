@@ -327,6 +327,29 @@ describe("confinement: dépôt", () => {
     expect(appelants).toEqual(["src/server/env/payment.ts", "src/server/payment/composition.ts", "src/server/routes/simulated-webhook.ts"]);
   });
 
+  // B3d (M2a ; décision 0138 § 9, ligne 7) : chemin de lecture de la clé de Resend.
+  it("confinement: src/server/env/cle-resend.ts n'a que l'implémentation Resend pour importeur hors de src/server/env/", () => {
+    const importeurs = resultats.filter((r) => r.imports.some((i) => i.cible === "src/server/env/cle-resend.ts")).map((r) => r.fichier);
+    expect(importeurs.filter((f) => !estFichierTest(f)).sort()).toEqual(["src/server/mail/resend.ts"]);
+    expect(importeurs.filter((f) => estFichierTest(f) && !f.startsWith("src/server/env/"))).toEqual([]);
+  });
+
+  it("confinement: `cleResend` n'est appelé, hors des tests, que par l'implémentation Resend (et défini dans son module)", () => {
+    const appelants = analyses
+      .filter((f) => f.chemin.startsWith("src/") && !estFichierTest(f.chemin) && /\bcleResend\(/.test(lireFichier(f.chemin)))
+      .map((f) => f.chemin)
+      .sort();
+    expect(appelants).toEqual(["src/server/env/cle-resend.ts", "src/server/mail/resend.ts"]);
+  });
+
+  // B3d (M2a ; décision 0138 § 9, ligne 7b, ajoutée par la Sécurité) : seule la composition de la connexion construit
+  // l'implémentation Resend ; ses tests sont nommés.
+  it("confinement: src/server/mail/resend.ts n'a que src/server/auth/index.ts pour importeur hors des tests ; tests nommés", () => {
+    const importeurs = resultats.filter((r) => r.imports.some((i) => i.cible === "src/server/mail/resend.ts")).map((r) => r.fichier);
+    expect(importeurs.filter((f) => !estFichierTest(f))).toEqual(["src/server/auth/index.ts"]);
+    expect(importeurs.filter((f) => estFichierTest(f) && !f.startsWith("src/server/mail/")).sort()).toEqual(["tests/db/plafond-emails.test.ts"]);
+  });
+
   it("confinement: le champ du secret décodé n'est nommé que dans src/server/env/index.ts, src/server/env/payment.ts et leurs tests", () => {
     // Nom assemblé à l'exécution : ce fichier ne doit pas lui-même contenir le texte cherché.
     const champ = ["simulated", "Webhook", "Secret"].join("");

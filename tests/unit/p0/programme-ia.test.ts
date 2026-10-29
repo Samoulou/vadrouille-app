@@ -8,6 +8,7 @@ import type { DayLineItem } from "@/contracts";
 import { CRENEAUX_PAR_JOUR_MAX, ELEMENTS_LISTE_PROGRAMME_MAX, lireProgramme, lieuxDuProgramme, ordreEcrit } from "@/ai/sorties";
 import { LONGUEURS_TEXTE } from "@/ai/candidat";
 import { BriefSchema } from "@/prototype/brief";
+import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { reduireSite } from "@/research/fetch-page";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assemblerProgrammeIa, pointsDeTrajet, sourceDuSite, type CreneauAssemble } from "@/server/p0/assemblage";
@@ -168,6 +169,7 @@ describe("programme: assemblage sans replanification (0116 § 1.6 à § 1.8, § 
   const assembler = (creneaux: CreneauAssemble[]) =>
     assemblerProgrammeIa({
       tripId: "proto_edimbourg_20261021_1",
+      organizationId: PROTOTYPE_ORG_ID,
       brief,
       jours: [{ date: brief.arrivee, creneaux }],
       bonsPlans: [],
@@ -291,6 +293,7 @@ describe("programme: lot 2a, source écrite depuis le site vérifié (A21 ; 0122
   const etapes = (creneaux: CreneauAssemble[]) =>
     assemblerProgrammeIa({
       tripId: "proto_rome_20261022_1",
+      organizationId: PROTOTYPE_ORG_ID,
       brief,
       jours: [{ date: brief.arrivee, creneaux }],
       bonsPlans: [],

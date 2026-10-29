@@ -271,7 +271,9 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
 
   // Amendée par 0046 D16 point 6 : politiques de prototype.purges (lecture de la date par vadrouille_prototype,
   // insertion par la fonction de purge) ; le test couvre USING (true) et WITH CHECK (true), dans tous les schémas.
-  // Amendée par B7c (0010_usage_forfait) : usage_ledger pour vadrouille_fn_usage.
+  // Amendée par B7c (0010_usage_forfait) : usage_ledger pour vadrouille_fn_usage ; par B3d (0020_plafond_emails) :
+  // email_daily_counts pour vadrouille_mail_counter ; par M1f-D (0021_compteurs_autocompletion) : autocomplete_daily_counts
+  // pour vadrouille_autocomplete_counter.
   it("liste fermée des politiques USING (true) et WITH CHECK (true)", async () => {
     const { rows } = await app.query(
       `SELECT CASE WHEN schemaname = 'public' THEN '' ELSE schemaname || '.' END || tablename || ':' || array_to_string(roles::text[], ',') AS policy
@@ -282,7 +284,11 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
       [
         "accounts:vadrouille_auth",
         "action_rate_limits:vadrouille_limiter",
+        // M1f-D (migration 0021_compteurs_autocompletion) : compteur global anonyme, rôle des compteurs seulement.
+        "autocomplete_daily_counts:vadrouille_autocomplete_counter",
         "checkouts:vadrouille_fn_checkout",
+        // B3d (migration 0020_plafond_emails ; 0138 § 11, T1) : compteur global anonyme, rôle du plafond seulement.
+        "email_daily_counts:vadrouille_mail_counter",
         "memberships:vadrouille_auth",
         "organizations:vadrouille_auth",
         "sessions:vadrouille_auth",

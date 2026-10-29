@@ -53,6 +53,13 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     ["src/server/presentation/tri-autre.ts", GENERATION],
     ["src/server/presentation/tri.ts/x.ts", GENERATION],
     ["src/workflows/recalcul-autre.ts", GENERATION],
+    // M1a-2 : seul `programme.ts` est nommé (0136 § 2.1) ; ses voisins restent refusés, et il n'atteint ni la création ni
+    // la composition de génération ni le contexte système.
+    ["src/workflows/programme-autre.ts", GENERATION],
+    ["src/workflows/programme.ts/x.ts", GENERATION],
+    ["src/workflows/programme.ts", CREATION],
+    ["src/workflows/programme.ts", COMPOSITION],
+    ["src/workflows/programme.ts", SYSTEME],
     // `tri.ts` : les seuls modules lot, expiration et demarrage (revue de la PR 667, mineurs 3 et 4).
     ["src/server/presentation/tri.ts", GENERATION],
     ["src/server/presentation/tri.ts", REPRISE],
@@ -102,6 +109,10 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     ["src/server/presentation/tri.ts", "@/server/generation/expiration"],
     ["src/server/presentation/tri.ts", "@/server/generation/demarrage"],
     ["src/workflows/index.ts", GENERATION],
+    // M1a-2 : pont de `generateProgramme` (chaîne inversée, 0136 § 2.1, amende 0101 § 4).
+    ["src/workflows/programme.ts", GENERATION],
+    ["src/workflows/programme.ts", "@/server/generation/etapes-programme"],
+    ["src/workflows/programme.ts", "@/server/generation/etat"],
     ["src/server/creation/nouvel-essai.ts", "@/server/generation/raison-echec"],
     ["src/server/generation/exemple.ts", "./raison-echec"],
     ["src/server/payment/suite.ts", GENERATION],

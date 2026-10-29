@@ -14,7 +14,16 @@ import { attempt, closeAll, connect, type DbClient, expectRefused, inTx, type Se
  */
 
 const APPEND_ONLY = ["trip_versions", "billing", "usage_ledger"] as const;
-const APPLICATIVE_ROLES = ["vadrouille_app", "vadrouille_auth", "vadrouille_share", "vadrouille_webhook", "vadrouille_account_admin", "vadrouille_limiter"];
+const APPLICATIVE_ROLES = [
+  "vadrouille_app",
+  "vadrouille_auth",
+  "vadrouille_share",
+  "vadrouille_webhook",
+  "vadrouille_account_admin",
+  "vadrouille_limiter",
+  "vadrouille_mail_counter",
+  "vadrouille_autocomplete_counter",
+];
 
 let app: DbClient;
 let admin: DbClient;

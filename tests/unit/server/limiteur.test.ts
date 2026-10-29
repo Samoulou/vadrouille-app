@@ -451,6 +451,13 @@ describe("module de journal", () => {
       "email.transport_disabled",
       // B3b-envoi : enveloppe refusée avant l'envoi (aucune valeur).
       "email.envelope_refused",
+      // B3d (M2a) : envoi réel accepté, plafond du jour atteint, refus de Resend, refus avant le transport (codes fermés).
+      "email.sent",
+      "email.cap_reached",
+      "email.provider_refused",
+      "email.transport_refused",
+      // B3d (revue de la PR 850, mineur 1) : purge du plafond global en échec, nom d'erreur seulement.
+      "email.purge_failed",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",
@@ -469,6 +476,9 @@ describe("module de journal", () => {
       "payment.webhook_config_invalid",
       // B9d (décision 0087 § 1.4) : voyage complet bloqué, identifiants internes et code fermé seulement.
       "generation.full_stuck",
+      // M1a-2 (décision 0136 § 2 ; verdict 0139 § 2, attente étendue, Q649) : fin de l'étape e de generateProgramme,
+      // compteurs maison en liste fermée par événement, aucun identifiant.
+      "generation.programme_written",
       // B10b (décision 0119 § 1.3 ; verdict 0120 S1 point 1 et S7) : recalcul d'un tri, identifiants internes, nom d'erreur et
       // nombre de jours touchés seulement.
       "recalcul.not_created",

@@ -13,10 +13,22 @@ import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
-import { assertPrototypeAllowedOnProcess, deblocagesEssai, photosEssai, prototypeCreationAdapter, prototypeTripAdapter, revisionEssai } from "./prototype-instance";
+import {
+  assertPrototypeAllowedOnProcess,
+  clePartageEssai,
+  deblocagesEssai,
+  photosEssai,
+  prototypeCreationAdapter,
+  prototypeSharedReader,
+  prototypeTripAdapter,
+  revisionEssai,
+  sessionPartageEssaiVerifiee,
+} from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
-import { shareAvailable } from "./share-guard";
+import { realShareAvailable, shareAvailable } from "./share-guard";
+import { createSignedShareAdapter } from "./signed-share";
+import { paiementSimule } from "./simulated-payment-instance";
 import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
 import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
 
@@ -41,7 +53,7 @@ export { authAdapterChoice, betterAuthAllowed, mockAuthAllowed } from "./auth-gu
 export { assertApiAdapter } from "./api-guard";
 export { getRequestContext, SessionRequiseError } from "./context";
 export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
-export { shareAvailable, shareDemoAvailable } from "./share-guard";
+export { realShareAvailable, shareAvailable, shareDemoAvailable } from "./share-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";
 export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype-instance";
 
@@ -144,15 +156,18 @@ export function getAuthAdapter(options: { scope?: SimulationScope; env?: NodeJS.
 export const CHECKOUT_TTL_MS = 30 * 60_000;
 export const DEMO_UNLOCK_TTL_MS = 30 * 60_000;
 
-function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_ADAPTER): "mock" {
+function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_ADAPTER): "mock" | "simulated" {
   const choice = adapterChoice(value);
   switch (choice) {
     case "mock":
       return "mock";
+    case "simulated":
+      // B4b (spécification B4, B4b point 1) : paiement simulé en base, branché au démarrage (`./simulated-payment-instance.ts`).
+      return "simulated";
     case "stripe":
       throw new Error("adaptateur de paiement stripe non implémenté (tâche de paiement réel, après G0 et Q26)");
     default:
-      throw new Error(`PAYMENT_ADAPTER inconnu : « ${choice} » (valeurs : mock, stripe)`);
+      throw new Error(`PAYMENT_ADAPTER inconnu : « ${choice} » (valeurs : mock, simulated, stripe)`);
   }
 }
 
@@ -170,33 +185,40 @@ function mockPaymentFor(scope: SimulationScope): PaymentAdapter & PaymentSimulat
   });
 }
 
+/** Adaptateur du choix courant : `mock` dans la portée, `simulated` branché au démarrage (la portée ne sert pas). */
+function paymentFor(scope: SimulationScope | undefined): PaymentAdapter & PaymentSimulator {
+  return paymentAdapterChoice() === "simulated" ? paiementSimule() : mockPaymentFor(scope ?? defaultScope());
+}
+
 /**
- * Adaptateur de paiement (variable serveur `PAYMENT_ADAPTER`, `mock` par défaut). **Filet de sécurité** :
- * lève une erreur si `paymentAvailable()` est faux ; les pages et les actions consultent la garde avant
- * et ne l'atteignent jamais dans ce cas.
+ * Adaptateur de paiement (variable serveur `PAYMENT_ADAPTER`, `mock` par défaut ; `simulated` depuis B4b, l'état vit
+ * alors en base et la portée de simulation ne sert pas). **Filet de sécurité** : lève une erreur si `paymentAvailable()`
+ * est faux ; les pages et les actions consultent la garde avant et ne l'atteignent jamais dans ce cas. `stripe` lève
+ * toujours « non implémenté » (B4c).
  */
 export function getPaymentAdapter(options: { scope?: SimulationScope } = {}): PaymentAdapter {
   if (!paymentAvailable()) {
     throw new Error("paiement indisponible : paymentAvailable() est faux (décision 0020 § 2.3)");
   }
-  paymentAdapterChoice();
-  return mockPaymentFor(options.scope ?? defaultScope());
+  return paymentFor(options.scope);
 }
 
-/** Simulation des issues : `null` hors adaptateur simulé autorisé (décision 0020 § 2.3). */
+/** Simulation des issues : `null` hors adaptateur simulé autorisé (décision 0020 § 2.3, amendée par B4b). */
 export function getPaymentSimulator(options: { scope?: SimulationScope } = {}): PaymentSimulator | null {
   if (!paymentAvailable()) return null;
-  return mockPaymentFor(options.scope ?? defaultScope());
+  return paymentFor(options.scope);
 }
 
 /**
  * Lecture des voyages par les pages du voyage (décision 0020 § 3, forme B) : l'adaptateur de base tel quel
- * sans paiement simulé disponible ; sinon, le décorateur qui sert un voyage débloqué par un droit de la
- * portée (lue à chaque appel, par `getSimulationScope()` si `options.scope` est absent).
+ * sans paiement simulé disponible, ou si l'adaptateur de paiement n'est pas le simulé **en mémoire** (`mock`) : avec
+ * `simulated` (B4b point 3, B4-TL-14), `Trip.unlocked` vient de `entitlements` par l'adaptateur `api`. Sinon, le
+ * décorateur qui sert un voyage débloqué par un droit de la portée (lue à chaque appel, par `getSimulationScope()` si
+ * `options.scope` est absent).
  */
 export function getTripReader(options: { scope?: SimulationScope } = {}): TripAdapter {
   const base = getTripAdapter();
-  if (!paymentAvailable()) return base;
+  if (!paymentAvailable() || adapterChoice(process.env.PAYMENT_ADAPTER) !== "mock") return base;
   if (isPrototypeAdapter()) {
     // Voyage d'essai (spécification E2E-essai, lot 1) : débloqué par le droit simulé de la portée, ou par le cookie signé
     // de l'essai (préversion seulement, garde du mode réel ouverte) ; l'adaptateur sert alors toutes ses journées.
@@ -342,14 +364,26 @@ export async function getRevisionFixtures(
 /**
  * Adaptateur de partage (spécification F10, F10-TL-7 ; décision 0039), simulé dans la portée de la requête : liens en
  * mémoire de la portée, voyages lus par `getTripReader()` de la même portée, durée du partage lue dans la
- * configuration serveur. **Filet de sécurité** : lève une erreur si `shareAvailable()` est faux ; les pages et les
- * actions consultent la garde avant et ne l'atteignent jamais dans ce cas.
+ * configuration serveur. **Partage réel du site d'essai** (`realShareAvailable`, décision 0135) : jeton signé sans
+ * stockage, lien créé depuis la session vérifiée (`getTripReader()` de la requête), vue partagée lue par un lecteur du
+ * seul voyage du lien, dans l'organisation du jeton. **Filet de sécurité** : lève une erreur si `shareAvailable()` est
+ * faux ; les pages et les actions consultent la garde avant et ne l'atteignent jamais dans ce cas.
  */
 export function getShareAdapter(options: { scope?: SimulationScope } = {}): ShareAdapter {
   if (!shareAvailable()) {
     throw new Error("partage indisponible : shareAvailable() est faux (spécification F10, F10-TL-7)");
   }
   const scope = options.scope ?? defaultScope();
+  if (realShareAvailable()) {
+    return createSignedShareAdapter({
+      creatorTrips: getTripReader({ scope }),
+      sharedTrips: (tripId) => prototypeSharedReader(tripId),
+      key: () => clePartageEssai(),
+      sessionVerified: () => sessionPartageEssaiVerifiee(),
+      now: () => scope.clock.now(),
+      accessDaysAfterReturn: OFFER_CONFIG.accessDaysAfterReturn,
+    });
+  }
   return createMockShareAdapter({
     trips: getTripReader({ scope }),
     now: () => scope.clock.now(),
@@ -360,10 +394,12 @@ export function getShareAdapter(options: { scope?: SimulationScope } = {}): Shar
 
 /**
  * Bouton « Partager » du Séjour et de la Journée (F10-PO-13, F10-PO-21) : partage disponible, voyage débloqué et fin
- * du partage pas encore passée à l'horloge de la portée de la requête. Rien n'est lu si la garde est fermée.
+ * du partage pas encore passée à l'horloge de la portée de la requête. Partage réel (décision 0135) : en plus, clé de
+ * signature présente et session vérifiée. Rien n'est lu si la garde est fermée.
  */
 export async function shareButtonVisible(trip: Pick<Trip, "unlocked" | "end" | "timeZone">): Promise<boolean> {
   if (!shareAvailable() || !trip.unlocked) return false;
+  if (realShareAvailable() && (clePartageEssai() === null || !(await sessionPartageEssaiVerifiee()))) return false;
   const scope = await getSimulationScope();
   return !shareEnded(trip, scope.clock.now(), OFFER_CONFIG.accessDaysAfterReturn);
 }

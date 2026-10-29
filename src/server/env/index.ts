@@ -34,6 +34,9 @@ const VARIABLES = {
   VADROUILLE_ENV: 0,
   VERCEL_ENV: 0,
   VERCEL: 0,
+  // B3d (M2a ; décision 0138 § 3 condition 4) : environnement cible de Vercel, absent ou exactement `preview` dans le
+  // cas admis de `EMAIL_TRANSPORT=resend`.
+  VERCEL_TARGET_ENV: 0,
   HOSTNAME: 0,
   AUTH_ADAPTER: 0,
   TRUSTED_IP_HEADER: 0,
@@ -71,6 +74,11 @@ const VARIABLES = {
   P0_REAL_RUNS: 0,
   P0_RUN_TOKEN: 0,
   "P0_*": 0,
+  // B3d (M2a ; décision 0138 § 2) : clé de l'API de Resend, présence et forme seulement (jamais un champ de `ServerEnv`,
+  // lue à l'envoi par `cleResend`, `./cle-resend.ts`) ; `NEXT_PUBLIC_*RESEND*` est le libellé fixe de toute variable de
+  // préfixe `NEXT_PUBLIC_` dont le nom contient `RESEND` (casse ignorée), refusée partout (jamais le nom exact).
+  RESEND_API_KEY: 0,
+  "NEXT_PUBLIC_*RESEND*": 0,
 } as const;
 export type ServerEnvVariable = keyof typeof VARIABLES;
 export const SERVER_ENV_VARIABLES: readonly ServerEnvVariable[] = Object.freeze(Object.keys(VARIABLES) as ServerEnvVariable[]);
@@ -147,8 +155,18 @@ export type ServerEnv = {
   readonly trustedIpHeader: TrustedIpHeader | null;
   /** Octets décodés de `RATE_LIMIT_HMAC_SECRET` ; `null` si absente (le limiteur échoue alors fermé, à l'usage). */
   readonly rateLimitHmacSecret: Buffer | null;
-  /** `null` ⇔ `EMAIL_TRANSPORT` absente : port d'envoi désactivé, aucun envoi implicite (B3b-envoi-PO-2). */
+  /**
+   * Cible SMTP (Mailpit), non nulle seulement quand `emailTransport` vaut `smtp`. `null` sinon : sans
+   * `EMAIL_TRANSPORT` (`emailTransport` `disabled` : port d'envoi désactivé, aucun envoi implicite, B3b-envoi-PO-2) ou
+   * avec `EMAIL_TRANSPORT=resend` admis (`emailTransport` `resend`, aucune cible SMTP).
+   */
   readonly smtp: SmtpSettings | null;
+  /**
+   * Transport du code de connexion retenu (B3d, M2a ; décision 0138 § 10.4, point 5) : `disabled` sans
+   * `EMAIL_TRANSPORT`, `smtp` (Mailpit, `local` et `ci`), `resend` (cas admis de 0138 § 3 seulement). Ne porte rien
+   * d'autre : la clé de Resend n'est jamais un champ de `ServerEnv` (0138 § 2.4).
+   */
+  readonly emailTransport: EmailTransport;
   /** `PAYMENT_ADAPTER` normalisé (B4a ; absent ou vide : `mock`, comme `payment-guard.ts`). */
   readonly paymentAdapter: PaymentAdapterChoice;
   /** `DATA_ADAPTER` normalisé (B4a ; absent ou vide : `mock`, comme `adapterChoice`). */
@@ -165,6 +183,9 @@ export type ServerEnv = {
    */
   readonly simulatedWebhookSecret: Buffer | null;
 };
+
+/** Transports du code de connexion (B3d, M2a ; décision 0138 § 10.4). */
+export type EmailTransport = "disabled" | "smtp" | "resend";
 
 /** Valeurs admises de `PAYMENT_ADAPTER` (spécification B4, B4-PO-1). */
 export const PAYMENT_ADAPTER_CHOICES = ["mock", "simulated", "stripe"] as const;
@@ -337,6 +358,47 @@ function verifierStripe(nom: string, valeur: string): void {
 /** Vrai derrière Vercel : `VERCEL_ENV` présente et `VERCEL` exactement `1` après `trim()` (0051 point 2.2). */
 const surVercel = (vercelEnv: string | undefined, vercel: string | undefined) => presente(vercelEnv) && vercel?.trim() === "1";
 
+// --- Envoi réel par Resend (B3d, M2a ; décision 0138 § 2 et § 3) ---------------------------------------------
+
+/**
+ * Forme de la clé de Resend (0138 § 2.3) : `re_` puis 16 à 125 caractères de `[A-Za-z0-9_-]` (19 à 128 au total), sans
+ * `trim()`. La valeur n'est que comparée : jamais copiée, rendue, journalisée ni jointe à une erreur.
+ */
+const FORME_CLE_RESEND = /^re_[A-Za-z0-9_-]{16,125}$/;
+
+/** Vrai si la valeur reçue a la forme de 0138 § 2.3 ; partagé par `parseServerEnv` et `cleResend` (`./cle-resend.ts`). */
+export function cleResendBienFormee(valeur: unknown): boolean {
+  return typeof valeur === "string" && FORME_CLE_RESEND.test(valeur);
+}
+
+/**
+ * Cas admis de `EMAIL_TRANSPORT=resend` (décision 0138 § 3, T2 : prédicat nommé, que M1h n'a pas à changer) : vrai si et
+ * seulement si **toutes** ces conditions tiennent sur l'objet reçu :
+ * 1. `VERCEL` vaut exactement `1` après `trim()` et `VERCEL_ENV` est présente (`surVercel`) ;
+ * 2. `VERCEL_ENV` vaut `preview` après `trim().toLowerCase()` (`VERCEL_ENV=staging`, qui donne aussi `staging`, est refusé) ;
+ * 3. `VADROUILLE_ENV` absente, vide ou faite d'espaces (toute déclaration de l'opérateur refuse, `staging` compris) ;
+ * 4. `VERCEL_TARGET_ENV` absente, ou exactement `preview` (sans `trim()` ni changement de casse, comme la barrière de
+ *    sortie : une valeur vide, d'espaces ou ` Preview ` refuse ; un environnement personnalisé de Vercel aussi) ;
+ * 5. en conséquence, l'environnement résolu vaut `staging` (assertion de cohérence).
+ * Fonction pure, appelée par `parseServerEnv` et par `cleResend` ; `AUTH_ADAPTER=better-auth` reste exigé par ailleurs
+ * (refusé en `staging` jusqu'à M1h, B3-TL-2) ; la condition de branche (`mvp-essai`) est posée par M1h.
+ */
+export function resendAdmis(env: Env): boolean {
+  const vercelEnv: unknown = env.VERCEL_ENV;
+  const vercel: unknown = env.VERCEL;
+  if (typeof vercelEnv !== "string" || typeof vercel !== "string" || !surVercel(vercelEnv, vercel)) return false;
+  if (vercelEnv.trim().toLowerCase() !== "preview") return false;
+  const declaration: unknown = env.VADROUILLE_ENV;
+  if (declaration !== undefined && (typeof declaration !== "string" || declaration.trim() !== "")) return false;
+  const cible: unknown = env.VERCEL_TARGET_ENV;
+  if (cible !== undefined && cible !== "preview") return false;
+  try {
+    return resolveServerEnvironment(env) === "staging";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Valide l'environnement reçu (tableau « requis quand » de la spécification B3, B3a point 1) et rend la configuration
  * figée. Fonction pure : ne lit que l'objet reçu, par propriété littérale (et, pour `STRIPE_*`, par le seul parcours de
@@ -372,14 +434,29 @@ export function parseServerEnv(env: Env): ServerEnv {
   }
   const brut = lu.data;
 
-  // EMAIL_TRANSPORT et SMTP_URL (B3b-envoi ; décision 0098 § 4, qui remplace le refus de 0077 § 5.1). Ordre : présence
+  // EMAIL_TRANSPORT et SMTP_URL (B3b-envoi ; décision 0098 § 4, amendée par 0138 § 10.3). Ordre : présence
   // (`!== undefined` : une valeur vide ou d'espaces est présente), puis refus en `staging` et `production` **et sur
-  // Vercel quel que soit `VADROUILLE_ENV`**, sans examiner la valeur ; la suite (valeurs, adaptateur) vient après le
-  // choix de `AUTH_ADAPTER`. Aucune valeur n'est copiée, rendue, journalisée ni jointe à une erreur.
+  // Vercel quel que soit `VADROUILLE_ENV`** : `SMTP_URL` n'y est jamais examinée ; `EMAIL_TRANSPORT` y est refusée sauf
+  // si le cas admis de 0138 § 3 (`resendAdmis`) est vrai **et** que sa valeur, après `trim()`, est exactement `resend`
+  // (seule comparaison faite sur sa valeur dans ces environnements, à une constante). La suite (valeurs, adaptateur)
+  // vient après le choix de `AUTH_ADAPTER`. Aucune valeur n'est copiée, rendue, journalisée ni jointe à une erreur.
+  const transport: unknown = env.EMAIL_TRANSPORT;
+  const casResend = typeof transport === "string" && transport.trim() === "resend" && resendAdmis(env);
   if (env.EMAIL_TRANSPORT !== undefined || env.SMTP_URL !== undefined) {
     if (environment === "staging" || environment === "production" || surVercel(brut.VERCEL_ENV, brut.VERCEL)) {
-      throw new ServerEnvError(env.EMAIL_TRANSPORT !== undefined ? V.EMAIL_TRANSPORT : V.SMTP_URL, "forbidden");
+      if (env.EMAIL_TRANSPORT !== undefined && !casResend) throw new ServerEnvError(V.EMAIL_TRANSPORT, "forbidden");
+      if (env.SMTP_URL !== undefined) throw new ServerEnvError(V.SMTP_URL, "forbidden");
     }
+  }
+
+  // RESEND_API_KEY (B3d, M2a ; décision 0138 § 2.2 et § 2.3, § 10.4) : présente (`!== undefined`, vide comprise) hors du
+  // cas admis de `EMAIL_TRANSPORT=resend` → `forbidden`, dans les quatre environnements ; dans le cas admis, requise
+  // (`missing`) et de la forme de 0138 § 2.3 (`invalid_value`). Contrôlée ici, avant `AUTH_ADAPTER`, pour que la clé du
+  // cas admis soit jugée même tant que `better-auth` y est refusé (jusqu'à M1h). Valeur jamais rendue.
+  if (env.RESEND_API_KEY !== undefined && !casResend) throw new ServerEnvError(V.RESEND_API_KEY, "forbidden");
+  if (casResend) {
+    if (env.RESEND_API_KEY === undefined) throw new ServerEnvError(V.RESEND_API_KEY, "missing");
+    if (!cleResendBienFormee(env.RESEND_API_KEY)) throw new ServerEnvError(V.RESEND_API_KEY, "invalid_value");
   }
 
   // Variables lues par Better Auth 1.7.7 sans passer par nos options (revue consolidée du head `f0b8c5a`, bloquant 1 ;
@@ -402,15 +479,27 @@ export function parseServerEnv(env: Env): ServerEnv {
   if (choix !== "mock" && choix !== "better-auth") throw new ServerEnvError(V.AUTH_ADAPTER, "invalid_value");
   if (choix === "better-auth" && environment !== "local" && environment !== "ci") throw new ServerEnvError(V.AUTH_ADAPTER, "forbidden");
 
-  // EMAIL_TRANSPORT (0098 § 4 points 3 à 6) : exactement `smtp` après `trim()` (minuscules), avec
-  // `AUTH_ADAPTER=better-auth` en `local` ou `ci` seulement ; `SMTP_URL` requise avec lui, refusée sans lui.
+  // EMAIL_TRANSPORT (0098 § 4 points 3 à 6, amendés par 0138 § 10.4) : après `trim()`, exactement `smtp` (minuscules),
+  // avec `AUTH_ADAPTER=better-auth` en `local` ou `ci` seulement, `SMTP_URL` requise avec lui et refusée sans lui ; ou
+  // exactement `resend`, dans le seul cas admis de 0138 § 3 et avec `AUTH_ADAPTER=better-auth` (`forbidden` en `local`
+  // et en `ci`, et avec `mock`). Toute autre valeur, casse comprise (`SMTP`, `Resend`, `RESEND`, vide), donne
+  // `invalid_value` en `local` et en `ci` hors de Vercel seulement : en `staging`, en `production` et sur Vercel, elle est
+  // déjà refusée plus haut (`forbidden`), sans que sa valeur soit examinée.
   let smtp: SmtpSettings | null = null;
+  let emailTransport: EmailTransport = "disabled";
   if (env.EMAIL_TRANSPORT !== undefined) {
-    if (env.EMAIL_TRANSPORT.trim() !== "smtp") throw new ServerEnvError(V.EMAIL_TRANSPORT, "invalid_value");
-    if (choix !== "better-auth" || (environment !== "local" && environment !== "ci")) throw new ServerEnvError(V.EMAIL_TRANSPORT, "forbidden");
-    if (env.SMTP_URL === undefined) throw new ServerEnvError(V.SMTP_URL, "missing");
-    smtp = analyserSmtp(env.SMTP_URL);
-    if (smtp === null) throw new ServerEnvError(V.SMTP_URL, "invalid_value");
+    const valeur = env.EMAIL_TRANSPORT.trim();
+    if (valeur === "resend") {
+      if (!casResend || choix !== "better-auth") throw new ServerEnvError(V.EMAIL_TRANSPORT, "forbidden");
+      emailTransport = "resend";
+    } else {
+      if (valeur !== "smtp") throw new ServerEnvError(V.EMAIL_TRANSPORT, "invalid_value");
+      if (choix !== "better-auth" || (environment !== "local" && environment !== "ci")) throw new ServerEnvError(V.EMAIL_TRANSPORT, "forbidden");
+      if (env.SMTP_URL === undefined) throw new ServerEnvError(V.SMTP_URL, "missing");
+      smtp = analyserSmtp(env.SMTP_URL);
+      if (smtp === null) throw new ServerEnvError(V.SMTP_URL, "invalid_value");
+      emailTransport = "smtp";
+    }
   } else if (env.SMTP_URL !== undefined) {
     throw new ServerEnvError(V.SMTP_URL, "forbidden");
   }
@@ -434,8 +523,15 @@ export function parseServerEnv(env: Env): ServerEnv {
   //   dont le nom commence par `P0_` (préfixe exact, sensible à la casse) refuse le démarrage en production dès que
   //   **la clé** est présente, vide ou faite d'espaces comprise (revue du head 6be9299, mineur 8) ; sa valeur n'est
   //   jamais lue ici ; le refus porte le libellé fixe `P0_*`, jamais le nom exact ni la valeur ;
-  // - `STRIPE_*` : garde des préfixes de production (B3a), sur les valeurs présentes.
+  // - `STRIPE_*` : garde des préfixes de production (B3a), sur les valeurs présentes ;
+  // - `NEXT_PUBLIC_*RESEND*` (B3d, M2a ; décision 0138 § 2.5) : toute variable dont le nom commence par `NEXT_PUBLIC_`
+  //   (préfixe exact, celui que Next.js expose au navigateur) et contient `RESEND`, casse ignorée, refuse le démarrage
+  //   partout ; **nom seul**, valeur jamais lue ; libellé fixe, jamais le nom exact. Défense en profondeur : la
+  //   protection première est qu'aucun code ne référence un tel nom.
   for (const nom in env) {
+    if (nom.startsWith("NEXT_PUBLIC_") && nom.slice("NEXT_PUBLIC_".length).toUpperCase().includes("RESEND")) {
+      throw new ServerEnvError(V["NEXT_PUBLIC_*RESEND*"], "forbidden");
+    }
     if (nom.startsWith("P0_")) {
       if (environment === "production") throw new ServerEnvError(V["P0_*"], "forbidden");
       continue;
@@ -523,6 +619,7 @@ export function parseServerEnv(env: Env): ServerEnv {
     trustedIpHeader,
     rateLimitHmacSecret,
     smtp,
+    emailTransport,
     paymentAdapter,
     dataAdapter,
     simulatedWebhookFlag,

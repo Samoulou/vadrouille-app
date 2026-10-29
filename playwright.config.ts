@@ -68,6 +68,17 @@ const apiURL = `http://127.0.0.1:${API_PORT}`;
 // `127.0.0.1` (garde de `assertServerProcessEnv`, test `tests/unit/server-env-config.test.ts`).
 const secretJetable = () => randomBytes(32).toString("base64url");
 
+// B4b (spécification B4, B4b point 4 ; décision 0097 B4-TL-8 point 4) : variables du paiement simulé en base, posées sur
+// le seul serveur `api`, qui choisit `PAYMENT_ADAPTER=simulated` : le drapeau du webhook simulé et le secret de signature
+// (tiré au hasard à chaque chargement, jamais écrit sur disque ni posé dans `process.env` de Playwright) n'existent que
+// pour ce choix. Aucun workflow ne les pose (0020 § 2.3, critère A26).
+const PAIEMENT_SIMULE_API = {
+  PAYMENT_ADAPTER: "simulated",
+  VADROUILLE_DEMO_PAYMENT: "1",
+  SIMULATED_WEBHOOK_ENABLED: "true",
+  SIMULATED_WEBHOOK_SECRET: secretJetable(),
+} as const;
+
 // Tests sur le build de production, servi comme dans l'image Docker. `pnpm verify` construit une seule fois
 // puis passe E2E_SKIP_BUILD=1 ; un lancement isolé reconstruit l'application.
 const serve = "node scripts/serve-standalone.mjs";
@@ -250,6 +261,11 @@ export default defineConfig<{ urlMock: string }>({
           {
             // Même build, connexion réelle et adaptateur `api` (B6b) : mêmes variables que le serveur `auth`, plus
             // `DATA_ADAPTER=api`. `RELECTURES_SOURCE` n'est pas posée : la garde de 0100 § 5.3 garde le double en `ci`.
+            // B4b (spécification B4, B4b point 4 ; décision 0097 B4-TL-8 point 4) : paiement simulé en base
+            // (`PAYMENT_ADAPTER=simulated`, choix d'adaptateur posé ici comme `DATA_ADAPTER` et `AUTH_ADAPTER`) ; ce serveur
+            // seul pose alors le drapeau du webhook simulé et un secret de signature tiré au hasard à chaque exécution
+            // (jamais dans un workflow, 0020 § 2.3) ; l'application construite (`NODE_ENV=production`) ouvre la garde par
+            // `VADROUILLE_DEMO_PAYMENT=1`, comme le serveur principal.
             command: serve,
             url: apiURL,
             reuseExistingServer: false,
@@ -259,6 +275,7 @@ export default defineConfig<{ urlMock: string }>({
             env: {
               AUTH_ADAPTER: "better-auth",
               DATA_ADAPTER: "api",
+              ...PAIEMENT_SIMULE_API,
               VADROUILLE_ENV: "ci",
               TRUSTED_IP_HEADER: "x-vercel-forwarded-for",
               EMAIL_TRANSPORT: "smtp",

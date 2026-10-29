@@ -2,15 +2,11 @@ import "server-only";
 
 import { createTransport } from "nodemailer";
 
-import { PRODUCT_NAME } from "@/config/site";
-import { format } from "@/i18n";
-import * as messages from "@/i18n/messages";
 import { SENDER_ADDRESS } from "@/server/config/email";
-import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
-import { logEvent } from "@/server/log";
+import type { CanonicalEmail } from "@/server/email";
 
-import { checkEnvelope } from "./enveloppe";
-import type { CodeMailer, LoginCodeMessage } from "./port";
+import { preparerMessageCode } from "./avant-transport";
+import { type CodeMailer, CodeMailerRefusalError, type LoginCodeMessage } from "./port";
 
 /**
  * Implémentation SMTP du port d'envoi du code, **vers Mailpit seulement** (spécification B3b-envoi, points 3 à 5 ;
@@ -22,10 +18,10 @@ import type { CodeMailer, LoginCodeMessage } from "./port";
  *   le port, **aucune autre clé** (ni `auth`, `url`, `service`, `proxy`, `tls`, `pool`, `sendmail`). Journal et trace
  *   SMTP coupés (`logger` et `debug` à `false`) ; lecture de fichiers et d'URL par un contenu de message coupée ;
  *   délais de connexion de 10 secondes au plus. Créé à l'envoi (paresseusement, une fois), jamais à l'import.
- * - **Contrôle avant tout appel du transport** : l'adresse reçue est contrôlée de nouveau par `parseEmailAddress`
- *   (point 4.1), puis `checkEnvelope` compile le message et compare son enveloppe à `{ from: SENDER_ADDRESS,
- *   to: [forme canonique] }` (point 4.3). Un refus écrit `email.address_refused` ou `email.envelope_refused` (sans
- *   valeur) et lève, **sans appeler le transport**.
+ * - **Contrôle avant tout appel du transport** : `preparerMessageCode` (`./avant-transport.ts`, commun avec Resend)
+ *   contrôle de nouveau l'adresse reçue par `parseEmailAddress` (point 4.1), puis `checkEnvelope` compile le message et
+ *   compare son enveloppe à `{ from: SENDER_ADDRESS, to: [forme canonique] }` (point 4.3). Un refus écrit
+ *   `email.address_refused` ou `email.envelope_refused` (sans valeur) et lève, **sans appeler le transport**.
  * - **Envoi** : le message contrôlé (quatre clés) avec l'enveloppe explicite, égale à la valeur comparée, et
  *   `maxRecipients: 1` (point 4.5).
  * - **Erreurs** : toute panne du transport (connexion, refus SMTP, délai) est remplacée par `SmtpEnvoiError`, sans
@@ -87,14 +83,8 @@ export function creerTransportSmtp(cible: SmtpTarget): TransportSmtp {
   return createTransport(optionsTransport(cible));
 }
 
-/** Message du port refusé avant tout appel du transport ; ne porte aucune valeur (ni adresse, ni code). */
-export class CodeMailerRefusalError extends Error {
-  override name = "CodeMailerRefusalError";
-
-  constructor() {
-    super("Envoi du code refusé avant le transport.");
-  }
-}
+/** Message du port refusé avant tout appel du transport (défini dans `./port.ts`, partagé avec `./resend.ts`). */
+export { CodeMailerRefusalError };
 
 /** Panne du transport SMTP ; ne porte aucune valeur ni cause (le message de la bibliothèque est perdu à dessein). */
 export class SmtpEnvoiError extends Error {
@@ -105,42 +95,16 @@ export class SmtpEnvoiError extends Error {
   }
 }
 
-/** Forme d'un code de connexion : 6 chiffres ASCII (B3-PO-4). */
-const FORME_CODE = /^[0-9]{6}$/;
-
-const adresseCanonique = (to: string): boolean => {
-  const lu = parseEmailAddress(to);
-  return lu.ok && lu.email === to;
-};
-
 export function createSmtpCodeMailer(cible: SmtpTarget, deps: SmtpDeps = {}): CodeMailer {
   let transport: TransportSmtp | undefined = deps.transport;
-  const adresseAdmise = deps.adresseAdmise ?? adresseCanonique;
 
   return Object.freeze({
     async sendLoginCode(message: LoginCodeMessage): Promise<void> {
       const to: CanonicalEmail = message.to;
-      if (!adresseAdmise(to)) {
-        logEvent("email.address_refused", {}, "warn");
-        throw new CodeMailerRefusalError();
-      }
-      if (!FORME_CODE.test(message.code) || !Number.isInteger(message.expiresInMinutes) || message.expiresInMinutes < 1) {
-        throw new CodeMailerRefusalError();
-      }
-      const donnees = {
-        from: SENDER_ADDRESS,
-        to,
-        subject: format(messages.emailCode.objet, { produit: PRODUCT_NAME }),
-        text: format(messages.emailCode.corps, { code: message.code, minutes: message.expiresInMinutes }),
-      };
-      const controle = checkEnvelope(donnees, { from: SENDER_ADDRESS, to });
-      if (!controle.ok) {
-        logEvent("email.envelope_refused", {}, "warn");
-        throw new CodeMailerRefusalError();
-      }
+      const envoi = preparerMessageCode(message, SENDER_ADDRESS, deps);
       try {
         transport ??= creerTransportSmtp(cible);
-        await transport.sendMail({ ...controle.message, envelope: { from: SENDER_ADDRESS, to: [to] }, maxRecipients: 1 });
+        await transport.sendMail({ ...envoi, envelope: { from: SENDER_ADDRESS, to: [to] }, maxRecipients: 1 });
       } catch {
         throw new SmtpEnvoiError();
       }

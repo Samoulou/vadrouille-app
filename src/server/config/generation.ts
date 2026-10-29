@@ -48,6 +48,37 @@ export const RANG_LOT: Readonly<Record<EtapeLot, number>> = { a: 1, e: 2 };
 export const MAX_RETRIES_LOT: Readonly<Record<EtapeLot, number>> = { a: 2, e: 0 };
 
 /**
+ * Étapes de `generateProgramme` (chaîne inversée, décision 0136 § 2.2) : `a` (relecture, conversion, forfait du profil
+ * `programme`) et `e` (étape « programme » : logements, rédaction, vérification, assemblage, publication), sur les lettres
+ * existantes (précédent du lot, 0119 § 1.4). Tables propres, distinctes de celles de l'aperçu de l'ancienne chaîne
+ * (`RANG_ETAPE` inchangé, où `e` vaut 6) : rang fixé ici, jamais calculé par le workflow.
+ */
+export const ETAPES_PROGRAMME = ["a", "e"] as const;
+export type EtapeProgramme = (typeof ETAPES_PROGRAMME)[number];
+export const RANG_PROGRAMME: Readonly<Record<EtapeProgramme, number>> = { a: 1, e: 2 };
+/** `maxRetries` de `generateProgramme` (0136 § 2.2) : `a` est déterministe et sans appel ; `e` rejouée repaierait. */
+export const MAX_RETRIES_PROGRAMME: Readonly<Record<EtapeProgramme, number>> = { a: 2, e: 0 };
+
+/** Chaîne de l'aperçu de l'adaptateur `api` (décision 0136 § 4.1). */
+export type ChaineApercu = "inversee" | "ancienne";
+
+/**
+ * Chaîne de l'aperçu de `api` (décision 0136 § 4) : une constante de code, changée par une PR, **ni variable
+ * d'environnement, ni variable Vercel**. Lue à l'appel par la composition de l'app (dépendances par défaut de
+ * `src/server/creation` et de `src/server/generation`), passée en dépendance `chaine` ; un jeu de dépendances injecté qui ne
+ * la nomme pas vaut `"ancienne"`. Posée à `"ancienne"` par M1a-2 (0136 § 12) ; M1a-3 la passe à `"inversee"`, avec son test.
+ */
+export const CHAINE_APERCU: ChaineApercu = "ancienne";
+
+/**
+ * Garde technique du récit sur `api` (verdict 0139 § 1.2 point 6 ; décision 0136 § 3 « Récit ») : `false` tant que Samuel
+ * n'a pas répondu oui à la question Q636 (récit de vrais comptes envoyé au fournisseur de modèles). Fermée : `createTrip`
+ * n'écrit pas `briefs.story` et l'étape `e` de `generateProgramme` passe `recit: undefined` à la conversion. Passée à `true`
+ * par une PR qui cite sa réponse.
+ */
+export const RECIT_API_AUTORISE = false;
+
+/**
  * Part du forfait de l'aperçu qui revient à chaque étape, en pourcentage (valeurs de départ du Tech Lead, B9-TL-3
  * point 5). Pour chaque ressource, les parts des étapes qui la consomment font 100 ; la dernière étape reçoit le reste
  * de l'arrondi. Un registre en mémoire par étape est borné par sa part.

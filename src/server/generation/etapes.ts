@@ -39,6 +39,7 @@ import { genererSansEchec } from "./programme";
 import { publier } from "./publication";
 import { estRefusDeReserve } from "./raison-echec";
 import { normaliser, reprendreRecherche, sourceDeReprise } from "./reprise-recherches";
+import { SQL_PLACE_SEJOUR } from "./sql-sejours";
 
 /**
  * Étapes de `generatePreview` (spécification B9, B9c ; décisions 0081 B9-TL-3, 0087 § 2 et 0100). **Fonctions ordinaires,
@@ -272,9 +273,6 @@ export function etapeBrief(entree: unknown, dependances?: DependancesGeneration)
 }
 
 // --- Étape l : logement ------------------------------------------------------------------------------------------------------
-
-export const SQL_PLACE_SEJOUR = `UPDATE public.stays SET place_id = $5
-  WHERE organization_id = $1 AND trip_id = $2 AND city = $3 AND from_date = $4::date`;
 
 /**
  * Étape `l` (rang 2, décision 0087 § 2) : contrôle de validité du logement de chaque ville de l'aperçu, **avant toute dépense

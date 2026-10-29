@@ -75,7 +75,16 @@ describe("partage : règles ESLint (F10c)", () => {
     expect(await messagesFor(`import type { ShareStatus } from "@/contracts";\nexport type S = ShareStatus;\n`, filePath, IMPORTS)).toEqual([]);
   });
 
-  it.each(["src/server/actions/partage.ts", "src/adapters/mock-share.ts", "src/adapters/share-guard.ts"])(
+  it.each([
+    "src/server/actions/partage.ts",
+    "src/adapters/mock-share.ts",
+    "src/adapters/share-guard.ts",
+    // Décision 0135 § 4 : partage réel du site d'essai.
+    "src/adapters/signed-share.ts",
+    "src/adapters/share-signed-token.ts",
+    "src/adapters/share-views.ts",
+    "src/server/essai/partage.ts",
+  ])(
     "refuse console dans %s",
     async (filePath) => {
       expect(await messagesFor(`export function f(token: string) {\n  console.log(token);\n}\n`, filePath, ["no-console"])).toHaveLength(1);

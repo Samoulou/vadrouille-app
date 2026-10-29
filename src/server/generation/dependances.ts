@@ -1,13 +1,14 @@
 import "server-only";
 
 import { composerReelle, composerSimulee, reglesDeGeneration, type FabriqueGeneration, type FabriquePortPositions } from "@/server/composition/generation";
-import { ECRITURE_PROGRAMMES_REELS_AUTORISEE, IDEES_PAR_JOUR } from "@/server/config/generation";
+import { ECRITURE_PROGRAMMES_REELS_AUTORISEE, IDEES_PAR_JOUR, type ChaineApercu } from "@/server/config/generation";
 import { PLAFONDS_USAGE, PLAFONDS_VARIANTE_SIMULEE, type PlafondsUsage } from "@/server/config/usage";
 import { horlogeSysteme, type Horloge } from "@/server/usage/port";
 import type { ReglesUsage } from "@/server/usage/reservation";
 import { withSystemOrg } from "@/server/with-system-org";
 import type { OrgTransaction } from "@/server/with-org";
 
+import { chaineDe } from "./chaine";
 import { ArretEtape } from "./codes";
 import { declarationsDeploiement, ecriturePositionsPermise, evaluerBarriere, plafondsDeGenerationPoses, type EtatBarriere } from "./barriere";
 
@@ -28,8 +29,17 @@ export interface DependancesGeneration {
    * fixés) pour la barrière et la variante réelle, `PLAFONDS_VARIANTE_SIMULEE` (valeurs de test) pour la variante simulée.
    */
   readonly plafonds?: PlafondsUsage | null;
-  /** Composition choisie par la barrière ; défaut : `reelle` (si la réponse de Samuel à la question 9 l'autorise), sinon `simulee`. */
-  readonly composition?: (etat: EtatBarriere) => FabriqueGeneration | Promise<FabriqueGeneration>;
+  /**
+   * Composition choisie par la barrière ; défaut : `reelle` (si la réponse de Samuel à la question 9 l'autorise), sinon `simulee`.
+   * `voyage` : destination du voyage de l'étape, qui choisit le jeu de fixtures de la variante simulée (décision 0136 § 9,
+   * liste fermée de `fixtures-simulees.ts`) ; absente : Édimbourg.
+   */
+  readonly composition?: (etat: EtatBarriere, voyage?: VoyageDeLaComposition) => FabriqueGeneration | Promise<FabriqueGeneration>;
+  /**
+   * Chaîne de l'aperçu (décision 0136 § 4.2) : un jeu de dépendances injecté qui ne la nomme pas vaut `"ancienne"` ; sans jeu
+   * injecté (workflows, production), `CHAINE_APERCU`, lue à l'appel.
+   */
+  readonly chaine?: ChaineApercu;
   readonly barriere?: { readonly env?: Readonly<Record<string, string | undefined>>; readonly branche?: string | null; readonly cookieValide?: () => Promise<boolean> };
   /** Écriture de programmes réels autorisée (question 9) ; `ECRITURE_PROGRAMMES_REELS_AUTORISEE` (`false`) par défaut. */
   readonly programmesReelsAutorises?: boolean;
@@ -51,6 +61,11 @@ export interface DependancesGeneration {
   readonly reserverEnSimulee?: boolean;
 }
 
+/** Ce que la composition reçoit du voyage de l'étape : sa destination seulement (choix des fixtures simulées). */
+export type VoyageDeLaComposition = { readonly destination: string };
+
+export { chaineDe };
+
 export type DependancesResolues = {
   readonly transaction: TransactionSysteme;
   readonly horloge: Horloge;
@@ -68,14 +83,17 @@ export type DependancesResolues = {
   /** Barrière de B9-TL-8, évaluée **à l'entrée de chaque étape**, avant tout forfait, toute composition et tout appel. */
   barriere(): Promise<EtatBarriere>;
   /** Composition qu'autorise l'état de la barrière (jamais `production` : l'étape s'est déjà arrêtée sur `production_refused`). */
-  composer(etat: EtatBarriere): Promise<FabriqueGeneration>;
+  composer(etat: EtatBarriere, voyage?: VoyageDeLaComposition): Promise<FabriqueGeneration>;
+  /** Chaîne de l'aperçu (décision 0136 § 4.2). */
+  readonly chaine: ChaineApercu;
   /** Vrai si l'étape `e` écrit les positions de la version publiée au cache avec cette composition. */
   ecriturePositions(fabrique: FabriqueGeneration): boolean;
   readonly portPositions: FabriquePortPositions | undefined;
   readonly ideesParJour: number;
 };
 
-export function resoudre(dependances: DependancesGeneration = {}): DependancesResolues {
+export function resoudre(injectees?: DependancesGeneration): DependancesResolues {
+  const dependances = injectees ?? {};
   const horloge = dependances.horloge ?? horlogeSysteme;
   const plafonds = dependances.plafonds === undefined ? PLAFONDS_USAGE : dependances.plafonds;
   const plafondsSimules = dependances.plafonds === undefined ? PLAFONDS_VARIANTE_SIMULEE : dependances.plafonds;
@@ -84,12 +102,12 @@ export function resoudre(dependances: DependancesGeneration = {}): DependancesRe
   const programmesReels = dependances.programmesReelsAutorises ?? ECRITURE_PROGRAMMES_REELS_AUTORISEE;
   const composition =
     dependances.composition ??
-    (async (etat: EtatBarriere): Promise<FabriqueGeneration> => {
+    (async (etat: EtatBarriere, voyage?: VoyageDeLaComposition): Promise<FabriqueGeneration> => {
       if (etat === "production") throw new ArretEtape("production_refused");
       // La variante réelle écrirait des programmes réels : tant que Samuel n'a pas répondu à la question 9, la composition
       // reste simulée même si la barrière est ouverte (0011 l. 77 ; spécification B9, question 9).
       if (etat === "reelle" && programmesReels) return composerReelle();
-      return composerSimulee({ env: declarationsDeploiement(dependances.barriere?.env) });
+      return composerSimulee({ env: declarationsDeploiement(dependances.barriere?.env), ...(voyage === undefined ? {} : { destination: voyage.destination }) });
     });
   return {
     transaction: dependances.transaction ?? withSystemOrg,
@@ -99,10 +117,11 @@ export function resoudre(dependances: DependancesGeneration = {}): DependancesRe
     reserverEnSimulee: dependances.reserverEnSimulee === true,
     maintenant: () => horloge.maintenant(),
     barriere: () => evaluerBarriere({ ...dependances.barriere, plafondsNonNuls: plafondsDeGenerationPoses(plafonds) }),
-    async composer(etat) {
+    async composer(etat, voyage) {
       if (etat === "production") throw new ArretEtape("production_refused");
-      return composition(etat);
+      return voyage === undefined ? composition(etat) : composition(etat, voyage);
     },
+    chaine: chaineDe(injectees),
     ecriturePositions: (fabrique) => dependances.ecriturePositions ?? (fabrique.variante === "reelle" && ecriturePositionsPermise({ env: dependances.barriere?.env })),
     portPositions: dependances.portPositions,
     ideesParJour: dependances.ideesParJour ?? IDEES_PAR_JOUR,

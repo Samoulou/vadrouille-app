@@ -20,21 +20,39 @@ Note de sécurité (revue de F9a, PR #86). Elle ne crée aucune règle : elle ra
 
 Ni l'une ni l'autre n'ouvre quoi que ce soit à elle seule : l'ouverture dépend des variables du tableau précédent.
 
-## Envoi du code de connexion par e-mail (B3b-envoi ; décision 0098)
+## Envoi du code de connexion par e-mail (B3b-envoi ; décision 0098, amendée par 0138)
 
-L'envoi du code par SMTP n'existe que **vers Mailpit, en local et en CI** : aucun fournisseur réel (Q25, Samuel). Il faut `AUTH_ADAPTER=better-auth`. Sans `EMAIL_TRANSPORT`, le port d'envoi reste désactivé : rien ne part, aucun repli vers Mailpit.
+Deux transports, choisis par `EMAIL_TRANSPORT` : **`smtp`**, vers Mailpit seulement, en local et en CI ; **`resend`**, envoi réel par l'API de Resend, dans le seul cas admis de la préversion de Vercel (spécification B3d, décision 0138, section suivante). Il faut `AUTH_ADAPTER=better-auth`. Sans `EMAIL_TRANSPORT`, le port d'envoi reste désactivé : rien ne part, aucun repli vers Mailpit ni vers Resend.
 
 | Variable | Valeur | Où la poser |
 |---|---|---|
-| `EMAIL_TRANSPORT` | exactement `smtp` (après `trim()`, en minuscules) | `.env.local` du poste (`VADROUILLE_ENV=local`) ; le serveur `auth` de `playwright.config.ts` (`ci`). **Jamais** sur Vercel ni en `staging` ou `production`. |
+| `EMAIL_TRANSPORT` | exactement `smtp` (après `trim()`, en minuscules) | `.env.local` du poste (`VADROUILLE_ENV=local`) ; le serveur `auth` de `playwright.config.ts` (`ci`). **Jamais** sur Vercel ni en `staging` ou `production`. Valeur `resend` : section suivante. |
 | `SMTP_URL` | `smtp://<hôte>:<port>` ou avec un `/` final, hôte parmi `localhost`, `127.0.0.1`, `[::1]` ; port de 1 à 65535, sans zéro de tête | idem. Exemple : `smtp://127.0.0.1:1025` (`docker compose up -d mailpit`, boîte sur `http://127.0.0.1:8025`). |
 
 Refus au démarrage (`ServerEnvError`, nom de la variable et code de règle seulement, valeur jamais rendue) :
 - l'une ou l'autre variable **présente**, même vide, en `staging` ou `production`, **ou sur Vercel quel que soit `VADROUILLE_ENV`** ;
-- `EMAIL_TRANSPORT` autre que `smtp` (`SMTP`, `ses`, `resend`, vide) ; `smtp` avec `AUTH_ADAPTER=mock` ; `smtp` sans `SMTP_URL` ; `SMTP_URL` sans `EMAIL_TRANSPORT=smtp` ;
+- `EMAIL_TRANSPORT` autre que `smtp` ou `resend` (`SMTP`, `ses`, `Resend`, `RESEND`, vide) : `invalid_value` en `local` et en `ci` hors de Vercel seulement ; en `staging`, en `production` et sur Vercel, `forbidden` (la valeur n'y est pas examinée) ; `resend` en `local` ou en `ci` (`forbidden`) ; `smtp` avec `AUTH_ADAPTER=mock` ; `smtp` sans `SMTP_URL` ; `SMTP_URL` sans `EMAIL_TRANSPORT=smtp` ; sur Vercel, en `staging` et en `production`, toute valeur d'`EMAIL_TRANSPORT` sauf `resend` dans le cas admis (`forbidden`) ;
 - `SMTP_URL` qui n'a pas exactement la forme ci-dessus : identifiants, chemin, `?`, `#`, espace, `%`, caractère hors ASCII, port absent ou écrit avec un zéro de tête, schéma autre que `smtp://` en minuscules, hôte hors de la liste fermée. La liste n'est pas extensible par configuration : un hôte de plus demande une décision de la Sécurité.
 
 Aucune valeur par défaut d'`SMTP_URL` dans le code, `.env.example` ou les scripts. Le transport est créé par options explicites (jamais par la chaîne), sans trace SMTP, avec des délais de 10 secondes au plus. Mailpit n'a aucune option de relais et son interface n'a pas d'authentification : ne la publier que sur `127.0.0.1`.
+
+## Envoi réel par Resend (B3d ; décision 0138)
+
+Envoi du code de connexion par l'API HTTPS de Resend (`src/server/mail/resend.ts`), sous un plafond global de **100 e-mails par jour** (jour civil UTC, compteur en base, table `email_daily_counts`). **Après M2a, `resend` ne démarre nulle part** : le cas admis s'arrête sur `AUTH_ADAPTER=better-auth`, encore refusé en `staging` (B3-TL-2) ; c'est M1h qui l'ouvre pour la seule branche `mvp-essai`.
+
+| Variable | Valeur | Qui la pose, où |
+|---|---|---|
+| `EMAIL_TRANSPORT` | exactement `resend` (après `trim()`, en minuscules) | Samuel, dans Vercel, environnement **Preview**, pour la seule branche `mvp-essai` (action S1, avec M1h). Jamais en Production, jamais dans un fichier versionné. |
+| `RESEND_API_KEY` | clé de Resend : `re_` puis 16 à 125 caractères de `[A-Za-z0-9_-]`, sans espace (0138 § 2.3) | idem, marquée « sensible » ; clé « Sending access » seulement (0138 § 2.7, § 13). |
+
+**Cas admis** (prédicat `resendAdmis`, `src/server/env/index.ts` ; 0138 § 3), toutes ces conditions : environnement résolu `staging` **par Vercel** et non par une déclaration, c'est-à-dire `VERCEL=1` et `VERCEL_ENV=preview` (après `trim()` et en minuscules), `VADROUILLE_ENV` absente (ou vide), `VERCEL_TARGET_ENV` absente ou exactement `preview` (un environnement personnalisé de Vercel est refusé). Avec `AUTH_ADAPTER=better-auth`.
+
+Refus au démarrage (`ServerEnvError`, nom et code de règle seulement, valeur jamais rendue) :
+- `EMAIL_TRANSPORT=resend` hors du cas admis : `local`, `ci`, `staging` hors Vercel (`VADROUILLE_ENV=staging`), `production` (dont `VERCEL_ENV=production`), `VERCEL_ENV=development`, préversion sans `VERCEL=1`, toute déclaration de `VADROUILLE_ENV` ; avec `AUTH_ADAPTER=mock` ; avec `SMTP_URL` (`forbidden`) ;
+- `RESEND_API_KEY` **présente**, même vide, sans `EMAIL_TRANSPORT=resend` admis, **partout**, `local` et `ci` compris (`forbidden`) ; absente avec `resend` admis (`missing`) ; d'une autre forme (`invalid_value`) ;
+- toute variable dont le nom commence par `NEXT_PUBLIC_` et contient `RESEND` (casse ignorée), partout (`forbidden`, libellé fixe `NEXT_PUBLIC_*RESEND*`).
+
+À l'envoi, la clé est relue par `cleResend` (`src/server/env/cle-resend.ts`) après la barrière de sortie et le cas admis ; un refus n'envoie rien (`email.transport_refused`). Prérequis de la base de la préversion : `db/bootstrap/roles.sql` rejoué par un propriétaire (rôle `vadrouille_mail_counter`), puis la migration `0020_plafond_emails` ; sans eux, la réservation échoue fermée (`provider_error`, aucun envoi). Plafond atteint, ou quota du jour ou du mois de Resend : `email_cap_reached` (`retryable: false`).
 
 ## Adaptateur prototype (spécification P0, P0b1 ; décision 0032 § A4 et § A6)
 
@@ -43,7 +61,7 @@ Aucune valeur par défaut d'`SMTP_URL` dans le code, `.env.example` ou les scrip
 | Variable | Valeur | Où la poser |
 |---|---|---|
 | `DATA_ADAPTER` | `prototype` | `.env.local` du poste (avec `pnpm dev`) ; le second serveur de `playwright.config.ts`. Jamais en production. |
-| `VADROUILLE_PROTOTYPE_DIR` | chemin **absolu et canonique** du dossier des programmes (sans lien symbolique : `realpath` du chemin égal au chemin donné), lu une fois au démarrage | `.env.local` ; `playwright.config.ts` (programme de test `prototype/programmes-test/`). Absente ou vide : la section « Prototype » de l'accueil est absente, sans erreur. |
+| `VADROUILLE_PROTOTYPE_DIR` | chemin **absolu et canonique** du dossier des programmes (sans lien symbolique : `realpath` du chemin égal au chemin donné), lu une fois au démarrage | `.env.local` ; `playwright.config.ts` (programme de test `prototype/programmes-test/`). Absente ou vide : la section « Prototype » de l'accueil est absente, sans erreur. **Jamais sur Vercel** (ni préversion, ni production) : en mode dossier, le partage réel crée un lien sans code d'accès (décision 0135 § 2). |
 | `VADROUILLE_PROTOTYPE` | `1`, avec `CI=true` | **En CI seulement** : `playwright.config.ts`, pour les tests sur le build de production. |
 
 **Liste blanche** (`prototypeAdapterAllowed`, `src/dev/flags.ts`) : l'adaptateur et son contexte (`org_prototype`) ne s'ouvrent que si aucun déploiement de production n'est détecté (`VADROUILLE_ENV` et `VERCEL_ENV` différents de `production`, même en majuscules ou avec des espaces), si `VADROUILLE_ENV` est absente, `local` ou `ci`, **et** dans l'un de ces trois cas :

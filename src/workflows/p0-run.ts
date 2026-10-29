@@ -28,7 +28,7 @@ import {
   type ConfigRecherche,
 } from "@/prototype/config";
 import { decouperProgramme } from "@/prototype/decoupage";
-import { ProgrammeEcritSchema, trajetsAConserver } from "@/prototype/programme-reduit";
+import { ProgrammeEcritSchema, PROTOTYPE_ORG_ID, trajetsAConserver } from "@/prototype/programme-reduit";
 import { reduireProgramme } from "@/prototype/reduction";
 import { reduireSite } from "@/research/fetch-page";
 import { composerP0Reel, type CapacitesProgramme, type CompositionP0Reel } from "@/server/composition/p0-reel";
@@ -936,6 +936,8 @@ async function ecrireVersion(
         // Brief saisi : identifiant connu dès le lancement, celui que suit l'écran 5 (décision 0125 § 2) ; révision :
         // celui du voyage révisé (décision 0126 § 1).
         tripId: redaction.tripId,
+        // Organisation du site d'essai (décision 0136 § 1.2 : reçue par l'assemblage partagé).
+        organizationId: PROTOTYPE_ORG_ID,
         brief,
         jours,
         bonsPlans: programme.bonsPlans,

@@ -177,28 +177,57 @@ export async function forfaitDuLot(
   contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
   reserveE: number,
 ): Promise<ForfaitDeLEtape> {
+  let forfait = await forfaitEntierReserve(dependances, contexte, "lot", (entier) => {
+    if (reserveE > entier.textSearchRequetes) throw new ArretEtape("cap_reached");
+  });
+  // Part Text Search de `e` bornée à sa réserve (0113 § 3 bis ; revue de la PR 667, mineur 10) : le registre de l'étape n'admet
+  // que les requêtes que la réserve a comptées, jamais tout le profil.
+  forfait = { ...forfait, textSearchRequetes: Math.min(forfait.textSearchRequetes, reserveE) };
+  const registre = creerRegistreForfait(forfait, contexte.generationRunId, dependances.horloge);
+  return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
+}
+
+/**
+ * Forfait **entier** d'un profil réservé sous l'identifiant de l'exécution (idempotent au rejeu), ou calculé en mémoire pour
+ * la variante simulée sans `reserverEnSimulee` (0110 § 3) ; `avant` contrôle le forfait du profil avant la réservation.
+ */
+async function forfaitEntierReserve(
+  dependances: DependancesResolues,
+  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
+  profil: "lot" | "programme",
+  avant: (entier: Forfait) => void = () => undefined,
+): Promise<Forfait> {
   const regles = dependances.reglesPour(contexte.barriere);
   if (regles === null) throw new ArretEtape("usage_unavailable");
   let entier: Forfait;
   try {
-    entier = forfaitDuProfil(regles.plafonds, regles.table, "lot");
+    entier = forfaitDuProfil(regles.plafonds, regles.table, profil);
   } catch {
     throw new ArretEtape("usage_unavailable");
   }
-  if (reserveE > entier.textSearchRequetes) throw new ArretEtape("cap_reached");
-  let forfait = entier;
-  if (contexte.barriere !== "simulee" || dependances.reserverEnSimulee) {
-    const reservation = await reserverForfait(
-      (fn) => dependances.transaction(contexte.organizationId, (tx) => fn(executeurSql(tx))),
-      { organisationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, profil: "lot" },
-      regles,
-    );
-    if (!reservation.ok) throw new ArretEtape(reservation.code);
-    forfait = reservation.forfait;
-  }
-  // Part Text Search de `e` bornée à sa réserve (0113 § 3 bis ; revue de la PR 667, mineur 10) : le registre de l'étape n'admet
-  // que les requêtes que la réserve a comptées, jamais tout le profil.
-  forfait = { ...forfait, textSearchRequetes: Math.min(forfait.textSearchRequetes, reserveE) };
+  avant(entier);
+  if (contexte.barriere === "simulee" && !dependances.reserverEnSimulee) return entier;
+  const reservation = await reserverForfait(
+    (fn) => dependances.transaction(contexte.organizationId, (tx) => fn(executeurSql(tx))),
+    { organisationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, profil },
+    regles,
+  );
+  if (!reservation.ok) throw new ArretEtape(reservation.code);
+  return reservation.forfait;
+}
+
+/**
+ * Forfait de `generateProgramme` (chaîne inversée, profil `programme` ; décision 0136 § 6) : réservé par l'étape `a` sous
+ * l'identifiant de l'exécution (idempotent), retrouvé par `e`, **entier à l'étape `e`** (`PARTS_FORFAIT` ne la concerne pas ;
+ * `a` ne consomme rien). Aucune réserve Text Search (`reserve-text-search.ts` n'est pas utilisé) ; la part Routes du profil
+ * vaut 0, si bien que le registre refuse tout appel Routes à la génération (§ 2.4). Variante simulée : en mémoire, sans
+ * ligne dans `usage_ledger`, sauf `reserverEnSimulee`.
+ */
+export async function forfaitDuProgramme(
+  dependances: DependancesResolues,
+  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
+): Promise<ForfaitDeLEtape> {
+  const forfait = await forfaitEntierReserve(dependances, contexte, "programme");
   const registre = creerRegistreForfait(forfait, contexte.generationRunId, dependances.horloge);
   return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
 }

@@ -1,4 +1,4 @@
-import { SHARE_TOKEN_PATTERN } from "@/contracts/values";
+import { SHARE_TOKEN_PATTERN, SIGNED_SHARE_TOKEN_PATTERN } from "@/contracts/values";
 
 /**
  * Adresses de la vue partagée (spécification F10, F10-TL-3 ; décision 0039) : seul endroit qui connaît le schéma de
@@ -20,9 +20,12 @@ export function sharedRoutes(token: string): SharedRoutes {
   };
 }
 
-/** Jeton lu dans l'adresse, s'il a la forme d'un jeton (`SHARE_TOKEN_PATTERN`) ; `null` sinon (404 sans lecture). */
+/**
+ * Jeton lu dans l'adresse, s'il a la forme d'un jeton (`SHARE_TOKEN_PATTERN`, ou `SIGNED_SHARE_TOKEN_PATTERN` du
+ * partage réel, décision 0135) ; `null` sinon (404 sans lecture). La signature est vérifiée par l'adaptateur.
+ */
 export function parseShareToken(value: string | null | undefined): string | null {
-  return typeof value === "string" && SHARE_TOKEN_PATTERN.test(value) ? value : null;
+  return typeof value === "string" && (SHARE_TOKEN_PATTERN.test(value) || SIGNED_SHARE_TOKEN_PATTERN.test(value)) ? value : null;
 }
 
 /** `n` de `RPJ` : entier écrit sans zéro initial ; `null` sinon (404). La présence du jour est vérifiée ensuite. */

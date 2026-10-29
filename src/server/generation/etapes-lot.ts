@@ -216,6 +216,15 @@ export function etapeLotDebut(entree: unknown, dependances?: DependancesGenerati
     entree,
     "a",
     async (contexte) => {
+      // Chaîne inversée (décision 0136 § 4.4), en attendant M1b : la ligne `batch` est close en `ready` sur sa version de base,
+      // sans nouvelle version (le tri est enregistré, le programme ne change pas), sans forfait ni appel.
+      if (contexte.dep.chaine === "inversee") {
+        await sql(contexte, async (x) => {
+          const fin = await x.query(SQL_FIN_LOT, [contexte.organizationId, contexte.generationRunId, contexte.rang, contexte.baseVersion, maintenant(contexte).toISOString()]);
+          if (fin.rows.length === 0) throw new ArretEtape("step_expired");
+        });
+        return "finie";
+      }
       const lot = await sql(contexte, (x) => lireLot(x, contexte));
       if (lot.jours.length === 0) {
         await sql(contexte, async (x) => {
