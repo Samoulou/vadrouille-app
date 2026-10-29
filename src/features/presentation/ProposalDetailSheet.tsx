@@ -37,7 +37,7 @@ export interface ProposalDetailSheetProps {
    */
   placesFromGoogle?: boolean;
   /**
-   * Photo du lieu (voyage d'essai, décision 0128), la même que celle de la carte : affichée en grand avec l'attribution
+   * Photo du lieu (site d'essai, décision 0128 ; `api`, décision 0143), la même que celle de la carte : affichée en grand avec l'attribution
    * complète exigée par Google (auteurs, liens vers leur profil, photo sur Google Maps). Absente ou `null` : rien.
    */
   photo?: PlacePhoto | null;

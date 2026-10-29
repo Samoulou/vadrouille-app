@@ -161,7 +161,7 @@
           ]
         }
       ],
-      "ecart": "ligne ordinaire de portée application (M1e, ticket 879 ; décision 0128 généralisée), modèle accepté par 0040 D4 et par la ligne de `api-tri-instance.ts` ; verdict Sécurité à rendre à la revue de la PR 879"
+      "ecart": "ligne ordinaire de portée application (M1e, ticket 879 ; décision 0143), modèle accepté par 0040 D4 et par la ligne de `api-tri-instance.ts` ; verdict Sécurité : approuvé (revue de la PR #882, c89c3f5)"
     },
     {
       "fichier": "src/adapters/simulated-payment-instance.ts",

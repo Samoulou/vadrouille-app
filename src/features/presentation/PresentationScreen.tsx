@@ -82,10 +82,13 @@ export interface PresentationScreenProps {
    * lien ne mène à une page 404 quand le paiement simulé n'est pas disponible.
    */
   canUnlock?: boolean;
-  /** Mention « Données de lieux : Google » (adaptateur `prototype`, spécification P0) ; absente par défaut. */
+  /**
+   * Mention « Données de lieux : Google » (adaptateur `prototype`, spécification P0 ; sur `api`, dès que les photos du tri
+   * sont demandées, décision 0143 § 5) ; absente par défaut.
+   */
   placesFromGoogle?: boolean;
   /**
-   * Photo de la carte affichée demandée à l'action (décision 0128 ; ticket 879 pour `api`) : la page passe
+   * Photo de la carte affichée demandée à l'action (décisions 0128 et 0143) : la page passe
    * `photosDuTriActives()` (site d'essai, ou `api` barrière ouverte). Absent : `placesFromGoogle`. Faux : aucune demande,
    * l'emplacement « Photo du lieu » reste.
    */
@@ -212,10 +215,15 @@ function Deck({
   const revisionDemandeeRef = useRef(false);
 
   const card = currentCard(state);
+  // Décision 0143 § 5 (0128 § 3) : dès que les photos Google sont demandées, la mention « Données de lieux : Google »
+  // accompagne le paquet et le détail, quel que soit l'adaptateur.
+  const donneesGoogle = placesFromGoogle || photos;
   // Décision 0128 : photo de la carte affichée seulement (voyage d'essai, ou `api` barrière ouverte ; jamais la carte
   // suivante en avance), puis celle du détail ouvert, servie par la même demande de la page.
-  const photoCarte = usePhotoCarte(tripId, card ? { proposalId: card.id, avecLieu: card.stop.placeId !== undefined } : null, photos, demanderPhoto);
-  const photoDetail = usePhotoCarte(tripId, detail ? { proposalId: detail.id, avecLieu: detail.stop.placeId !== undefined } : null, photos, demanderPhoto);
+  const carteDemandee = card ? { proposalId: card.id, avecLieu: card.stop.placeId !== undefined } : null;
+  const detailDemande = detail ? { proposalId: detail.id, avecLieu: detail.stop.placeId !== undefined } : null;
+  const photoCarte = usePhotoCarte(tripId, carteDemandee, photos, demanderPhoto);
+  const photoDetail = usePhotoCarte(tripId, detailDemande, photos, demanderPhoto);
   const position = offset + state.index + 1;
   const total = offset + state.cards.length;
   const programme = `/voyages/${encodeURIComponent(tripId)}`;
@@ -515,7 +523,7 @@ function Deck({
         />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
-      <PlacesAttribution placesFromGoogle={placesFromGoogle} className="shrink-0" />
+      <PlacesAttribution placesFromGoogle={donneesGoogle} className="shrink-0" />
       {/* Montées seulement à l'ouverture : la fermeture les démonte, et Radix rend le focus (`onReturnFocus`). */}
       {state.prompt ? (
         <Suspense fallback={null}>
@@ -542,7 +550,7 @@ function Deck({
             weekday={weekdayOf(dayOf(detail.day)?.date ?? "")}
             onClose={() => setDetail(null)}
             onReturnFocus={returnFocus}
-            placesFromGoogle={placesFromGoogle}
+            placesFromGoogle={donneesGoogle}
             photo={photoDetail.photo}
             photoEnAttente={photoDetail.attente}
           />

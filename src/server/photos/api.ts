@@ -6,31 +6,25 @@ import { evaluerBarriere, plafondsDeGenerationPoses, type EtatBarriere } from "@
 import { checkRateLimit } from "@/server/rate-limit";
 
 /**
- * Photos du tri « J'aime / Pas pour moi » sur l'adaptateur `api` (ticket 879, ligne M1e du plan
- * `docs/plans/mvp-etapes-1-9.md` ; décision 0128 généralisée). Même règle que le site d'essai : une photo par carte
- * affichée, demandée par la carte (`tripId`, `proposalId`), **jamais par un identifiant de lieu** ; la photo n'est jamais
- * stockée, journalisée ni mise en cache ; aucune donnée Google en base ni dans un prompt.
+ * Photos du tri « J'aime / Pas pour moi » sur l'adaptateur `api` (décision 0143, qui généralise 0128 ; ticket 879, ligne
+ * M1e du plan `docs/plans/mvp-etapes-1-9.md`). Même règle que le site d'essai : une photo par carte affichée, demandée par
+ * la carte (`tripId`, `proposalId`), **jamais par un identifiant de lieu** ; la photo n'est jamais stockée, journalisée
+ * ni mise en cache ; aucune donnée Google en base ni dans un prompt.
  *
- * À **chaque** photo, dans cet ordre, le premier refus l'emportant (refus : `null`, aucun appel Google ; la carte garde
- * son emplacement « Photo du lieu », sans message) :
- * 1. **barrière** : celle des appels réels de `api` (B9-TL-8, `evaluerBarriere`, plafonds de génération posés et non
- *    nuls), qui tient lieu sur `api` de la garde du mode réel et du code d'accès du site d'essai (comme pour la ville de
- *    l'écran 1, décision 0141 § 6.2). Aucun crochet d'accès n'est fourni : la barrière reste **fermée** (`simulee` ou
- *    `production`) tant que M1h ne branche pas le crochet de `api` ; aucune lecture du voyage, aucun limiteur, aucune
- *    base ;
- * 2. **appartenance au voyage** : le lieu est celui que rend `lieu`, c'est-à-dire, pour `photoLieuApi`
- *    (`src/adapters/index.ts`), le `placeId` d'une proposition du voyage demandé, lue en base dans le contexte
- *    d'organisation de la requête ; `null` (voyage d'une autre organisation, carte d'un autre voyage, sans lieu) :
- *    refus, sans limiteur ;
- * 3. **cadence** : même plafond que le site d'essai, 40 photos par heure (`MAX_PHOTOS_PAR_HEURE` de
- *    `src/server/p0/photos.ts`, F13-TL-2), comptées par le limiteur de l'app (`action_rate_limits`, action `photo-tri`,
- *    `src/server/config/limites.ts`) : aucune table nouvelle, aucune migration ; échec fermé ;
- * 4. **client** : le client des photos de `api`, **non branché** (`client` vaut `null` par défaut) : sa composition (clé,
- *    port de consommation, décompte du coût hors de `prototype.forfaits`) revient au Tech Lead avec M1h (question de la
- *    PR 879). Une photo rendue est revalidée ici (`PlacePhotoSchema`).
+ * À **chaque** photo, dans cet ordre (0143 § 2), le premier refus l'emportant (refus : `null`, aucun appel Google ; la
+ * carte garde son emplacement « Photo du lieu », sans message) :
+ * 1. **barrière** B9-TL-8 (`evaluerBarriere`, plafonds de génération posés et non nuls), **sans crochet d'accès** : elle
+ *    rend `production` ou `simulee` tant que M1h ne fournit pas le crochet de `api` (0143 § 1) ;
+ * 2. **client branché** : la fabrique du client des photos vaut `null` par défaut (0143 § 4 : le branchement et son
+ *    décompte sont livrés par M1h) ; non branchée, refus avant toute lecture du voyage ;
+ * 3. **appartenance au voyage** : `lieu` rend, pour `photoLieuApi` (`src/adapters/index.ts`), le `placeId` d'une
+ *    proposition du voyage demandé, lu en base dans l'organisation de la session ; `null` : refus, sans limiteur ;
+ * 4. **cadence** : 40 photos par heure et par adresse IP, limiteur de l'app (`action_rate_limits`, action `photo-tri`,
+ *    `src/server/config/limites.ts` ; 0143 § 3) : aucune table nouvelle, aucune migration ; échec fermé ;
+ * 5. **client** construit après le limiteur seulement, puis photo revalidée (`PlacePhotoSchema`).
  *
- * Aucun journal ici : la barrière fermée et le lieu hors du voyage sont des refus attendus ; le limiteur journalise ses
- * propres refus, sans valeur d'en-tête.
+ * Aucun journal ici : barrière fermée et lieu hors du voyage sont des refus attendus ; le limiteur journalise ses propres
+ * refus, sans valeur d'en-tête.
  */
 
 /** Action du limiteur pour les photos du tri (`RATE_LIMITS`, 40 par heure et par adresse IP). */
@@ -58,7 +52,7 @@ export interface PhotosApi {
   photo(lieu: () => Promise<string | null>): Promise<PlacePhoto | null>;
 }
 
-/** Client par défaut de `api` : aucun (composition à décider avec M1h, question de la PR 879). */
+/** Client par défaut de `api` : aucun (0143 § 4 : branchement et décompte livrés par M1h). */
 const CLIENT_PAR_DEFAUT: (() => Promise<ClientPhotosApi>) | null = null;
 
 /** Barrière par défaut : aucun crochet d'accès (fermé par défaut, B9-TL-8) ; M1h branchera celui de `api`. */
@@ -78,9 +72,9 @@ export function creerPhotosApi(dependances: DependancesPhotosApi = {}): PhotosAp
     async photo(lieu) {
       try {
         if ((await barriere()) !== "reelle") return null;
+        if (client === null) return null;
         const placeId = await lieu();
         if (placeId === null) return null;
-        if (client === null) return null;
         if (!(await limiteur())) return null;
         // Contrat de l'action (hôtes Google seulement) : une forme invalide vaut « aucune photo ».
         const lu = PlacePhotoSchema.nullable().safeParse(await (await client()).photo(placeId));
@@ -93,9 +87,9 @@ export function creerPhotosApi(dependances: DependancesPhotosApi = {}): PhotosAp
 }
 
 /**
- * Vrai si l'écran du tri de `api` peut demander une photo : client branché et barrière ouverte (aucun client lu ni
- * construit). Lu par la page (aucune
- * demande du navigateur sous la barrière fermée : l'emplacement « Photo du lieu » reste, sans appel à l'action).
+ * Vrai si l'écran du tri de `api` peut demander une photo : client branché et barrière ouverte ; aucun client n'est
+ * construit ici. Lu par la page : sous la barrière fermée, le navigateur ne demande rien et l'emplacement « Photo du
+ * lieu » reste, sans appel à l'action.
  */
 export async function photosApiOuvertes(dependances: Pick<DependancesPhotosApi, "barriere" | "client"> = {}): Promise<boolean> {
   try {

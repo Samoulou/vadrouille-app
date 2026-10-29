@@ -331,6 +331,21 @@ async function lieuDeLaProposition(lecteur: TripAdapter, ctx: AdapterContext, tr
 }
 
 /**
+ * Étape commune aux photos du site d'essai et de `api` (décisions 0128 et 0143) : lecture différée du lieu de la carte,
+ * appelée par le service des photos après sa barrière seulement ; lieu absent ou mal formé : `null`.
+ */
+function lieuDeLaCarte(
+  lecteur: () => TripAdapter,
+  ctx: AdapterContext,
+  demande: { readonly tripId: string; readonly proposalId: string },
+): () => Promise<string | null> {
+  return async () => {
+    const placeId = await lieuDeLaProposition(lecteur(), ctx, demande.tripId, demande.proposalId);
+    return placeId !== null && PLACE_ID_PHOTO.test(placeId) ? placeId : null;
+  };
+}
+
+/**
  * Photo d'une carte du tri d'un voyage d'essai (décision 0128, demande de Samuel du 2026-10-23 15:23 UTC), chargée à la
  * demande par les photos branchées sur l'adaptateur `prototype` (`src/server/p0/photos.ts` : garde du mode réel, cookie
  * d'accès, cadence et forfait réservé). **Le lieu n'est jamais pris de l'entrée** : il est lu sur la proposition
@@ -349,10 +364,7 @@ export async function photoLieuEssai(
     const photos = photosEssai();
     if (photos === null) return null;
     // Le voyage n'est lu qu'après la garde et le cookie d'accès (`src/server/p0/photos.ts`) : sans code d'accès, aucune lecture.
-    const lieu = async () => {
-      const placeId = await lieuDeLaProposition(lecteur(), ctx, demande.tripId, demande.proposalId);
-      return placeId !== null && PLACE_ID_PHOTO.test(placeId) ? placeId : null;
-    };
+    const lieu = lieuDeLaCarte(lecteur, ctx, demande);
     return (await photos.photo(lieu)) ?? null;
   } catch {
     return null;
@@ -369,9 +381,9 @@ export function cheminPhotosDuTri(value: string | undefined = process.env.DATA_A
 }
 
 /**
- * Photo d'une carte du tri sur l'adaptateur `api` (ticket 879, M1e ; décision 0128 généralisée) : barrière B9-TL-8, puis
- * lieu, cadence et client de `src/server/photos/api.ts`, branchés au démarrage (`api-photos-instance.ts`). **Le lieu n'est jamais pris de l'entrée** : il est lu en base
- * sur la proposition `proposalId` du voyage `tripId`, par `getTripReader()` dans le contexte d'organisation de la
+ * Photo d'une carte du tri sur l'adaptateur `api` (décision 0143, qui généralise 0128 ; ticket 879, M1e) : barrière
+ * B9-TL-8, client branché, lieu, cadence et client de `src/server/photos/api.ts`, branchés au démarrage
+ * (`api-photos-instance.ts`). **Le lieu n'est jamais pris de l'entrée** : il est lu en base sur la proposition `proposalId` du voyage `tripId`, par `getTripReader()` dans le contexte d'organisation de la
  * requête (mêmes cartes que l'écran, `lieuDeLaProposition`), et seulement barrière ouverte. Hors adaptateur `api`,
  * voyage inconnu ou d'une autre organisation, proposition d'un autre voyage ou sans lieu, identifiant mal formé : `null`,
  * photos non branchées, aucun appel. Ne lève jamais ; rien n'est stocké.
@@ -385,10 +397,7 @@ export async function photoLieuApi(
   try {
     const photos = photosApi();
     if (photos === null) return null;
-    const lieu = async () => {
-      const placeId = await lieuDeLaProposition(lecteur(), ctx, demande.tripId, demande.proposalId);
-      return placeId !== null && PLACE_ID_PHOTO.test(placeId) ? placeId : null;
-    };
+    const lieu = lieuDeLaCarte(lecteur, ctx, demande);
     return (await photos.photo(lieu)) ?? null;
   } catch {
     return null;

@@ -1,7 +1,7 @@
 import type { PlacePhoto } from "@/contracts/photo";
 
 /**
- * Photos du tri sur l'adaptateur `api` (ticket 879, M1e ; décision 0128 généralisée ; même modèle que
+ * Photos du tri sur l'adaptateur `api` (ticket 879, M1e ; décision 0143, qui généralise 0128 ; même modèle que
  * `api-tri-instance.ts`).
  *
  * **Branchement au démarrage** : ce module n'importe rien de `src/server` (ni `src/server/photos/api.ts`, ni la barrière,

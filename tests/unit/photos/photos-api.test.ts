@@ -4,9 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { RATE_LIMITS } from "@/server/config/limites";
 import { ACTION_LIMITEUR_PHOTO, creerPhotosApi, photosApiOuvertes, type ClientPhotosApi, type DependancesPhotosApi } from "@/server/photos/api";
 import type { EtatBarriere } from "@/server/generation/barriere";
+import { MAX_PHOTOS_PAR_HEURE } from "@/server/p0/photos";
 
 /**
- * Photos du tri sur `api` (PR 879, M1e ; décision 0128 généralisée) : barrière B9-TL-8 d'abord, puis le lieu lu sur la
+ * Photos du tri sur `api` (PR 879, M1e ; décision 0143, qui généralise 0128) : barrière B9-TL-8 d'abord, puis le lieu lu sur la
  * proposition du voyage, le limiteur, puis le client ; sous la barrière fermée, ni lecture du voyage, ni limiteur, ni
  * client. Doubles seulement : aucune base, aucun en-tête, aucun appel Google.
  */
@@ -68,11 +69,11 @@ describe("photos du tri sur api (PR 879)", () => {
     expect(await photosApiOuvertes({ client: d.fabrique })).toBe(false);
   });
 
-  it("client par défaut non branché : null même barrière ouverte, sans limiteur ; l'écran ne demande rien", async () => {
+  it("client par défaut non branché : null même barrière ouverte, sans lecture du voyage ni limiteur ; l'écran ne demande rien", async () => {
     const d = doubles("reelle");
     const sansClient: DependancesPhotosApi = { barriere: d.dependances.barriere, limiteur: d.dependances.limiteur };
     expect(await creerPhotosApi(sansClient).photo(d.lieu)).toBeNull();
-    expect(d.ordre).toEqual(["barriere", "lieu"]);
+    expect(d.ordre).toEqual(["barriere"]);
     expect(await photosApiOuvertes({ barriere: d.dependances.barriere })).toBe(false);
   });
 
@@ -109,8 +110,8 @@ describe("photos du tri sur api (PR 879)", () => {
     expect(await photosApiOuvertes({ ...panne.dependances, barriere })).toBe(false);
   });
 
-  it("même plafond que le site d'essai : 40 photos par heure, action photo-tri du limiteur", () => {
+  it("même plafond que le site d'essai (MAX_PHOTOS_PAR_HEURE) par heure et par adresse IP, action photo-tri du limiteur", () => {
     expect(ACTION_LIMITEUR_PHOTO).toBe("photo-tri");
-    expect(RATE_LIMITS[ACTION_LIMITEUR_PHOTO]).toEqual([{ kind: "ip", windowSeconds: 3600, threshold: 40 }]);
+    expect(RATE_LIMITS[ACTION_LIMITEUR_PHOTO]).toEqual([{ kind: "ip", windowSeconds: 3600, threshold: MAX_PHOTOS_PAR_HEURE }]);
   });
 });

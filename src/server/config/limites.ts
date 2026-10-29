@@ -33,9 +33,9 @@ export const RATE_LIMITS: RateLimitConfig = {
   // de la phase simulée seulement : ils ne valent pas pour `stripe` (B4c, Q86).
   "payment-start": [{ kind: "ip", windowSeconds: 3600, threshold: 20 }],
   "payment-simulate": [{ kind: "ip", windowSeconds: 3600, threshold: 60 }],
-  // M1e (ticket 879) : photos du tri sur `api` (`src/server/photos/api.ts`), même plafond que le site d'essai, 40 par
-  // heure (décision 0128 § 4, F13-TL-2), ici par adresse IP (le limiteur n'a pas de règle par session). Lu seulement
-  // barrière B9-TL-8 ouverte et lieu admis : aucun appel aujourd'hui. Seuil proposé, à confirmer (Q86, PR 879).
+  // M1e (décision 0143 § 3) : photos du tri sur `api` (`src/server/photos/api.ts`), même nombre que le site d'essai
+  // (`MAX_PHOTOS_PAR_HEURE`, 0128 § 4), compté par adresse IP (le limiteur n'a pas de règle par session ; le site d'essai
+  // compte toutes sessions confondues). Lu seulement barrière B9-TL-8 ouverte, client branché et lieu admis.
   "photo-tri": [{ kind: "ip", windowSeconds: 3600, threshold: 40 }],
 };
 

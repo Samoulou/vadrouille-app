@@ -33,12 +33,14 @@ export default async function PresentationPage({ params }: { params: Promise<{ i
   if (!data) {
     notFound();
   }
+  const photos = await photosDuTriActives();
   return (
     <PresentationScreen
       {...data}
       canUnlock={paymentAvailable()}
-      placesFromGoogle={isPrototypeAdapter()}
-      photos={await photosDuTriActives()}
+      // Décision 0143 § 5 : une photo Google affichée sur `api` porte aussi « Données de lieux : Google » (0128 § 3).
+      placesFromGoogle={isPrototypeAdapter() || photos}
+      photos={photos}
       recorderKind={devPagesEnabled() ? "console" : "none"}
     />
   );
