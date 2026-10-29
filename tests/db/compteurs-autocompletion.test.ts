@@ -118,7 +118,7 @@ afterAll(async () => {
 });
 
 describe("autocomplétion: forme de la table (0021)", () => {
-  it("trois colonnes seulement (jour, suggestions, choix) : aucune saisie, donnée Google, empreinte ni organisation", async () => {
+  it("quatre colonnes seulement (jour, suggestions, choix, lieux) : aucune saisie, donnée Google, empreinte ni organisation", async () => {
     const { rows } = await admin.query(
       `SELECT attname, pg_catalog.format_type(atttypid, atttypmod) AS type, attnotnull FROM pg_catalog.pg_attribute
        WHERE attrelid = 'public.autocomplete_daily_counts'::regclass AND attnum > 0 AND NOT attisdropped ORDER BY attnum`,
@@ -127,6 +127,8 @@ describe("autocomplétion: forme de la table (0021)", () => {
       { attname: "day", type: "date", attnotnull: true },
       { attname: "suggestions", type: "integer", attnotnull: true },
       { attname: "choix", type: "integer", attnotnull: true },
+      // M5-D (migration 0022, décision 0147 § 6.4 point 3) : recherches d'un lieu à soi.
+      { attname: "lieux", type: "integer", attnotnull: true },
     ]);
   });
 
@@ -261,8 +263,13 @@ describe("autocomplétion: droits minimaux et isolation des rôles", () => {
 });
 
 const DOWN_0021 = readFileSync(path.join(process.cwd(), "db/migrations/0021_compteurs_autocompletion.down.sql"), "utf8");
+/**
+ * Descente de 0022 (M5-D), jouée d'abord : les descentes se jouent dans l'ordre inverse des migrations, et celle de 0021
+ * ne connaît pas l'`UPDATE (lieux)` accordé par 0022.
+ */
+const DOWN_0022 = readFileSync(path.join(process.cwd(), "db/migrations/0022_feedback_signalements.down.sql"), "utf8");
 
-describe("autocomplétion: retour arrière de 0021 (base jetable)", () => {
+describe("autocomplétion: retour arrière de 0021, après celui de 0022 (base jetable)", () => {
   it("la descente retire droits et politique, garde la table et ses compteurs ; la réservation est refusée (42501)", async () => {
     const nom = await creerBase("autocompl_retour");
     await runMigrations({ VADROUILLE_DATABASE_URL_MIGRATOR: urlBaseJetable("migrator", nom) });
@@ -270,6 +277,7 @@ describe("autocomplétion: retour arrière de 0021 (base jetable)", () => {
     expect(await reserver(appJ, "suggestions", 150)).toBe(1);
 
     await migrateur.query("BEGIN");
+    await migrateur.query(DOWN_0022);
     await migrateur.query(DOWN_0021);
     expect((await migrateur.query("SELECT current_user::text AS u")).rows[0].u).toBe("vadrouille_migrator");
     await migrateur.query("COMMIT");
@@ -424,6 +432,7 @@ describe("autocomplétion: module de réservation (M1f)", () => {
     await expect(compteur.purge()).resolves.toBeUndefined();
 
     await migrateur.query("BEGIN");
+    await migrateur.query(DOWN_0022);
     await migrateur.query(DOWN_0021);
     await migrateur.query("COMMIT");
 

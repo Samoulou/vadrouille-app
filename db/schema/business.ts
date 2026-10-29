@@ -479,6 +479,18 @@ export const eventOccurrences = pgTable(
   ],
 );
 
+/**
+ * Motifs d'un signalement : valeurs de `STOP_REPORT_REASONS` (décision 0147 § 1 point 1, contrat de M5-C), dans le même
+ * ordre ; comparées à la migration 0022 par `tests/unit/db/migration-feedback.test.ts`.
+ */
+const FEEDBACK_REASONS = ["closed", "hours", "wrongPlace", "price", "other"] as const;
+
+/**
+ * Signalements d'une étape (décision 0147 § 2, migration 0022_feedback_signalements) : un motif fermé, **aucun texte**
+ * (`text` reste pour la purge, toujours nulle), idempotence par `request_id`, une seule ligne par motif, étape et lieu
+ * (`place_id` dans la clé : les identifiants d'étape sont réutilisés d'une version à l'autre, 0142 § 5.1). Jamais
+ * modifiée : `vadrouille_app` n'a que `SELECT, INSERT` (`REVOKE UPDATE` de 0022).
+ */
 export const feedback = pgTable(
   "feedback",
   {
@@ -494,11 +506,22 @@ export const feedback = pgTable(
       .notNull()
       .references(() => users.id),
     createdAt: createdAt(),
+    // 0147 § 2 point 1 : nullable pour la forme, toujours écrite par `reportStop`.
+    requestId: uuid("request_id"),
   },
   (t) => [
     tripFk("feedback_trip_fk", t),
     index("feedback_organization_id_trip_id_idx").on(t.organizationId, t.tripId),
+    uniqueIndex("feedback_organization_id_trip_id_request_id_idx")
+      .on(t.organizationId, t.tripId, t.requestId)
+      .where(sql`${t.requestId} IS NOT NULL`),
+    uniqueIndex("feedback_stop_dedup_idx")
+      .on(t.organizationId, t.tripId, t.targetStopId, t.reason, sql`COALESCE(${t.placeId}, '')`)
+      .where(sql`${t.scope} = 'stop'`),
     check("feedback_scope_check", oneOf(t.scope, ["stop", "trip"])),
+    check("feedback_reason_check", oneOf(t.reason, FEEDBACK_REASONS)),
+    check("feedback_text_check", sql`${t.text} IS NULL`),
+    check("feedback_target_stop_check", sql`${t.scope} <> 'stop' OR ${t.targetStopId} IS NOT NULL`),
   ],
 );
 
