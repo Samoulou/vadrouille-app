@@ -439,7 +439,8 @@ describe("confinement: spécificateurs et paquets (dépôt)", () => {
     expect(suivis.map((f) => f.chemin).filter((c) => /(^|\/)(\.npmrc|\.yarnrc[^/]*|pnpm-workspace\.yaml)$/.test(c))).toEqual([".npmrc"]);
   });
 
-  it(".npmrc : contenu exact, l'âge minimal de publication seulement (décision 0144 § 6)", () => {
+  it(".npmrc : fichier ordinaire (mode 100644, jamais un lien symbolique), contenu exact, l'âge minimal de publication seulement (décision 0144 § 6)", () => {
+    expect(suivis.filter((f) => f.chemin === ".npmrc").map((f) => f.mode)).toEqual(["100644"]);
     expect(lireFichier(".npmrc")).toBe("minimum-release-age=20160\n");
   });
 });
