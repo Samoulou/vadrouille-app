@@ -102,6 +102,22 @@ vi.mock("@/server/presentation/tri", () => ({
   cloreTri: casDuTri.cloreTri,
 }));
 
+// PR 879 (M1e) : branchement des photos du tri `api` (doubles : aucune barrière, aucun limiteur, aucune base).
+const brancherPhotos = vi.fn();
+const photosApi = { photo: vi.fn(), ouvertes: vi.fn() };
+const creerPhotosApi = vi.fn(() => ({ photo: photosApi.photo }));
+let echecPhotos: Error | null = null;
+vi.mock("@/adapters/api-photos-instance", () => ({
+  brancherPhotosApi: (photos: unknown) => brancherPhotos(photos),
+}));
+vi.mock("@/server/photos/api", () => ({
+  get creerPhotosApi() {
+    if (echecPhotos) throw echecPhotos;
+    return () => creerPhotosApi();
+  },
+  photosApiOuvertes: () => photosApi.ouvertes(),
+}));
+
 // B4b : branchement du paiement simulé en base (doubles : aucune composition réelle, aucune base, aucune clé).
 const brancherPaiement = vi.fn();
 const composerPaiementSimule = vi.fn(() => ({ adaptateur: "simule" }));
@@ -136,6 +152,11 @@ beforeEach(() => {
   echecPaiement = null;
   brancherTri.mockClear();
   echecTri = null;
+  brancherPhotos.mockClear();
+  creerPhotosApi.mockClear();
+  photosApi.photo.mockClear();
+  photosApi.ouvertes.mockClear();
+  echecPhotos = null;
   logEvent.mockClear();
   brancher.mockClear();
   brancherApi.mockClear();
@@ -363,6 +384,40 @@ describe("instrumentation : branchement du tri enregistré api (spécification B
     expect(brancherApi).toHaveBeenCalledTimes(1);
     expect(brancherCreation).toHaveBeenCalledTimes(1);
     expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-tri", errorName: "TypeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
+  });
+});
+
+describe("instrumentation : branchement des photos du tri api (PR 879, M1e)", () => {
+  it("DATA_ADAPTER=api : photos branchées une fois, rien n'est appelé au démarrage", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    await register();
+    expect(brancherPhotos).toHaveBeenCalledTimes(1);
+    expect(creerPhotosApi).toHaveBeenCalledTimes(1);
+    expect(photosApi.photo).not.toHaveBeenCalled();
+    expect(photosApi.ouvertes).not.toHaveBeenCalled();
+    const branchees = brancherPhotos.mock.calls[0]?.[0] as { photo: (lieu: unknown) => unknown; ouvertes: () => unknown };
+    const lieu = async () => null;
+    branchees.photo(lieu);
+    branchees.ouvertes();
+    expect(photosApi.photo).toHaveBeenCalledWith(lieu);
+    expect(photosApi.ouvertes).toHaveBeenCalledTimes(1);
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "mock", "prototype"])("DATA_ADAPTER=%j : photos du tri api non branchées", async (valeur) => {
+    vi.stubEnv("DATA_ADAPTER", valeur);
+    await register();
+    expect(brancherPhotos).not.toHaveBeenCalled();
+  });
+
+  it("échec du branchement : voyages.action_failed (branchement-photos) avec le seul nom d'erreur, tri toujours branché", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    echecPhotos = Object.assign(new TypeError("secret du module"), { cause: "secret" });
+    await register();
+    expect(brancherPhotos).not.toHaveBeenCalled();
+    expect(brancherTri).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-photos", errorName: "TypeError" }, "error");
     expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
   });
 });
