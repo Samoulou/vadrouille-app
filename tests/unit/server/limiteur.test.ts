@@ -458,6 +458,8 @@ describe("module de journal", () => {
       "email.transport_refused",
       // B3d (revue de la PR 850, mineur 1) : purge du plafond global en échec, nom d'erreur seulement.
       "email.purge_failed",
+      // M7a : e-mail « propositions prêtes » non envoyé (base, composition ou transport), nom d'erreur seulement.
+      "email.notification_failed",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",

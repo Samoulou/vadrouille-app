@@ -2,7 +2,7 @@ import "server-only";
 
 import { logEvent } from "@/server/log";
 
-import type { CodeMailer } from "./port";
+import type { CodeMailer, NotificationMailer } from "./port";
 
 /** Refus de l'implémentation désactivée ; ne porte aucune valeur (ni adresse, ni code). */
 export class CodeMailerDisabledError extends Error {
@@ -20,6 +20,17 @@ export class CodeMailerDisabledError extends Error {
  */
 export const disabledCodeMailer: CodeMailer = Object.freeze({
   async sendLoginCode(): Promise<void> {
+    logEvent("email.transport_disabled", {}, "warn");
+    throw new CodeMailerDisabledError();
+  },
+});
+
+/**
+ * Port des notifications désactivé (M7a) : sans `EMAIL_TRANSPORT`, ou sans `APP_URL` (aucun lien possible). Refuse tout
+ * envoi avec l'événement `email.transport_disabled`, sans aucune valeur, comme `disabledCodeMailer`.
+ */
+export const disabledNotificationMailer: NotificationMailer = Object.freeze({
+  async sendApercuPret(): Promise<void> {
     logEvent("email.transport_disabled", {}, "warn");
     throw new CodeMailerDisabledError();
   },
