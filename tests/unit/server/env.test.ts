@@ -5,6 +5,7 @@ import { inspect } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { authAdapterChoice, betterAuthAllowed } from "@/adapters/auth-guard";
+import { paymentAvailable } from "@/adapters/payment-guard";
 import { isProductionDeployment } from "@/dev/flags";
 import * as route from "@/app/api/v1/webhooks/simulated/route";
 import * as moduleEnv from "@/server/env";
@@ -1119,6 +1120,36 @@ describe("paiement: réponses du webhook simulé (A24)", () => {
       expect(["method_not_allowed", "invalid_request", "server_error"].some((code) => texte === JSON.stringify({ error: code }))).toBe(true);
       for (const valeur of [recu.id, recu.data.object.id, recu.data.object.metadata.checkoutId, "base indisponible"]) expect(texte).not.toContain(valeur);
     }
+  });
+});
+
+describe("paiement: parité du webhook simulé ouvert avec la garde de `src/adapters/payment-guard.ts` (amendement B4-TL-14 de 0020 § 2.3 ; revue de la PR 836, mineur 4)", () => {
+  // `paymentAvailable` recalcule « webhook simulé ouvert » sans importer `src/server/env`. Pour chaque environnement, la
+  // garde (paiement simulé autorisé par `NODE_ENV=test`, `DATA_ADAPTER=api`, `AUTH_ADAPTER=better-auth`) est ouverte si
+  // et seulement si le serveur démarre (`parseServerEnv`) et que `webhookSimuleOuvert` (lu par `configurationDepuisEnv`)
+  // est vrai.
+  const variantes: Env[] = [];
+  for (const VADROUILLE_ENV of ["ci", "local", "development", " CI ", "staging", "production", undefined]) {
+    for (const VERCEL_ENV of [undefined, "development", "preview", "production"]) {
+      for (const SIMULATED_WEBHOOK_ENABLED of ["true", "TRUE", "1", " true", undefined]) {
+        variantes.push(ouvertWebhook({ VADROUILLE_ENV, VERCEL_ENV, SIMULATED_WEBHOOK_ENABLED }));
+      }
+    }
+  }
+  const ouvertCoteServeur = (env: Env): boolean => {
+    try {
+      return configurationDepuisEnv(parseServerEnv(env)).ouvert;
+    } catch {
+      return false;
+    }
+  };
+
+  it("même verdict pour chaque environnement de la table, avec des cas ouverts et des cas fermés", () => {
+    const ecarts = variantes.filter((env) => paymentAvailable({ ...env, NODE_ENV: "test" }) !== ouvertCoteServeur(env));
+    expect(ecarts.map((env) => JSON.stringify([env.VADROUILLE_ENV, env.VERCEL_ENV, env.SIMULATED_WEBHOOK_ENABLED]))).toEqual([]);
+    const issues = variantes.map(ouvertCoteServeur);
+    expect(issues).toContain(true);
+    expect(issues).toContain(false);
   });
 });
 

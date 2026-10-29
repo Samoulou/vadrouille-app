@@ -148,6 +148,20 @@ describe("configuration versionnée : drapeau du paiement simulé (décision 002
     expect(lignesWebhookSimule("APP_URL=\nPAYMENT_ADAPTER=\n")).toEqual([]);
   });
 
+  // B4b (spécification B4, B4b points 4 et 5 ; décision 0097 B4-TL-8 point 4) : `playwright.config.ts` (hors de la
+  // configuration versionnée ci-dessus) pose le drapeau et le secret du webhook simulé dans le seul objet du paiement
+  // simulé du serveur `api`, à côté de `PAYMENT_ADAPTER: "simulated"`, le secret par `secretJetable()` (jamais un texte).
+  it("playwright.config.ts pose le drapeau et le secret du webhook simulé avec PAYMENT_ADAPTER=simulated seulement (B4b)", () => {
+    const source = readFileSync(join(ROOT, "playwright.config.ts"), "utf8");
+    const [drapeau, secret] = NOMS_WEBHOOK_SIMULE as [string, string];
+    expect(lignesWebhookSimule(source).map((ligne) => ligne.trim())).toEqual([`${drapeau}: "true",`, `${secret}: secretJetable(),`]);
+    const objet = /const PAIEMENT_SIMULE_API = \{([^}]*)\} as const;/.exec(source)?.[1] ?? "";
+    expect(objet).toContain('PAYMENT_ADAPTER: "simulated"');
+    expect(objet).toContain(`${drapeau}: "true"`);
+    expect(objet).toContain(`${secret}: secretJetable()`);
+    expect(source.match(/\.\.\.PAIEMENT_SIMULE_API/g)).toHaveLength(1);
+  });
+
   it("playwright.config.ts pose le drapeau du partage pour les tests (F10-TL-7)", () => {
     expect(readFileSync(join(ROOT, "playwright.config.ts"), "utf8")).toMatch(/VADROUILLE_DEMO_SHARE: "1"/);
   });

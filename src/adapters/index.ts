@@ -28,6 +28,7 @@ import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
 import { realShareAvailable, shareAvailable } from "./share-guard";
 import { createSignedShareAdapter } from "./signed-share";
+import { paiementSimule } from "./simulated-payment-instance";
 import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
 import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
 
@@ -155,15 +156,18 @@ export function getAuthAdapter(options: { scope?: SimulationScope; env?: NodeJS.
 export const CHECKOUT_TTL_MS = 30 * 60_000;
 export const DEMO_UNLOCK_TTL_MS = 30 * 60_000;
 
-function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_ADAPTER): "mock" {
+function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_ADAPTER): "mock" | "simulated" {
   const choice = adapterChoice(value);
   switch (choice) {
     case "mock":
       return "mock";
+    case "simulated":
+      // B4b (spécification B4, B4b point 1) : paiement simulé en base, branché au démarrage (`./simulated-payment-instance.ts`).
+      return "simulated";
     case "stripe":
       throw new Error("adaptateur de paiement stripe non implémenté (tâche de paiement réel, après G0 et Q26)");
     default:
-      throw new Error(`PAYMENT_ADAPTER inconnu : « ${choice} » (valeurs : mock, stripe)`);
+      throw new Error(`PAYMENT_ADAPTER inconnu : « ${choice} » (valeurs : mock, simulated, stripe)`);
   }
 }
 
@@ -181,33 +185,40 @@ function mockPaymentFor(scope: SimulationScope): PaymentAdapter & PaymentSimulat
   });
 }
 
+/** Adaptateur du choix courant : `mock` dans la portée, `simulated` branché au démarrage (la portée ne sert pas). */
+function paymentFor(scope: SimulationScope | undefined): PaymentAdapter & PaymentSimulator {
+  return paymentAdapterChoice() === "simulated" ? paiementSimule() : mockPaymentFor(scope ?? defaultScope());
+}
+
 /**
- * Adaptateur de paiement (variable serveur `PAYMENT_ADAPTER`, `mock` par défaut). **Filet de sécurité** :
- * lève une erreur si `paymentAvailable()` est faux ; les pages et les actions consultent la garde avant
- * et ne l'atteignent jamais dans ce cas.
+ * Adaptateur de paiement (variable serveur `PAYMENT_ADAPTER`, `mock` par défaut ; `simulated` depuis B4b, l'état vit
+ * alors en base et la portée de simulation ne sert pas). **Filet de sécurité** : lève une erreur si `paymentAvailable()`
+ * est faux ; les pages et les actions consultent la garde avant et ne l'atteignent jamais dans ce cas. `stripe` lève
+ * toujours « non implémenté » (B4c).
  */
 export function getPaymentAdapter(options: { scope?: SimulationScope } = {}): PaymentAdapter {
   if (!paymentAvailable()) {
     throw new Error("paiement indisponible : paymentAvailable() est faux (décision 0020 § 2.3)");
   }
-  paymentAdapterChoice();
-  return mockPaymentFor(options.scope ?? defaultScope());
+  return paymentFor(options.scope);
 }
 
-/** Simulation des issues : `null` hors adaptateur simulé autorisé (décision 0020 § 2.3). */
+/** Simulation des issues : `null` hors adaptateur simulé autorisé (décision 0020 § 2.3, amendée par B4b). */
 export function getPaymentSimulator(options: { scope?: SimulationScope } = {}): PaymentSimulator | null {
   if (!paymentAvailable()) return null;
-  return mockPaymentFor(options.scope ?? defaultScope());
+  return paymentFor(options.scope);
 }
 
 /**
  * Lecture des voyages par les pages du voyage (décision 0020 § 3, forme B) : l'adaptateur de base tel quel
- * sans paiement simulé disponible ; sinon, le décorateur qui sert un voyage débloqué par un droit de la
- * portée (lue à chaque appel, par `getSimulationScope()` si `options.scope` est absent).
+ * sans paiement simulé disponible, ou si l'adaptateur de paiement n'est pas le simulé **en mémoire** (`mock`) : avec
+ * `simulated` (B4b point 3, B4-TL-14), `Trip.unlocked` vient de `entitlements` par l'adaptateur `api`. Sinon, le
+ * décorateur qui sert un voyage débloqué par un droit de la portée (lue à chaque appel, par `getSimulationScope()` si
+ * `options.scope` est absent).
  */
 export function getTripReader(options: { scope?: SimulationScope } = {}): TripAdapter {
   const base = getTripAdapter();
-  if (!paymentAvailable()) return base;
+  if (!paymentAvailable() || adapterChoice(process.env.PAYMENT_ADAPTER) !== "mock") return base;
   if (isPrototypeAdapter()) {
     // Voyage d'essai (spécification E2E-essai, lot 1) : débloqué par le droit simulé de la portée, ou par le cookie signé
     // de l'essai (préversion seulement, garde du mode réel ouverte) ; l'adaptateur sert alors toutes ses journées.

@@ -118,6 +118,52 @@ describe("paymentAvailable avec l'adaptateur prototype (spécification E2E-essai
   });
 });
 
+describe("paymentAvailable avec l'adaptateur simulated (spécification B4, critère B4 ; amendement B4-TL-14 de 0020 § 2.3)", () => {
+  const OUVERT = {
+    PAYMENT_ADAPTER: "simulated",
+    DATA_ADAPTER: "api",
+    AUTH_ADAPTER: "better-auth",
+    SIMULATED_WEBHOOK_ENABLED: "true",
+    VADROUILLE_ENV: "ci",
+  } as const;
+
+  it.each([
+    [{ ...OUVERT, NODE_ENV: "test" }],
+    [{ ...OUVERT, NODE_ENV: "development", VADROUILLE_ENV: "local" }],
+    // Application construite du job de bout en bout : `NODE_ENV=production`, ouverte par `VADROUILLE_DEMO_PAYMENT=1`.
+    [{ ...OUVERT, NODE_ENV: "production", VADROUILLE_DEMO_PAYMENT: "1" }],
+    [{ ...OUVERT, NODE_ENV: "production", VADROUILLE_DEMO_PAYMENT: "1", VERCEL_ENV: "development" }],
+  ] as [NodeJS.ProcessEnv][])("vrai : %j", (env) => {
+    expect(paymentAvailable(env)).toBe(true);
+  });
+
+  it.each([
+    // Paiement simulé non autorisé.
+    [{ ...OUVERT, NODE_ENV: "production" }],
+    [{ ...OUVERT, NODE_ENV: "production", VADROUILLE_DEMO_PAYMENT: "true" }],
+    // Autre adaptateur de données.
+    [{ ...OUVERT, NODE_ENV: "test", DATA_ADAPTER: "mock" }],
+    [{ ...OUVERT, NODE_ENV: "test", DATA_ADAPTER: "" }],
+    [{ ...OUVERT, NODE_ENV: "test", DATA_ADAPTER: "prototype", VADROUILLE_PROTOTYPE: "1", CI: "true" }],
+    // Autre adaptateur de connexion.
+    [{ ...OUVERT, NODE_ENV: "test", AUTH_ADAPTER: "mock" }],
+    [{ ...OUVERT, NODE_ENV: "test", AUTH_ADAPTER: undefined }],
+    // Webhook simulé fermé : drapeau absent ou autre que `true`, ou environnement hors `local` et `ci`.
+    [{ ...OUVERT, NODE_ENV: "test", SIMULATED_WEBHOOK_ENABLED: undefined }],
+    [{ ...OUVERT, NODE_ENV: "test", SIMULATED_WEBHOOK_ENABLED: "1" }],
+    [{ ...OUVERT, NODE_ENV: "test", SIMULATED_WEBHOOK_ENABLED: "TRUE" }],
+    [{ ...OUVERT, NODE_ENV: "test", VADROUILLE_ENV: undefined }],
+    [{ ...OUVERT, NODE_ENV: "test", VADROUILLE_ENV: "staging" }],
+    [{ ...OUVERT, NODE_ENV: "test", VERCEL_ENV: "preview" }],
+    // Déploiement de production : toujours fermé, quelles que soient les variables.
+    [{ ...OUVERT, NODE_ENV: "test", VADROUILLE_DEMO_PAYMENT: "1", VERCEL_ENV: "production" }],
+    [{ ...OUVERT, NODE_ENV: "development", VADROUILLE_ENV: "production" }],
+    [{ ...OUVERT, NODE_ENV: "test", VADROUILLE_ENV: " Production " }],
+  ] as [NodeJS.ProcessEnv][])("faux : %j", (env) => {
+    expect(paymentAvailable(env)).toBe(false);
+  });
+});
+
 describe("filets de sécurité", () => {
   it("getPaymentAdapter lève une erreur si le paiement est indisponible ; getPaymentSimulator renvoie null", async () => {
     const actual = await vi.importActual<typeof import("@/adapters")>("@/adapters");
