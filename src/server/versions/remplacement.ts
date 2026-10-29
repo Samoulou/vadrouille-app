@@ -28,6 +28,7 @@ import {
 import { WISH_MAX_LENGTH } from "@/contracts/values";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { CandidatMoteur, EntreeMoteur, Nuit } from "@/domain/entrees";
+import { lignesApresVersion, type LigneAFaire } from "@/domain/a-faire";
 import { appliquerPatch, type ResultatPatch } from "@/domain/patch";
 import { demandeDeRelectures } from "@/domain/recomposition";
 import { INCONNU, type DemandeRelectures, type Relectures, type SourceRelectures } from "@/domain/relectures";
@@ -40,7 +41,7 @@ import { executerActionVoyage, RefusAction, type DependancesAction, type Execute
 import { sejoursParNuit, type VersionDeChaine } from "@/server/voyages/conversion";
 import { lireBaseDeRevision, recomposerJourDeRevision, relireRevision, type BaseDeRevision } from "@/server/voyages/lecture";
 
-import { BaseDeVersionDepassee, ecrireVersion, verrouillerVersions } from "./ecrire";
+import { BaseDeVersionDepassee, ecrireVersion, lireLignesAFaire, verrouillerVersions } from "./ecrire";
 
 /**
  * Remplacer une étape sur l'adaptateur `api` (écran 14 ; tâche M1g, ticket 869 ; plan `docs/plans/mvp-etapes-1-9.md`,
@@ -145,22 +146,21 @@ export type ChoixRemplacement = ChoixRetenu | { readonly ok: false; readonly ref
  * Proposition retenue pour remplacer `stopId` : la première compatible de `propositions` (dans l'ordre reçu), ou celle du
  * candidat `candidateId` (application : le candidat de l'aperçu, revérifié). Compatible : même nature (`activity` ou
  * `meal`), un `placeId`, lieu et identifiant créé absents du programme courant. Refus : étape inconnue (ou hors de la ligne
- * d'un jour), verrouillée, engagement (jamais remplacé), désignée par une ligne « À faire » (`etapesAFaire`, sinon la lecture
- * échouerait sur `checklist_orphan` ; question au Product Owner, PR 869), ou aucune proposition compatible.
+ * d'un jour), verrouillée, engagement (jamais remplacé), ou aucune proposition compatible. Une étape désignée par une ligne
+ * « À faire » se remplace (décision 0147 § 7.2 point 3, M5-PO-15, critère 30) : la liste suit la version (`ecrireVersion`).
  */
 export function choisirRemplacement(entree: {
   readonly instantane: TripSnapshot;
   readonly baseVersion: number;
   readonly stopId: string;
   readonly propositions: readonly PropositionDuVoyage[];
-  readonly etapesAFaire: ReadonlySet<string>;
   readonly candidateId?: string;
 }): ChoixRemplacement {
   const situee = etapeSituee(entree.instantane, entree.stopId);
   if (situee === undefined) return { ok: false, refus: "unknown_stop" };
   const ancienne = situee.stop;
   if (ancienne.locked) return { ok: false, refus: "locked_stop" };
-  if (ancienne.commitment !== undefined || entree.etapesAFaire.has(ancienne.id)) return { ok: false, refus: "no_option" };
+  if (ancienne.commitment !== undefined) return { ok: false, refus: "no_option" };
   const { lieux, ids } = presents(entree.instantane);
   const compatible = ({ candidat }: PropositionDuVoyage) =>
     candidat.typeEtape === ancienne.kind &&
@@ -281,7 +281,9 @@ class RemplacementIncoherent extends Error {
 /**
  * Brouillon de l'aperçu depuis le résultat du moteur : jours touchés recomposés comme une lecture sur la chaîne où la
  * version du remplacement est en tête (dates de contrôle comprises), changements du moteur (trajets et budget compris),
- * étape proposée.
+ * étape proposée. Les lignes `checklist` de « Ce qui change » viennent de la fonction de liste appelée à blanc sur les
+ * `lignes` du voyage (décision 0147 § 7.2 point 2) : la ligne non faite de l'étape remplacée est retirée, une étape nouvelle
+ * `toReserve` ajoute la sienne ; elles suivent les changements du moteur.
  */
 export function brouillonDuRemplacement(
   contexte: ContexteVoyage,
@@ -289,6 +291,7 @@ export function brouillonDuRemplacement(
   relectures: Relectures,
   cible: string,
   maintenant: number,
+  lignes: readonly LigneAFaire[] = [],
 ): Extract<ReplacementOffer, { status: "offer" }>["draft"] {
   const { base } = contexte;
   const chaine: VersionDeChaine[] = [{ version: base.version + 1, snapshot: resultat.instantane, createdAtMs: maintenant }, ...base.chaine];
@@ -298,7 +301,7 @@ export function brouillonDuRemplacement(
   if (proposal === undefined) throw new RemplacementIncoherent();
   return {
     days,
-    changes: resultat.resultat.changes,
+    changes: [...resultat.resultat.changes, ...lignesApresVersion(lignes, base.snapshot, resultat.instantane).changements],
     changedStopIds: etapesChangees(base.snapshot, resultat.instantane, jours, cible),
     targetStopId: cible,
     proposal,
@@ -316,7 +319,6 @@ const SQL_PAR_DEMANDE = "SELECT version, patch, author_kind FROM public.trip_ver
 /** Un recalcul ou un voyage complet en cours (même règle que la lecture, `SQL_EN_COURS`) : aucune version n'est écrite. */
 const SQL_EN_COURS = `SELECT EXISTS (SELECT 1 FROM public.generation_runs WHERE organization_id = $1 AND trip_id = $2
   AND finished_at IS NULL AND kind IN ('full', 'batch')) AS en_cours`;
-const SQL_A_FAIRE = "SELECT stop_id FROM public.checklist_items WHERE organization_id = $1 AND trip_id = $2 AND stop_id IS NOT NULL";
 const SQL_BRIEF = `SELECT pace, wishes, limit_categories, meal_budget FROM public.briefs
   WHERE organization_id = $1 AND trip_id = $2 ORDER BY version DESC LIMIT 1`;
 const SQL_SEJOURS = `SELECT label, place_id, from_date::text AS "from", to_date::text AS "to" FROM public.stays
@@ -409,10 +411,6 @@ async function propositionsDe(executeur: ExecuteurAction, org: string, tripId: s
   });
 }
 
-async function etapesAFaire(executeur: ExecuteurAction, org: string, tripId: string): Promise<Set<string>> {
-  return new Set((await executeur.query(SQL_A_FAIRE, [org, tripId])).rows.flatMap((ligne) => (typeof ligne.stop_id === "string" ? [ligne.stop_id] : [])));
-}
-
 async function refuserPendantUnRecalcul(executeur: ExecuteurAction, org: string, tripId: string): Promise<void> {
   if ((await executeur.query(SQL_EN_COURS, [org, tripId])).rows[0]?.en_cours === true) throw new RefusAction("generation_in_progress");
 }
@@ -500,7 +498,7 @@ function refusDuMoteur(resultat: Exclude<ResultatPatch, { ok: true }>): RefusDeR
 }
 
 /** Étape 1 : contexte du voyage et choix, ou une réponse immédiate ; `null` : `not_found`. */
-type Prepare = { readonly contexte: ContexteVoyage; readonly choix: ChoixRetenu };
+type Prepare = { readonly contexte: ContexteVoyage; readonly choix: ChoixRetenu; readonly lignes: readonly LigneAFaire[] };
 type Preparation = { readonly fin: RefusDeReponse } | { readonly prepare: Prepare; readonly ctx: Session };
 
 async function preparer(
@@ -517,14 +515,15 @@ async function preparer(
     baseVersion: contexte.base.version,
     stopId: valeur.stopId,
     propositions: situee === undefined ? [] : await propositionsDe(executeur, ctx.organizationId, valeur.tripId, situee),
-    etapesAFaire: await etapesAFaire(executeur, ctx.organizationId, valeur.tripId),
     ...(valeur.candidateId === undefined ? {} : { candidateId: valeur.candidateId }),
   });
   if (!choix.ok) {
     const refus = refusDuChoix(choix.refus);
     return refus === null ? null : { fin: refus };
   }
-  return { prepare: { contexte, choix }, ctx: { organizationId: ctx.organizationId, userId: ctx.userId } };
+  // Lignes « À faire » du voyage : lues pour les lignes `checklist` de l'aperçu (0147 § 7.2 point 2), jamais un refus.
+  const lignes = await lireLignesAFaire(executeur, ctx.organizationId, valeur.tripId);
+  return { prepare: { contexte, choix, lignes }, ctx: { organizationId: ctx.organizationId, userId: ctx.userId } };
 }
 
 function journaliser(nom: "preview-replacement" | "apply-replacement", erreur: unknown, tripId: string): void {
@@ -582,7 +581,7 @@ export async function proposerRemplacement(dependances: DependancesRemplacement,
   if (!resultat.ok) return ok(refusDuMoteur(resultat));
   try {
     const cible = identifiantRemplacement(valeur.baseVersion, prepare.choix.proposition.candidat.id);
-    const draft = brouillonDuRemplacement(prepare.contexte, resultat, relectures, cible, Date.now());
+    const draft = brouillonDuRemplacement(prepare.contexte, resultat, relectures, cible, Date.now(), prepare.lignes);
     return ok({ status: "offer", version: valeur.baseVersion, candidateId: prepare.choix.proposition.candidat.id, draft });
   } catch (erreur) {
     journaliser("preview-replacement", erreur, valeur.tripId);
@@ -624,9 +623,8 @@ export async function appliquerRemplacement(dependances: DependancesRemplacement
     if (ligne !== undefined) return rejeu(ligne, "replace", courante);
     await refuserPendantUnRecalcul(executeur, org, valeur.tripId);
     if (courante !== valeur.baseVersion || courante !== prepare.contexte.base.version) return { status: "conflict", currentVersion: courante };
-    // Une ligne « À faire » posée entre-temps sur l'étape la rend non remplaçable (comme à l'étape 1). Une carte écartée au
-    // tri entre l'étape 1 et ici n'est pas revue : elle ne change pas la version (écart admis, décision 0145 § 6).
-    if ((await etapesAFaire(executeur, org, valeur.tripId)).has(valeur.stopId)) return { status: "noOption" };
+    // Une carte écartée au tri entre l'étape 1 et ici n'est pas revue : elle ne change pas la version (écart admis, décision
+    // 0145 § 6). Les lignes « À faire » sont relues par `ecrireVersion` sous le verrou des versions (0147 § 7.2).
     const patch = patchDuRemplacement(valeur.requestId, courante, prepare.choix);
     const resultat = moteur(dependances, prepare, relectures, patch);
     if (!resultat.ok) return refusDuMoteur(resultat);
@@ -638,6 +636,7 @@ export async function appliquerRemplacement(dependances: DependancesRemplacement
         auteur: "user",
         auteurUserId: ctx.userId,
         instantane: resultat.instantane,
+        instantanePrecedent: prepare.contexte.base.snapshot,
         patch,
       });
       return { status: "applied", version: ecrite.version };
@@ -693,6 +692,7 @@ export function annulerRemplacement(dependances: DependancesRemplacement, entree
         auteur: "user",
         auteurUserId: ctx.userId,
         instantane: resultat.instantane,
+        instantanePrecedent: actuelle.instantane,
         patch,
       });
       return { status: "undone", version: ecrite.version };

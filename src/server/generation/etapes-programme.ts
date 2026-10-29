@@ -1,6 +1,7 @@
 import "server-only";
 
 import { ChecklistItemSchema, type Trip, type TripSnapshot } from "@/contracts";
+import { identifiantLigneAFaire, lignesDuProgramme } from "@/domain/a-faire";
 import {
   lieuxHorsPart,
   reduireSiteDuProgramme,
@@ -204,24 +205,48 @@ function journaliser(compteurs: CompteursProgramme, echec?: { readonly erreur: u
 }
 
 /**
- * Identifiant déterministe de la ligne « À faire » de rang `rang` (0 pour le premier bon plan) d'une exécution (0136 § 3.3 ;
- * 0139 § 3 condition 4) : les 8 premiers chiffres portent le rang, le reste vient de l'identifiant de l'exécution. Jamais tiré
- * d'un texte de l'IA ; l'ordre des `id` (lecture `ORDER BY id`) est celui du programme.
+ * Identifiant déterministe de la ligne « À faire » de rang `rang` d'une exécution (0136 § 3.3 ; 0139 § 3 condition 4),
+ * généralisé par `identifiantLigneAFaire` (décision 0147 § 7.1 point 2) : les 8 premiers chiffres portent le rang, le reste
+ * vient de l'identifiant de l'exécution. Jamais tiré d'un texte de l'IA.
  */
 export function identifiantBonPlan(generationRunId: string, rang: number): string {
-  if (!Number.isInteger(rang) || rang < 0 || rang > 0xffffffff) throw new RangeError("bon plan : rang hors bornes");
-  return `${rang.toString(16).padStart(8, "0")}${generationRunId.slice(8)}`;
+  return identifiantLigneAFaire(generationRunId, rang);
 }
 
-/** Lignes « À faire » de la chaîne inversée : bons plans non vides, dans l'ordre de l'IA, validés par `ChecklistItemSchema`. */
-export function lignesAFaire(checklist: Trip["checklist"], generationRunId: string): { readonly id: string; readonly label: string }[] {
+/**
+ * Bons plans de la chaîne inversée : non vides, dans l'ordre de l'IA, validés par `ChecklistItemSchema`, sorte `other`. Leur
+ * rang suit celui des lignes du programme (`premierRang`, 0147 § 7.1 point 2 : un seul rang, réservations et engagements
+ * d'abord, puis les bons plans).
+ */
+export function lignesAFaire(checklist: Trip["checklist"], generationRunId: string, premierRang = 0): { readonly id: string; readonly label: string }[] {
   return checklist
     .map((item) => item.label.trim())
     .filter((label) => label !== "")
     .map((label, rang) => {
-      const item = ChecklistItemSchema.parse({ id: identifiantBonPlan(generationRunId, rang), kind: "other", label, when: { type: "beforeDeparture" }, done: false, sponsored: false });
+      const item = ChecklistItemSchema.parse({ id: identifiantBonPlan(generationRunId, premierRang + rang), kind: "other", label, when: { type: "beforeDeparture" }, done: false, sponsored: false });
       return { id: item.id, label: item.label };
     });
+}
+
+/** Ligne « À faire » de la version 1, telle que `ecrireDePlus` l'écrit. */
+export type LigneDeLaVersion1 = {
+  readonly id: string;
+  readonly kind: "reservation" | "ticket" | "other";
+  readonly label: string;
+  readonly done: boolean;
+  readonly stopId: string | null;
+};
+
+/**
+ * Lignes « À faire » de la **version 1 seulement** (décision 0147 § 7.1, T9 ; M5-PO-13) : une ligne `reservation` par étape
+ * `toReserve` (libellé = le seul nom de l'étape) et une ligne `ticket` faite par engagement, dans l'ordre du programme
+ * (`lignesDuProgramme`), puis les bons plans (`other`), sur un seul rang. Aucune autre version n'écrit ces lignes : elle passe
+ * par `lignesApresVersion` (`ecrireVersion`, § 7.2).
+ */
+export function lignesDeLaVersion1(instantane: TripSnapshot, checklist: Trip["checklist"], generationRunId: string): LigneDeLaVersion1[] {
+  const programme = lignesDuProgramme(instantane).map((ligne, rang) => ({ id: identifiantBonPlan(generationRunId, rang), ...ligne }));
+  const bonsPlans = lignesAFaire(checklist, generationRunId, programme.length).map((ligne) => ({ ...ligne, kind: "other" as const, done: false, stopId: null }));
+  return [...programme, ...bonsPlans];
 }
 
 /** Compteurs à zéro d'un passage de l'étape « programme » (ou de la révision). */
@@ -347,8 +372,8 @@ export async function redigerEtVerifier(
   return { complet, instantane: instantaneDuProgramme(complet.trip), verifies, logements, obtenuesA };
 }
 
-const SQL_A_FAIRE = `INSERT INTO public.checklist_items (id, organization_id, trip_id, kind, label, moment, sponsored)
-  VALUES ($3::uuid, $1, $2, 'other', $4, '{"type":"beforeDeparture"}'::jsonb, false)`;
+const SQL_A_FAIRE = `INSERT INTO public.checklist_items (id, organization_id, trip_id, stop_id, kind, label, moment, sponsored, done, done_at)
+  VALUES ($3::uuid, $1, $2, $4, $5, $6, '{"type":"beforeDeparture"}'::jsonb, false, $7, CASE WHEN $7 THEN now() END)`;
 
 /**
  * Étape `e` (rang 2) : l'étape « programme » de la chaîne inversée (0136 § 2.3), voir l'en-tête. Variante simulée : doubles et
@@ -379,7 +404,7 @@ export function etapeProgrammeEcriture(entree: unknown, dependances?: Dependance
           (c) => c.rediger(entreeProgrammeDepuisBrief(brief), { arrivee: brief.arrivee, depart: brief.depart }),
         );
         const cases = casesDuProgramme(complet.trip.days, instantane);
-        const aFaire = lignesAFaire(complet.trip.checklist, contexte.generationRunId);
+        const aFaire = lignesDeLaVersion1(instantane, complet.trip.checklist, contexte.generationRunId);
         // `stays.place_id` : logements `known` et `suggestedLodging` seulement (la zone ne vit qu'en mémoire, 0136 § 3.2).
         const sejoursAncres = voyage.sejours.flatMap((sejour, rang) => {
           const placeId = logements[rang];
@@ -395,6 +420,8 @@ export function etapeProgrammeEcriture(entree: unknown, dependances?: Dependance
           { organizationId: contexte.organizationId, generationRunId: contexte.generationRunId, tripId: contexte.tripId, requestId: contexte.requestId, echeance: contexte.echeance, rang: RANG_PROGRAMME.e },
           {
             instantane,
+            // Version 1 : ses lignes « À faire » sont écrites ci-dessous (0147 § 7.1), jamais par `lignesApresVersion`.
+            instantanePrecedent: null,
             cases,
             statut: statutDesCases(cases, CASES_APERCU),
             ...(ecrirePositions === undefined ? {} : { ecrirePositions }),
@@ -402,7 +429,9 @@ export function etapeProgrammeEcriture(entree: unknown, dependances?: Dependance
               for (const { sejour, placeId } of sejoursAncres) {
                 await x.query(SQL_PLACE_SEJOUR, [contexte.organizationId, contexte.tripId, sejour.ville, sejour.du, placeId]);
               }
-              for (const ligne of aFaire) await x.query(SQL_A_FAIRE, [contexte.organizationId, contexte.tripId, ligne.id, ligne.label]);
+              for (const ligne of aFaire) {
+                await x.query(SQL_A_FAIRE, [contexte.organizationId, contexte.tripId, ligne.id, ligne.stopId, ligne.kind, ligne.label, ligne.done]);
+              }
             },
           },
         );

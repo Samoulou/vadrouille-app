@@ -22,6 +22,11 @@ export interface ChecklistRowProps {
   sponsored: boolean;
   /** Nouvel état demandé par la case. */
   onToggle: (done: boolean) => void;
+  /**
+   * Identifiant de l'élément qui dit pourquoi la case est inactive (bandeau hors ligne, M5e) : la case reste focalisable,
+   * porte `aria-disabled` et la description, et n'appelle pas `onToggle`. Absent : case active.
+   */
+  disabledBy?: string;
   className?: string;
 }
 
@@ -58,7 +63,7 @@ export function formatChecklistMoment(moment: ChecklistMoment): string {
  * initial (+4,9 Ko gzip mesurés sur l'accueil). Il est rendu côté client par les écrans qui l'importent
  * (Séjour, `/dev/composants`), qui fournissent `onToggle`. Ne pas l'utiliser depuis un composant serveur.
  */
-export function ChecklistRow({ label, when, done, bookingUrl, sponsored, onToggle, className }: ChecklistRowProps) {
+export function ChecklistRow({ label, when, done, bookingUrl, sponsored, onToggle, disabledBy, className }: ChecklistRowProps) {
   const labelId = useId();
   const sponsoredId = useId();
   const link = !done && bookingUrl ? bookingUrl : undefined;
@@ -73,9 +78,13 @@ export function ChecklistRow({ label, when, done, bookingUrl, sponsored, onToggl
         type="button"
         aria-pressed={done}
         aria-labelledby={labelId}
+        aria-disabled={disabledBy ? true : undefined}
+        aria-describedby={disabledBy}
         data-part="case"
-        onClick={() => onToggle(!done)}
-        className="inline-flex size-(--touch-target) shrink-0 items-center justify-center rounded-control"
+        onClick={() => {
+          if (!disabledBy) onToggle(!done);
+        }}
+        className="inline-flex size-(--touch-target) shrink-0 items-center justify-center rounded-control aria-disabled:cursor-not-allowed"
       >
         <span
           aria-hidden="true"

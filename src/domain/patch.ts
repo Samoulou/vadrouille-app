@@ -309,9 +309,10 @@ function etapesSituees(jours: readonly DaySnapshot[]): Map<string, { jour: numbe
 /**
  * Identité d'une étape pour « Ce qui change » (décision 0147 § 5.2 point 1) : l'identifiant, le `placeId` et le nom.
  * Depuis M1b, un identifiant `j<jour>-<rang>` est réutilisé d'une version à l'autre (0142 § 5.1) : une étape de même
- * `id` mais d'autre lieu ou d'autre nom n'est pas la même étape (`removed` puis `added`, jamais `moved`).
+ * `id` mais d'autre lieu ou d'autre nom n'est pas la même étape (`removed` puis `added`, jamais `moved`). Reprise par la
+ * liste « À faire » (`lignesApresVersion`, `src/domain/a-faire.ts`, 0147 § 7.2 point 1).
  */
-function identite(stop: StopSnapshot): string {
+export function identite(stop: Pick<StopSnapshot, "id" | "placeId" | "name">): string {
   return JSON.stringify([stop.id, stop.placeId ?? null, stop.name]);
 }
 

@@ -53,7 +53,10 @@
       "compteur": {
         "un": "1 réservation à faire",
         "plusieurs": "{n} réservations à faire"
-      }
+      },
+      "reserver": "Réserver : {nom}",
+      "echec": "Impossible d'enregistrer. Réessaie.",
+      "horsLigne": "Tu es hors ligne. Cocher une ligne demande une connexion."
     },
     "pendant": {
       "titre": "Pendant ton séjour",

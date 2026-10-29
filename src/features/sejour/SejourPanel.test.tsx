@@ -8,7 +8,7 @@ import { edimbourg, edimbourgDebloque } from "@/mocks/edimbourg";
 import { axeViolations } from "../../../tests/unit/axe";
 
 import { SejourOriginProvider } from "./SejourOrigin";
-import { SejourPanel } from "./SejourPanel";
+import { checklistLabel, SejourPanel } from "./SejourPanel";
 import { TripShell } from "./TripShell";
 
 // Séjour : pas de paramètre `n` ni `etape`.
@@ -81,13 +81,15 @@ describe("SejourPanel : « À faire avant de partir » (F5-PO-4)", () => {
     const list = section("À faire avant de partir");
     expect(within(list).getAllByRole("button")).toHaveLength(5);
     expect(within(list).getAllByRole("listitem").map((item) => item.querySelector("[id]")?.textContent)).toEqual(
-      edimbourg.checklist.map((item) => item.label),
+      edimbourg.checklist.map(checklistLabel),
     );
+    // Réservations : le seul nom stocké, « Réserver : » composé à l'écran (M5e) ; billet déjà pris : son libellé.
+    expect(edimbourg.checklist.map(checklistLabel).slice(0, 2)).toEqual(["[Billets du Tattoo]", "Réserver : [Excursion dans les Highlands]"]);
     expect(within(list).getByRole("img", { name: "4 réservations à faire" })).toHaveTextContent("4");
     expect(within(list).getByRole("button", { name: "[Billets du Tattoo]" })).toHaveAttribute("aria-pressed", "true");
     expect(within(list).getByText("[Billets du Tattoo]")).toHaveClass("line-through");
     // « [Assurance voyage] » : lien rémunéré.
-    const assurance = within(list).getByRole("button", { name: "[Assurance voyage]" }).closest("li")!;
+    const assurance = within(list).getByRole("button", { name: "Réserver : [Assurance voyage]" }).closest("li")!;
     expect(within(assurance).getByText("Lien rémunéré")).toBeInTheDocument();
     expect(within(list).getAllByRole("link", { name: "Réserver" })).toHaveLength(4);
   });
@@ -95,7 +97,7 @@ describe("SejourPanel : « À faire avant de partir » (F5-PO-4)", () => {
   it("cocher le château : ligne faite sans lien, compteur à 3, un checklist_item_done sans propriété, aucun toast", async () => {
     const { container } = renderSejour();
     const list = section("À faire avant de partir");
-    const chateau = within(list).getByRole("button", { name: "[Château d'Édimbourg]" });
+    const chateau = within(list).getByRole("button", { name: "Réserver : [Château d'Édimbourg]" });
     await act(async () => fireEvent.click(chateau));
     expect(chateau).toHaveAttribute("aria-pressed", "true");
     expect(within(chateau.closest("li")!).queryByRole("link")).not.toBeInTheDocument();
@@ -116,11 +118,11 @@ describe("SejourPanel : « À faire avant de partir » (F5-PO-4)", () => {
   it("singulier à 1, compteur masqué à 0", async () => {
     renderSejour();
     const list = section("À faire avant de partir");
-    for (const name of ["[Excursion dans les Highlands]", "[Château d'Édimbourg]", "[Visite de la distillerie]"]) {
+    for (const name of ["Réserver : [Excursion dans les Highlands]", "Réserver : [Château d'Édimbourg]", "Réserver : [Visite de la distillerie]"]) {
       await act(async () => fireEvent.click(within(list).getByRole("button", { name })));
     }
     expect(within(list).getByRole("img", { name: "1 réservation à faire" })).toBeInTheDocument();
-    await act(async () => fireEvent.click(within(list).getByRole("button", { name: "[Assurance voyage]" })));
+    await act(async () => fireEvent.click(within(list).getByRole("button", { name: "Réserver : [Assurance voyage]" })));
     expect(within(list).queryByRole("img")).not.toBeInTheDocument();
     await waitFor(() => expect(recorder.events).toHaveLength(4));
   });
@@ -137,13 +139,74 @@ describe("SejourPanel : « À faire avant de partir » (F5-PO-4)", () => {
         <SejourPanel recorder={recorder} />
       </TripShell>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "[Château d'Édimbourg]" }));
+    fireEvent.click(screen.getByRole("button", { name: "Réserver : [Château d'Édimbourg]" }));
     expect(actions.setChecklistItemDone).toHaveBeenCalledWith("check-chateau", true);
     expect(recorder.events).toEqual([]);
     await act(async () => new Promise((wait) => setTimeout(wait, 50)));
     expect(recorder.events).toEqual([]);
     await act(async () => resolve());
     await waitFor(() => expect(recorder.events).toEqual([{ name: "checklist_item_done", properties: {} }]));
+  });
+
+  it("a-faire: compteur des réservations seulement : bons plans et billets ne comptent pas, compteur absent sans réservation", () => {
+    const bonsPlans: Trip = {
+      ...edimbourg,
+      checklist: edimbourg.checklist.map((item) => (item.kind === "reservation" ? { ...item, kind: "other" as const } : item)),
+    };
+    renderSejour(bonsPlans);
+    const list = section("À faire avant de partir");
+    expect(within(list).getAllByRole("button")).toHaveLength(5);
+    expect(within(list).queryByRole("img")).not.toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "[Château d'Édimbourg]" })).toBeInTheDocument();
+  });
+
+  it("a-faire: un échec de l'enregistrement affiche « Impossible d'enregistrer. Réessaie. » (role alert), sans mesure", async () => {
+    let echoue = true;
+    const actions = {
+      setStopLocked: vi.fn(async () => {}),
+      undo: vi.fn(async () => {}),
+      setChecklistItemDone: vi.fn(async () => {
+        if (echoue) throw new Error("case non enregistrée");
+      }),
+      checklistOnServer: true,
+    };
+    render(
+      <TripShell trip={edimbourg} maps={[]} base="/voyages" actions={actions}>
+        <SejourPanel recorder={recorder} />
+      </TripShell>,
+    );
+    const alerte = () => screen.getByRole("alert");
+    expect(alerte()).toHaveTextContent("");
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Réserver : [Château d'Édimbourg]" })));
+    expect(alerte()).toHaveTextContent("Impossible d'enregistrer. Réessaie.");
+    await act(async () => new Promise((wait) => setTimeout(wait, 50)));
+    expect(recorder.events).toEqual([]);
+    // Nouvel essai réussi : le message disparaît.
+    echoue = false;
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Réserver : [Château d'Édimbourg]" })));
+    expect(alerte()).toHaveTextContent("");
+  });
+
+  it("a-faire: hors ligne, cochage enregistré : cases inactives décrites par le bandeau ; cochage en mémoire : cases actives", async () => {
+    const enLigne = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    try {
+      const actions = { setStopLocked: vi.fn(async () => {}), undo: vi.fn(async () => {}), setChecklistItemDone: vi.fn(async () => {}), checklistOnServer: true };
+      const { unmount } = render(
+        <TripShell trip={edimbourg} maps={[]} base="/voyages" actions={actions}>
+          <SejourPanel recorder={recorder} />
+        </TripShell>,
+      );
+      const chateau = screen.getByRole("button", { name: "Réserver : [Château d'Édimbourg]" });
+      expect(chateau).toHaveAttribute("aria-disabled", "true");
+      expect(chateau).toHaveAccessibleDescription("Tu es hors ligne. Cocher une ligne demande une connexion.");
+      fireEvent.click(chateau);
+      expect(actions.setChecklistItemDone).not.toHaveBeenCalled();
+      unmount();
+      renderSejour();
+      expect(screen.getByRole("button", { name: "Réserver : [Château d'Édimbourg]" })).not.toHaveAttribute("aria-disabled");
+    } finally {
+      enLigne.mockRestore();
+    }
   });
 });
 

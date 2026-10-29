@@ -23,6 +23,11 @@ export interface ProgrammeActions {
    * `checklist_item_done` quand la promesse d'un cochage est résolue ; l'implémentation n'envoie rien.
    */
   setChecklistItemDone(itemId: ChecklistItem["id"], done: boolean): Promise<void>;
+  /**
+   * Cochage enregistré sur le serveur (adaptateur `api`, M5e) : l'écran désactive les cases hors ligne. Absent ou faux :
+   * cochage en mémoire, sans réseau.
+   */
+  readonly checklistOnServer?: boolean;
 }
 
 /** Écarts aux données de l'adaptateur. */

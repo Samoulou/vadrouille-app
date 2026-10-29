@@ -1,4 +1,5 @@
 import {
+  ChecklistItemSchema,
   DayMapSchema,
   DaySchema,
   DeckSessionSchema,
@@ -12,6 +13,7 @@ import {
 } from "@/contracts";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
 import { annulerRemplacement, appliquerRemplacement, proposerRemplacement, versionDuVoyage, type DependancesRemplacement } from "@/server/versions/remplacement";
+import { basculerAFaire } from "@/server/voyages/a-faire";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
 
 import type { AdapterContext, RevisionAdapter, TripAdapter } from "./types";
@@ -32,7 +34,8 @@ export type OptionsAdaptateurApi = DependancesLecture;
 /**
  * Révision enregistrée (M1g, ticket 869) : cas d'usage de `src/server/versions/remplacement.ts`, dans le même processus,
  * avec le contexte de la session reçu de l'action serveur et **le même port de relectures** que la lecture (un appel par
- * aperçu ou application, hors transaction). Chaque réponse est validée par son contrat.
+ * aperçu ou application, hors transaction). Chaque réponse est validée par son contrat. Le cochage d'une ligne « À faire »
+ * (`toggleChecklistItem`, B6b, branché sur l'écran 11 par M5e) passe par le même adaptateur.
  */
 function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
   const { withOrg, relectures } = options;
@@ -43,6 +46,8 @@ function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
     previewReplacement: async (ctx, input) => valide(ReplacementOfferSchema)(await proposerRemplacement(dependances(ctx), input)),
     applyReplacement: async (ctx, input) => valide(ReplacementWriteSchema)(await appliquerRemplacement(dependances(ctx), input)),
     undoReplacement: async (ctx, input) => valide(ReplacementWriteSchema)(await annulerRemplacement(dependances(ctx), input)),
+    toggleChecklistItem: async (ctx, input) =>
+      valide(ChecklistItemSchema)(await basculerAFaire({ contexte: async () => ctx, ...(withOrg === undefined ? {} : { withOrg }) }, input)),
   };
 }
 

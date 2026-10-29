@@ -232,6 +232,42 @@ describe("remplacer une étape sur api (M1g, PR 869)", () => {
     expect(await versions(a, tripId)).toHaveLength(3);
   });
 
+  it("a-faire: une retouche met la liste à jour (M5e, critère 30 ; décision 0147 § 7.2) : ligne non faite retirée, ligne faite déliée, aucune ligne orpheline", async () => {
+    const tripId = await nouveauVoyage();
+    const NON_FAITE = randomUUID();
+    const FAITE = randomUUID();
+    const lignesAFaire = () =>
+      inTx(app, { org: a.org, user: a.owner }, async (c) =>
+        (await c.query("SELECT id, stop_id, done FROM checklist_items WHERE organization_id = $1 AND trip_id = $2 AND id = ANY($3::uuid[]) ORDER BY id", [a.org, tripId, [NON_FAITE, FAITE]])).rows,
+      );
+    await inTx(app, { org: a.org, user: a.owner }, async (c) =>
+      c.query(
+        `INSERT INTO checklist_items (id, organization_id, trip_id, stop_id, kind, label, moment, sponsored, done, done_at) VALUES
+         ($3, $1, $2, 'j1-diner', 'reservation', '[Bonne table de l''Old Town]', '{"type":"beforeDeparture"}'::jsonb, false, false, NULL),
+         ($4, $1, $2, 'j1-diner', 'ticket', '[Table déjà prise]', '{"type":"beforeDeparture"}'::jsonb, false, true, now())`,
+        [a.org, tripId, NON_FAITE, FAITE],
+      ),
+    );
+    // L'étape désignée par des lignes « À faire » se remplace (refus `etapesAFaire` levé) ; l'aperçu dit la ligne retirée.
+    const proposee = offre(await apercu(tripId, "j1-diner", 1));
+    expect(proposee.draft.changes).toContainEqual({ type: "checklist", action: "removed", label: "[Bonne table de l'Old Town]" });
+    expect(proposee.draft.changes.map((change) => change.type)).not.toContain("removed");
+    expect(await lignesAFaire()).toHaveLength(2);
+
+    expect(valeur(await appliquer(tripId, "j1-diner", proposee.candidateId, 1))).toEqual({ status: "applied", version: 2 });
+    expect(await lignesAFaire()).toEqual([{ id: FAITE, stop_id: null, done: true }]);
+    // Aucune ligne orpheline : la lecture (contrôle `checklist_orphan`) sert le voyage, ligne faite déliée comprise.
+    const trip = await adaptateur.getTrip(ctxA, tripId);
+    expect(trip?.checklist.find((ligne) => ligne.id === FAITE)).toMatchObject({ done: true });
+    expect(trip?.checklist.find((ligne) => ligne.id === FAITE)?.stopId).toBeUndefined();
+    expect(trip?.checklist.map((ligne) => ligne.id)).not.toContain(NON_FAITE);
+
+    // L'annulation est une version comme une autre : la ligne faite reste déliée et cochée.
+    expect(valeur(await annuler(tripId, 2))).toEqual({ status: "undone", version: 3 });
+    expect(await lignesAFaire()).toEqual([{ id: FAITE, stop_id: null, done: true }]);
+    expect(await adaptateur.getTrip(ctxA, tripId)).not.toBeNull();
+  });
+
   it("PR 869 : même requestId, une seule version (application et annulation) ; rejeu par l'autre action : conflict", async () => {
     const tripId = await nouveauVoyage();
     const proposee = offre(await apercu(tripId, "j1-diner", 1));
@@ -260,7 +296,7 @@ describe("remplacer une étape sur api (M1g, PR 869)", () => {
     const tripId = await nouveauVoyage();
     // Le Tattoo est verrouillé (et un engagement).
     expect(valeur(await apercu(tripId, "j1-tattoo", 1))).toEqual({ status: "lockedStop" });
-    // Château : désigné par une ligne « À faire » (et aucune activité hors programme) : aucune option.
+    // Château : aucune activité hors programme, aucune option (sa ligne « À faire » ne le rend plus non remplaçable : 0147 § 7.2).
     expect(valeur(await apercu(tripId, "j1-chateau", 1))).toEqual({ status: "noOption" });
     // Étape absente du programme : `not_found`.
     const inconnue = await apercu(tripId, "j1-inconnue", 1);
@@ -337,6 +373,7 @@ describe("remplacer une étape sur api (M1g, PR 869)", () => {
           auteur: "user",
           auteurUserId: a.owner,
           instantane: snapshot,
+          instantanePrecedent: snapshot,
           patch: { requestId, baseVersion, operations: [{ op: "lock", stopId: "j1-chateau" }] },
         }),
       );
@@ -352,6 +389,7 @@ describe("remplacer une étape sur api (M1g, PR 869)", () => {
           auteur: "user",
           auteurUserId: a.owner,
           instantane: snapshot,
+          instantanePrecedent: snapshot,
           patch: { requestId, baseVersion: 1, operations: [{ op: "lock", stopId: "j1-chateau" }] },
         }),
       ),

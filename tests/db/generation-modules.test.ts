@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { TripCommitment, TripDraft } from "@/contracts";
+import { TripSnapshotSchema, type TripCommitment, type TripDraft } from "@/contracts";
 import { lireBrouillon } from "@/server/creation/brouillon";
 import { composerSimuleeAvec } from "@/server/composition/generation";
 import { doublesEdimbourg } from "../support/banc-apercu";
@@ -116,7 +116,7 @@ describe("versions: src/server/versions/ecrire.ts", () => {
     const instantane = await instantaneValide(org);
     const tripId = await creer(org);
     const requestId = randomUUID();
-    const demande = { organizationId: org.org, tripId, requestId, auteur: "workflow" as const, instantane };
+    const demande = { organizationId: org.org, tripId, requestId, auteur: "workflow" as const, instantane, instantanePrecedent: null };
     const premiere = (await ecrire(org, tripId, (x) => ecrireVersion(x, demande))) as { version: number; creee: boolean };
     expect(premiere).toMatchObject({ version: 1, creee: true });
     const rejeu = (await ecrire(org, tripId, (x) => ecrireVersion(x, demande))) as { version: number; creee: boolean };
@@ -131,7 +131,7 @@ describe("versions: src/server/versions/ecrire.ts", () => {
     const instantane = await instantaneValide(org);
     const tripId = await creer(org);
     for (let i = 1; i <= 3; i += 1) {
-      const r = (await ecrire(org, tripId, (x) => ecrireVersion(x, { organizationId: org.org, tripId, requestId: randomUUID(), auteur: "engine", instantane }))) as { version: number };
+      const r = (await ecrire(org, tripId, (x) => ecrireVersion(x, { organizationId: org.org, tripId, requestId: randomUUID(), auteur: "engine", instantane, instantanePrecedent: i === 1 ? null : TripSnapshotSchema.parse(instantane) }))) as { version: number };
       expect(r.version).toBe(i);
     }
     const etat = await lignes(org, tripId);
@@ -144,7 +144,7 @@ describe("versions: src/server/versions/ecrire.ts", () => {
     const instantane = (await instantaneValide(org)) as Record<string, unknown>;
     const tripId = await creer(org);
     for (const mauvais of [{ ...instantane, googleApiKey: "AIzaSENTINELLE" }, { ...instantane, version: "pas un nombre" }, null, "texte"]) {
-      await expect(ecrire(org, tripId, (x) => ecrireVersion(x, { organizationId: org.org, tripId, requestId: randomUUID(), auteur: "workflow", instantane: mauvais }))).rejects.toThrow();
+      await expect(ecrire(org, tripId, (x) => ecrireVersion(x, { organizationId: org.org, tripId, requestId: randomUUID(), auteur: "workflow", instantane: mauvais, instantanePrecedent: null }))).rejects.toThrow();
     }
     expect(await lignes(org, tripId)).toEqual({ versions: [], courante: null });
   });
@@ -153,7 +153,7 @@ describe("versions: src/server/versions/ecrire.ts", () => {
     const org = await nouvelleOrg();
     const instantane = await instantaneValide(org);
     const tripId = await creer(org);
-    const base = { organizationId: org.org, tripId, requestId: randomUUID(), instantane };
+    const base = { organizationId: org.org, tripId, requestId: randomUUID(), instantane, instantanePrecedent: null };
     const refus = [
       { ...base, auteur: "user" as const },
       { ...base, auteur: "user" as const, auteurUserId: "pas-un-uuid" },
