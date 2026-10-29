@@ -37,6 +37,10 @@ export const RATE_LIMITS: RateLimitConfig = {
   // minute et par adresse IP (0129 § 3 point 4). Écran anonyme : espèce `ip` seulement ; sans en-tête de confiance,
   // compartiment commun `no-trusted-ip`. Appelé avant la réservation du jour (§ 4.4).
   "ville-recherche": [{ kind: "ip", windowSeconds: 60, threshold: 20 }],
+  // M1e (décision 0143 § 3) : photos du tri sur `api` (`src/server/photos/api.ts`), même nombre que le site d'essai
+  // (`MAX_PHOTOS_PAR_HEURE`, 0128 § 4), compté par adresse IP (le limiteur n'a pas de règle par session ; le site d'essai
+  // compte toutes sessions confondues). Lu seulement barrière B9-TL-8 ouverte, client branché et lieu admis.
+  "photo-tri": [{ kind: "ip", windowSeconds: 3600, threshold: 40 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

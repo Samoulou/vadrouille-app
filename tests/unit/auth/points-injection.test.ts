@@ -37,6 +37,9 @@ const POINTS: Readonly<Record<string, readonly string[]>> = {
   // B10a (décision 0112 § 2 point 3) : même règle pour le branchement du tri enregistré `api`.
   brancherTriEnregistre: ["src/adapters/api-tri-instance.ts", "src/instrumentation.ts"],
   debrancherTriEnregistrePourTests: ["src/adapters/api-tri-instance.ts"],
+  // PR 879 (M1e) : même règle pour le branchement des photos du tri `api`.
+  brancherPhotosApi: ["src/adapters/api-photos-instance.ts", "src/instrumentation.ts"],
+  debrancherPhotosApiPourTests: ["src/adapters/api-photos-instance.ts"],
   // B4b (spécification B4, B4b point 1) : même règle pour le branchement du paiement simulé en base.
   brancherPaiementSimule: ["src/adapters/simulated-payment-instance.ts", "src/instrumentation.ts"],
   debrancherPaiementSimulePourTests: ["src/adapters/simulated-payment-instance.ts"],

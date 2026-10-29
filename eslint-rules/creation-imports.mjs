@@ -14,9 +14,10 @@ import { cibleDe, importateurDe, visiteurs } from "./ia-recherche-imports.mjs";
  *   qui amende 0101 § 4 d'un importateur), `src/workflows/index.ts`, et le seul fichier `src/server/presentation/tri.ts` pour les
  *   seuls modules `lot`, `expiration` et `demarrage` (`completeDeck` crée la ligne `batch`, démarre le workflow 5 et expire les
  *   lots figés, 0119 § 1.3 point 2 et § 1.4 point 5 ; importateur admis par la Sécurité à la revue de la PR 667, 0120 S9 point 3),
- *   et le seul fichier `src/server/composition/villes-api.ts` pour les seuls modules `barriere` et `acces-reel` (recherche de
+ *   le seul fichier `src/server/composition/villes-api.ts` pour les seuls modules `barriere` et `acces-reel` (recherche de
  *   ville de `api` : barrière B9-TL-8 et crochet d'accès seulement, décision 0141 § 6.2, qui amende 0101 § 4 ; la page de
  *   l'écran 1 n'en est pas importatrice : elle passe par `rechercheVilleApiOuverte`) ;
+ *   le seul fichier `src/server/photos/api.ts` pour le seul module `barriere` (photos du tri sur `api`, décision 0143 § 6) ;
  *   `@/server/generation/reprise` seul : aussi `scripts/reprise-studio.ts` (commande de reprise du studio, 0087 § 1.6 point 3) ;
  * - `@/server/creation/*` : `src/server/creation/`, `src/server/actions/creation.ts` et, par dérogation (0101 § 1), le seul
  *   `src/adapters/api-creation.ts` ;
@@ -59,6 +60,8 @@ export const IMPORTATEURS_GENERATION_PAR_MODULE = [
   { importateur: "src/server/presentation/tri.ts", modules: ["src/server/generation/lot", "src/server/generation/expiration", "src/server/generation/demarrage"] },
   // Recherche de ville de api : barrière B9-TL-8 et crochet d'accès seulement (décision 0141 § 6.2, amende 0101 § 4).
   { importateur: "src/server/composition/villes-api.ts", modules: ["src/server/generation/barriere", "src/server/generation/acces-reel"] },
+  // Décision 0143 § 6 (amende 0101 § 4) : photos du tri sur `api`, barrière B9-TL-8 seulement (modèle de 0141 § 6.2).
+  { importateur: "src/server/photos/api.ts", modules: ["src/server/generation/barriere"] },
 ];
 const admisParModule = (importateur, chemin) =>
   IMPORTATEURS_GENERATION_PAR_MODULE.some((entree) => entree.importateur === importateur && entree.modules.includes(chemin));
