@@ -8,15 +8,19 @@ import { authAdapterChoice, betterAuthAllowed } from "@/adapters/auth-guard";
 import { paymentAvailable } from "@/adapters/payment-guard";
 import { isProductionDeployment } from "@/dev/flags";
 import * as route from "@/app/api/v1/webhooks/simulated/route";
+import * as routeStripe from "@/app/api/v1/webhooks/stripe/route";
 import * as moduleEnv from "@/server/env";
 import { assertServerProcessEnv, parseServerEnv, rateLimitSettings, resendAdmis, SERVER_ENV_VARIABLES, ServerEnvError, type ServerEnvRule, type ServerEnvVariable } from "@/server/env";
 import { resolveServerEnvironment, ServerEnvironmentUndeclaredError } from "@/server/env/resolve";
 import { formatLogLine, LOG_VARIABLES } from "@/server/log";
 import type { DependancesPaiement } from "@/server/payment/dependances";
 import { signer } from "@/server/payment/signature";
+import { verifierEvenementStripe } from "@/server/payment/stripe";
 import { configurationDepuisEnv, creerWebhookSimule, TAILLE_MAX_CORPS, type OptionsWebhookSimule } from "@/server/routes/simulated-webhook";
+import { configurationStripeDepuisEnv, creerWebhookStripe } from "@/server/routes/stripe-webhook";
 
 import { isProductionForDatabase } from "../../../db/connection";
+import { cleDeTest, SDK, secretWebhookDeTest, signerStripe } from "../../support/stripe-evenements";
 
 /**
  * Gardes de configuration du serveur (spécification B3, critères A1, A2 et A13 ; décisions 0050, B3-TL-1 et B3-TL-5,
@@ -785,7 +789,10 @@ describe("env: gardes de configuration du paiement simulé (B4a ; critère A21 ;
       const config = parseServerEnv(ci({ PAYMENT_ADAPTER: vide, DATA_ADAPTER: vide }));
       expect([config.paymentAdapter, config.dataAdapter]).toEqual(["mock", "mock"]);
     }
-    expect(parseServerEnv(ci({ PAYMENT_ADAPTER: " stripe ", DATA_ADAPTER: "prototype" }))).toMatchObject({ paymentAdapter: "stripe", dataAdapter: "prototype" });
+    // B4c (PR 863 ; décision 0140 § 3 point 3) : ` stripe ` est reconnu (espaces retirés), puis refusé faute de clé ; la
+    // configuration Stripe complète est acceptée dans « env: gardes de configuration » plus bas.
+    refusParse(ci({ PAYMENT_ADAPTER: " stripe ", DATA_ADAPTER: "prototype" }), NOM.STRIPE_SECRET_KEY, "missing");
+    expect(parseServerEnv(ci({ PAYMENT_ADAPTER: " mock ", DATA_ADAPTER: " prototype " }))).toMatchObject({ paymentAdapter: "mock", dataAdapter: "prototype" });
     for (const inconnu of [SENTINELLE, "Simulated", "postgres", "constructor"]) {
       refusParse(ci({ PAYMENT_ADAPTER: inconnu }), NOM.PAYMENT_ADAPTER, "invalid_value");
       refusParse(ci({ DATA_ADAPTER: inconnu }), NOM.DATA_ADAPTER, "invalid_value");
@@ -1284,5 +1291,300 @@ describe("env: gardes de l'envoi réel (B3d, R1 ; décision 0138 § 2, § 3 et �
     expect(config.emailTransport).toBe("smtp");
     expect(Object.keys(config)).not.toContain("resendApiKey");
     expect(inspect(config, { depth: 5 })).not.toContain("re_");
+  });
+});
+
+// --- Paiement Stripe en mode test (spécification B4, B4c ; décision 0140 § 2 et § 3 ; critères T1, T2, T5, T7) -------
+// Ici pour la même raison que le webhook simulé : seul test admis, hors de `src/server/env/`, à importer `@/server/env`.
+// Clé et secret tirés au hasard (forme de 0140 § 3), noms en clés d'objet ; jamais `vi.stubEnv` d'un nom secret.
+
+/** Configuration Stripe complète en `ci`, plus `extra`. */
+const stripeOuvert = (extra: Env = {}): Env =>
+  ci(
+    connexionReelle({
+      [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(aleatoire()),
+      [NOM.STRIPE_SECRET_KEY]: cleDeTest(),
+      [NOM.STRIPE_WEBHOOK_SECRET]: secretWebhookDeTest(),
+      PAYMENT_ADAPTER: "stripe",
+      DATA_ADAPTER: "api",
+      ...extra,
+    }),
+  );
+
+describe("env: gardes de configuration (B4c : PAYMENT_ADAPTER=stripe, clés de test ; décision 0140 § 3 points 1 à 3)", () => {
+  it("configuration complète en `ci` et en `local` → acceptée ; ni la clé ni le secret dans l'objet rendu", () => {
+    for (const environnement of ["ci", "local"]) {
+      const env = stripeOuvert({ VADROUILLE_ENV: environnement });
+      const config = parseServerEnv(env);
+      expect({ p: config.paymentAdapter, d: config.dataAdapter, f: config.simulatedWebhookFlag }).toEqual({ p: "stripe", d: "api", f: false });
+      const texte = inspect(config, { depth: 5 });
+      for (const nom of [NOM.STRIPE_SECRET_KEY, NOM.STRIPE_WEBHOOK_SECRET]) expect(texte).not.toContain(env[nom]);
+    }
+  });
+
+  it("forme stricte de la clé secrète, dès qu'elle est présente (sans trim) → invalid_value ; sk_test_ et rk_test_ conformes acceptés", () => {
+    const cle = cleDeTest();
+    for (const valeur of [`${cle} `, ` ${cle}`, `${cle}\n`, "sk_test_court", `sk_test_${"a".repeat(256)}`, `sk_test_${SENTINELLE}-x`, cle.replace("sk_test_", "pk_test_")]) {
+      refusParse(ci({ [NOM.STRIPE_SECRET_KEY]: valeur }), NOM.STRIPE_SECRET_KEY, "invalid_value");
+    }
+    for (const valeur of [cle, `rk_test_${"A1".repeat(8)}`, `sk_test_${SENTINELLE}`]) expect(() => parseServerEnv(ci({ [NOM.STRIPE_SECRET_KEY]: valeur }))).not.toThrow();
+  });
+
+  it("forme du secret du webhook (whsec_ puis 24 à 128 caractères) → invalid_value ; préfixe de production → production_prefix", () => {
+    const secret = secretWebhookDeTest();
+    for (const valeur of [`${secret} `, "whsec_court", `whsec_${"a".repeat(129)}`, secret.replace("whsec_", "WHSEC_"), `whsec_${SENTINELLE}!`]) {
+      refusParse(ci({ [NOM.STRIPE_WEBHOOK_SECRET]: valeur }), NOM.STRIPE_WEBHOOK_SECRET, "invalid_value");
+    }
+    refusParse(ci({ [NOM.STRIPE_WEBHOOK_SECRET]: `sk_live_${SENTINELLE}` }), NOM.STRIPE_WEBHOOK_SECRET, "production_prefix");
+    expect(() => parseServerEnv(ci({ [NOM.STRIPE_WEBHOOK_SECRET]: secret }))).not.toThrow();
+  });
+
+  it("PAYMENT_ADAPTER=stripe : clé et secret présents, DATA_ADAPTER=api, connexion réelle et secret du limiteur exigés ; jamais avec le drapeau simulé", () => {
+    refusParse(stripeOuvert({ [NOM.STRIPE_SECRET_KEY]: undefined }), NOM.STRIPE_SECRET_KEY, "missing");
+    refusParse(stripeOuvert({ [NOM.STRIPE_SECRET_KEY]: "" }), NOM.STRIPE_SECRET_KEY, "missing");
+    refusParse(stripeOuvert({ [NOM.STRIPE_WEBHOOK_SECRET]: undefined }), NOM.STRIPE_WEBHOOK_SECRET, "missing");
+    for (const donnees of [undefined, "mock", "prototype"]) refusParse(stripeOuvert({ DATA_ADAPTER: donnees }), NOM.DATA_ADAPTER, "invalid_value");
+    refusParse(stripeOuvert({ AUTH_ADAPTER: "mock" }), NOM.AUTH_ADAPTER, "invalid_value");
+    refusParse(stripeOuvert({ [NOM.RATE_LIMIT_HMAC_SECRET]: undefined }), NOM.RATE_LIMIT_HMAC_SECRET, "missing");
+    for (const drapeau of ["true", " TRUE "]) refusParse(stripeOuvert({ SIMULATED_WEBHOOK_ENABLED: drapeau }), NOM.SIMULATED_WEBHOOK_ENABLED, "forbidden");
+    expect(parseServerEnv(stripeOuvert({ SIMULATED_WEBHOOK_ENABLED: "false" })).paymentAdapter).toBe("stripe");
+  });
+
+  it("PAYMENT_ADAPTER=stripe en production ou sur une cible de production (casse et espaces ignorés) → forbidden", () => {
+    for (const valeur of ["production", " Production "]) {
+      refusParse({ VADROUILLE_ENV: valeur, PAYMENT_ADAPTER: "stripe" }, NOM.PAYMENT_ADAPTER, "forbidden");
+      refusParse(vercel(valeur, { PAYMENT_ADAPTER: "stripe" }), NOM.PAYMENT_ADAPTER, "forbidden");
+      refusParse(stripeOuvert({ VERCEL_TARGET_ENV: valeur }), NOM.PAYMENT_ADAPTER, "forbidden");
+    }
+  });
+});
+
+/** Pose une variable de production du vrai `process.env`, par nom littéral (régime des tests). */
+const POSER_PRODUCTION: readonly (readonly [string, (valeur: string) => void])[] = [
+  ["VADROUILLE_ENV", (valeur) => vi.stubEnv("VADROUILLE_ENV", valeur)],
+  ["VERCEL_ENV", (valeur) => vi.stubEnv("VERCEL_ENV", valeur)],
+  ["VERCEL_TARGET_ENV", (valeur) => vi.stubEnv("VERCEL_TARGET_ENV", valeur)],
+];
+
+const URL_WEBHOOK_STRIPE = "http://127.0.0.1:3000/api/v1/webhooks/stripe";
+
+function requeteStripe(corps: string | Uint8Array<ArrayBuffer>, entetes: Record<string, string> = {}, method = "POST"): Request {
+  return new Request(URL_WEBHOOK_STRIPE, { method, body: method === "GET" || method === "HEAD" ? null : (corps as BodyInit), headers: { "content-type": "application/json", ...entetes } });
+}
+
+const evenementStripeTest = () =>
+  JSON.stringify({
+    id: `evt_${randomBytes(12).toString("hex")}`,
+    object: "event",
+    type: "checkout.session.completed",
+    livemode: false,
+    created: MAINTENANT_S,
+    data: { object: { id: `cs_test_${randomBytes(12).toString("hex")}`, payment_status: "paid", amount_total: 900, currency: "chf", metadata: { checkoutId: crypto.randomUUID() } } },
+  });
+
+/** Webhook Stripe ouvert (configuration validée), secret de test injecté dans la fermeture de vérification. */
+function stripeOuvertAvec() {
+  const secret = secretWebhookDeTest();
+  const env = parseServerEnv(stripeOuvert());
+  const base = baseIndisponible();
+  const gestionnaire = creerWebhookStripe({
+    lireConfiguration: () => ({ ouvert: configurationStripeDepuisEnv(env).ouvert, verifierSignature: () => (corps, entete, ms) => verifierEvenementStripe(corps, entete, secret, ms) }),
+    dependances: base.dependances,
+  });
+  const signeeStripe = (corps: string, horodatage = MAINTENANT_S) => requeteStripe(corps, { "stripe-signature": signerStripe(corps, secret, horodatage) });
+  return { ...base, secret, gestionnaire, signeeStripe };
+}
+
+describe("paiement: webhook Stripe fermé hors PAYMENT_ADAPTER=stripe et en production", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("la route exporte les sept méthodes vers le même gestionnaire, fermé dans l'environnement des tests : 404 pour chacune, corps vide", async () => {
+    const exportsRoute = [
+      ["GET", routeStripe.GET],
+      ["HEAD", routeStripe.HEAD],
+      ["POST", routeStripe.POST],
+      ["PUT", routeStripe.PUT],
+      ["PATCH", routeStripe.PATCH],
+      ["DELETE", routeStripe.DELETE],
+      ["OPTIONS", routeStripe.OPTIONS],
+    ] as const;
+    expect(exportsRoute.map(([methode]) => methode)).toEqual([...METHODES]);
+    for (const [methode, gestionnaire] of exportsRoute) {
+      expect(gestionnaire).toBe(routeStripe.POST);
+      const reponse = await gestionnaire(requeteStripe("{}", {}, methode));
+      expect(reponse.status).toBe(404);
+      expect(await reponse.text()).toBe("");
+      expect(reponse.headers.get("cache-control")).toBe("no-store");
+    }
+    expect(routeStripe.dynamic).toBe("force-dynamic");
+  });
+
+  it.each([
+    ["PAYMENT_ADAPTER absent", { VADROUILLE_ENV: "ci" }],
+    ["PAYMENT_ADAPTER=mock", { VADROUILLE_ENV: "ci", PAYMENT_ADAPTER: "mock" }],
+    ["PAYMENT_ADAPTER=simulated (webhook simulé ouvert)", ouvertWebhook()],
+  ] as const)("%s → 404 pour les sept méthodes, sans lire le corps, le secret ni la base, sans appel à constructEvent", async (_cas, env) => {
+    const espion = vi.spyOn(SDK.webhooks, "constructEvent");
+    const { acces, dependances } = baseIndisponible();
+    const lireSecret = vi.fn();
+    const gestionnaire = creerWebhookStripe({
+      lireConfiguration: () => {
+        const configuration = configurationStripeDepuisEnv(parseServerEnv(env));
+        return { ouvert: configuration.ouvert, verifierSignature: () => (lireSecret(), configuration.verifierSignature()) };
+      },
+      dependances,
+    });
+    for (const methode of METHODES) {
+      const demande = requeteStripe(evenementStripeTest(), { "stripe-signature": "t=1,v1=00" }, methode);
+      const reponse = await gestionnaire(demande);
+      expect(reponse.status).toBe(404);
+      expect(await reponse.text()).toBe("");
+      expect(demande.bodyUsed).toBe(false);
+    }
+    expect(lireSecret).not.toHaveBeenCalled();
+    expect(espion).not.toHaveBeenCalled();
+    expect(acces.nombre).toBe(0);
+  });
+
+  it.each(["VADROUILLE_ENV", "VERCEL_ENV", "VERCEL_TARGET_ENV"])("PAYMENT_ADAPTER=stripe et %s=production dans l'objet reçu → 404 et une ligne `payment.webhook_config_invalid`", async (nom) => {
+    for (const valeur of ["production", " Production "]) {
+      const lignes = journal();
+      const { acces, dependances } = baseIndisponible();
+      const env = nom === "VADROUILLE_ENV" ? { VADROUILLE_ENV: valeur, PAYMENT_ADAPTER: "stripe" } : nom === "VERCEL_ENV" ? vercel(valeur, { PAYMENT_ADAPTER: "stripe" }) : stripeOuvert({ [nom]: valeur });
+      const gestionnaire = creerWebhookStripe({ lireConfiguration: () => configurationStripeDepuisEnv(parseServerEnv(env)), dependances });
+      for (const methode of ["POST", "GET"]) {
+        const reponse = await gestionnaire(requeteStripe(evenementStripeTest(), {}, methode));
+        expect(reponse.status).toBe(404);
+        expect(await reponse.text()).toBe("");
+      }
+      expect(acces.nombre).toBe(0);
+      const ecrites = lignes().map((ligne) => JSON.parse(ligne) as Record<string, unknown>);
+      expect(ecrites).toEqual([
+        expect.objectContaining({ event: "payment.webhook_config_invalid", rule: "forbidden", variable: NOM.PAYMENT_ADAPTER }),
+        expect.objectContaining({ event: "payment.webhook_config_invalid", rule: "forbidden", variable: NOM.PAYMENT_ADAPTER }),
+      ]);
+      vi.restoreAllMocks();
+    }
+  });
+
+  it.each(POSER_PRODUCTION)("PAYMENT_ADAPTER=stripe valide, %s=production dans le vrai process.env → 404 pour les sept méthodes, sans lire le secret", async (_nom, poser) => {
+    const env = parseServerEnv(stripeOuvert());
+    for (const valeur of ["production", " Production "]) {
+      poser(valeur);
+      const lireSecret = vi.fn(() => null);
+      const { acces, dependances } = baseIndisponible();
+      const gestionnaire = creerWebhookStripe({ lireConfiguration: () => ({ ouvert: configurationStripeDepuisEnv(env).ouvert, verifierSignature: lireSecret }), dependances });
+      for (const methode of METHODES) {
+        const demande = requeteStripe(evenementStripeTest(), {}, methode);
+        expect((await gestionnaire(demande)).status).toBe(404);
+        expect(demande.bodyUsed).toBe(false);
+      }
+      expect(lireSecret).not.toHaveBeenCalled();
+      expect(acces.nombre).toBe(0);
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("configuration invalide sans rapport (secret du limiteur trivial) → 404 et une ligne avec `rule` et `variable`, sans valeur", async () => {
+    const lignes = journal();
+    const trivial = "a".repeat(64);
+    const gestionnaire = creerWebhookStripe({ lireConfiguration: () => configurationStripeDepuisEnv(parseServerEnv(stripeOuvert({ [NOM.RATE_LIMIT_HMAC_SECRET]: trivial }))), dependances: baseIndisponible().dependances });
+    expect((await gestionnaire(requeteStripe(evenementStripeTest()))).status).toBe(404);
+    const ecrites = lignes();
+    expect(ecrites.map((ligne) => JSON.parse(ligne) as object)).toEqual([expect.objectContaining({ event: "payment.webhook_config_invalid", rule: "secret_trivial", variable: NOM.RATE_LIMIT_HMAC_SECRET })]);
+    expect(ecrites.join("")).not.toContain(trivial.slice(0, 8));
+  });
+});
+
+describe("paiement: réponses du webhook Stripe", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  async function attendre(reponse: Response, status: number, corps: Record<string, unknown>) {
+    expect(reponse.status).toBe(status);
+    expect(reponse.headers.get("cache-control")).toBe("no-store");
+    expect(await reponse.json()).toEqual(corps);
+  }
+
+  it("`GET`, `PUT`, `PATCH`, `DELETE`, `OPTIONS` → 405 (`Allow: POST`) ; type de média autre que JSON → 400 ; sans constructEvent ni base", async () => {
+    const espion = vi.spyOn(SDK.webhooks, "constructEvent");
+    const { gestionnaire, acces, signeeStripe } = stripeOuvertAvec();
+    for (const methode of ["GET", "PUT", "PATCH", "DELETE", "OPTIONS"]) {
+      const reponse = await gestionnaire(requeteStripe(evenementStripeTest(), {}, methode));
+      expect(reponse.headers.get("allow")).toBe("POST");
+      await attendre(reponse, 405, { error: "method_not_allowed" });
+    }
+    const signee = signeeStripe(evenementStripeTest());
+    await attendre(await gestionnaire(new Request(signee.url, { method: "POST", body: await signee.text(), headers: { "content-type": "text/plain", "stripe-signature": signee.headers.get("stripe-signature") ?? "" } })), 400, { error: "invalid_request" });
+    expect(espion).not.toHaveBeenCalled();
+    expect(acces.nombre).toBe(0);
+  });
+
+  it("corps de taille maximale + 1 octet → 413 sans vérification", async () => {
+    const espion = vi.spyOn(SDK.webhooks, "constructEvent");
+    const { gestionnaire, acces } = stripeOuvertAvec();
+    await attendre(await gestionnaire(requeteStripe(new Uint8Array(TAILLE_MAX_CORPS + 1).fill(32), { "stripe-signature": "t=1,v1=00" })), 413, { error: "payload_too_large" });
+    expect(espion).not.toHaveBeenCalled();
+    expect(acces.nombre).toBe(0);
+  });
+
+  it("en-tête absent, vide ou de plus de 512 caractères → 400 sans appel à constructEvent ; signature fausse ou d'un autre secret → 400 sans base", async () => {
+    const espion = vi.spyOn(SDK.webhooks, "constructEvent");
+    const { gestionnaire, acces, signeeStripe } = stripeOuvertAvec();
+    const corps = evenementStripeTest();
+    const valide = signeeStripe(corps).headers.get("stripe-signature") ?? "";
+    await attendre(await gestionnaire(requeteStripe(corps)), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(requeteStripe(corps, { "stripe-signature": "" })), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(requeteStripe(corps, { "stripe-signature": `${valide},v0=${"0".repeat(512)}` })), 400, { error: "invalid_request" });
+    expect(espion).not.toHaveBeenCalled();
+    await attendre(await gestionnaire(requeteStripe(corps, { "stripe-signature": `t=${MAINTENANT_S},v1=${"0".repeat(64)}` })), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(requeteStripe(corps, { "stripe-signature": signerStripe(corps, secretWebhookDeTest(), MAINTENANT_S) })), 400, { error: "invalid_request" });
+    await attendre(await gestionnaire(signeeStripe(corps, MAINTENANT_S - 301)), 400, { error: "invalid_request" });
+    expect(espion).toHaveBeenCalledTimes(3);
+    expect(acces.nombre).toBe(0);
+  });
+
+  it("corps signé illisible (UTF-8 invalide, JSON invalide, événement sans type) → 400 sans base", async () => {
+    const { gestionnaire, acces, secret, signeeStripe } = stripeOuvertAvec();
+    const octets = new Uint8Array([0x7b, 0xff, 0x7d]);
+    await attendre(await gestionnaire(requeteStripe(octets, { "stripe-signature": signerStripe(Buffer.from(octets).toString("latin1"), secret, MAINTENANT_S) })), 400, { error: "invalid_request" });
+    for (const corps of ["{", "[]", JSON.stringify({ id: "evt_0", livemode: false })]) await attendre(await gestionnaire(signeeStripe(corps)), 400, { error: "invalid_request" });
+    expect(acces.nombre).toBe(0);
+  });
+
+  it("signature valide (à −299 s et à +301 s) et base indisponible → 500, corps constant", async () => {
+    const { gestionnaire, acces, signeeStripe } = stripeOuvertAvec();
+    for (const decalage of [0, -299, 301]) await attendre(await gestionnaire(signeeStripe(evenementStripeTest(), MAINTENANT_S + decalage)), 500, { error: "server_error" });
+    expect(acces.nombre).toBeGreaterThan(0);
+  });
+
+  it("chemin réel du secret : secret du webhook absent du vrai process.env → fermeture `null`, 400 sans base", async () => {
+    const env = parseServerEnv(stripeOuvert());
+    const configuration = configurationStripeDepuisEnv(env);
+    expect(configuration.ouvert).toBe(true);
+    expect(configuration.verifierSignature()).toBeNull();
+    const { acces, dependances } = baseIndisponible();
+    const gestionnaire = creerWebhookStripe({ lireConfiguration: () => configuration, dependances });
+    const corps = evenementStripeTest();
+    await attendre(await gestionnaire(requeteStripe(corps, { "stripe-signature": signerStripe(corps, secretWebhookDeTest(), MAINTENANT_S) })), 400, { error: "invalid_request" });
+    expect(acces.nombre).toBe(0);
+  });
+
+  it("aucune donnée sortie (T5 a) : ni en-tête, ni corps, ni secret dans les réponses ni dans le journal capturé", async () => {
+    const lignes = journal();
+    const { gestionnaire, secret, signeeStripe } = stripeOuvertAvec();
+    const corps = evenementStripeTest();
+    const recu = JSON.parse(corps) as { id: string; data: { object: { id: string; metadata: { checkoutId: string } } } };
+    const signee = signeeStripe(corps);
+    const entete = signee.headers.get("stripe-signature") ?? "";
+    const textes: string[] = [];
+    for (const demande of [signee, requeteStripe(corps, { "stripe-signature": `${entete}0` }), requeteStripe(corps, { "stripe-signature": entete.replace("v1=", "v0=") }), requeteStripe(corps, {}, "PUT")]) {
+      textes.push(await (await gestionnaire(demande)).text());
+    }
+    textes.push(...lignes());
+    for (const texte of textes) {
+      for (const valeur of [secret, entete, entete.split("v1=")[1] ?? entete, recu.id, recu.data.object.id, recu.data.object.metadata.checkoutId, "base indisponible"]) expect(texte).not.toContain(valeur);
+    }
   });
 });

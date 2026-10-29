@@ -312,10 +312,16 @@ describe("confinement: dépôt", () => {
     expect(importeurs.filter((f) => !f.startsWith("db/schema/"))).toEqual([]);
   });
 
-  // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 (c)) : chemin de lecture du secret du webhook simulé.
-  it("confinement: src/server/env/payment.ts n'a que deux importeurs hors de ses tests (composition et webhook simulés)", () => {
+  // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 (c)) : chemin de lecture du secret du webhook simulé. B4c (PR 863 ;
+  // décision 0140 § 3 point 4 et § 6 ligne 10) : la composition et le webhook Stripe s'y ajoutent, et eux seuls.
+  it("confinement: src/server/env/payment.ts n'a que quatre importeurs hors de ses tests (compositions et webhooks simulés et Stripe)", () => {
     const importeurs = resultats.filter((r) => r.imports.some((i) => i.cible === "src/server/env/payment.ts")).map((r) => r.fichier);
-    expect(importeurs.filter((f) => !estFichierTest(f)).sort()).toEqual(["src/server/payment/composition.ts", "src/server/routes/simulated-webhook.ts"]);
+    expect(importeurs.filter((f) => !estFichierTest(f)).sort()).toEqual([
+      "src/server/payment/composition-stripe.ts",
+      "src/server/payment/composition.ts",
+      "src/server/routes/simulated-webhook.ts",
+      "src/server/routes/stripe-webhook.ts",
+    ]);
     expect(importeurs.filter((f) => estFichierTest(f) && !f.startsWith("src/server/env/"))).toEqual([]);
   });
 
@@ -325,6 +331,21 @@ describe("confinement: dépôt", () => {
       .map((f) => f.chemin)
       .sort();
     expect(appelants).toEqual(["src/server/env/payment.ts", "src/server/payment/composition.ts", "src/server/routes/simulated-webhook.ts"]);
+  });
+
+  // B4c (PR 863 ; décision 0140 § 6 ligne 9, modèle de `nodemailer` et de 0138 § 9 ligne 7b) : seul module qui importe
+  // `stripe`, et ses deux seuls importeurs hors des tests.
+  it("confinement: src/server/payment/stripe.ts n'a que la composition et le webhook Stripe pour importeurs hors des tests", () => {
+    const importeurs = resultats.filter((r) => r.imports.some((i) => i.cible === "src/server/payment/stripe.ts")).map((r) => r.fichier);
+    expect(importeurs.filter((f) => !estFichierTest(f)).sort()).toEqual(["src/server/payment/composition-stripe.ts", "src/server/routes/stripe-webhook.ts"]);
+  });
+
+  it("confinement: `cleStripe` n'est appelé, hors des tests, que par la composition Stripe (et défini dans son module)", () => {
+    const appelants = analyses
+      .filter((f) => f.chemin.startsWith("src/") && !estFichierTest(f.chemin) && /\bcleStripe\(/.test(lireFichier(f.chemin)))
+      .map((f) => f.chemin)
+      .sort();
+    expect(appelants).toEqual(["src/server/env/payment.ts", "src/server/payment/composition-stripe.ts"]);
   });
 
   // B3d (M2a ; décision 0138 § 9, ligne 7) : chemin de lecture de la clé de Resend.
@@ -515,6 +536,8 @@ describe("confinement: le régime s'applique à lui-même", () => {
     const capacites = duRegime.filter((c) => c.par?.startsWith("capacite:")).map((c) => c.par);
     expect([...new Set(capacites)].sort()).toEqual([
       idLigneCapacite("tests/support/serveur-local.ts", "module:node:http", "createServer"),
+      // B4c (PR 863 ; décision 0140 § 6 ligne 3) : émetteur Stripe de test, seul fichier de test qui importe `stripe`.
+      idLigneCapacite("tests/support/stripe-evenements.ts", "module:stripe", "default"),
       idLigneCapacite("tests/unit/confinement/fichiers.ts", "module:node:child_process", "execFileSync"),
     ]);
   });

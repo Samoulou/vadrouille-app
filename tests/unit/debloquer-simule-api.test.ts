@@ -141,8 +141,12 @@ describe("getPaymentAdapter et getPaymentSimulator acceptent simulated (B4b poin
     expect(fabrique).not.toHaveBeenCalled();
   });
 
-  it("stripe reste non implémenté (B4c)", () => {
+  // B4c (PR 863 ; décision 0140 § 5 point 1) : `stripe` est implémenté ; sa garde reste fermée sans ses conditions
+  // (ici `DATA_ADAPTER=api` mais sans `AUTH_ADAPTER=better-auth`), sans repli vers le simulé ni le `mock`. Les cas
+  // ouverts sont dans `tests/unit/paiement-stripe-branchement.test.ts` et `tests/unit/payment-guard.test.ts`.
+  it("stripe sans ses conditions : garde fermée, aucun repli (B4c)", () => {
     vi.stubEnv("PAYMENT_ADAPTER", "stripe");
+    vi.stubEnv("AUTH_ADAPTER", undefined);
     expect(adapters.paymentAvailable()).toBe(false);
     expect(() => adapters.getPaymentAdapter()).toThrow(/paiement indisponible/);
     expect(adapters.getPaymentSimulator()).toBeNull();

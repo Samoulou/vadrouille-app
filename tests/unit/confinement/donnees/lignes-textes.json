@@ -726,6 +726,85 @@
         }
       ],
       "ecart": "module d'envoi réel de B3d (décision 0138 § 1.1) : verdict Sécurité : approuvé par la Sécurité sur le head 68d6e69"
+    },
+    {
+      "fichier": "src/adapters/stripe-payment-instance.ts",
+      "portee": "application",
+      "usage": "portée application, justification (0040 D4, modèle de `simulated-payment-instance.ts`) : alias de `globalThis` affecté à la constante `holder`, lu et écrit par la seule clé constante `PAIEMENT_KEY` (`Symbol.for(\"vadrouille.paiement-stripe\")`) ; garde la fabrique de l'adaptateur de paiement `stripe` (`composerPaiementStripe` de `src/server/payment/composition-stripe.ts`) et l'adaptateur qu'elle construit au premier usage, branchée une fois au démarrage par `src/instrumentation.ts` quand `PAYMENT_ADAPTER` vaut `stripe`, entre les copies du module que Next charge par route ; n'atteint aucune capacité (ni `fetch`, ni module à capacité, ni `process`, ni la clé Stripe, lue à chaque appel au prestataire) ; non branchée, ou fabrique qui lève, chaque méthode rend `provider_error` sans rien lire ni écrire (échec fermé). Garde-fou : `brancherPaiementStripe` lève `PaiementStripeDejaBrancheError` si la clé est déjà définie, hors de `tests/` seuls ce module et `src/instrumentation.ts` la nomment, et la remise à zéro `debrancherPaiementStripePourTests` n'est nommée hors de `tests/` que par ce module (`tests/unit/auth/points-injection.test.ts`) ; toute autre écriture de `globalThis` reste refusée par ce régime",
+      "capacites": [
+        {
+          "capacite": "global:globalThis",
+          "formes": [
+            "alias:holder",
+            "holder[PAIEMENT_KEY]"
+          ]
+        }
+      ],
+      "ecart": "ligne ordinaire de portée application (B4c, ticket 863 ; spécification B4, B4c point 2), modèle accepté par 0040 D4 et par la ligne de `simulated-payment-instance.ts` ; ligne au-delà de 0140 § 6 (relevée par `pnpm test`) : verdict Sécurité à rendre à la revue de B4c"
+    },
+    {
+      "fichier": "src/contracts/billing.ts",
+      "portee": "application",
+      "usage": "liste fermée des origines du prestataire admises dans redirectUrl (0020 § 1.3 amendé par 0140 § 4) ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:checkout.stripe.com",
+          "formes": [
+            "https://checkout.stripe.com"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B4c (0140 § 4) ; verdict Sécurité rendu sur le head final de la PR de la décision 0140 (#848), à confirmer au head de la PR de B4c"
+    },
+    {
+      "fichier": "src/contracts/billing.test.ts",
+      "portee": "test",
+      "usage": "critère C4 : chaque ligne du tableau de 0140 § 4 (adresses du prestataire acceptées et refusées), par le schéma et par adressePrestataireAdmise ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:checkout.stripe.com",
+          "formes": [
+            "https://checkout.stripe.com/c/pay/cs_test_a1#",
+            "https://checkout.stripe.com/c/pay/cs_test_a1#fidabc",
+            "https://checkout.stripe.com/",
+            "https://CHECKOUT.stripe.com/c/pay/x",
+            "https://Checkout.Stripe.com/c/pay/x",
+            "https://checkout.stripe.com:443/c/pay/x",
+            "https://checkout.stripe.com:444/c/pay/x",
+            "https://checkout.stripe.com",
+            "https://checkout.stripe.com.evil.example/x",
+            "https://checkout.stripe.com@evil.example/x",
+            "https://user@checkout.stripe.com/x",
+            "https://user:pw@checkout.stripe.com/x",
+            "https://evil.example/?https://checkout.stripe.com/",
+            "http://checkout.stripe.com/x",
+            "//checkout.stripe.com/x",
+            "https://checkout.stripe.com/x y",
+            "https://checkout.stripe.com/x\ny",
+            "https://checkout.stripe.com/x\ty",
+            "https://checkout.stripe.com/x\\y",
+            "https://checkout.stripe.com/x\u0000y",
+            "https://checkout.stripe.com/xy"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:dashboard.stripe.com",
+          "formes": [
+            "https://dashboard.stripe.com/x"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:api.stripe.com",
+          "formes": [
+            "https://api.stripe.com/x"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B4c (0140 § 4 et § 6 ligne 8) ; verdict Sécurité rendu sur le head final de la PR de la décision 0140 (#848), à confirmer au head de la PR de B4c"
     }
   ]
 }

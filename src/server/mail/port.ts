@@ -53,3 +53,39 @@ export class CodeMailerCapError extends Error {
     super("Plafond des envois du jour atteint.");
   }
 }
+
+/**
+ * Plafond global indisponible (base, configuration) : échec fermé, aucun envoi (spécification B3d, point 3). Aucune
+ * valeur. Défini avec le port (M7a) pour que les deux transports le lèvent sans s'importer l'un l'autre ; `./resend.ts`
+ * le réexporte.
+ */
+export class PlafondIndisponibleError extends Error {
+  override name = "PlafondIndisponibleError";
+
+  constructor() {
+    super("Plafond des envois indisponible.");
+  }
+}
+
+/**
+ * Message « propositions prêtes » (M7a ; plan `docs/plans/mvp-etapes-1-9.md`, étape 7) : la forme canonique de l'adresse
+ * du compte, l'origine de l'application (`APP_URL` validée par `parseServerEnv`) et l'identifiant du voyage (`uuid`).
+ * Le lien est construit par la préparation commune (`preparerMessageApercu`), jamais reçu tout fait ; le message ne
+ * porte ni destination, ni date, ni lieu, ni aucun contenu du programme, ni aucune donnée Google.
+ */
+export type ApercuPretMessage = {
+  readonly to: CanonicalEmail;
+  readonly origine: string;
+  readonly tripId: string;
+};
+
+/**
+ * Port d'envoi des notifications (M7a) : une opération, l'e-mail « propositions prêtes ». Mêmes règles que `CodeMailer` :
+ * un refus ou une panne **lève** une erreur de nom fixe, sans valeur ; `CodeMailerCapError` dit le plafond atteint.
+ * Implémentations : `createSmtpNotificationMailer` (`./smtp.ts`, Mailpit en `local` et `ci`) et
+ * `createResendNotificationMailer` (`./resend.ts`, cas admis de 0138 § 3 seulement), choisies par la composition de
+ * `src/server/auth/index.ts` comme le port du code ; `disabledNotificationMailer` (`./disabled.ts`) sans transport.
+ */
+export interface NotificationMailer {
+  sendApercuPret(message: ApercuPretMessage): Promise<void>;
+}

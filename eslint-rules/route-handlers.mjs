@@ -5,10 +5,13 @@ import { cibleDe, importateurDe, visiteurs } from "./ia-recherche-imports.mjs";
  * dans 0006, conflit C17 ; décision 0097 B4-TL-5). Posée sur tout fichier du dépôt par un seul bloc d'`eslint.config.mjs`
  * (tests/unit/lint/route-handlers-lint.test.ts) :
  * - `@/server/routes/*` ne s'importe que depuis un `route.ts` de `src/app/api/` (et depuis les tests : `*.test.*` et
- *   `tests/`, qui appellent le gestionnaire directement, critère A22) ;
+ *   `tests/`, qui appellent le gestionnaire directement, critère A22), ou depuis `src/server/routes/` lui-même (fabrique
+ *   commune des webhooks, décision 0140 § 2.1) ;
  * - un `route.ts` de `src/app/api/` n'importe rien d'autre de `src/server` que `@/server/routes/*` ;
  * - dans `src/server/actions/` : ni `@/server/routes/*`, ni `@/server/env/payment`, ni les identifiants `constructEvent`,
- *   `STRIPE_WEBHOOK_SECRET` et `SIMULATED_WEBHOOK_SECRET`, ni le paquet `stripe` hors de `paiement.ts` ;
+ *   `STRIPE_WEBHOOK_SECRET` et `SIMULATED_WEBHOOK_SECRET`, ni le paquet `stripe` dans aucun fichier, `paiement.ts`
+ *   compris (amendement de 0006 par la décision 0140 § 1.3 (b) : la session est créée par l'adaptateur, depuis
+ *   `src/server/payment/stripe.ts`, seul importateur du paquet) ;
  * - `PaymentEvent` et `PaymentEventSchema` (contrat interne du serveur) ne s'importent ni dans `src/features` ni dans
  *   `src/components`.
  * La directive `"use server"` d'un fichier de `src/server/routes/` est refusée par `ligne/use-server-only-in-actions`.
@@ -34,12 +37,13 @@ export function refusImport(source, importateur) {
   const cible = cibleDe(source, importateur);
   if (cible.paquet !== undefined) {
     const paquet = cible.paquet;
-    if (importateur.startsWith(ACTIONS) && importateur !== `${ACTIONS}paiement.ts` && (paquet === "stripe" || paquet.startsWith("stripe/"))) return "stripe";
+    if (importateur.startsWith(ACTIONS) && (paquet === "stripe" || paquet.startsWith("stripe/"))) return "stripe";
     return null;
   }
   const chemin = cible.chemin;
   if (dans(chemin, ROUTES)) {
-    if (estTest(importateur) || estRouteApi(importateur)) return null;
+    // B4c (décision 0140 § 2.1) : les modules de `src/server/routes/` s'importent entre eux (fabrique commune des webhooks).
+    if (estTest(importateur) || estRouteApi(importateur) || dans(importateur, ROUTES)) return null;
     return "routes";
   }
   if (estRouteApi(importateur) && dans(chemin, "src/server")) return "route";
@@ -51,7 +55,7 @@ const MESSAGES = {
   routes: "@/server/routes/* ne s'importe que depuis un route.ts de src/app/api (B4a point 7 ; amendement de 0006) ({{source}}).",
   route: "Un route.ts de src/app/api n'importe de src/server que @/server/routes/* (B4a point 7 ; amendement de 0006) ({{source}}).",
   envPaiement: "@/server/env/payment est refusé dans src/server/actions (B4a point 7 ; décision 0097 B4-TL-3) ({{source}}).",
-  stripe: "Le paquet stripe ne s'importe dans src/server/actions que depuis paiement.ts (B4a point 7) ({{source}}).",
+  stripe: "Le paquet stripe ne s'importe pas dans src/server/actions (décision 0140 § 1.3 : seul src/server/payment/stripe.ts l'importe) ({{source}}).",
   identifiant: "Identifiant refusé dans src/server/actions (B4a point 7 : vérification de signature et secrets des webhooks) ({{nom}}).",
   contrat: "PaymentEvent est un contrat interne du serveur : jamais importé dans src/features ni src/components (décision 0097 B4-TL-5) ({{nom}}).",
 };

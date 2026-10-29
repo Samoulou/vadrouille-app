@@ -40,6 +40,9 @@ const POINTS: Readonly<Record<string, readonly string[]>> = {
   // B4b (spécification B4, B4b point 1) : même règle pour le branchement du paiement simulé en base.
   brancherPaiementSimule: ["src/adapters/simulated-payment-instance.ts", "src/instrumentation.ts"],
   debrancherPaiementSimulePourTests: ["src/adapters/simulated-payment-instance.ts"],
+  // B4c (ticket 863) : branchement du paiement Stripe, même modèle.
+  brancherPaiementStripe: ["src/adapters/stripe-payment-instance.ts", "src/instrumentation.ts"],
+  debrancherPaiementStripePourTests: ["src/adapters/stripe-payment-instance.ts"],
 };
 
 const DOSSIERS = ["src", "db", "scripts", "eslint-rules"];

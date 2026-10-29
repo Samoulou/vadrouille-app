@@ -52,10 +52,25 @@ export const IMPORTATEURS_ADMIS = new Map([
       "tests/unit/server/env.test.ts",
       "src/server/payment/composition.ts",
       "src/server/routes/simulated-webhook.ts",
+      // B4c (décision 0140 § 6 ligne 10) : composition du paiement Stripe et webhook Stripe (`serverEnv()`) ; fabrique
+      // commune des webhooks (classe `ServerEnvError`, pour journaliser une configuration invalide à l'étape 1).
+      "src/server/payment/composition-stripe.ts",
+      "src/server/routes/stripe-webhook.ts",
+      "src/server/routes/webhook-commun.ts",
     ],
   ],
   ["resolve", ["db/connection.ts", "tests/unit/server/env.test.ts"]],
-  ["payment", ["src/server/payment/composition.ts", "src/server/routes/simulated-webhook.ts"]],
+  // B4c (décision 0140 § 6 ligne 10) : composition du paiement Stripe (`cleStripe`, `productionPaiement`) et webhook
+  // Stripe (`webhookStripeOuvert`, `secretWebhookStripe`).
+  [
+    "payment",
+    [
+      "src/server/payment/composition.ts",
+      "src/server/routes/simulated-webhook.ts",
+      "src/server/payment/composition-stripe.ts",
+      "src/server/routes/stripe-webhook.ts",
+    ],
+  ],
   // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, depuis la garde et l'accès seulement ; ses
   // tests sont dans `src/server/env/` (`p0.test.ts`).
   // P0r3d (ticket 354 ; 0046, D24) : commit du déploiement (`commitDuDeploiement`), lu par le lancement seulement, garde
