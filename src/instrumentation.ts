@@ -41,8 +41,8 @@
  * `src/adapters/api-tri-instance.ts`. Rien n'est lu ni connecté ici. Un échec du branchement est journalisé
  * (`voyages.action_failed`, action `branchement-tri`) sans arrêter le serveur : chaque action du tri rend `internal`.
  *
- * M1e (ticket 879 ; décision 0143, qui généralise 0128, sur le modèle de B10a) : environnement valide et `DATA_ADAPTER=api`, les
- * photos du tri (`creerPhotosApi`, `src/server/photos/api.ts` : barrière B9-TL-8, lieu lu en base, limiteur, client non
+ * M1e (ticket 879 ; décision 0143, qui généralise 0128, sur le modèle de B10a) : environnement valide et
+ * `DATA_ADAPTER=api`, les photos du tri (`creerPhotosApi`, `src/server/photos/api.ts` : barrière B9-TL-8, lieu lu en base, limiteur, client non
  * branché) sont branchées sur `src/adapters/api-photos-instance.ts`. Rien n'est lu ni connecté ici. Un échec du
  * branchement est journalisé (`voyages.action_failed`, action `branchement-photos`) sans arrêter le serveur : les cartes
  * gardent leur emplacement « Photo du lieu ».

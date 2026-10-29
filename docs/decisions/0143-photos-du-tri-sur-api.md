@@ -1,12 +1,14 @@
 # 0143 — Photos du tri sur `api` (M1e) : barrière B9-TL-8 sans crochet, lieu lu en base, cadence `photo-tri`, client livré par M1h ; amendements de 0128 § 1 à § 5 et de 0101 § 4
 
-Statut : **acceptée**. Décision déléguée du **Tech Lead** (architecture, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`), sur proposition du rôle front ; le **CEO** la valide (arbitrages de la revue consolidée de la PR #882, head `c89c3f5`). Définitive dès sa fusion, **sans fenêtre de veto** (0093) ; à lister dans la note de version suivante (rubrique « Décisions prises par le studio »).
+Statut : **acceptée**. Décision déléguée du **Tech Lead** (architecture, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`), sur proposition du rôle front ; le **CEO** la valide (arbitrages de la revue consolidée de la PR #882, head `c89c3f5`). Définitive dès sa fusion, **sans fenêtre de veto** (0093), **pour ce qu'elle tranche seulement** : la question du flux hors UE (F13-Q4, ci-dessous) n'est **pas** tranchée par 0143 et reste à Samuel ; à lister dans la note de version suivante (rubrique « Décisions prises par le studio »).
 
-Date : 2026-10-29 · Décideur : Tech Lead (proposée par front, validée par le CEO) · Ticket : #879 · PR : #882 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 1, § 1 (b) point 5 et ligne M1e · Décisions liées : 0010, 0027, 0081 (B9-TL-8), 0093, 0101 § 4, 0128, 0136, 0141 (§ 6.2, modèle de M1f) · Verdict Sécurité : **approuvé** (revue de la PR #882, head `c89c3f5`) : ligne de confinement de `src/adapters/api-photos-instance.ts`, ordre barrière → appartenance → limiteur, action sans `placeId`, aucune donnée Google stockée.
+Date : 2026-10-29 · Décideur : Tech Lead (proposée par front, validée par le CEO) · Ticket : #879 · PR : #882 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 1, § 1 (b) point 5 et ligne M1e · Décisions liées : 0010, 0027, 0081 (B9-TL-8), 0093, 0101 § 4, 0128, 0136, 0141 (§ 6.2, modèle de M1f) · Verdict Sécurité : **approuvé** aux revues de la PR #882, head `c89c3f5` (ligne de confinement de `src/adapters/api-photos-instance.ts`, action sans `placeId`, aucune donnée Google stockée) puis head `f502390` (ordre barrière → client branché → lieu → limiteur → client, étape commune `lieuDeLaCarte`, appartenance prouvée sur base) · Verdict UX : approuvé au head `f502390` (attribution ; `alt=""` confirmé, 0128 § 3).
 
 Numérotation : 0143 est réservé par le CEO pour cette PR.
 
 **Ce que cette décision n'engage pas.** Aucun argent, aucun compte, aucune clé, aucun appel Google : la barrière reste fermée et **aucun client des photos n'est branché sur `api`** (§ 4). Aucune migration, aucune variable d'environnement nouvelle, aucune donnée Google en base, dans un journal ou dans un prompt. Aucun test supprimé ni désactivé. Les appels payants et l'ouverture de la barrière restent réservés à Samuel (plafonds de M1h).
+
+**Flux hors UE (F13-Q4), non tranché ici.** Quand le navigateur charge l'image chez Google (`googleusercontent.com`), l'adresse IP du voyageur part hors UE. Samuel n'a accepté ce chargement direct que **pour la phase 0** (F13-Q4, réponse du 2026-10-12 à 11:12 CEST : « ok pour les deux »), **« à revoir avant l'ouverture au public »** (`docs/decisions/0128-photos-du-tri.md`, l. 9 et l. 62). 0143 ne fait passer **aucune** image par ce flux : la barrière est fermée et aucun client n'est branché (§ 1, § 4). **L'ouverture de la barrière sur `api` (M1h) requiert une réponse explicite de Samuel** sur ce flux avant tout public : maintien du chargement direct hors UE, ou passage de l'image par le serveur. 0143 ne vaut ni réponse ni prolongation de F13-Q4.
 
 ## Contexte
 
@@ -39,8 +41,10 @@ Le terminal est branché au démarrage (`src/instrumentation.ts` → `src/adapte
 
 1. **Sous la barrière fermée, emplacement réservé.** La fabrique du client des photos de `api` vaut `null` par défaut (`CLIENT_PAR_DEFAUT`). Aucun client n'est construit, aucune clé n'est lue, aucun appel n'a lieu.
 2. **Le branchement du client et son décompte sont livrés par M1h** (ticket à ouvrir par le CEO) : composition du client Places Photos de `api` (fabrique commune des clients Google, 0100 § 5.2), port de consommation, décompte du coût hors de `prototype.forfaits`, plafond par organisation, crochet d'accès (§ 1 point 2), avec nouvelle revue Sécurité (client construit après le limiteur, clé côté serveur seulement, coût décompté, adresses limitées aux hôtes Google).
-3. **Critère d'acceptation de M1h** : sur `api` avec barrière ouverte, la photo de la première proposition s'affiche avec son crédit.
+3. **Critère d'acceptation de M1h** : sur `api` avec barrière ouverte, la photo de la première proposition s'affiche avec son crédit ; **condition préalable** : réponse explicite de Samuel sur le flux hors UE (F13-Q4, en tête), consignée dans la décision de M1h, avant toute ouverture à un public.
 4. Point à trancher avec M1h (Sécurité, mineur 11 de la revue) : la lecture du lieu recompose les propositions (`listPreviewSlots`, `listProposals`) avant le limiteur. C'est sans effet tant que la barrière est fermée ou le client non branché, puisque la lecture n'a pas lieu. M1h choisit entre lire le seul `placeId` sans recomposer et placer le limiteur en amont.
+5. Plafond par organisation et par jour (au-delà de la cadence par adresse IP du § 3) : à poser avec M1h avant d'ouvrir la barrière.
+6. Nom de l'action : `photoDuLieuEssai` (`src/server/actions/photo-essai.ts`) sert désormais les deux adaptateurs ; son renommage est renvoyé à une PR ultérieure (mineur 14 de la revue du head `c89c3f5`), pour ne pas toucher le site d'essai ici.
 
 ## 5. Attribution
 
@@ -50,7 +54,7 @@ Dès que les photos sont demandées sur `api`, la mention « Données de lieux :
 
 - **0128 § 1 à § 5**, généralisés à l'adaptateur `api` :
   - § 1 : l'exception « appel à l'affichage » vaut aussi pour le tri de `api`, derrière la barrière du § 1 ci-dessus au lieu de la garde du mode réel et du cookie d'accès ;
-  - § 2 : sur `api`, rien n'est stocké non plus ; le client est celui du § 4 ;
+  - § 2 : sur `api`, rien n'est stocké non plus. L'amendement vaut **barrière fermée et client non branché seulement** : aucune image n'est chargée chez Google depuis `api`. Le chargement direct (F13-Q4) n'est **pas** étendu à `api` par 0143 ; il le sera, ou non, par M1h sur réponse de Samuel (en tête) ;
   - § 3 : attribution du § 5 ;
   - § 4 : cadence du § 3, aucun forfait de `prototype.forfaits` sur `api` ;
   - § 5 : même repli silencieux.

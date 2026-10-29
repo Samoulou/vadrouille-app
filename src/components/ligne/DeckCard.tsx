@@ -70,8 +70,8 @@ export interface DeckCardProps {
   /** Repas : dernière option du créneau (F6-PO-7). */
   isLastOption?: boolean;
   /**
-   * Photo du lieu (site d'essai, décision 0128 ; `api`, décision 0143), chargée à la demande par l'écran ; absente ou `null` : l'emplacement
-   * « photo » reste. Affichée avec ses auteurs et « Google Maps » (conditions de Places API).
+   * Photo du lieu (site d'essai, décision 0128 ; `api`, décision 0143), chargée à la demande par l'écran ; absente ou
+   * `null` : l'emplacement « photo » reste. Affichée avec ses auteurs et « Google Maps » (conditions de Places API).
    */
   photo?: PlacePhoto | null;
   /** Photo demandée, pas encore arrivée : l'emplacement reste, sans icône ni libellé (aucun clignotement d'une carte à l'autre). */

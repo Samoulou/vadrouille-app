@@ -383,8 +383,9 @@ export function cheminPhotosDuTri(value: string | undefined = process.env.DATA_A
 /**
  * Photo d'une carte du tri sur l'adaptateur `api` (décision 0143, qui généralise 0128 ; ticket 879, M1e) : barrière
  * B9-TL-8, client branché, lieu, cadence et client de `src/server/photos/api.ts`, branchés au démarrage
- * (`api-photos-instance.ts`). **Le lieu n'est jamais pris de l'entrée** : il est lu en base sur la proposition `proposalId` du voyage `tripId`, par `getTripReader()` dans le contexte d'organisation de la
- * requête (mêmes cartes que l'écran, `lieuDeLaProposition`), et seulement barrière ouverte. Hors adaptateur `api`,
+ * (`api-photos-instance.ts`). **Le lieu n'est jamais pris de l'entrée** : il est lu en base sur la proposition
+ * `proposalId` du voyage `tripId`, par `getTripReader()` dans le contexte d'organisation de la requête (mêmes cartes que
+ * l'écran, `lieuDeLaProposition`), et seulement barrière ouverte et client branché. Hors adaptateur `api`,
  * voyage inconnu ou d'une autre organisation, proposition d'un autre voyage ou sans lieu, identifiant mal formé : `null`,
  * photos non branchées, aucun appel. Ne lève jamais ; rien n'est stocké.
  */
