@@ -225,7 +225,7 @@ describe("evals: programme par l'IA, sorties simulées de rome-1 et edimbourg-1 
 
   it("evals: les seuils et les incontournables ne sont ni dans le prompt ni dans le code de production", () => {
     const prompt = readFileSync(path.join(RACINE, "src/ai/prompts/programme.ts"), "utf8");
-    const production = ["src/ai/sorties.ts", "src/ai/rediger-programme.ts", "src/workflows/p0-run.ts", "src/server/p0/assemblage.ts"].map((fichier) => readFileSync(path.join(RACINE, fichier), "utf8"));
+    const production = ["src/ai/sorties.ts", "src/ai/rediger-programme.ts", "src/workflows/p0-run.ts", "src/server/p0/assemblage.ts", "src/server/programme/assemblage.ts"].map((fichier) => readFileSync(path.join(RACINE, fichier), "utf8"));
     for (const texte of [prompt, ...production]) {
       for (const variantes of Object.values(CONFIG.parCas).flatMap((cas) => cas.incontournables.attendus)) {
         for (const variante of variantes.filter((v) => v.length > 6)) expect(normaliser(texte)).not.toContain(variante);

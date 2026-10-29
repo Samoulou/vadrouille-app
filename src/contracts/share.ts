@@ -13,7 +13,7 @@ import {
   TerminusItemSchema,
   TripBaseSchema,
 } from "./trip";
-import { SHARED_EXCEPTIONS, SHARE_TOKEN_PATTERN } from "./values";
+import { SHARED_EXCEPTIONS, SHARE_TOKEN_PATTERN, SIGNED_SHARE_TOKEN_PATTERN } from "./values";
 
 /**
  * Contrats du partage et de la vue partagée (spécification F10, F10c ; décision 0039, F10-TL-1 et F10-TL-7).
@@ -126,9 +126,12 @@ export const ShareStatusSchema = z.discriminatedUnion("active", [
 ]);
 export type ShareStatus = z.infer<typeof ShareStatusSchema>;
 
-/** Lien créé : seule réponse qui porte le jeton en clair (F10-PO-17). */
+/**
+ * Lien créé : seule réponse qui porte le jeton en clair (F10-PO-17). Jeton aléatoire de l'adaptateur simulé
+ * (`SHARE_TOKEN_PATTERN`) ou jeton signé de l'adaptateur réel du site d'essai (`SIGNED_SHARE_TOKEN_PATTERN`, décision 0135).
+ */
 export const CreatedShareLinkSchema = z.strictObject({
-  token: z.string().regex(SHARE_TOKEN_PATTERN),
+  token: z.union([z.string().regex(SHARE_TOKEN_PATTERN), z.string().regex(SIGNED_SHARE_TOKEN_PATTERN)]),
   createdAt: InstantSchema,
   expiresOn: IsoDateSchema,
 });

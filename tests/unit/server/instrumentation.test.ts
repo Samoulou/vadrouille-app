@@ -27,7 +27,12 @@ vi.mock("@/adapters/prototype-instance", () => ({
   brancherDeblocagesEssai: (deblocages: unknown) => brancherDeblocages(deblocages),
   brancherCreationEssai: (port: unknown) => brancherCreationEssai(port),
   brancherPhotosEssai: (photos: unknown) => brancherPhotosEssai(photos),
+  brancherPartageEssai: (partage: unknown) => brancherPartageEssai(partage),
 }));
+// Décision 0135 : partage réel d'un voyage du site d'essai (double : aucune clé, aucun cookie, aucune base).
+const brancherPartageEssai = vi.fn();
+const partageEssai = { cle: vi.fn(), sessionVerifiee: vi.fn(), barriereLecture: vi.fn() };
+vi.mock("@/server/essai/partage", () => ({ partageEssai }));
 // Décision 0128 : photos du tri d'un voyage d'essai (double : aucune base, aucun cookie, aucun appel Google).
 const brancherPhotosEssai = vi.fn();
 const photosEssai = { photo: vi.fn() };
@@ -130,6 +135,7 @@ beforeEach(() => {
   poolLectureProgrammes.mockClear();
   brancherCreationEssai.mockClear();
   brancherPhotosEssai.mockClear();
+  brancherPartageEssai.mockClear();
   echecBarriere = null;
   vi.stubEnv("NEXT_RUNTIME", "nodejs");
 });
@@ -186,6 +192,14 @@ describe("instrumentation : branchement de la lecture des programmes réels (dé
     await register();
     expect(brancherCreationEssai).toHaveBeenCalledTimes(1);
     expect(brancherCreationEssai).toHaveBeenCalledWith(creationEssai);
+  });
+
+  it("DATA_ADAPTER=prototype : partage réel branché (décision 0135)", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    await register();
+    expect(brancherPartageEssai).toHaveBeenCalledTimes(1);
+    expect(brancherPartageEssai).toHaveBeenCalledWith(partageEssai);
+    expect(logEvent).not.toHaveBeenCalled();
   });
 
   it("DATA_ADAPTER=prototype : photos du tri branchées (décision 0128)", async () => {

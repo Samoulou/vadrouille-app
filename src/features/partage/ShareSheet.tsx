@@ -6,6 +6,7 @@ import { Button } from "@/components/ligne/Button";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
 import type { CreatedShareLink, Result, ShareRequest, ShareStatus } from "@/contracts";
+import { SIGNED_SHARE_TOKEN_PATTERN } from "@/contracts/values";
 import { localDateAt } from "@/features/voyage/today";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -44,7 +45,7 @@ type View =
   | { kind: "unread" }
   | { kind: "none" }
   | { kind: "active"; createdAt: string; expiresOn: string }
-  | { kind: "created"; url: string; expiresOn: string };
+  | { kind: "created"; url: string; expiresOn: string; stable: boolean };
 
 /** Action envoyée, ou relue par « Réessayer » avec la même entrée. */
 type Operation = "read" | "create" | "revoke" | "replace";
@@ -152,7 +153,10 @@ function ShareContent({
           const result = await actions.createShareLink(input());
           if (!result.ok) throw new Error("création");
           const url = `${window.location.origin}${sharedRoutes(result.value.token).sejour()}`;
-          setView({ kind: "created", url, expiresOn: result.value.expiresOn });
+          // Partage réel du site d'essai (décision 0135 § 7) : jeton signé, le même pour ce voyage, que « Créer un lien »
+          // redonne ; « il ne pourra plus s'afficher » ne vaut que pour le jeton aléatoire de l'adaptateur simulé.
+          const stable = SIGNED_SHARE_TOKEN_PATTERN.test(result.value.token);
+          setView({ kind: "created", url, expiresOn: result.value.expiresOn, stable });
           setConfirm(null);
           setFocusTarget("champ");
         }
@@ -305,7 +309,7 @@ function ShareContent({
                 className="min-h-(--touch-target) w-full rounded-control border border-border-control bg-raised px-3 text-corps text-ink"
               />
             </div>
-            <p className="text-corps-s text-ink-2">{t.copieMaintenant}</p>
+            <p className="text-corps-s text-ink-2">{view.stable ? t.lienStable : t.copieMaintenant}</p>
             <Button variant="primary" data-part="copier" className="w-full" onClick={() => void copy(view.url)}>
               {t.copier}
             </Button>

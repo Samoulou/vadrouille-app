@@ -409,15 +409,25 @@ export default defineConfig([
     rules: { "no-console": "error" },
   },
   {
-    // F10c (F10-TL-5) : aucun journal dans le partage (le jeton n'est jamais journalisé, F10-PO-17).
-    files: ["src/server/actions/partage.ts", "src/adapters/mock-share.ts", "src/adapters/share-guard.ts"],
+    // F10c (F10-TL-5) : aucun journal dans le partage (le jeton n'est jamais journalisé, F10-PO-17) ; de même dans le
+    // partage réel du site d'essai (décision 0135).
+    files: [
+      "src/server/actions/partage.ts",
+      "src/adapters/mock-share.ts",
+      "src/adapters/share-guard.ts",
+      "src/adapters/signed-share.ts",
+      "src/adapters/share-signed-token.ts",
+      "src/adapters/share-views.ts",
+      "src/server/essai/partage.ts",
+    ],
     rules: { "no-console": "error" },
   },
   {
     // F9a : horloge injectée, jamais l'horloge système dans l'adaptateur de paiement simulé (0017 § 10.1, 0020 § 2.2) ;
     // F10c : de même dans l'adaptateur de partage simulé (F10-TL-5) ; F8b : de même dans la connexion simulée
     // et la création simulée (0017 § 10.1).
-    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts", "src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts"],
+    // Décision 0135 : de même dans l'adaptateur de partage réel (horloge de la portée).
+    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts", "src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts", "src/adapters/signed-share.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -654,6 +664,13 @@ export default defineConfig([
       "src/server/p0/vers-moteur.ts",
       // B7a (ticket 423, décision 0077 § 1 point 5) : adaptateur de P0 vers la couche IA, même régime que `vers-moteur.ts`.
       "src/server/p0/vers-couche-ia.ts",
+      // Décision 0136 § 1.5 (M1a-1) : code partagé de la chaîne inversée, déplacé de `src/server/p0` et réexporté par
+      // `assemblage.ts`, `vers-couche-ia.ts` et `vers-moteur.ts`, donc chargé par `pnpm p0` sous Node nu ; même
+      // justification et même condition de sortie que P0r3c-5a. `brief.ts`, `sites.ts` et `apercu.ts` du même dossier
+      // gardent `import "server-only"`.
+      "src/server/programme/forme.ts",
+      "src/server/programme/entree.ts",
+      "src/server/programme/assemblage.ts",
     ],
     rules: { "ligne/require-server-only": "error" },
   },

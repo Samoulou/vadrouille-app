@@ -1,11 +1,11 @@
 import { fail, ok, type CreatedShareLink, type Result, type ShareStatus, type Trip } from "@/contracts";
-import { CreatedShareLinkSchema, SharedDayViewSchema, SharedTripViewSchema, ShareStatusSchema } from "@/contracts/share";
+import { CreatedShareLinkSchema, ShareStatusSchema } from "@/contracts/share";
 import { SHARE_TOKEN_PATTERN } from "@/contracts/values";
 import { localDateAt } from "@/features/voyage/today";
 import { accessUntil } from "@/lib/dates";
 
-import { projectSharedMaps, projectSharedPoints, projectSharedTrip } from "./share-projection";
 import { hashShareToken, randomShareToken } from "./share-token";
+import { buildSharedDayView, buildSharedTripView } from "./share-views";
 import { MAX_SHARE_LINKS_PER_SCOPE, type ShareLinkRecord, type ShareStore } from "./simulation";
 import type { AdapterContext, ShareAdapter, TripAdapter } from "./types";
 
@@ -122,22 +122,12 @@ export function createMockShareAdapter(options: MockShareOptions): ShareAdapter 
 
     async getSharedTrip(token) {
       const resolved = await resolve(token);
-      if (!resolved) return null;
-      const maps = await trips.getTripMap(resolved.ctx, resolved.trip.id);
-      return SharedTripViewSchema.parse({ trip: projectSharedTrip(resolved.trip), maps: projectSharedMaps(resolved.trip, maps) });
+      return resolved ? buildSharedTripView(trips, resolved.ctx, resolved.trip) : null;
     },
 
     async getSharedDay(token, index) {
       const resolved = await resolve(token);
-      if (!resolved) return null;
-      const day = resolved.trip.days.find((candidate) => candidate.index === index);
-      if (!day) return null;
-      const map = await trips.getDayMap(resolved.ctx, resolved.trip.id, index);
-      return SharedDayViewSchema.parse({
-        trip: projectSharedTrip(resolved.trip),
-        dayIndex: index,
-        points: projectSharedPoints(day, map),
-      });
+      return resolved ? buildSharedDayView(trips, resolved.ctx, resolved.trip, index) : null;
     },
   };
 }

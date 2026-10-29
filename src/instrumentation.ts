@@ -100,6 +100,15 @@ async function brancherLecturePrototype(
     logEvent("essai.unlock_unavailable", { errorName: errorNameOf(error) }, "error");
   }
   try {
+    // Décision 0135 : partage réel d'un voyage du site d'essai (clé tirée du code d'accès, session vérifiée par le cookie
+    // d'accès, barrière de la vue partagée sans cookie). Rien n'est lu ici. Échec : aucune clé, tout lien répond 404.
+    const { brancherPartageEssai } = await import("@/adapters/prototype-instance");
+    const { partageEssai } = await import("@/server/essai/partage");
+    brancherPartageEssai(partageEssai);
+  } catch (error) {
+    logEvent("p0.read_unavailable", { errorName: errorNameOf(error) }, "error");
+  }
+  try {
     // Spécification E2E-essai, lot 3 : création d'un voyage d'essai depuis l'app (lancement de `p0Run` sur le brief saisi,
     // même garde que `/prototype/executions`, et avancement). Rien n'est lu ici. Échec : la création rend `provider_error`.
     const { brancherCreationEssai } = await import("@/adapters/prototype-instance");
