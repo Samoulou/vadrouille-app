@@ -433,8 +433,15 @@ describe("confinement: spécificateurs et paquets (dépôt)", () => {
     expect(fantomes).toEqual([]);
   });
 
-  it("aucun fichier .npmrc, .yarnrc ou pnpm-workspace.yaml suivi", () => {
-    expect(suivis.map((f) => f.chemin).filter((c) => /(^|\/)(\.npmrc|\.yarnrc[^/]*|pnpm-workspace\.yaml)$/.test(c))).toEqual([]);
+  // B4d-TL (décision 0144 § 6) : un seul `.npmrc`, à la racine, dont le contenu est exactement l'âge minimal de
+  // publication (20160 minutes) ; toute autre ligne (registre, jeton, script, hôte) le fait refuser.
+  it("aucun fichier .yarnrc ou pnpm-workspace.yaml suivi ; un seul .npmrc, à la racine, présent", () => {
+    expect(suivis.map((f) => f.chemin).filter((c) => /(^|\/)(\.npmrc|\.yarnrc[^/]*|pnpm-workspace\.yaml)$/.test(c))).toEqual([".npmrc"]);
+  });
+
+  it(".npmrc : fichier ordinaire (mode 100644, jamais un lien symbolique), contenu exact, l'âge minimal de publication seulement (décision 0144 § 6)", () => {
+    expect(suivis.filter((f) => f.chemin === ".npmrc").map((f) => f.mode)).toEqual(["100644"]);
+    expect(lireFichier(".npmrc")).toBe("minimum-release-age=20160\n");
   });
 });
 
