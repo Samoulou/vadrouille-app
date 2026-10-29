@@ -114,6 +114,10 @@ export const LOG_EVENTS = [
   "payment.alert",
   "payment.followup_failed",
   "payment.webhook_config_invalid",
+  // B4c (décision 0140 § 1.2) : échec d'un appel au prestataire Stripe (création ou lecture d'une session), niveau `warn`,
+  // champ unique `errorClass` (`LOG_PROVIDER_ERROR_CLASSES`) ; ni message, ni en-tête, ni paramètre, ni identifiant de
+  // requête de Stripe, ni clé.
+  "payment.provider_failed",
   // B9d (spécification B9, B9-PO-17 points 3 et 4 ; décision 0087 § 1.4) : un voyage complet entre en état bloqué (reprise par
   // le studio), une fois par passage, par l'écrivain dont l'écriture a passé la ligne en `failed`. Niveau `warn` ; champs
   // `tripId`, `organizationId`, `generationRunId` (identifiants internes) et `stopReason` (code fermé) ; aucune donnée de lieu.
@@ -245,6 +249,11 @@ export type LogFields = {
    * (`p0.read_unavailable`, décision 0137 § 2) : `LOG_STEP_FAILURE_CODES`, jamais un message ; retiré sur tout autre événement.
    */
   readonly failureCode?: string;
+  /**
+   * Classe d'une erreur du prestataire Stripe (`payment.provider_failed`, décision 0140 § 1.2) :
+   * `LOG_PROVIDER_ERROR_CLASSES`, jamais un message ; retiré sur tout autre événement (modèle `failureCode`).
+   */
+  readonly errorClass?: string;
   /** Identifiant d'un événement de paiement (`payment.alert`, B4-TL-13) : forme simulée ou `evt_…` de Stripe. */
   readonly eventId?: string;
   /** Type normalisé d'un événement de paiement (`PaymentEvent.type`, liste fermée). */
@@ -307,6 +316,7 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     VADROUILLE_DB_ADMIN_URL: 0,
     STRIPE_SECRET_KEY: 0,
     STRIPE_PUBLISHABLE_KEY: 0,
+    STRIPE_WEBHOOK_SECRET: 0,
     "STRIPE_*": 0,
     P0_REAL_RUNS: 0,
     P0_RUN_TOKEN: 0,
@@ -647,6 +657,24 @@ export const LOG_ALERT_CODES: readonly string[] = [
   "dispute",
 ];
 const CODES_ALERTE: ReadonlySet<string> = new Set(LOG_ALERT_CODES);
+/**
+ * Valeurs du champ `errorClass` (`payment.provider_failed`, décision 0140 § 1.2) : les sept classes d'erreur du SDK
+ * nommées par `src/server/payment/stripe.ts` (égalité vérifiée par le test du journal), `invalid_response` (réponse
+ * inexploitable), `egress_refused` (barrière de sortie fermée) et `other` (toute autre erreur).
+ */
+export const LOG_PROVIDER_ERROR_CLASSES: readonly string[] = [
+  "StripeConnectionError",
+  "StripeRateLimitError",
+  "StripeAPIError",
+  "StripeIdempotencyError",
+  "StripeAuthenticationError",
+  "StripePermissionError",
+  "StripeInvalidRequestError",
+  "invalid_response",
+  "egress_refused",
+  "other",
+];
+const CLASSES_ERREUR_PRESTATAIRE: ReadonlySet<string> = new Set(LOG_PROVIDER_ERROR_CLASSES);
 /** Raisons de fin d'une génération (copie de `FINS_MODELE` de `@/ai/client`, égalité vérifiée par le test du journal ; 0130 § 2). */
 export const LOG_FINISH_REASONS: readonly string[] = ["stop", "length", "content-filter", "tool-calls", "error", "other"];
 const RAISONS_FIN: ReadonlySet<string> = new Set(LOG_FINISH_REASONS);
@@ -765,13 +793,15 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
  * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee`
  * seulement (constat du 2026-10-25 ; verdict 0122 § 2.1 point 4 : aucun statut sur la ligne des sites) ; `failureCode`
  * sur `p0.step_failed` (ticket 493) et `p0.read_unavailable` (décision 0137 § 2) seulement ; `usage` sur `email.sent` et
- * `email.cap_reached` seulement (B3d point 6).
+ * `email.cap_reached` seulement (B3d point 6) ; `errorClass` sur `payment.provider_failed` seulement (B4c, décision 0140
+ * § 1.2 ; revue de la PR 848, mineur : règle dans cette table, valeur de `LOG_PROVIDER_ERROR_CLASSES`).
  */
 const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlySet<string>; readonly controle: (valeur: unknown) => boolean }> = new Map([
   ["googleCode", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
   ["httpStatus", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
   ["failureCode", { evenements: new Set(["p0.step_failed", "p0.read_unavailable"]), controle: (v: unknown) => chaine(v) && CODES_ETAPE.has(v) }],
   ["usage", { evenements: new Set(["email.sent", "email.cap_reached"]), controle: (v: unknown) => chaine(v) && USAGES_EMAIL.has(v) }],
+  ["errorClass", { evenements: new Set(["payment.provider_failed"]), controle: (v: unknown) => chaine(v) && CLASSES_ERREUR_PRESTATAIRE.has(v) }],
 ]);
 
 /**

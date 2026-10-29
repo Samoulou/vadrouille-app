@@ -29,6 +29,7 @@ import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-g
 import { realShareAvailable, shareAvailable } from "./share-guard";
 import { createSignedShareAdapter } from "./signed-share";
 import { paiementSimule } from "./simulated-payment-instance";
+import { paiementStripe } from "./stripe-payment-instance";
 import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
 import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
 
@@ -156,7 +157,7 @@ export function getAuthAdapter(options: { scope?: SimulationScope; env?: NodeJS.
 export const CHECKOUT_TTL_MS = 30 * 60_000;
 export const DEMO_UNLOCK_TTL_MS = 30 * 60_000;
 
-function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_ADAPTER): "mock" | "simulated" {
+function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_ADAPTER): "mock" | "simulated" | "stripe" {
   const choice = adapterChoice(value);
   switch (choice) {
     case "mock":
@@ -165,7 +166,9 @@ function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_AD
       // B4b (spécification B4, B4b point 1) : paiement simulé en base, branché au démarrage (`./simulated-payment-instance.ts`).
       return "simulated";
     case "stripe":
-      throw new Error("adaptateur de paiement stripe non implémenté (tâche de paiement réel, après G0 et Q26)");
+      // B4c (spécification B4, B4c point 2 ; décision 0140 § 5 point 1) : Stripe en mode test, branché au démarrage
+      // (`./stripe-payment-instance.ts`) ; sans simulateur.
+      return "stripe";
     default:
       throw new Error(`PAYMENT_ADAPTER inconnu : « ${choice} » (valeurs : mock, simulated, stripe)`);
   }
@@ -185,28 +188,37 @@ function mockPaymentFor(scope: SimulationScope): PaymentAdapter & PaymentSimulat
   });
 }
 
-/** Adaptateur du choix courant : `mock` dans la portée, `simulated` branché au démarrage (la portée ne sert pas). */
-function paymentFor(scope: SimulationScope | undefined): PaymentAdapter & PaymentSimulator {
-  return paymentAdapterChoice() === "simulated" ? paiementSimule() : mockPaymentFor(scope ?? defaultScope());
+/**
+ * Adaptateur du choix courant : `mock` dans la portée, `simulated` ou `stripe` branchés au démarrage (la portée ne sert
+ * pas) ; `stripe` n'a pas de simulateur.
+ */
+function paymentFor(scope: SimulationScope | undefined): { adapter: PaymentAdapter; simulator: PaymentSimulator | null } {
+  const choice = paymentAdapterChoice();
+  if (choice === "stripe") return { adapter: paiementStripe(), simulator: null };
+  const adapter = choice === "simulated" ? paiementSimule() : mockPaymentFor(scope ?? defaultScope());
+  return { adapter, simulator: adapter };
 }
 
 /**
- * Adaptateur de paiement (variable serveur `PAYMENT_ADAPTER`, `mock` par défaut ; `simulated` depuis B4b, l'état vit
- * alors en base et la portée de simulation ne sert pas). **Filet de sécurité** : lève une erreur si `paymentAvailable()`
- * est faux ; les pages et les actions consultent la garde avant et ne l'atteignent jamais dans ce cas. `stripe` lève
- * toujours « non implémenté » (B4c).
+ * Adaptateur de paiement (variable serveur `PAYMENT_ADAPTER`, `mock` par défaut ; `simulated` depuis B4b et `stripe` en
+ * mode test depuis B4c : l'état vit alors en base et la portée de simulation ne sert pas). **Filet de sécurité** : lève
+ * une erreur si `paymentAvailable()` est faux ; les pages et les actions consultent la garde avant et ne l'atteignent
+ * jamais dans ce cas.
  */
 export function getPaymentAdapter(options: { scope?: SimulationScope } = {}): PaymentAdapter {
   if (!paymentAvailable()) {
     throw new Error("paiement indisponible : paymentAvailable() est faux (décision 0020 § 2.3)");
   }
-  return paymentFor(options.scope);
+  return paymentFor(options.scope).adapter;
 }
 
-/** Simulation des issues : `null` hors adaptateur simulé autorisé (décision 0020 § 2.3, amendée par B4b). */
+/**
+ * Simulation des issues : `null` hors adaptateur simulé autorisé (décision 0020 § 2.3, amendée par B4b), et toujours
+ * `null` pour `stripe` (B4c, décision 0140 § 5 point 1 : seul le webhook Stripe accorde le droit).
+ */
 export function getPaymentSimulator(options: { scope?: SimulationScope } = {}): PaymentSimulator | null {
   if (!paymentAvailable()) return null;
-  return paymentFor(options.scope);
+  return paymentFor(options.scope).simulator;
 }
 
 /**

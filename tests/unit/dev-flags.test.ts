@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { devPagesEnabled, isProductionDeployment } from "@/dev/flags";
+import { devPagesEnabled, isProductionDeployment, isProductionTarget } from "@/dev/flags";
 
 const env = (values: Record<string, string | undefined>) => values as unknown as NodeJS.ProcessEnv;
 
@@ -56,5 +56,37 @@ describe("pages de développement", () => {
   it("isProductionDeployment ne ferme pas sans valeur de production", () => {
     expect(isProductionDeployment(env({}))).toBe(false);
     expect(isProductionDeployment(env({ VERCEL_ENV: "preview", VADROUILLE_ENV: "local" }))).toBe(false);
+  });
+});
+
+// B4c (PR 863 ; décision 0140 § 3 point 6) : prédicat de production partagé du paiement Stripe. Il contient
+// `isProductionDeployment` (aucune ligne de sa table n'est retirée) et ferme aussi sur `VERCEL_TARGET_ENV`.
+describe("env: isProductionTarget", () => {
+  it.each([
+    [{ VADROUILLE_ENV: "production" }, true],
+    [{ VADROUILLE_ENV: " Production " }, true],
+    [{ VERCEL_ENV: "production" }, true],
+    [{ VERCEL_ENV: "PRODUCTION" }, true],
+    [{ VERCEL_TARGET_ENV: "production" }, true],
+    [{ VERCEL_TARGET_ENV: " Production " }, true],
+    [{ VERCEL_TARGET_ENV: "production", VERCEL_ENV: "preview", VADROUILLE_ENV: "ci" }, true],
+    [{}, false],
+    [{ VERCEL_ENV: "preview", VADROUILLE_ENV: "local" }, false],
+    [{ VERCEL_TARGET_ENV: "preview" }, false],
+    [{ VERCEL_TARGET_ENV: "mvp-essai" }, false],
+    [{ VERCEL_TARGET_ENV: "prod" }, false],
+    [{ VERCEL_TARGET_ENV: "" }, false],
+  ] as const)("%j → %s", (values, attendu) => {
+    expect(isProductionTarget(env(values))).toBe(attendu);
+  });
+
+  it("vrai dès que isProductionDeployment est vrai (même table)", () => {
+    for (const valeur of ["production", " Production ", "PRODUCTION"]) {
+      for (const nom of ["VADROUILLE_ENV", "VERCEL_ENV"]) {
+        const e = env({ [nom]: valeur });
+        expect(isProductionDeployment(e)).toBe(true);
+        expect(isProductionTarget(e)).toBe(true);
+      }
+    }
   });
 });

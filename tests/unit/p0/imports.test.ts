@@ -2013,6 +2013,14 @@ const FRONTIERE_P0R3B = {
       fichier: "src/server/routes/simulated-webhook.ts",
       admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
     },
+    // B4c (PR 863 ; décision 0140 § 2.1) : webhook Stripe, sur le modèle exact du simulé : seul module importé par le route
+    // handler `src/app/api/v1/webhooks/stripe/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive, qui
+    // lit `serverEnv()` et `@/server/env/payment` (secret lu à l'appel par `secretWebhookStripe`). Entrée au-delà de
+    // 0140 § 6, relevée par `pnpm test` : verdict Sécurité à rendre à la revue de B4c.
+    {
+      fichier: "src/server/routes/stripe-webhook.ts",
+      admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
+    },
     {
       fichier: "src/server/p0/page-acces.ts",
       admise: (f: string, source: string) => {
@@ -2221,12 +2229,13 @@ describe("p0: clé côté serveur seulement", () => {
     expect(directivesDuPrologue("x.ts", '"use strict";\n"use server";\nexport {};\n')).toEqual(["use strict", "use server"]);
   });
 
-  it("frontière de P0r3b sur le dépôt : les trois entrées réelles, celle du webhook simulé (B4a) et le terminal portent leur propriété", () => {
+  it("frontière de P0r3b sur le dépôt : les trois entrées réelles, celles des webhooks simulé (B4a) et Stripe (B4c) et le terminal portent leur propriété", () => {
     expect(FRONTIERE_P0R3B.entrees.map((e) => e.fichier)).toEqual([
       "src/server/actions/p0-acces.ts",
       "src/server/actions/p0-lancement.ts",
       "src/server/actions/villes-essai.ts",
       "src/server/routes/simulated-webhook.ts",
+      "src/server/routes/stripe-webhook.ts",
       "src/server/p0/page-acces.ts",
     ]);
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);

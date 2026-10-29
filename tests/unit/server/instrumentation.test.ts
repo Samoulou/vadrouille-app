@@ -116,8 +116,21 @@ vi.mock("@/server/payment/composition", () => ({
   },
 }));
 
+// B4c (PR 863 ; décision 0140 § 5 point 1) : branchement du paiement Stripe, mêmes doubles (aucune composition réelle,
+// aucune base, aucune clé).
+const brancherStripe = vi.fn();
+const composerPaiementStripe = vi.fn(() => ({ adaptateur: "stripe" }));
+vi.mock("@/adapters/stripe-payment-instance", () => ({
+  brancherPaiementStripe: (fabrique: unknown) => brancherStripe(fabrique),
+}));
+vi.mock("@/server/payment/composition-stripe", () => ({
+  composerPaiementStripe: () => composerPaiementStripe(),
+}));
+
 beforeEach(() => {
   vi.resetModules();
+  brancherStripe.mockClear();
+  composerPaiementStripe.mockClear();
   brancherPaiement.mockClear();
   composerPaiementSimule.mockClear();
   echecPaiement = null;
@@ -383,5 +396,27 @@ describe("instrumentation : branchement du paiement simulé en base (spécificat
     expect(brancherApi).toHaveBeenCalledTimes(1);
     expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-paiement", errorName: "TypeError" }, "error");
     expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
+  });
+});
+
+describe("instrumentation : branchement du paiement Stripe (spécification B4, B4c point 2 ; PR 863)", () => {
+  it("PAYMENT_ADAPTER=stripe : fabrique branchée, la composition n'est construite qu'au premier usage ; paiement simulé non branché", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    vi.stubEnv("PAYMENT_ADAPTER", "stripe");
+    await register();
+    expect(brancherStripe).toHaveBeenCalledTimes(1);
+    expect(brancherPaiement).not.toHaveBeenCalled();
+    expect(composerPaiementStripe).not.toHaveBeenCalled();
+    const [fabrique] = brancherStripe.mock.calls[0] as [() => unknown];
+    expect(fabrique()).toEqual({ adaptateur: "stripe" });
+    expect(composerPaiementStripe).toHaveBeenCalledTimes(1);
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "mock", "simulated"])("PAYMENT_ADAPTER=%j : paiement Stripe non branché", async (valeur) => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    vi.stubEnv("PAYMENT_ADAPTER", valeur);
+    await register();
+    expect(brancherStripe).not.toHaveBeenCalled();
   });
 });
