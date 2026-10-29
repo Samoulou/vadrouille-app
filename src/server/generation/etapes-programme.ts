@@ -1,13 +1,15 @@
 import "server-only";
 
-import { ChecklistItemSchema, type Trip } from "@/contracts";
+import { ChecklistItemSchema, type Trip, type TripSnapshot } from "@/contracts";
 import {
   lieuxHorsPart,
   reduireSiteDuProgramme,
+  type CapaciteProgramme,
   type ControleVerification,
   type ExecuteurPublication,
   type LieuxVerifies,
   type OptionsEtape,
+  type RedactionProgramme,
 } from "@/server/composition/generation";
 import { CASES_APERCU, DUREE_ETAPE_MS, RANG_PROGRAMME, RECIT_API_AUTORISE, type EtapeProgramme } from "@/server/config/generation";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
@@ -26,7 +28,7 @@ import { ArretEtape, codeDeErreur, codeFerme } from "./codes";
 import type { DependancesGeneration, DependancesResolues } from "./dependances";
 import { resoudre } from "./dependances";
 import { lireEtatProgramme, type EtatProgramme } from "./etat";
-import { forfaitDuProgramme } from "./forfait-etape";
+import { forfaitDuProgramme, type ForfaitDeLEtape } from "./forfait-etape";
 import { cloreEnEchecAuRang, commencerEtapeAuRang } from "./garde";
 import { lireVoyage, type ExecuteurLecture, type VoyageLu } from "./lecture";
 import { publier } from "./publication";
@@ -146,6 +148,19 @@ async function briefOuArreter(contexte: Contexte, x: Executeur): Promise<{ reado
   return { voyage, brief: conversion.brief };
 }
 
+/**
+ * Voyage relu et converti **sans récit**, pour la révision de la chaîne inversée (M1b, ticket 868) : la conversion de
+ * `briefOuArreter`, `recit` toujours absent (choix conservateur tant que la Sécurité n'a pas jugé une requête de révision qui
+ * recevrait le récit, verdict 0139 § 1.2 point 2) ; `briefs.story` n'est pas lu. Illisible ou refusé : `invalid_input`.
+ */
+export async function voyageEtBriefSansRecit(x: Executeur, organizationId: string, tripId: string): Promise<{ readonly voyage: VoyageLu; readonly brief: BriefEssai }> {
+  const voyage = await lireVoyage(x, organizationId, tripId);
+  if (voyage === null) throw new ArretEtape("invalid_input");
+  const conversion = briefDepuisFormulaire(voyage.draft, voyage.brief, undefined);
+  if (!conversion.ok) throw new ArretEtape("invalid_input");
+  return { voyage, brief: conversion.brief };
+}
+
 const contexteForfait = (contexte: Contexte) => ({ organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, barriere: contexte.barriere });
 
 // --- Étape a : brief et forfait ------------------------------------------------------------------------------------------
@@ -210,6 +225,129 @@ export function lignesAFaire(checklist: Trip["checklist"], generationRunId: stri
     });
 }
 
+/** Compteurs à zéro d'un passage de l'étape « programme » (ou de la révision). */
+export function compteursInitiaux(): CompteursProgramme {
+  return {
+    days: 0,
+    slots: 0,
+    placesToVerify: 0,
+    daysRemoved: 0,
+    slotsRemoved: 0,
+    fieldsRemoved: 0,
+    textsCut: 0,
+    modelCalls: 0,
+    unverifiedForCap: 0,
+    ...compteursNonSoumis(0),
+  };
+}
+
+/** Programme rédigé, vérifié et assemblé, en mémoire jusqu'à la publication de l'appelant. */
+export type ProgrammeVerifie = {
+  readonly complet: ReturnType<typeof assemblerProgrammeIa>;
+  readonly instantane: TripSnapshot;
+  readonly verifies: LieuxVerifies;
+  /** `placeId` des logements du brief, dans son ordre. */
+  readonly logements: readonly string[];
+  /** Instant pris **avant** les fiches qui rendent les positions (0060 § 1.3 point 2). */
+  readonly obtenuesA: number;
+};
+
+/**
+ * **Corps commun** de l'étape « programme » de `generateProgramme` et de la révision de la chaîne inversée (décision 0126 § 1 :
+ * « seules la requête et le filet diffèrent », portée sur `api` par M1b), en mémoire jusqu'à la publication, que l'appelant
+ * fait : (1) logements d'abord (`lodging_unresolved` avant toute requête de modèle, 0136 § 2.3.2) ; (2) **une** requête de
+ * modèle (`rediger`), lecture tolérante et ordre écrit, une seule fois (aucune journée lisible : `model_output_invalid`) ;
+ * (3) vérification des lieux distincts dans l'ordre écrit, part et échéance avant chaque appel, sans réserve de trajets
+ * (aucun appel Routes, § 2.4), et des sites en parallèle ; (4) assemblage sans replanification ni trajet par le module partagé
+ * (`assemblerProgrammeIa`, organisation de l'exécution) et instantané. Les compteurs sont tenus dans `compteurs`.
+ */
+export async function redigerEtVerifier(
+  contexte: Pick<Contexte, "dep" | "organizationId" | "tripId" | "echeance">,
+  entree: {
+    readonly brief: BriefEssai;
+    readonly capacite: CapaciteProgramme;
+    readonly forfait: ForfaitDeLEtape["forfait"];
+    readonly registre: ForfaitDeLEtape["registre"];
+    readonly compteurs: CompteursProgramme;
+  },
+  rediger: (capacite: CapaciteProgramme) => Promise<RedactionProgramme>,
+): Promise<ProgrammeVerifie> {
+  const { brief, capacite, forfait, registre, compteurs } = entree;
+  // Instant pris **avant** les fiches qui rendent les positions (0060 § 1.3 point 2).
+  const obtenuesA = contexte.dep.maintenant();
+  // 1. Logements d'abord : introuvable, `lodging_unresolved` avant toute requête de modèle (0136 § 2.3.2).
+  const logements = await capacite.logements(brief);
+
+  // 2. Rédaction : une requête de modèle, lecture tolérante et ordre écrit, une seule fois.
+  compteurs.modelCalls += 1;
+  const redaction = await rediger(capacite);
+  if (redaction.fin !== undefined) compteurs.finishReason = redaction.fin;
+  if (redaction.tokens !== undefined) {
+    compteurs.inputTokens = redaction.tokens.entree;
+    compteurs.outputTokens = redaction.tokens.sortie;
+  }
+  compteurs.daysRemoved = redaction.joursRetires;
+  compteurs.slotsRemoved = redaction.creneauxRetires;
+  compteurs.fieldsRemoved = redaction.champsRetires;
+  compteurs.textsCut = redaction.textesCoupes;
+  const programme = redaction.programme;
+  if (programme === null) throw new ArretEtape("model_output_invalid");
+  compteurs.days = programme.jours.length;
+  compteurs.slots = programme.jours.reduce((total, jour) => total + jour.creneaux.length, 0);
+  // Sites proposés : adresses réduites distinctes en ordre écrit, en mémoire seulement (0121 § 2.1 point 1).
+  const sites = sitesDuProgramme(programme, reduireSiteDuProgramme);
+  compteurs.fieldsRemoved += sites.formesRefusees;
+  Object.assign(compteurs, compteursNonSoumis(sites.adresses.length));
+
+  // 3. Vérification des lieux distincts dans l'ordre écrit, part et échéance avant chaque appel, sans réserve de trajets.
+  const lieux = capacite.lieux(brief.destination);
+  compteurs.placesToVerify = lieux.nombre;
+  compteurs.unverifiedForCap = lieuxHorsPart(lieux.nombre, forfait.textSearchRequetes, brief.logements.length);
+  const controle: ControleVerification = async (methode) => {
+    const methodeGoogle = methode === "textSearch" ? "places_text_search" : "places_details";
+    if (contexte.dep.maintenant() + DELAI_REQUETE_MS.places + MARGE_VERIFICATION_MS > contexte.echeance) return "temps";
+    const consomme = await registre.consumption(null, { methode: methodeGoogle });
+    const plafond = methode === "textSearch" ? forfait.textSearchRequetes : forfait.placeDetailsRequetes;
+    return consomme.requetes + 1 > plafond ? "part" : "ok";
+  };
+  // Sites en parallèle (0121 § 2.1 points 2 et 4), sans donnée commune ; 60 s au plus, jamais au-delà de l'échéance. Si
+  // la vérification des lieux lève, les vérifications de sites en cours sont abandonnées et attendues.
+  const abandonSites = new AbortController();
+  const verificationSites = verifierSites(sites.adresses, capacite.sites, {
+    limite: Math.min(contexte.dep.maintenant() + SITES_DUREE_MAX_MS, contexte.echeance),
+    maintenant: () => contexte.dep.maintenant(),
+    signal: abandonSites.signal,
+  });
+  const verificationLieux = lieux.verifier(controle).catch((erreur: unknown) => {
+    abandonSites.abort();
+    throw erreur;
+  });
+  const [issueLieux, issueSites] = await Promise.allSettled([verificationLieux, verificationSites]);
+  const resultatSites: ResultatSites = issueSites.status === "fulfilled" ? issueSites.value : { gardees: new Set(), compteurs: compteursNonSoumis(sites.adresses.length) };
+  Object.assign(compteurs, resultatSites.compteurs);
+  if (issueLieux.status === "rejected") throw issueLieux.reason;
+  const verifies: LieuxVerifies = issueLieux.value;
+
+  // 4. Assemblage sans replanification ni trajet (0136 § 2.3.5 et § 2.4) par le module partagé, puis instantané.
+  const jours = programme.jours.map((jour, indiceJour) => ({
+    date: jour.date,
+    ...(jour.titre === undefined ? {} : { titre: jour.titre }),
+    creneaux: jour.creneaux.map((creneau, rang) => ({ ...avecSiteGarde(creneau, sites.adresseDe(indiceJour, rang), resultatSites.gardees), placeId: verifies.placeIdDe(indiceJour, rang) })),
+  }));
+  const complet = assemblerProgrammeIa({
+    tripId: contexte.tripId,
+    organizationId: contexte.organizationId,
+    brief,
+    jours,
+    bonsPlans: programme.bonsPlans,
+    logements,
+    configuration: CONFIGURATION_MOTEUR,
+    mode: modeDeTrajet(brief),
+    trajets: () => undefined,
+  });
+  return { complet, instantane: instantaneDuProgramme(complet.trip), verifies, logements, obtenuesA };
+}
+
 const SQL_A_FAIRE = `INSERT INTO public.checklist_items (id, organization_id, trip_id, kind, label, moment, sponsored)
   VALUES ($3::uuid, $1, $2, 'other', $4, '{"type":"beforeDeparture"}'::jsonb, false)`;
 
@@ -234,92 +372,13 @@ export function etapeProgrammeEcriture(entree: unknown, dependances?: Dependance
       };
       const fabrique = await contexte.dep.composer(contexte.barriere, { destination: voyage.draft.destination });
       const capacite = fabrique.programme(options);
-      const compteurs: CompteursProgramme = {
-        days: 0,
-        slots: 0,
-        placesToVerify: 0,
-        daysRemoved: 0,
-        slotsRemoved: 0,
-        fieldsRemoved: 0,
-        textsCut: 0,
-        modelCalls: 0,
-        unverifiedForCap: 0,
-        ...compteursNonSoumis(0),
-      };
+      const compteurs = compteursInitiaux();
       try {
-        // Instant pris **avant** les fiches qui rendent les positions (0060 § 1.3 point 2).
-        const obtenuesA = contexte.dep.maintenant();
-        // 1. Logements d'abord : introuvable, `lodging_unresolved` avant toute requête de modèle (0136 § 2.3.2).
-        const logements = await capacite.logements(brief);
-
-        // 2. Rédaction : une requête `programme`, lecture tolérante et ordre écrit, une seule fois.
-        compteurs.modelCalls += 1;
-        const redaction = await capacite.rediger(entreeProgrammeDepuisBrief(brief), { arrivee: brief.arrivee, depart: brief.depart });
-        if (redaction.fin !== undefined) compteurs.finishReason = redaction.fin;
-        if (redaction.tokens !== undefined) {
-          compteurs.inputTokens = redaction.tokens.entree;
-          compteurs.outputTokens = redaction.tokens.sortie;
-        }
-        compteurs.daysRemoved = redaction.joursRetires;
-        compteurs.slotsRemoved = redaction.creneauxRetires;
-        compteurs.fieldsRemoved = redaction.champsRetires;
-        compteurs.textsCut = redaction.textesCoupes;
-        const programme = redaction.programme;
-        if (programme === null) throw new ArretEtape("model_output_invalid");
-        compteurs.days = programme.jours.length;
-        compteurs.slots = programme.jours.reduce((total, jour) => total + jour.creneaux.length, 0);
-        // Sites proposés : adresses réduites distinctes en ordre écrit, en mémoire seulement (0121 § 2.1 point 1).
-        const sites = sitesDuProgramme(programme, reduireSiteDuProgramme);
-        compteurs.fieldsRemoved += sites.formesRefusees;
-        Object.assign(compteurs, compteursNonSoumis(sites.adresses.length));
-
-        // 3. Vérification des lieux distincts dans l'ordre écrit, part et échéance avant chaque appel, sans réserve de trajets.
-        const lieux = capacite.lieux(brief.destination);
-        compteurs.placesToVerify = lieux.nombre;
-        compteurs.unverifiedForCap = lieuxHorsPart(lieux.nombre, forfait.textSearchRequetes, brief.logements.length);
-        const controle: ControleVerification = async (methode) => {
-          const methodeGoogle = methode === "textSearch" ? "places_text_search" : "places_details";
-          if (contexte.dep.maintenant() + DELAI_REQUETE_MS.places + MARGE_VERIFICATION_MS > contexte.echeance) return "temps";
-          const consomme = await registre.consumption(null, { methode: methodeGoogle });
-          const plafond = methode === "textSearch" ? forfait.textSearchRequetes : forfait.placeDetailsRequetes;
-          return consomme.requetes + 1 > plafond ? "part" : "ok";
-        };
-        // Sites en parallèle (0121 § 2.1 points 2 et 4), sans donnée commune ; 60 s au plus, jamais au-delà de l'échéance. Si
-        // la vérification des lieux lève, les vérifications de sites en cours sont abandonnées et attendues.
-        const abandonSites = new AbortController();
-        const verificationSites = verifierSites(sites.adresses, capacite.sites, {
-          limite: Math.min(contexte.dep.maintenant() + SITES_DUREE_MAX_MS, contexte.echeance),
-          maintenant: () => contexte.dep.maintenant(),
-          signal: abandonSites.signal,
-        });
-        const verificationLieux = lieux.verifier(controle).catch((erreur: unknown) => {
-          abandonSites.abort();
-          throw erreur;
-        });
-        const [issueLieux, issueSites] = await Promise.allSettled([verificationLieux, verificationSites]);
-        const resultatSites: ResultatSites = issueSites.status === "fulfilled" ? issueSites.value : { gardees: new Set(), compteurs: compteursNonSoumis(sites.adresses.length) };
-        Object.assign(compteurs, resultatSites.compteurs);
-        if (issueLieux.status === "rejected") throw issueLieux.reason;
-        const verifies: LieuxVerifies = issueLieux.value;
-
-        // 4. Assemblage sans replanification ni trajet (0136 § 2.3.5 et § 2.4), puis publication en une transaction.
-        const jours = programme.jours.map((jour, indiceJour) => ({
-          date: jour.date,
-          ...(jour.titre === undefined ? {} : { titre: jour.titre }),
-          creneaux: jour.creneaux.map((creneau, rang) => ({ ...avecSiteGarde(creneau, sites.adresseDe(indiceJour, rang), resultatSites.gardees), placeId: verifies.placeIdDe(indiceJour, rang) })),
-        }));
-        const complet = assemblerProgrammeIa({
-          tripId: contexte.tripId,
-          organizationId: contexte.organizationId,
-          brief,
-          jours,
-          bonsPlans: programme.bonsPlans,
-          logements,
-          configuration: CONFIGURATION_MOTEUR,
-          mode: modeDeTrajet(brief),
-          trajets: () => undefined,
-        });
-        const instantane = instantaneDuProgramme(complet.trip);
+        const { complet, instantane, verifies, logements, obtenuesA } = await redigerEtVerifier(
+          contexte,
+          { brief, capacite, forfait, registre, compteurs },
+          (c) => c.rediger(entreeProgrammeDepuisBrief(brief), { arrivee: brief.arrivee, depart: brief.depart }),
+        );
         const cases = casesDuProgramme(complet.trip.days, instantane);
         const aFaire = lignesAFaire(complet.trip.checklist, contexte.generationRunId);
         // `stays.place_id` : logements `known` et `suggestedLodging` seulement (la zone ne vit qu'en mémoire, 0136 § 3.2).
