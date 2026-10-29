@@ -8,6 +8,9 @@
  * - **déblocage** et **déblocage après refus** (B4b, `tests/e2e/debloquer-api.api.spec.ts`) : les mêmes quatre voyages,
  *   chacun dans sa propre organisation, dont le scénario débloque le seul voyage non débloqué (pendant d'Édimbourg) par
  *   le paiement simulé en base, sans toucher aux organisations A et B que les scénarios de lecture comparent à `mock` ;
+ * - **remplacement** (M1g, `tests/e2e/remplacer-api.api.spec.ts`) : les mêmes quatre voyages dans leur propre
+ *   organisation, dont le scénario remplace puis rétablit le dîner du J1 d'Édimbourg (versions 2 et 3 en base), puis remplace
+ *   Dean Village au J2 ;
  * - **photos** (M1e, PR 879, `tests/e2e/photos-api.api.spec.ts`) : les mêmes quatre voyages dans leur propre
  *   organisation, dont le scénario ouvre le tri du voyage non débloqué sans rien y décider (lecture seule).
  *
@@ -22,4 +25,5 @@ export const ADRESSE_A = "b6b-api-a@exemple.test";
 export const ADRESSE_B = "b6b-api-b@exemple.test";
 export const ADRESSE_DEBLOQUER = "b4b-debloquer@exemple.test";
 export const ADRESSE_DEBLOQUER_REFUS = "b4b-debloquer-refus@exemple.test";
+export const ADRESSE_REMPLACER = "m1g-remplacer@exemple.test";
 export const ADRESSE_PHOTOS = "m1e-photos@exemple.test";

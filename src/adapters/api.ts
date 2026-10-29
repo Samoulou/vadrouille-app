@@ -4,13 +4,17 @@ import {
   DeckSessionSchema,
   PreviewSlotsSchema,
   ProposalSchema,
+  ReplacementOfferSchema,
+  ReplacementWriteSchema,
   TripSchema,
   TripSummarySchema,
+  type Result,
 } from "@/contracts";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
+import { annulerRemplacement, appliquerRemplacement, proposerRemplacement, versionDuVoyage, type DependancesRemplacement } from "@/server/versions/remplacement";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
 
-import type { TripAdapter } from "./types";
+import type { AdapterContext, RevisionAdapter, TripAdapter } from "./types";
 
 /**
  * Adaptateur `api` (spécification B6, B6a point 5 ; handover § 11 : aucun appel HTTP vers soi-même) : implémente
@@ -25,10 +29,28 @@ import type { TripAdapter } from "./types";
  */
 export type OptionsAdaptateurApi = DependancesLecture;
 
+/**
+ * Révision enregistrée (M1g, ticket 869) : cas d'usage de `src/server/versions/remplacement.ts`, dans le même processus,
+ * avec le contexte de la session reçu de l'action serveur et **le même port de relectures** que la lecture (un appel par
+ * aperçu ou application, hors transaction). Chaque réponse est validée par son contrat.
+ */
+function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
+  const { withOrg, relectures } = options;
+  const dependances = (ctx: AdapterContext | null): DependancesRemplacement => ({ contexte: async () => ctx, relectures, ...(withOrg === undefined ? {} : { withOrg }) });
+  const valide = <T>(schema: { parse(valeur: unknown): T }) => (resultat: Result<T>): Result<T> => (resultat.ok ? { ok: true, value: schema.parse(resultat.value) } : resultat);
+  return {
+    currentVersion: (ctx, input) => versionDuVoyage(dependances(ctx), input),
+    previewReplacement: async (ctx, input) => valide(ReplacementOfferSchema)(await proposerRemplacement(dependances(ctx), input)),
+    applyReplacement: async (ctx, input) => valide(ReplacementWriteSchema)(await appliquerRemplacement(dependances(ctx), input)),
+    undoReplacement: async (ctx, input) => valide(ReplacementWriteSchema)(await annulerRemplacement(dependances(ctx), input)),
+  };
+}
+
 export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter {
   const lecture = creerLectureVoyages(options);
   const getDeckSession = creerLectureDuTri(options.withOrg === undefined ? {} : { withOrg: options.withOrg });
   return {
+    revision: revisionApi(options),
     async listTrips(ctx) {
       return TripSummarySchema.array().parse(await lecture.listTrips(ctx));
     },

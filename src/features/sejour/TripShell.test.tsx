@@ -177,3 +177,48 @@ describe("TripShell : toast partagé et surlignage (décision 0016 § 9, F7-PO-1
     }
   });
 });
+
+describe("TripShell : annulation qui n'aboutit pas (révision enregistrée, PR 869)", () => {
+  const toastOf = (container: HTMLElement) => container.querySelector<HTMLElement>("[data-undo-toast]");
+  const undoButton = (container: HTMLElement) => toastOf(container)?.querySelector("button") ?? null;
+
+  it("PR 869 : le toast reste pendant l'appel, revient avec l'annonce de l'échec et le focus sur « Annuler », sans perdre le surlignage ; le second essai annule", async () => {
+    location.n = "2";
+    const { container, rerender } = render(tree());
+    let rejeter: (erreur: Error) => void = () => {};
+    const undo = vi
+      .fn<() => Promise<void>>()
+      .mockImplementationOnce(() => new Promise<void>((_, reject) => (rejeter = reject)))
+      .mockResolvedValueOnce(undefined);
+    const actions = { ...shell().actions, undo };
+    rerender(
+      <TripShell trip={edimbourg} maps={[]} base="/voyages" actions={actions}>
+        <Probe />
+      </TripShell>,
+    );
+    const onUndone = vi.fn();
+    act(() => shell().notifyApplied({ message: "Modifié.", dayIndex: 2, highlighted: [CONCERT], targetStopId: CONCERT, onUndone }));
+
+    act(() => undoButton(container)?.click());
+    // Pendant l'appel : le toast et le surlignage restent ; un second appui est ignoré.
+    expect(toastOf(container)?.textContent).toBe("Modifié.Annuler");
+    expect(shell().highlight).toEqual({ dayIndex: 2, stopIds: [CONCERT] });
+    act(() => undoButton(container)?.click());
+    expect(undo).toHaveBeenCalledTimes(1);
+
+    await act(async () => rejeter(new Error("réseau")));
+    const region = container.querySelector("[data-undo-region]");
+    expect(region?.getAttribute("role")).toBe("status");
+    expect(toastOf(container)?.textContent).toBe("L'annulation n'a pas abouti. Ta modification est toujours là. Réessaie avec Annuler.Annuler");
+    expect(document.activeElement).toBe(undoButton(container));
+    expect(shell().highlight).toEqual({ dayIndex: 2, stopIds: [CONCERT] });
+    expect(onUndone).not.toHaveBeenCalled();
+
+    await act(async () => undoButton(container)?.click());
+    expect(undo).toHaveBeenCalledTimes(2);
+    expect(toastOf(container)).toBeNull();
+    expect(shell().highlight).toBeNull();
+    expect(onUndone).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("[data-part='annonce-annulation']")?.textContent).toBe("Modification annulée.");
+  });
+});

@@ -47,7 +47,12 @@ export type ProgrammeEvent =
   /** Révision appliquée (remplacement, déplacement ; ajout avec F7c) : jours touchés du brouillon. */
   | { type: "applyRevision"; days: readonly Day[] }
   /** `base` : valeur de `done` dans les données de l'adaptateur. */
-  | { type: "setChecklistItemDone"; itemId: ChecklistItem["id"]; done: boolean; base: boolean };
+  | { type: "setChecklistItemDone"; itemId: ChecklistItem["id"]; done: boolean; base: boolean }
+  /**
+   * Données de l'adaptateur relues après une révision enregistrée (adaptateur `api`, M1g) : les jours affichés en attendant
+   * la relecture sont retirés, les verrous et la liste locale restent.
+   */
+  | { type: "rebase" };
 
 export const INITIAL_PROGRAMME: ProgrammeState = { locks: {}, days: {}, previous: null, checklist: {} };
 
@@ -70,6 +75,9 @@ export function programmeReducer(state: ProgrammeState, event: ProgrammeEvent): 
     }
     case "undo":
       return state.previous ? { ...state, locks: state.previous.locks, days: state.previous.days, previous: null } : state;
+    case "rebase":
+      if (Object.keys(state.days).length === 0 && (state.previous === null || Object.keys(state.previous.days).length === 0)) return state;
+      return { ...state, days: {}, previous: state.previous ? { locks: state.previous.locks, days: {} } : null };
     case "setChecklistItemDone": {
       const checklist: Record<string, boolean> = { ...state.checklist };
       if (event.done === event.base) delete checklist[event.itemId];
@@ -140,6 +148,15 @@ export interface MemoryProgrammeStore {
 
 export function createMemoryProgrammeStore(): MemoryProgrammeStore {
   return { state: INITIAL_PROGRAMME, version: 0, serial: 0, previews: new Map() };
+}
+
+/**
+ * Applique un événement à la copie de l'état et au réducteur de l'écran (révision enregistrée, M1g) : même règle que les
+ * actions en mémoire, pour que leurs vérifications (verrous, jours courants) voient les jours affichés.
+ */
+export function sendToMemoryStore(store: MemoryProgrammeStore, dispatch: (event: ProgrammeEvent) => void, event: ProgrammeEvent): void {
+  store.state = programmeReducer(store.state, event);
+  dispatch(event);
 }
 
 /** Actions du programme et de la révision : un seul objet, une seule version (décision 0016 § 5). */

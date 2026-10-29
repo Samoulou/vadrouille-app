@@ -40,7 +40,17 @@ export type DependancesAction = {
 };
 
 /** Nom fixe de l'action, journalisé (`ACTION` de `src/server/log.ts` : minuscules, chiffres, tirets). */
-export type NomAction = "toggle-checklist-item" | "decide-card" | "undo-decision" | "answer-preference-prompt" | "complete-deck";
+export type NomAction =
+  | "toggle-checklist-item"
+  | "decide-card"
+  | "undo-decision"
+  | "answer-preference-prompt"
+  | "complete-deck"
+  // M1g (ticket 869) : remplacer une étape sur `api` (`src/server/versions/remplacement.ts`).
+  | "preview-replacement"
+  | "apply-replacement"
+  | "undo-replacement"
+  | "revision-version";
 
 type EntreeVoyage = { readonly tripId: string };
 

@@ -448,6 +448,18 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `PatchResult.version` | stocké | `trip_versions.version` de la version produite |
 | `PatchResult.touchedDays` | calculé | Moteur, jours modifiés par le patch |
 | `PatchResult.changes` | calculé | Moteur, voir `Change[*].*` (jamais persisté ; le patch l'est) |
+| `ReplacementOffer[offer].status` | calculé | Discriminant de la réponse d'aperçu du remplacement (M1g), jamais persistée |
+| `ReplacementOffer[offer].version` | stocké | `trip_versions.version` de la version de base de l'aperçu |
+| `ReplacementOffer[offer].candidateId` | stocké | `candidates.id` du candidat proposé, repris par `TripPatchOperation[replace].candidateId` |
+| `ReplacementOffer[offer].draft` | calculé | Moteur (`appliquerPatch`), brouillon des jours touchés ; jamais persisté |
+| `ReplacementOffer[noOption].status` | calculé | Discriminant |
+| `ReplacementOffer[conflict].status` | calculé | Discriminant |
+| `ReplacementOffer[conflict].currentVersion` | stocké | `trip_versions.version` courante |
+| `ReplacementOffer[lockedStop].status` | calculé | Discriminant |
+| `ReplacementWrite[noOption].status` | calculé | Discriminant de la réponse d'écriture du remplacement (M1g) |
+| `ReplacementWrite[conflict].status` | calculé | Discriminant |
+| `ReplacementWrite[conflict].currentVersion` | stocké | `trip_versions.version` courante |
+| `ReplacementWrite[lockedStop].status` | calculé | Discriminant |
 | `Change[replaced].type` | calculé | Moteur, aperçu des effets (jamais persisté ; le patch l'est) |
 | `Change[replaced].time` | calculé | Moteur |
 | `Change[replaced].before` | calculé | Moteur, depuis `Stop.name` |

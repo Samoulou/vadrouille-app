@@ -1,6 +1,6 @@
 import "server-only";
 
-import { TripSnapshotSchema, type TripSnapshot } from "@/contracts";
+import { TripPatchSchema, TripSnapshotSchema, type TripSnapshot } from "@/contracts";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -29,14 +29,29 @@ export type DemandeVersion = {
   readonly instantane: unknown;
   /** Identifiant de la personne, pour l'auteur `user` seulement. */
   readonly auteurUserId?: string;
+  /**
+   * Patch de la version (`trip_versions.patch`, décision 0037 B2-TL-3), validé par `TripPatchSchema` avant toute requête :
+   * même `requestId` que la demande, et `baseVersion` égale à la version qu'il remplace (la dernière du voyage, lue sous le
+   * verrou de l'appelant), sinon rien n'est écrit. Absent : colonne nulle (version 1 et versions du moteur, comme avant).
+   */
+  readonly patch?: unknown;
 };
+
+/**
+ * Écriture refusée par la garde du patch (`HAVING max(version) = baseVersion`) : la dernière version du voyage n'est plus la
+ * `baseVersion` du patch ; rien n'est écrit. L'appelant la rend en conflit (`conflict`), jamais en `internal`.
+ */
+export class BaseDeVersionDepassee extends Error {
+  override name = "BaseDeVersionDepassee";
+}
 
 export type VersionEcrite = { readonly version: number; readonly creee: boolean; readonly instantane: TripSnapshot };
 
 const SQL_EXISTANTE = `SELECT version FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2 AND request_id = $3`;
-const SQL_INSERTION = `INSERT INTO public.trip_versions (organization_id, trip_id, version, parent_version, request_id, snapshot, author_kind, author_user_id)
-  SELECT $1::uuid, $2::uuid, COALESCE(max(version), 0) + 1, max(version), $3::uuid, $4::jsonb, $5, $6::uuid
+const SQL_INSERTION = `INSERT INTO public.trip_versions (organization_id, trip_id, version, parent_version, request_id, snapshot, author_kind, author_user_id, patch)
+  SELECT $1::uuid, $2::uuid, COALESCE(max(version), 0) + 1, max(version), $3::uuid, $4::jsonb, $5, $6::uuid, $7::jsonb
   FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2
+  HAVING $8::integer IS NULL OR max(version) = $8::integer
   RETURNING version`;
 const SQL_COURANTE = `UPDATE public.trips SET current_version = $3
   WHERE organization_id = $1 AND id = $2 AND (current_version IS NULL OR current_version < $3)`;
@@ -48,6 +63,8 @@ export async function ecrireVersion(executeur: ExecuteurVersions, demande: Deman
   }
   // Validation stricte avant toute requête : un instantané refusé ne laisse rien.
   const instantane = TripSnapshotSchema.parse(demande.instantane);
+  const patch = demande.patch === undefined ? null : TripPatchSchema.parse(demande.patch);
+  if (patch !== null && patch.requestId !== demande.requestId) throw new RangeError("versions: patch d'une autre demande");
 
   const existante = (await executeur.query(SQL_EXISTANTE, [demande.organizationId, demande.tripId, demande.requestId])).rows[0];
   if (existante !== undefined) return { version: Number(existante.version), creee: false, instantane };
@@ -60,9 +77,12 @@ export async function ecrireVersion(executeur: ExecuteurVersions, demande: Deman
       JSON.stringify(instantane),
       demande.auteur,
       demande.auteurUserId ?? null,
+      patch === null ? null : JSON.stringify(patch),
+      patch === null ? null : patch.baseVersion,
     ])
   ).rows[0];
-  if (ecrite === undefined) throw new Error("versions: aucune ligne écrite");
+  // Avec un patch, aucune ligne : la dernière version n'est pas sa `baseVersion` (rien n'est écrit).
+  if (ecrite === undefined) throw new BaseDeVersionDepassee("versions: aucune ligne écrite");
   const version = Number(ecrite.version);
   await executeur.query(SQL_COURANTE, [demande.organizationId, demande.tripId, version]);
   return { version, creee: true, instantane };

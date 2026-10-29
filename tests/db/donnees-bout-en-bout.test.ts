@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ADRESSE_A, ADRESSE_B, ADRESSE_DEBLOQUER, ADRESSE_DEBLOQUER_REFUS, ADRESSE_PHOTOS } from "../support/bout-en-bout-api";
+import { ADRESSE_A, ADRESSE_B, ADRESSE_DEBLOQUER, ADRESSE_DEBLOQUER_REFUS, ADRESSE_REMPLACER, ADRESSE_PHOTOS } from "../support/bout-en-bout-api";
 import { convertirVoyagesSimules, ecrireVoyagesSimules } from "../support/voyages-en-base";
 import { closeAll, connect, createOrg, inTx, type DbClient } from "./helpers";
 
@@ -49,9 +49,11 @@ beforeAll(async () => {
 afterAll(closeAll);
 
 describe("données de bout en bout de l'adaptateur api (B6b ; B4b pour le déblocage)", () => {
-  it.each([ADRESSE_A, ADRESSE_B, ADRESSE_DEBLOQUER, ADRESSE_DEBLOQUER_REFUS, ADRESSE_PHOTOS])("%s : organisation personnelle et quatre voyages du jeu simulé", async (adresse) => {
+  it.each([ADRESSE_A, ADRESSE_B, ADRESSE_DEBLOQUER, ADRESSE_DEBLOQUER_REFUS, ADRESSE_REMPLACER, ADRESSE_PHOTOS])("%s : organisation personnelle et quatre voyages du jeu simulé", async (adresse) => {
     const id = await identite(adresse);
-    if ((await nombreDeVoyages(id)) === 0) await ecrireVoyagesSimules(app, id);
+    // Le scénario du remplacement (M1g, PR 869) a besoin des candidats de ses propositions déjà vérifiées, et de la réserve
+    // du jeu simulé de révision (« [Dégustation…] » pour « [Dean Village] »).
+    if ((await nombreDeVoyages(id)) === 0) await ecrireVoyagesSimules(app, id, { candidats: adresse === ADRESSE_REMPLACER, reserveDeRevision: adresse === ADRESSE_REMPLACER });
     expect(await nombreDeVoyages(id)).toBe(convertirVoyagesSimules().length);
     // Rejouer ne crée ni personne ni voyage de plus.
     expect(await identite(adresse)).toEqual(id);

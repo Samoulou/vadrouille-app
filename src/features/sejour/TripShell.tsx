@@ -36,10 +36,13 @@ import {
   createMemoryProgramme,
   createMemoryProgrammeStore,
   programmeReducer,
+  sendToMemoryStore,
   type ProgrammeActions,
+  type ProgrammeEvent,
 } from "./programme";
 import { layoutFitPadding, layoutVisibleInsets, useMapLayout } from "./map-layout";
 import { HIGHLIGHT_MS, type RevisionActions } from "./revision";
+import { createServerRevision, createServerRevisionStore, syncServerRevisionVersion } from "./revision-serveur";
 import { tripRoutes, type TripRoutes, type TripRoutesBase } from "./routes";
 
 const t = messages.sejour;
@@ -55,6 +58,8 @@ interface ToastState {
   message: string;
   /** Appelé après l'annulation (par exemple pour rendre le focus au bouton d'origine). */
   afterUndo?: () => void;
+  /** Toast revenu après une annulation qui n'a pas abouti : « Annuler » reprend le focus. */
+  refocus?: boolean;
 }
 
 /** Fiche fermée dont le lien d'origine doit reprendre le focus (handover § 7). */
@@ -194,6 +199,12 @@ export interface TripShellProps {
   revision?: RevisionActions;
   /** Jeu simulé de révision lu par la mise en page (adaptateur `mock`) ; sans lui, aucune option compatible. */
   revisionFixtures?: RevisionFixtures | null;
+  /**
+   * Version courante du voyage pour la révision enregistrée (adaptateur `api`, M1g), lue par la mise en page : non nulle,
+   * le remplacement d'une étape et son annulation passent par les actions serveur (`revision-serveur.ts`) ; nulle ou
+   * absente, l'implémentation en mémoire.
+   */
+  revisionVersion?: number | null;
   /** Données de lieux Google (adaptateur `prototype`, spécification P0) ; `PLACES_FROM_GOOGLE` par défaut. */
   placesFromGoogle?: boolean;
   /**
@@ -224,6 +235,7 @@ export function TripShell({
   actions: injected,
   revision: injectedRevision,
   revisionFixtures = null,
+  revisionVersion = null,
   placesFromGoogle = PLACES_FROM_GOOGLE,
   shareable = false,
   unlockHref = null,
@@ -244,9 +256,37 @@ export function TripShell({
     () => createMemoryProgramme(sourceTrip, dispatch, revisionFixtures, memoryStore),
     [sourceTrip, revisionFixtures, memoryStore],
   );
-  const actions = injected ?? memory;
-  const revision = injectedRevision ?? memory;
+  // Révision enregistrée (adaptateur `api`, M1g) : état gardé pour la vie du shell, comme celui de la mémoire.
+  const [serverStore] = useState(() => (revisionVersion === null ? null : createServerRevisionStore(revisionVersion)));
+  const send = useCallback((event: ProgrammeEvent) => sendToMemoryStore(memoryStore, dispatch, event), [memoryStore]);
+  // Relecture du voyage demandée après une écriture : tout de suite, ou une fois l'écran 14 quitté (son étape n'existe plus).
+  const [writes, setWrites] = useState(0);
+  const refreshedWrites = useRef(0);
+  const afterWrite = useCallback(() => setWrites((count) => count + 1), []);
+  const server = useMemo(
+    () =>
+      serverStore === null
+        ? null
+        : createServerRevision({
+            tripId: sourceTrip.id,
+            store: serverStore,
+            memory,
+            currentDays: () => applyProgramme(sourceTrip, memoryStore.state).days,
+            showDays: (days) => send({ type: "applyRevision", days }),
+            afterWrite,
+          }),
+    [serverStore, sourceTrip, memory, memoryStore, send, afterWrite],
+  );
+  const actions = injected ?? server ?? memory;
+  const revision = injectedRevision ?? server ?? memory;
   const trip = useMemo(() => applyProgramme(sourceTrip, programme), [sourceTrip, programme]);
+  // Voyage relu (révision enregistrée) : les jours affichés en attendant la relecture sont retirés.
+  useEffect(() => {
+    if (serverStore !== null) send({ type: "rebase" });
+  }, [sourceTrip, serverStore, send]);
+  useEffect(() => {
+    if (serverStore !== null && revisionVersion !== null) syncServerRevisionVersion(serverStore, revisionVersion);
+  }, [serverStore, revisionVersion]);
 
   const nParam = Array.isArray(params.n) ? params.n[0] : params.n;
   const day = nParam === undefined ? undefined : trip.days.find((candidate) => String(candidate.index) === nParam);
@@ -254,6 +294,11 @@ export function TripShell({
   // Écran 14 (`…/remplacer/[stopId]`) : l'étape remplacée est sélectionnée sur la carte (F7-PO-2).
   const stopParam = Array.isArray(params.stopId) ? params.stopId[0] : params.stopId;
   const replaceStopId = stopParam === undefined ? undefined : safeDecode(stopParam);
+  useEffect(() => {
+    if (writes === refreshedWrites.current || replaceStopId !== undefined) return;
+    refreshedWrites.current = writes;
+    router.refresh();
+  }, [writes, replaceStopId, router]);
   const replaceTarget =
     day && replaceStopId !== undefined
       ? day.items.some((item) => item.type === "stop" && item.stop.id === replaceStopId)
@@ -446,13 +491,33 @@ export function TripShell({
     },
     [clearHighlight],
   );
+  // « Annuler » de la révision enregistrée (PR 869) : le toast reste affiché pendant l'appel (pas de clignotement), le
+  // surlignage n'est retiré qu'après un succès, et un second appui pendant l'attente est ignoré.
+  const undoing = useRef(false);
+  const undoButton = useRef<HTMLButtonElement>(null);
   const onUndo = useCallback(async () => {
     const current = toast;
-    setToast(null);
+    if (current === null || undoing.current) return;
+    undoing.current = true;
+    try {
+      await actions.undo();
+    } catch {
+      // Annulation refusée ou réseau perdu : la modification reste, et reste annulable. Le toast revient (délai relancé)
+      // avec l'annonce de l'échec (`role="status"` de sa région) et le focus sur « Annuler ».
+      toastId.current += 1;
+      setToast({ id: toastId.current, message: messages.revision.annulationEchouee, afterUndo: current.afterUndo, refocus: true });
+      return;
+    } finally {
+      undoing.current = false;
+    }
+    setToast((shown) => (shown?.id === current.id ? null : shown));
     clearHighlight();
-    await actions.undo();
-    current?.afterUndo?.();
+    current.afterUndo?.();
   }, [actions, toast, clearHighlight]);
+  // Focus rendu à « Annuler » du toast revenu après un échec (le toast est remonté, son bouton est neuf).
+  useEffect(() => {
+    if (toast?.refocus) undoButton.current?.focus();
+  }, [toast]);
 
   const [replaceOrigin, setReplaceOrigin] = useState<string | null>(null);
   const markReplaceOrigin = useCallback((href: string | null) => setReplaceOrigin(href), []);
@@ -566,6 +631,7 @@ export function TripShell({
           key={toast.id}
           message={toast.message}
           onUndo={onUndo}
+          undoRef={undoButton}
           onExpire={() => setToast(null)}
           className="pointer-events-auto"
         />

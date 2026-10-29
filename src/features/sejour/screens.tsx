@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { getRevisionFixtures, isPrototypeAdapter, paymentAvailable, shareButtonVisible } from "@/adapters";
+import { getRevisionFixtures, getRevisionVersion, isPrototypeAdapter, paymentAvailable, shareButtonVisible } from "@/adapters";
 import { contexteFacultatif } from "@/features/compte/session";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { format } from "@/i18n";
@@ -35,6 +35,8 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
   if (!data) notFound();
   // Jeu simulé de révision (F7, décision 0016 § 6) : adaptateur `mock` seulement, sinon `null`.
   const revisionFixtures = await getRevisionFixtures(ctx, tripId);
+  // Révision enregistrée (adaptateur `api`, M1g) : version courante du voyage, sinon `null` (implémentation en mémoire).
+  const revisionVersion = await getRevisionVersion(ctx, tripId);
   // Bouton « Partager » (F10c) : routes `/voyages` seulement, voyage débloqué, partage disponible et pas terminé.
   const shareable = base === "/voyages" && (await shareButtonVisible(data.trip));
   // « Débloquer » depuis le Séjour (spécification E2E-essai, lot 1) : routes `/voyages`, voyage non débloqué, paiement simulé disponible.
@@ -46,6 +48,7 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
       base={base}
       placesFromGoogle={isPrototypeAdapter()}
       revisionFixtures={revisionFixtures}
+      revisionVersion={revisionVersion}
       shareable={shareable}
       unlockHref={unlockHref}
     >

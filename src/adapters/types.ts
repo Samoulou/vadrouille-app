@@ -19,6 +19,8 @@ import type {
   PreviewSlot,
   Proposal,
   Receipt,
+  ReplacementOffer,
+  ReplacementWrite,
   Result,
   RetryGenerationRequest,
   Session,
@@ -82,6 +84,24 @@ export interface TripAdapter {
    * « À débloquer »). Facultatif : absent (`mock`, `api`), il vaut `false` ; lu par `isTrialTrip` de `@/adapters`.
    */
   isTrialTrip?(ctx: AdapterContext, tripId: string): Promise<boolean>;
+  /**
+   * Remplacer une étape (écran 14 ; tâche M1g, ticket 869) par une autre proposition déjà vérifiée du voyage, en une
+   * nouvelle version annulable. Facultatif : présent sur `api` seulement (`mock` sert son jeu simulé de révision,
+   * `getRevisionFixtures` ; `prototype` n'en a pas). Entrées reçues en `unknown`, revalidées par le cas d'usage.
+   */
+  readonly revision?: RevisionAdapter;
+}
+
+/**
+ * Révision enregistrée d'un voyage (M1g) : cas d'usage de `src/server/versions/remplacement.ts`, dans le cadre commun des
+ * actions sur un voyage. Le contexte est celui **de la session** (jamais une valeur de l'entrée) ; `null` : sans session.
+ */
+export interface RevisionAdapter {
+  /** Version courante du voyage, base de la première demande d'aperçu ; `not_found` hors organisation. */
+  currentVersion(ctx: AdapterContext | null, input: unknown): Promise<Result<number>>;
+  previewReplacement(ctx: AdapterContext | null, input: unknown): Promise<Result<ReplacementOffer>>;
+  applyReplacement(ctx: AdapterContext | null, input: unknown): Promise<Result<ReplacementWrite>>;
+  undoReplacement(ctx: AdapterContext | null, input: unknown): Promise<Result<ReplacementWrite>>;
 }
 
 /**

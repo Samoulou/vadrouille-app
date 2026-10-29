@@ -13,7 +13,8 @@ import {
   type TripSnapshot,
 } from "@/contracts";
 import { edimbourgCarte } from "@/mocks/edimbourg-carte";
-import { EDIMBOURG_DEBLOQUE_TRIP_ID, EDIMBOURG_TRIP_ID } from "@/mocks/edimbourg";
+import { EDIMBOURG_DEBLOQUE_TRIP_ID, EDIMBOURG_TRIP_ID, propositions as propositionsEdimbourg } from "@/mocks/edimbourg";
+import { edimbourgRevision } from "@/mocks/edimbourg-revision";
 import { lieuConverti, logementDeTest, tableDesRelectures, VOYAGES_SIMULES, type VoyageSimule } from "@/mocks/relectures-voyages";
 
 /**
@@ -226,6 +227,48 @@ export function convertirVoyageSimule(voyage: VoyageSimule): VoyageConverti {
   };
 }
 
+/**
+ * Réserve du jeu simulé de révision (M1g, PR 869 ; `src/mocks/edimbourg-revision.ts`) : pour Édimbourg, chaque proposition
+ * d'un brouillon de remplacement devient une proposition `deck` de plus, au créneau de l'étape remplacée (sur le modèle de
+ * la proposition de cette étape). Avec `candidats`, elle reçoit sa ligne `candidates` comme les autres. Le double de
+ * relectures lui sert les durées de son brouillon (« [Dégustation…] » à la place de « [Dean Village] » : trajets de 20 à
+ * 25 min et de 15 à 10 min). Le budget d'un jour n'est calculé que si chaque ligne a son coût (B5-PO-10) : les lignes
+ * sans coût du jour de ces brouillons reçoivent un coût de test (`COUTS_DE_TEST`, somme égale au budget de `mock`, 95), pour
+ * que le moteur rende aussi la ligne de budget (+ 15). Autre voyage : données inchangées.
+ */
+const COUTS_DE_TEST: Readonly<Record<string, number>> = { "j2-dejeuner": 25, "j2-diner": 45, "j2-concert-orgue": 25 };
+
+function avecCoutsDeTest(snapshot: TripSnapshot, jours: ReadonlySet<number>): TripSnapshot {
+  const coute = <T extends StopSnapshot>(stop: T): T => {
+    const cout = COUTS_DE_TEST[stop.id];
+    return cout === undefined || stop.facts.costPerPerson !== undefined ? stop : { ...stop, facts: { ...stop.facts, costPerPerson: cout } };
+  };
+  return TripSnapshotSchema.parse({
+    days: snapshot.days.map((day) =>
+      jours.has(day.index)
+        ? { ...day, items: day.items.map((item) => (item.type === "stop" ? { ...item, stop: coute(item.stop) } : item)), events: day.events.map(coute) }
+        : day,
+    ),
+  });
+}
+
+export function avecReserveDeRevision(mockId: string, donnees: DonneesVoyage): DonneesVoyage {
+  if (mockId !== EDIMBOURG_TRIP_ID) return donnees;
+  const jours = new Set(edimbourgRevision.replacements.flatMap(({ draft }) => draft.days.map((day) => day.index)));
+  const versions = donnees.versions.map((version) => ({ ...version, snapshot: avecCoutsDeTest(TripSnapshotSchema.parse(version.snapshot), jours) }));
+  const lignes: LigneProposition[] = edimbourgRevision.replacements.flatMap(({ stopId, draft }) => {
+    const modele = propositionsEdimbourg.find((proposal) => proposal.stop.id === stopId);
+    if (modele === undefined) return [];
+    const proposal: Proposal = { ...modele, id: `prop-${draft.proposal.id}`, stop: draft.proposal };
+    return [{ phase: "deck", position: 0, slotType: "proposal", day: modele.day, time: modele.time, kind: modele.kind, content: enregistrementConverti(proposal) }];
+  });
+  const [premier, ...autres] = donnees.runs;
+  if (premier === undefined || premier.kind !== "preview") throw new Error("réserve de révision : exécution preview attendue en premier");
+  const rang = Math.max(0, ...premier.propositions.filter((l) => l.phase === "deck").map((l) => l.position));
+  const ajoutees = lignes.map((ligne, i) => ({ ...ligne, position: rang + i + 1 }));
+  return { ...donnees, versions, runs: [{ ...premier, propositions: [...premier.propositions, ...ajoutees] }, ...autres] };
+}
+
 export function convertirVoyagesSimules(): VoyageConverti[] {
   const convertis = VOYAGES_SIMULES.map(convertirVoyageSimule);
   const erreurs = controlesPrealables(convertis);
@@ -330,6 +373,35 @@ async function simulerSejourSansNuit(admin: ExecuteurTest, stayId: string, toDat
   }
 }
 
+/**
+ * Options d'écriture. `candidats` (M1g, PR 869) : chaque proposition `proposal` dont l'étape a un lieu reçoit sa ligne
+ * `candidates` (champs maison de la proposition, source de test en `example.org`, notes neutres) et la désigne par
+ * `proposals.candidate_id`, comme une proposition déjà vérifiée de la génération. Absente : aucune ligne `candidates` (les
+ * autres scénarios ne changent pas). `reserveDeRevision` (par `ecrireVoyagesSimules`) : voir `avecReserveDeRevision`.
+ */
+export type OptionsEcriture = { readonly candidats?: boolean; readonly reserveDeRevision?: boolean };
+
+const FAITS_CANDIDAT = ["durationMinutes", "costPerPerson", "area"] as const;
+
+/** Ligne `candidates` d'une proposition convertie, ou `null` (case vide, étape sans lieu, événement). */
+function candidatDeTest(ligne: LigneProposition) {
+  if (ligne.slotType !== "proposal" || ligne.content === null) return null;
+  const record = ProposalRecordSchema.parse(ligne.content);
+  const stop = record.stop;
+  if (stop.placeId === undefined || (stop.kind !== "activity" && stop.kind !== "meal")) return null;
+  const facts = Object.fromEntries(FAITS_CANDIDAT.flatMap((cle) => (stop.facts[cle] === undefined ? [] : [[cle, stop.facts[cle]] as const])));
+  return {
+    name: stop.name,
+    summary: stop.reason ?? null,
+    category: record.category,
+    facts,
+    sources: [{ label: "[Source de test]", url: `https://example.org/mock/${stop.id}`, checkedOn: "2026-08-01" }],
+    placeId: stop.placeId,
+    stopKind: stop.kind,
+    toReserve: stop.exceptions.includes("toReserve"),
+  };
+}
+
 type Requete = (texte: string, valeurs?: readonly unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
 
 /**
@@ -377,7 +449,7 @@ async function ecrireLot(
  * ligne `stays` sans nuit exige la connexion d'administration (`admin`, voir `simulerFuseauNul` et
  * `simulerSejourSansNuit`).
  */
-export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donnees: DonneesVoyage, admin?: ExecuteurTest): Promise<string> {
+export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donnees: DonneesVoyage, admin?: ExecuteurTest, options: OptionsEcriture = {}): Promise<string> {
   if (donnees.timeZone === null && admin === undefined) throw new Error("voyage sans fuseau : connexion d'administration requise (migration 0012)");
   if (donnees.stays.some((stay) => stay.to <= stay.from) && admin === undefined) throw new Error("séjour sans nuit : connexion d'administration requise (migration 0012)");
   const sansNuit: { id: string; to: string }[] = [];
@@ -418,9 +490,20 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
     }
     const ecrirePropositions = async (runId: string, propositions: readonly LigneProposition[]) => {
       for (const ligne of propositions) {
+        const candidat = options.candidats === true ? candidatDeTest(ligne) : null;
+        const candidateId =
+          candidat === null
+            ? null
+            : ((
+                await q(
+                  `INSERT INTO candidates (organization_id, trip_id, kind, name, summary, category, facts, sources, place_id, stop_kind, to_reserve, fit, not_for_me_risk, must_see, slot_fit)
+                   VALUES ($1, $2, 'place', $3, $4, $5, $6, $7, $8, $9, $10, true, 1, false, $11) RETURNING id`,
+                  [org.org, tripId, candidat.name, candidat.summary, candidat.category, JSON.stringify(candidat.facts), JSON.stringify(candidat.sources), candidat.placeId, candidat.stopKind, candidat.toReserve, [candidat.stopKind]],
+                )
+              ).rows[0]?.id as string);
         await q(
-          "INSERT INTO proposals (organization_id, trip_id, generation_run_id, phase, position, slot_type, day, time, kind, content) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-          [org.org, tripId, runId, ligne.phase, ligne.position, ligne.slotType, ligne.day, ligne.time, ligne.kind, ligne.content === null ? null : JSON.stringify(ligne.content)],
+          "INSERT INTO proposals (organization_id, trip_id, generation_run_id, phase, position, slot_type, day, time, kind, content, candidate_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+          [org.org, tripId, runId, ligne.phase, ligne.position, ligne.slotType, ligne.day, ligne.time, ligne.kind, ligne.content === null ? null : JSON.stringify(ligne.content), candidateId],
         );
       }
     };
@@ -465,8 +548,11 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
 }
 
 /** Écrit les quatre voyages convertis ; rend l'`uuid` de chacun par identifiant de `mock`. */
-export async function ecrireVoyagesSimules(executeur: ExecuteurTest, org: OrgTest): Promise<Map<string, string>> {
+export async function ecrireVoyagesSimules(executeur: ExecuteurTest, org: OrgTest, options: OptionsEcriture = {}): Promise<Map<string, string>> {
   const ids = new Map<string, string>();
-  for (const converti of convertirVoyagesSimules()) ids.set(converti.mockId, await ecrireVoyage(executeur, org, converti.donnees));
+  for (const converti of convertirVoyagesSimules()) {
+    const donnees = options.reserveDeRevision === true ? avecReserveDeRevision(converti.mockId, converti.donnees) : converti.donnees;
+    ids.set(converti.mockId, await ecrireVoyage(executeur, org, donnees, undefined, options));
+  }
   return ids;
 }
