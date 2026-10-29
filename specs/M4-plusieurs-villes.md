@@ -31,18 +31,30 @@ Rédaction : Product Owner · Date : 2026-10-29 · `main` relu : `e428115` (0141
 **Correction 3** (revue consolidée du head `129de42`, UX/UI et Tech Lead ; tentative bornée, Q690) :
 - bloquant 1 : Séjour à une seule ville inchangé (§ 7.4, § 7.5, M4-PO-10, critère 25) ;
 - bloquant 2 : sur l'écran 5 et les cartes de l'écran 6, la journée du changement de ville est toujours nommée « De {ville} à {ville} » (§ 3.1 point 3, § 5.3, § 7.3, critère 14) ;
-- mineurs 3 à 15 :
-  - numérotation et repères de la carte d'ensemble, carte de la Journée laissée à UX/UI (§ 7.4) ;
-  - résumé de Séjour sur deux lignes (§ 7.5) ;
-  - `{heure}` du départ estimé ;
-  - `{n}` des annonces et aide existante (§ 8) ;
-  - nom accessible de `DayBadge` (§ 7.7) ;
-  - focus après un retrait (§ 7.1) ;
-  - critère 22 ;
-  - `context` et `detour` après l'arrivée (§ 7.3) ;
-  - citation de 0141 (§ 4.2) ;
-  - chevauchement défini et arrivée proche (§ 3.4) ;
-  - critères 8 et 18.
+- mineurs 3 à 15, par numéro de la revue :
+  - 3 et 4 : carte d'ensemble et carte de la Journée (§ 7.4, depuis renvoyées à M4-suite par la correction 4) ;
+  - 5 : résumé de Séjour sur deux lignes (§ 7.5) ;
+  - 6 : `{heure}` du départ estimé (§ 8) ;
+  - 7 : `{n}` des annonces et aide existante (§ 7.1, § 8) ;
+  - 8 : nom accessible de `DayBadge` (§ 7.7) ;
+  - 9 : focus après un retrait (§ 7.1) ;
+  - 10 : critère 22 ;
+  - 11 : `context` et `detour` après l'arrivée (§ 7.3) ;
+  - 12 : citation de 0141 (§ 4.2) ;
+  - 13 : chevauchement défini et arrivée proche (§ 3.4, depuis renvoyés à M4-suite par la correction 4) ;
+  - 14 : critère 18 ;
+  - 15 : critère 8, « après le critère 1 ».
+
+**Correction 4 : découpage** (revue consolidée du head `4d771bb`, Tech Lead et UX/UI ; décision du CEO **Q697** : découper plutôt que corriger une quatrième fois) :
+- renvoyés à une spécification suivante, **M4-suite**, que le Product Owner écrira après la décision M4-TL (§ 15) :
+  - les règles de planification de la journée du changement de ville (ancien § 3.4, marges et départ estimé de l'ancien § 3.2), d'où les bloquants 3, 4 et 5 et le mineur 9 ;
+  - la numérotation, les repères et les étiquettes de la carte d'ensemble à plusieurs villes, et la carte de la Journée d'un changement de ville (§ 7.4), d'où le bloquant 1 et le mineur 10 ;
+- bloquant 2 : mini-lignes de l'écran 5 seulement « dès que le voyage a plus d'une ville » (§ 7.2, M4-PO-9, critère 13) ;
+- mineurs 6 et 7 : nom accessible de `DayBadge` et de la mini-ligne (§ 7.7, § 8, critère 17) ;
+- mineur 8 : citation exacte de 0141 § 4 point 5 (§ 4.2) ;
+- mineur 9 : le seuil de 30 minutes part avec l'ancien § 3.4 ;
+- mineur 10 : carte d'ensemble inchangée, forme renvoyée à UX/UI dans M4-suite ; `ink-2` est le token existant (§ 7.5) ;
+- mineur 11 : traçabilité de la correction 3 ci-dessus.
 
 **Vocabulaire.** Dans cette spécification et dans l'interface :
 - le **changement de ville** est le passage d'une ville à la suivante, et la **journée du changement de ville** est le jour où il a lieu. À l'écran, il s'appelle « Vers {ville} » ;
@@ -126,6 +138,8 @@ Aucun code ne commence avant la fusion de M4-TL. Si M4-TL change un point de cet
 
 C'est la question **T11** à M4-TL, et **la réponse de M4-TL fait foi**. Les critères 6 à 12 se testent dans la couche qu'elle désigne. Les mentions « par le code » ci-dessous sont des propositions du Product Owner, pas des décisions.
 
+**Ce que cette spécification ne fixe pas.** Les règles de planification de cette journée (marges, chevauchements, départ estimé, repas, long changement de ville, engagements autour du départ et de l'arrivée) sont fixées par M4-TL, puis par **M4-suite** (§ 3.4, § 15).
+
 ### 3.1 Définition (M4-PO-6)
 1. Il y a **un changement de ville par ville ajoutée**, à la date d'arrivée de la ville 2, puis de la ville 3. Un voyage de 3 villes en a donc deux.
 2. La journée du changement de ville **appartient aux deux villes**. Elle commence au logement de la ville quittée (terminus `start`, libellé de ce logement) et se termine au logement de la ville d'arrivée (terminus `end`, libellé du nouveau logement). C'est la seule journée dont les deux terminus diffèrent.
@@ -139,30 +153,19 @@ C'est la question **T11** à M4-TL, et **la réponse de M4-TL fait foi**. Les cr
 
 ### 3.2 Ce qu'elle contient (M4-PO-6)
 Dans l'ordre de la ligne du jour :
-1. **Le matin, dans la ville quittée.** La ligne part du logement. Elle contient ensuite des étapes près de ce logement s'il reste du temps avant le départ. Sinon, une ligne « Temps libre » (`free`) va jusqu'au départ : il n'y a jamais de trou.
+1. **Avant le départ, dans la ville quittée.** La ligne part du logement, puis montre les étapes de la ville quittée, ou une ligne « Temps libre » (`free`) jusqu'au départ : il n'y a jamais de trou.
 2. **La ligne « Vers {ville} »**, avec le mode, l'heure et la durée (§ 3.3).
    - Ce n'est **pas une étape** : elle n'a pas de fiche, pas de numéro sur la carte, et ni « Remplacer », ni « Déplacer », ni « Verrouiller ».
    - Elle occupe son créneau : il n'y a pas de trou dans le programme (principe produit 4).
-3. **Après l'arrivée, dans la ville d'arrivée.** Des étapes près du nouveau logement s'il reste du temps, puis le repas du soir, puis le retour au logement.
+3. **Après l'arrivée, dans la ville d'arrivée.** Les étapes de la ville d'arrivée, puis le retour au nouveau logement.
 
 **Règles de remplissage.** Elles sont provisoires et révisables après le premier essai de Samuel. Si M4-TL les met dans le moteur, le Product Owner propose de les placer dans `moteur.json`, à côté de `activitesParRythme` (T11).
-- **Marges.**
-  - Au moins **45 minutes** entre la fin de la dernière étape du matin et le départ (aller à la gare, reprendre les bagages).
-  - Au moins **30 minutes** entre l'arrivée et la première étape qui suit (déposer les bagages).
 - **Activités.**
   - **Au plus** la moitié des activités d'un jour plein du rythme, arrondie au-dessus : 1 pour « tranquille », 2 pour « équilibré », 2 pour « intense » (`activitesParRythme` : 2, 3, 4).
   - Elles sont choisies près du logement du moment.
   - Jamais une étape à réserver (`toReserve`), sauf si c'est un engagement saisi.
-- **Déjeuner.**
-  - Il a lieu dans la ville où la personne se trouve à 12:30, si les marges le permettent.
-  - Il n'y en a pas si elle est en route à 12:30, ou si le déjeuner ne laisse pas 45 minutes avant le départ.
-- **Dîner.**
-  - Il a lieu dans la ville d'arrivée, près du nouveau logement, si l'arrivée a lieu avant 20:00.
-  - Sinon, il n'y a pas de dîner, et la ligne se termine au logement.
-- **Long changement de ville.** Au-delà de 4 heures de route, la journée ne contient que les repas et la ligne « Vers {ville} », sans activité.
 - **Titre du jour** (`Day.theme`) : « De {ville quittée} à {ville d'arrivée} ». *Proposition* : il est écrit par le code, pas par l'IA (T11).
-
-**Départ estimé.** La journée commence à 09:00 (`fenetreJour.debut`). Un départ **estimé** vers 10:00, avec 45 minutes de marge, ne laisse aucune étape le matin. La ligne montre le départ du logement, « Temps libre » jusqu'à 10:00, puis « Vers {ville} » avec « départ vers 10:00 (estimation) ». C'est voulu : sans billet, l'heure du train est inconnue, et on ne promet rien le matin. Un départ **saisi** plus tard laisse des étapes le matin (critère 7).
+- **Le reste** (marges avant le départ et après l'arrivée, repas, long changement de ville, heure d'un départ sans billet) : fixé par M4-TL, puis par M4-suite (§ 3.4).
 
 ### 3.3 Heure, mode et durée (M4-PO-7)
 
@@ -179,12 +182,13 @@ Il y a deux cas, dans cet ordre de priorité.
    - Son heure de début est le départ. Son heure de fin, si elle est saisie, est l'arrivée.
    - Son libellé devient le mode affiché (« Train Rome–Florence »).
    - S'il y en a plusieurs ce jour-là, le premier qui commence compte. Les autres restent des engagements ordinaires.
-   - Sans heure de fin, le départ est celui du billet et la durée est estimée (cas 2, pour la durée seulement).
+   - Sans heure de fin, le départ est celui du billet, et l'arrivée est « à confirmer » (§ 3.4).
    - **Fin de l'engagement** : `BriefEssai.engagements` ne porte aujourd'hui que l'heure de début (`brief.ts`, l. 76-81). L'heure d'arrivée doit atteindre la couche qui planifie la journée (T9).
 2. **Départ estimé.** Sans billet ni vol ce jour-là :
-   - le départ est affiché « départ vers 10:00 (estimation) », jamais « 10:00 » seul ;
-   - la durée vient de la méthode que choisira M4-TL (T2). Elle est **toujours affichée comme une estimation** (« environ 1 h 30 (estimation) »), et jamais présentée comme l'horaire d'un train ;
-   - si aucune estimation n'existe, la ligne affiche « durée à confirmer », et le créneau réservé dans ce cas est fixé par M4-TL. Jamais une durée inventée n'est présentée comme sûre ;
+   - l'heure de départ et la durée sont toujours affichées comme des estimations (« départ vers {heure} (estimation) », « environ 1 h 30 (estimation) »), jamais comme l'horaire d'un train ; l'heure seule, sans « vers » ni « (estimation) », n'est jamais affichée ;
+   - la règle qui donne cette heure, et le créneau réservé quand aucune durée n'existe, sont fixés par M4-TL, puis par M4-suite (§ 3.4) ;
+   - la durée vient de la méthode que choisira M4-TL (T2). Sans estimation, la ligne affiche « durée à confirmer ». Jamais une durée inventée n'est présentée comme sûre ;
+   - l'arrivée est « à confirmer » (§ 3.4) ;
    - le mode affiché vient des déplacements du brief (choix de produit provisoire) :
      - « En voiture » si `car` est coché, même avec `transit` ;
      - « En train ou en bus » si `transit` est coché sans `car` ;
@@ -194,22 +198,12 @@ Il y a deux cas, dans cet ordre de priorité.
 
 **Données Google** : aucune durée Google n'est écrite, nulle part (0011 ; 0092 ne vaut que pour le prototype ; Q637 ouverte). La source de la durée estimée revient à **M4-TL** (T2). Une durée saisie par la personne est une donnée de la personne, pas une donnée Google.
 
-### 3.4 Engagements de la journée du changement de ville (M4-PO-8)
-- Un engagement garde toujours son heure. Le programme ne le déplace jamais : c'est une étape verrouillée (cadrage § 3.2, F8-PO-3).
-- Sa ville dépend du départ :
-  - un engagement qui finit avant le départ a lieu dans la ville quittée ;
-  - un engagement qui commence après l'arrivée a lieu dans la ville d'arrivée.
-- **Engagement sans heure de fin** : pour ces règles, il dure **1 heure** (valeur provisoire).
-- **Intervalle du changement de ville** : il va du départ à l'arrivée. L'arrivée est l'heure de fin du billet, ou le départ plus la durée estimée. Un engagement **chevauche** le changement de ville si son intervalle (début, et fin ou début plus 1 heure) recoupe celui-ci.
-- **Chevauchement avec un départ estimé** : le départ est décalé après la fin de l'engagement, avec la marge de 45 minutes.
-- **Chevauchement avec un départ saisi** : l'engagement reste en place, et la journée affiche le bandeau de chevauchement (§ 7.6, § 8). Les deux sont des saisies de la personne : le studio ne choisit pas à sa place.
-- **Marge courte avant un départ saisi** : un engagement qui finit moins de 45 minutes avant le départ ne chevauche rien. La journée affiche un **second texte**, celui de la marge courte (§ 8).
-- **Engagement qui commence pendant le changement de ville, ou moins de 30 minutes après l'arrivée** :
-  - il est rangé dans la ville d'arrivée ;
-  - pendant le changement de ville, il chevauche, et c'est le bandeau de chevauchement qui s'affiche ;
-  - moins de 30 minutes après l'arrivée, c'est le texte « arrivée proche » du § 8.
-  - La mise en œuvre de ces règles revient à M4-TL (T9, T11).
-- **Vol de ce jour** : le « Vol » d'une journée de changement de ville n'est **pas** un vol d'arrivée ou de départ du voyage. `heuresDeVol` (`src/domain/squelette.ts`) ne lit que les vols du premier et du dernier jour, et `engagementsDuBrief` écarte aujourd'hui tout vol (T9).
+### 3.4 Planification de la journée (M4-PO-8)
+- La journée du changement de ville montre la ligne « Vers {ville} » entre les étapes de la ville quittée et celles de la ville d'arrivée.
+- L'arrivée est l'heure de fin du billet ou du vol, sinon elle est « à confirmer ».
+- Toute autre règle de cette journée (chevauchements, marges, départ estimé) est fixée par M4-TL (T9, T11), puis par M4-suite (§ 15).
+
+**Vol de ce jour** (constat, pour T9) : le « Vol » d'une journée de changement de ville n'est **pas** un vol d'arrivée ou de départ du voyage. `heuresDeVol` (`src/domain/squelette.ts`) ne lit que les vols du premier et du dernier jour, et `engagementsDuBrief` écarte aujourd'hui tout vol.
 
 ## 4. Villes et décalage horaire (premier lot)
 
@@ -226,7 +220,7 @@ Il y a deux cas, dans cet ordre de priorité.
      Les modules que nomme 0141 (`src/server/composition/villes-api.ts`, `src/server/villes/recherche.ts`, `src/server/config/villes.ts`, `src/server/generation/acces-reel.ts`) viendront avec la tâche de code M1f : ils ne sont pas encore dans `main`.
    - **Bornes** : la ville est bornée aux 62 de `villes-mvp.json` tant que Q626 est ouverte (0141 § 8 points 1 et 2, `villeMvpDuPays`).
    - **Ce qui est envoyé** : seul le **nom maison**. `OtherCity` n'a pas de `destinationRegion`, et `createTrip` de `api` contrôle par le nom (`controlerVilles`, 0141 § 6.3 point 3). Le `placeId` d'une ville n'est ni conservé ni envoyé.
-   - **Autres villes** : 0141 § 6.4 monte la recherche sur l'écran 1 existant et ne dit rien des autres villes. Son § 4 point 5 anticipe déjà « Ajouter une ville » de l'étape 4. Étendre la recherche aux autres villes fait partie de M4c. Les autres villes se saisissent sur le même écran 1 anonyme, avant la connexion. Le motif de revoir le plafond que donne 0141 § 4 point 5 (une recherche qui servirait **après** la connexion) ne s'applique donc pas. Le risque reste celui de S-M4-3.
+   - **Autres villes** : 0141 § 6.4 monte la recherche sur l'écran 1 existant et ne dit rien des autres villes. Son § 4 point 5 dit : « À revoir si la recherche de ville sert un jour après la connexion (par exemple « Ajouter une ville » de l'étape 4, plusieurs villes) ». Étendre la recherche aux autres villes fait partie de M4c. Les autres villes se saisissent sur le même écran 1 anonyme, avant la connexion. Le motif de revoir le plafond que donne 0141 § 4 point 5 (une recherche qui servirait **après** la connexion) ne s'applique donc pas. Le risque reste celui de S-M4-3.
 3. **Même ville deux fois de suite** : refusée, avec le texte du § 8. Une ville qui revient plus tard est acceptée (Rome, Florence, puis Rome). Cette règle est nouvelle : ni `controlerVilles` ni `checkCities` ne la portent. Sa place revient à M4-TL (T4).
 4. **Site d'essai** : il ne change pas (M4-PO-1). Il garde une seule ville et le texte `uneSeuleVille`.
 
@@ -234,7 +228,7 @@ Il y a deux cas, dans cet ordre de priorité.
 
 1. **Brief vers l'IA.** Il contient :
    - la liste ordonnée des villes, avec pour chacune son nom maison, sa date d'arrivée, son nombre de nuits et le texte de son logement ;
-   - les changements de ville et leur forme (saisie ou estimée, heures) ;
+   - les changements de ville et leur forme (saisie ou estimée, heures connues) ;
    - les engagements de chaque jour.
 
    Rien d'autre n'y entre, et jamais une donnée Google (0011 § 4). La forme exacte (prompt `programme` v5) revient à ia-recherche dans M4a, sous la décision M4-TL.
@@ -289,8 +283,8 @@ Ordre de grandeur : quelques centimes de Google par ville en plus, et une part f
 - La recherche de ville sert à chaque ville ajoutée, comme à la destination, quand elle est ouverte (§ 4.2).
 
 ### 7.2 Écran 5 — Propositions prêtes (`/voyages/[id]/preparation`)
-- Chaque mini-ligne de jour nomme sa ville : « Jour {n} · {ville} ».
-- La journée du changement de ville est nommée « Jour {n} · De {ville} à {ville} ».
+- **Dès que le voyage a plus d'une ville**, chaque mini-ligne de jour nomme sa ville : « Jour {n} · {ville} ». La journée du changement de ville est nommée « Jour {n} · De {ville} à {ville} ».
+- **Avec une seule ville**, les mini-lignes ne changent pas (critère 25).
 - Les cases suivent le § 7.3. Le changement de ville n'est jamais une case.
 - Dans l'interface, on écrit « Tes premières propositions », jamais « Aperçu » (handover front-end § 10).
 
@@ -310,26 +304,20 @@ Ordre de grandeur : quelques centimes de Google par ville en plus, et une part f
 - **contexte** : `context` (`formatContexte`) ne cite jamais un déjeuner le jour d'un changement de ville. Si un voisin est la ligne « Vers {ville} », il compte comme un voisin absent. Sans aucun voisin, la carte n'a pas de ligne de contexte : c'est le comportement actuel de `formatContexte` (`null`), sans texte de repli. Aucun texte nouveau n'est ajouté.
 
 ### 7.4 Écran 11 — Séjour, carte d'ensemble
-**Voyage à une seule ville : carte inchangée**, y compris ses anneaux `overview` sans numéro. Les règles ci-dessous ne valent que pour 2 ou 3 villes.
+**La carte d'ensemble reste celle d'aujourd'hui**, pour une ville comme pour plusieurs : des anneaux `StopMarker kind="overview"` sans numéro, selon la règle de Ligne (`docs/design-system/carte.md` : « Vue d'ensemble du séjour : arrêts en petits anneaux de 12 px, sans numéro » ; `StopMarker.test.tsx`).
 
-- **Cadrage** : à l'ouverture, la carte d'ensemble cadre **toutes les villes** du voyage, c'est-à-dire toutes les étapes servies et tous les logements. Le zoom minimal pour des villes éloignées reste à confirmer par UX/UI à la revue de M4c : c'est le seul point non tranché ici.
-- **Numérotation** :
-  - les marqueurs `StopMarker kind="overview"` sont numérotés **en continu** sur tout le voyage, dans l'ordre du jour par jour. Ils n'ont pas de numéro aujourd'hui : seul `kind="stop"` en affiche un (`StopMarker.tsx`), d'où T7 ;
-  - la numérotation ne recommence **jamais** à 1 dans chaque ville ;
-  - la carte de la **Journée** garde sa numérotation par jour (`kind="stop"`), inchangée. Les numéros de la carte d'ensemble ne sont pas ceux de la Journée ;
-  - la liste du jour par jour reste la source complète, la carte n'en est que le reflet (handover § 11).
-- **Distinction des villes** :
-  - par **groupe** : chaque ville a un **repère visuel**, le terminus de son logement (`StopMarker kind="terminus"`), accompagné d'une étiquette texte qui porte le nom maison de la ville. Ses marqueurs sont autour de lui, et le jour par jour les range sous le titre de la ville ;
-  - **jamais** par la couleur `quai`, réservée à l'action requise (handover § 0, règle 6, et § 4), ni par la couleur seule.
-- **Pas de ligne entre les villes** : le changement de ville n'est pas tracé sur la carte, ni comme un trajet à pied, ni autrement (T7).
-- **Carte de la Journée d'un changement de ville** (écran 12) : sa forme est **confiée à UX/UI**, à confirmer à la revue de M4c, dans les règles du handover § 8. Deux points sont à fixer : un cadrage sur les deux villes, et un tracé en deux morceaux (matin, puis après l'arrivée), sans ligne entre eux.
+- **Seul changement, à partir de 2 villes** : à l'ouverture, la carte cadre **toutes les villes** du voyage, c'est-à-dire toutes les étapes servies et tous les logements.
+- Aucun tracé ne relie les villes. Aucune couleur `quai` n'est ajoutée (handover § 0, règle 6, et § 4).
+- La liste du jour par jour, groupée par ville (§ 7.5), reste la source complète. La carte n'en est que le reflet (handover § 11).
+- **Carte de la Journée d'un changement de ville** (écran 12) : rendu actuel de la Journée, inchangé. Aucun segment n'est tracé entre la dernière étape avant la ligne « Vers {ville} » et la première après elle, puisque cette ligne n'est pas un `Segment` de marche (T1).
+- **Renvoyé à M4-suite**, avec une décision UX/UI dans `docs/decisions/` : numérotation de la carte d'ensemble, repères par ville (terminus, étiquettes, groupes), zoom minimal pour des villes éloignées, et forme propre de la carte de la Journée d'un changement de ville. Toute modification du rendu `overview` passe par cette décision et par le test de `StopMarker` qu'elle modifierait.
 
 ### 7.5 Écran 11 — Séjour, liste
 **Voyage à une seule ville : écran inchangé.** Il n'y a ni liste de villes sous la plaque, ni titre de ville, et le jour par jour reste une seule liste, comme aujourd'hui (maquettes, `SejourPanel.test.tsx`). Les règles ci-dessous ne valent que pour 2 ou 3 villes.
 
 - **Plaque** : la plaque garde la destination (ville 1) et son `meta` actuel.
 - **Liste des villes** sous la plaque, en dehors d'elle, dans l'ordre : « Rome · Florence · Venise ».
-  - Elle est en `ink-2` sur le fond de la page, et son contraste est vérifié par test.
+  - Elle utilise le token existant `ink-2` sur le fond de la page, et son contraste est vérifié par test.
   - Avec des noms longs, elle passe à la ligne et n'est jamais tronquée.
 - **Jour par jour**, groupé par ville, sous le titre de niveau 2 actuel « Jour par jour » :
   - un **titre de niveau 3** par ville : « {ville} · {n} nuits », « {ville} · 1 nuit » au singulier. C'est un titre simple : il n'est pas focalisable et se parcourt par la navigation entre titres ;
@@ -340,25 +328,18 @@ Ordre de grandeur : quelques centimes de Google par ville en plus, et une part f
 - « À faire avant de partir » et « Pendant ton séjour » : inchangés.
 
 ### 7.6 Écran 12 — Journée, journée du changement de ville seulement
-- **Ligne du jour** : elle suit le § 3.2.
+- **Ligne du jour** : elle suit le § 3.2 et le § 3.4.
 - **Ligne « Vers {ville} »** :
   - elle a le gabarit d'une ligne `DayLine.Segment` : un élément de la liste ordonnée, le texte « Vers {ville} » et le détail du § 8 ;
   - elle n'a pas de lien et n'est pas focalisable ;
   - son nom accessible est « Vers {ville}, {détail} » ;
   - sa forme de données revient à T1.
-- **Bandeaux**. Ils sont en tête de la journée. Quand ils coexistent, ils sont dans cet ordre :
-  1. le **bandeau du budget de trajet** existant (`sejour.journee.bandeauTrajet`), `StatusBanner kind="travel"`, `role="status"`. Il est inchangé et porte sur `Day.travelMinutes` seul ;
-  2. le **bandeau de chevauchement, de marge courte ou d'arrivée proche** (§ 3.4), `StatusBanner kind="conflict"`, `role="alert"` (`statusBannerRole`) :
-     - filet `ink` ;
-     - aucune action ;
-     - jamais la couleur `quai` : la personne vérifie ses horaires, elle n'a pas d'action à faire dans l'app.
-
-     S'il y a plusieurs engagements en cause, il y a un bandeau par engagement, dans l'ordre des heures.
+- **Bandeaux** : le **bandeau du budget de trajet** existant (`sejour.journee.bandeauTrajet`, `StatusBanner kind="travel"`, `role="status"`) est inchangé et porte sur `Day.travelMinutes` seul. Ce lot n'ajoute aucun bandeau : un éventuel signalement d'horaires serrés est renvoyé à M4-suite.
 - **Autres journées** : elles ne changent pas.
 
 ### 7.7 Noms accessibles et petits écrans (390 px)
-- **Pastille `DayBadge`** d'une journée de changement de ville : son nom accessible actuel est **gardé** (jour abrégé, état actif `aria-current`, mention « complet » s'il y a lieu), suivi de « , de {ville} à {ville} ».
-- **Mini-ligne de l'écran 5** : même règle. Son nom actuel est gardé, puis suivi de la ville ou de « de {ville} à {ville} ».
+- **Pastille `DayBadge`** d'une journée de changement de ville : son nom accessible est le nom actuel (`dayBadgeName` : « Jour {n} », puis « , {jour abrégé} »), suivi de « , de {ville} à {ville} », puis de « , complet » s'il y a lieu. Exemple : « Jour 3, lun., de Rome à Florence, complet ». L'état actif reste porté par l'attribut `aria-current`, pas par le texte du nom.
+- **Mini-ligne de l'écran 5**, dès que le voyage a plus d'une ville : son nom accessible actuel est gardé, puis suivi de « , {ville} » pour un jour ordinaire, ou de « , de {ville} à {ville} » pour une journée de changement de ville. Avec une seule ville, il ne change pas.
 - Le titre et le thème de la Journée, la mini-ligne de l'écran 5 et l'en-tête des cartes de l'écran 6 passent à la ligne quand les noms de villes sont longs. Ils ne sont jamais tronqués ni ne débordent horizontalement à 390 px.
 
 ### 7.8 Hors de ces écrans
@@ -385,17 +366,15 @@ Ils vivent dans `src/i18n/fr/creation.json`, `src/i18n/fr/sejour.json` et `src/i
 | Écran 1, annonces ({n} = rang de la ville dans le voyage, destination comprise : 2 ou 3, comme le libellé actuel `villes.ville`) | « Ville {n} ajoutée. » ; « {ville} retirée. » (« Ville {n} retirée. » sans nom) |
 | Écran 5 et cartes de l'écran 6, jour d'une ville | « Jour {n} · {ville} » |
 | Écran 5, jour d'un changement de ville ; thème | « Jour {n} · De {ville} à {ville} » ; thème : « De {ville} à {ville} » |
-| Pastille du jour et mini-ligne de l'écran 5, fin du nom accessible | « , de {ville} à {ville} », après le nom actuel (§ 7.7) |
+| Pastille du jour, nom accessible | « {nom actuel}, de {ville} à {ville} », puis « , complet » s'il y a lieu (§ 7.7) |
+| Mini-ligne de l'écran 5, fin du nom accessible (plus d'une ville) | jour ordinaire : « , {ville} » ; changement de ville : « , de {ville} à {ville} » (§ 7.7) |
 | Séjour, villes sous la plaque | « {ville 1} · {ville 2} · {ville 3} » |
 | Séjour, titre de ville | « {ville} · {n} nuits » ; « {ville} · 1 nuit » |
 | Séjour, résumé du changement de ville | ligne 1 : « Vers {ville} » ; ligne 2 : le résumé actuel |
 | Journée, ligne du changement de ville | « Vers {ville} » |
-| Journée, détail, départ saisi | « {libellé}, {heure de départ} – {heure d'arrivée} » ; sans heure d'arrivée : « {libellé}, départ à {heure}, environ {durée} (estimation) » |
-| Journée, détail, départ estimé ({heure} donnée par le code : 10:00 par défaut, ou plus tard après un engagement, § 3.4) | « {mode}, départ vers {heure} (estimation), environ {durée} (estimation) » ; sans estimation de durée : « {mode}, départ vers {heure} (estimation), durée à confirmer » ; avec `walk` seul, sans « {mode}, » |
+| Journée, détail, départ saisi | « {libellé}, {heure de départ} – {heure d'arrivée} » ; sans heure d'arrivée : « {libellé}, départ à {heure}, arrivée à confirmer » |
+| Journée, détail, départ estimé ({heure} donnée par le code, selon la règle de M4-TL puis de M4-suite, § 3.3) | « {mode}, départ vers {heure} (estimation), environ {durée} (estimation) » ; sans estimation de durée : « {mode}, départ vers {heure} (estimation), durée à confirmer » ; avec `walk` seul, sans « {mode}, » |
 | Modes estimés (provisoires) | « En train ou en bus » ; « En voiture » |
-| Journée, bandeau de chevauchement | « Ton départ vers {ville} chevauche {libellé}. Vérifie tes horaires. » |
-| Journée, bandeau de marge courte | « {libellé} finit peu avant ton départ vers {ville}. Vérifie que tu as le temps. » |
-| Journée, bandeau d'arrivée proche | « {libellé} commence peu après ton arrivée à {ville}. Vérifie que tu as le temps. » |
 
 Formats : « 10:12 », « 10:12 – 11:47 », « 45 min », « 1 h 30 ».
 
@@ -431,18 +410,15 @@ Formats : « 10:12 », « 10:12 – 11:47 », « 45 min », « 1 h 30 ».
   - `Day.city` (texte maison) ;
   - `Trip.cities` (nom, première et dernière date) ;
   - une recomposition à la lecture depuis `stays` (`logementsDuJour`) et la position de la ligne « Vers {ville} ».
-- **T7 — Carte.** Mise en œuvre du § 7.4 :
-  - cadrage sur toutes les villes ;
-  - numéros continus des marqueurs `overview` : ils n'en portent pas aujourd'hui (`StopMarker`, anneaux de `GoogleMapRenderer`) ;
-  - groupes par ville, sans ligne entre les villes ;
-  - carte du jour d'un changement de ville : étapes des deux villes, sans tracé entre elles.
+- **T7 — Carte.** Mise en œuvre du § 7.4 : cadrage de la carte d'ensemble sur toutes les villes, et absence de segment entre les deux villes sur la carte de la Journée. La numérotation et les repères par ville sont renvoyés à M4-suite.
 - **T8 — Module partagé.** `briefDepuisFormulaire` sert `p0Run` et `api`. Comment lever le refus de `draft.otherCities` pour `api` seulement, en gardant celui du site d'essai (M4-PO-1) : un paramètre de la conversion, ou deux fonctions ?
 - **T9 — Engagements et changement de ville.**
-  - Où se font la détection du départ saisi (règle du billet de trajet, § 3.3) et le placement des engagements (§ 3.4) ? *Proposition* : dans le code, de façon déterministe, avant le prompt.
+  - Où se fait la détection du départ saisi (règle du billet de trajet, § 3.3) ? *Proposition* : dans le code, de façon déterministe, avant le prompt.
+  - Quelles règles pour les engagements autour du changement de ville (chevauchement, marges, heure d'un départ estimé) ? M4-TL en fixe le cadre, que M4-suite détaille (§ 3.4).
   - L'**heure de fin** des engagements doit atteindre la couche qui planifie. `BriefEssai.engagements` n'a que `heure` : faut-il un champ `fin` (évolution du brief et du prompt), ou un passage hors du brief ?
   - Le « Vol » d'une journée de changement de ville ne doit pas être écarté par `engagementsDuBrief`, ni lu par `heuresDeVol`.
 - **T10 — Tests.** Le critère 13 de M1a (`chaine-inversee: une seule ville`) et le test qui le porte changent d'attente pour `api` : 1 à 3 villes y sont acceptées. M4-TL écrit ce changement dans sa décision, avec la liste fermée des attentes modifiées, comme 0136 § 9. Aucun test n'est supprimé ni désactivé sans décision écrite (CLAUDE.md).
-- **T11 — Qui tient les règles du changement de ville (§ 3.2 à § 3.4).** Les règles visées sont les marges, le nombre d'activités, le départ estimé, les repas, le long changement de ville, le thème et le placement des engagements. Elles peuvent vivre :
+- **T11 — Qui tient les règles du changement de ville (§ 3.2 à § 3.4).** Les règles visées sont le nombre d'activités et le thème (§ 3.2), et, pour M4-suite, les marges, le départ estimé, les repas, le long changement de ville et le placement des engagements. Elles peuvent vivre :
   - dans le **prompt `programme` v5**, où l'IA les applique ;
   - dans le **moteur** (`squelette.ts`, qui suppose aujourd'hui un seul séjour, et `moteur.json`) ;
   - dans un **contrôle de la sortie** de l'IA, qui refuse ou corrige ;
@@ -493,25 +469,15 @@ Les tests de base de données tournent en CI (`pnpm test:db`), en composition si
 7. `changement de ville: billet saisi`.
    - Contexte : un engagement « Billet » « Train Rome–Florence » le 2027-05-06, de 15:05 à 16:40.
    - La ligne « Vers Florence » va de 15:05 à 16:40 et porte ce libellé, sans « (estimation) ».
-   - La dernière étape du matin à Rome se termine au plus tard à 14:20. La première étape de Florence commence au plus tôt à 17:10.
-   - Le déjeuner a lieu à Rome et le dîner à Florence.
+   - Sans heure de fin, le détail est « Train Rome–Florence, départ à 15:05, arrivée à confirmer ».
 8. `changement de ville: départ estimé`.
-   - Contexte : sans billet, sans vol et sans autre engagement le matin.
-   - La ligne affiche « départ vers 10:00 (estimation) », puis « environ {durée} (estimation) », ou « durée à confirmer » sans estimation.
-   - Avant elle, la journée n'a que le départ du logement et « Temps libre », sans étape.
+   - Contexte : sans billet, sans vol.
+   - La ligne affiche « départ vers {heure} (estimation) », puis « environ {durée} (estimation) », ou « durée à confirmer » sans estimation. Aucune heure de départ n'est affichée sans « vers » et « (estimation) ».
    - Après le critère 1, ni `trip_versions.snapshot` ni aucune autre table du schéma principal ne contient de durée Google (critère 9 de M1a, rejoué).
-9. `changement de ville: rythme et repas`.
-   - Il y a **au plus** 1, 2 et 2 activités pour les rythmes « tranquille », « équilibré » et « intense » (§ 3.2).
-   - Le déjeuner a lieu dans la ville où la personne se trouve à 12:30. Il n'y en a pas si elle est en route, ou si la marge de 45 minutes ne tient pas.
-   - Le dîner a lieu dans la ville d'arrivée si l'arrivée est avant 20:00.
-   - Plus de 4 heures de route ne laissent aucune activité.
-10. `changement de ville: engagements`.
-    - Un engagement garde son heure. Avant le départ, il a lieu dans la ville quittée ; après l'arrivée, dans la ville d'arrivée.
-    - Un engagement sans heure de fin compte pour 1 heure.
-    - S'il chevauche un départ estimé, le départ suit sa fin d'au moins 45 minutes.
-    - S'il chevauche un départ saisi, le bandeau « Ton départ vers {ville} chevauche {libellé}. Vérifie tes horaires. » s'affiche.
-    - S'il finit moins de 45 minutes avant un départ saisi, c'est le bandeau « {libellé} finit peu avant ton départ vers {ville}. Vérifie que tu as le temps. » qui s'affiche.
-    - Les deux bandeaux sont `StatusBanner kind="conflict"`, `role="alert"`, sans `quai`, et viennent après le bandeau `travel` s'il existe.
+9. `changement de ville: rythme`.
+   - Il y a **au plus** 1, 2 et 2 activités pour les rythmes « tranquille », « équilibré » et « intense » (§ 3.2), et aucune étape à réserver qui ne soit pas un engagement saisi.
+10. `changement de ville: place de la ligne`.
+    - La ligne « Vers {ville} » est affichée au bon endroit : après toutes les étapes de la ville quittée, et avant toutes celles de la ville d'arrivée (§ 3.4).
 11. `changement de ville: vol, billet et mode`.
     - Un « Vol » daté d'un changement de ville devient le changement de ville. Il ne change ni l'heure d'arrivée du premier jour ni celle de départ du dernier.
     - Un « Billet » de ce jour devient le changement de ville. Un « Billet » d'un autre jour, ou daté de la veille, reste un engagement ordinaire. Une « Sortie » de ce jour n'est jamais le changement de ville.
@@ -523,7 +489,8 @@ Les tests de base de données tournent en CI (`pnpm test:db`), en composition si
     - un lieu placé un jour de Florence et trouvé à Rome n'a pas de `placeId`, et reçoit le traitement de 0116 (badge « à confirmer ») ;
     - le jour d'un changement de ville, une étape du matin trouvée dans la ville quittée **garde** son `placeId`, et une étape d'après l'arrivée trouvée dans la ville quittée le perd.
 13. `Écran 5: ville de chaque jour`.
-    - Les mini-lignes affichent « Jour 1 · Rome » et « Jour 3 · De Rome à Florence ».
+    - Pour Rome puis Florence, les mini-lignes affichent « Jour 1 · Rome » et « Jour 3 · De Rome à Florence ».
+    - Pour Édimbourg seul, aucune mini-ligne ne nomme de ville, et les tests existants de l'écran 5 passent sans modification.
     - Le mot « Aperçu » n'apparaît dans aucun texte d'interface ajouté.
 14. `Présentation: plusieurs villes`.
     - Pour Rome une nuit, puis Florence à partir du 05-05, les cases viennent de J1 et J3, jamais de J2.
@@ -534,10 +501,9 @@ Les tests de base de données tournent en CI (`pnpm test:db`), en composition si
     - `listPreviewSlots` rend au plus 8 cases et aucune n'est un changement de ville.
 15. `Séjour: carte d'ensemble à plusieurs villes`. Pour Rome puis Florence :
     - le cadrage initial contient toutes les étapes servies et les deux logements ;
-    - les numéros des marqueurs `overview` vont de 1 à N, dans l'ordre du jour par jour, sans recommencer à Florence ;
-    - chaque ville a un terminus de logement avec une étiquette texte à son nom (« Rome », « Florence ») ;
-    - aucun marqueur ni groupe n'utilise la couleur `quai` ;
-    - aucun tracé ne relie les deux villes.
+    - les marqueurs `overview` restent des anneaux sans numéro (`StopMarker.test.tsx` inchangé) ;
+    - aucun tracé ne relie les deux villes, sur la carte d'ensemble comme sur la carte de la Journée du changement de ville ;
+    - aucun marqueur n'utilise la couleur `quai`.
 16. `Séjour: jour par jour groupé par ville`. Pour Rome puis Florence :
     - sous le titre de niveau 2 « Jour par jour », les titres de niveau 3 « Rome · 2 nuits » et « Florence · 2 nuits » s'affichent ;
     - la journée du 05-06 est rangée sous Florence. La première ligne de son résumé est « Vers Florence », et la seconde est le résumé actuel ;
@@ -545,7 +511,7 @@ Les tests de base de données tournent en CI (`pnpm test:db`), en composition si
 17. `Journée: ligne « Vers {ville} »`.
     - La ligne n'a ni fiche, ni numéro sur la carte, ni action « Remplacer », « Déplacer » ou « Verrouiller ». Elle n'est pas focalisable.
     - Son nom accessible est « Vers Florence, {détail} ».
-    - Le nom accessible de la pastille du jour garde son nom actuel (jour abrégé, état actif, « complet ») et se termine par « , de Rome à Florence ».
+    - Le nom accessible de la pastille du jour est « Jour 3, lun., de Rome à Florence », puis « , complet » s'il y a lieu. L'état actif reste `aria-current`.
 18. `Écran 1: aide du billet de trajet`.
     - L'aide du § 8 s'affiche dès qu'une autre ville est ajoutée, et pas avant.
     - Tant qu'il y a plus d'une ville, elle est reliée par `aria-describedby` au sélecteur « Type de réservation » de chaque engagement.
@@ -559,11 +525,10 @@ Les tests de base de données tournent en CI (`pnpm test:db`), en composition si
     - Axe passe sans violation sur :
       - l'écran 1 avec 3 villes et une erreur de ville ;
       - Séjour à 2 villes ;
-      - une journée de changement de ville avec ses deux bandeaux ;
+      - une journée de changement de ville ;
       - l'écran 5 d'un voyage avec un changement de ville ;
       - l'écran 6 d'un voyage à 2 villes.
     - La liste des villes sous la plaque a un contraste d'au moins 4,5:1 sur le fond de la page (test de contraste).
-    - Les bandeaux de chevauchement, de marge courte et d'arrivée proche ont `role="alert"`, et celui du budget de trajet `role="status"`.
     - Les cibles mesurent au moins 44 × 44 px : « Ajouter une ville », y compris à l'état `aria-disabled`, chaque « Retirer », les champs de ville et de date.
     - Après un ajout, le focus va au nom de la ville ajoutée ; après un retrait, à « Ajouter une ville » (§ 7.1). L'ajout et le retrait sont annoncés en `role="status"`.
     - Chaque erreur de ville est reliée à son champ (`aria-describedby`).
@@ -577,7 +542,7 @@ Les tests de base de données tournent en CI (`pnpm test:db`), en composition si
 24. `pnpm verify` vert (variante du studio : `env -u GOOGLE_MAPS_SERVER_KEY SKIP_DB_TESTS=1 pnpm verify`, les tests de base de données en CI).
 25. `Séjour: une seule ville inchangée`. Pour un voyage à Édimbourg seul :
     - Séjour n'a ni liste de villes sous la plaque, ni titre de ville de niveau 3 ;
-    - la carte d'ensemble garde ses anneaux `overview` sans numéro ;
+    - la carte d'ensemble est celle d'aujourd'hui ;
     - les cartes de l'écran 6 et les mini-lignes de l'écran 5 ne nomment pas de ville ;
     - les tests existants de Séjour (`SejourPanel.test.tsx`), de l'écran 5 et de l'écran 6 passent sans modification.
 
@@ -608,38 +573,36 @@ Elles restent dans le cadre du cadrage (§ 3.5 « plusieurs villes », tableau d
 - **M4-PO-6 — Journée du changement de ville.**
   - Une par ville ajoutée, à la date d'arrivée dans la ville suivante, du logement quitté au nouveau logement.
   - Elle contient le matin dans la ville quittée (étapes ou « Temps libre »), puis la ligne « Vers {ville} », qui n'est pas une étape, puis la ville d'arrivée.
-  - Les règles de produit du § 3.2 en fixent le remplissage : marges de 45 et 30 minutes, au plus la moitié des activités, repas, aucune activité au-delà de 4 heures de route, thème « De {ville} à {ville} ». Elles sont provisoires et révisables après le premier essai de Samuel.
+  - Le § 3.2 en fixe le nombre d'activités (au plus la moitié d'un jour plein) et le thème « De {ville} à {ville} », valeurs provisoires et révisables après le premier essai de Samuel.
   - Le choix de la couche qui les tient revient à M4-TL (T11).
 - **M4-PO-7 — Règle du billet de trajet.**
   - Le jour d'un changement de ville, un « Billet » est le titre de transport entre les deux villes, jamais un billet d'entrée. Un « Vol » de ce jour est aussi le changement de ville, et le premier qui commence compte.
   - Les autres jours, « Billet » garde son sens.
-  - Sans billet ni vol, le départ est affiché « départ vers 10:00 (estimation) » et la durée est une estimation, toujours affichée comme telle.
+  - Sans billet ni vol, le départ et la durée sont des estimations, toujours affichées comme telles. L'arrivée est l'heure de fin du billet ou du vol, sinon « à confirmer ».
   - Les trains de nuit ne sont pas gérés dans ce lot.
   - Aucun champ nouveau à l'écran 1 : une aide explique la règle.
   - La source de l'estimation revient à M4-TL (T2).
-- **M4-PO-8 — Engagements de la journée du changement de ville.**
-  - Ils gardent leur heure, et ils sont placés dans la ville quittée ou dans la ville d'arrivée selon le départ.
-  - Sans heure de fin, ils comptent pour 1 heure.
-  - Un chevauchement avec un départ estimé décale le départ.
-  - Un chevauchement avec un départ saisi, une marge de moins de 45 minutes avant le départ ou un engagement à moins de 30 minutes de l'arrivée sont signalés par un bandeau `conflict`, et la personne tranche.
-- **M4-PO-9 — Aperçu et présentation** (amendée par la correction 2).
+- **M4-PO-8 — Planification de la journée, découpée** (correction 4, décision du CEO Q697).
+  - La ligne « Vers {ville} » est entre les étapes de la ville quittée et celles de la ville d'arrivée.
+  - Les autres règles (marges, chevauchements, départ estimé, repas, signalement d'horaires serrés) sont renvoyées à M4-TL, puis à M4-suite. Cette spécification n'ajoute aucun bandeau.
+- **M4-PO-9 — Aperçu et présentation** (amendée par les corrections 2 et 4).
   - Les 8 propositions viennent des deux premiers jours qui ne sont pas des changements de ville, J1 compris. Cela amende M1a-PO-2 (« J1 puis J2 ») pour les voyages à plusieurs villes ; il ne change rien pour une seule ville.
   - Avant le déblocage, les journées servies sont J1 et les journées des cases.
   - Chaque carte nomme sa ville dès qu'il y a plus d'une ville. Le jour d'un changement de ville, toutes les cartes de ce jour affichent « De {ville} à {ville} ».
   - La première carte après l'arrivée n'affiche ni `travelFromPrevious` ni `detour`.
   - `context` ne cite jamais un déjeuner le jour d'un changement de ville.
-  - L'écran 5 nomme la ville de chaque jour.
+  - Dès que le voyage a plus d'une ville, l'écran 5 nomme la ville de chaque jour. Avec une seule ville, il ne change pas.
   - Le déblocage est inchangé.
 - **M4-PO-10 — Séjour groupé par ville**, à partir de 2 villes seulement.
   - **Une seule ville** : Séjour ne change pas. Il n'a ni liste de villes ni titre de ville, et sa carte ne change pas non plus (critère 25).
   - Un titre de niveau 3 par ville, avec ses nuits, et chaque jour sous la ville où l'on dort.
   - Sous la plaque, la liste des villes.
   - La journée du changement de ville a un résumé sur deux lignes : « Vers {ville} », puis le résumé actuel.
-  - La carte d'ensemble cadre toutes les villes et numérote ses marqueurs en continu. Elle distingue les villes par groupe, avec un terminus et une étiquette par ville, jamais par `quai` (§ 7.4).
-  - La carte de la Journée d'un changement de ville est confiée à UX/UI.
-- **M4-PO-11 — Deux mots, deux sens, et l'ordre des bandeaux.**
+  - La carte d'ensemble reste celle d'aujourd'hui (anneaux sans numéro, `docs/design-system/carte.md`), cadrée sur toutes les villes (§ 7.4).
+  - Numérotation, repères par ville et carte propre de la Journée d'un changement de ville : renvoyés à M4-suite, avec une décision UX/UI.
+- **M4-PO-11 — Deux mots, deux sens.**
   - « Vers {ville} » nomme le changement de ville. « Temps de trajet » est réservé à `Day.travelMinutes`.
-  - Le bandeau du budget de trajet (`travel`) vient avant celui du chevauchement ou de la marge courte (`conflict`).
+  - Le bandeau du budget de trajet (`travel`) est inchangé.
 - **M4-PO-12 — Textes.** Les textes du § 8 sont provisoires. UX/UI les valide ou les reformule sans changer la règle, et reste maître du rendu des écrans non maquettés, dans les règles du § 7.
 
 ## 13. Hors périmètre
@@ -648,6 +611,7 @@ Elles restent dans le cadre du cadrage (§ 3.5 « plusieurs villes », tableau d
 - Les villes hors des 62 (Q626).
 - Un champ de saisie du changement de ville à l'écran 1 (mode, heure, durée) autre que les engagements existants, et un nouveau type d'engagement.
 - Les trains de nuit et tout changement de ville qui arrive le lendemain (§ 3.3).
+- Ce que reprend M4-suite (§ 15).
 - La réservation de billets, les horaires réels de train et tout prix de transport.
 - Le réordonnancement des villes par glisser-déposer.
 - Le site d'essai, `p0Run`, le schéma `prototype` et la garde du mode réel.
@@ -685,9 +649,7 @@ Elles restent dans le cadre du cadrage (§ 3.5 « plusieurs villes », tableau d
 
 **Sécurité** : S-M4-1 à S-M4-4 du § 10, avec les blocages du tableau des prérequis.
 
-**UX/UI** : deux points de rendu restent ouverts, avec la validation des textes du § 8 :
-- le zoom minimal de la carte d'ensemble pour des villes éloignées ;
-- la carte de la Journée d'un changement de ville (§ 7.4). Ne bloque pas le code (clés de `src/i18n`), mais bloque la fusion de M4c.
+**UX/UI** : validation des textes du § 8. La forme de la carte d'ensemble à plusieurs villes et de la carte de la Journée d'un changement de ville est renvoyée à M4-suite, avec une décision UX/UI (§ 7.4). Ne bloque pas M4c.
 
 **ia-recherche** : forme du prompt `programme` v5 (§ 5), selon T11, et jeu d'évaluation de M4a, avec au moins :
 - Rome puis Florence, avec un billet saisi ;
@@ -698,6 +660,26 @@ Sorties simulées seulement. Bloque M4a.
 
 **CEO** :
 - l'ordre des tâches : M4-TL au cycle 221, puis M4a à M4c aux cycles 222 à 224 du plan ;
+- **ouvrir le ticket M4-suite après la fusion de M4-TL** (§ 15), pour le Product Owner, avec revue du Tech Lead et d'UX/UI. Recommandation : oui. Bloque : les règles de planification de la journée du changement de ville et la forme de la carte à plusieurs villes, pas M4a à M4c ;
 - le report dans `QUESTIONS.md` des questions ci-dessus ;
 - le relais de la question Samuel 4 avec M4-TL ;
 - la mention, dans `specs/F8-creation-compte.md`, de M4-PO-2 (3 villes) et de M4-PO-7 (sens de « Billet » le jour d'un changement de ville) à côté de F8-PO-3, lors de l'amendement de F8 que demande déjà Q666 (non bloquant).
+
+## 15. Découpage : ce que reprend M4-suite
+
+Décision du CEO **Q697** (revue du head `4d771bb`) : plutôt qu'une quatrième correction, deux sujets sortent de cette spécification. Ils dépendent de réponses que M4-TL doit donner d'abord (T9, T11, T12), ou d'une décision UX/UI sur une règle de Ligne. Le Product Owner écrira **M4-suite** après la fusion de M4-TL.
+
+1. **Règles de planification de la journée du changement de ville** (ancien § 3.4, et marges, repas et départ estimé de l'ancien § 3.2) :
+   - départ estimé (heure par défaut, créneau sans durée) ;
+   - intervalle du changement de ville quand l'arrivée est « à confirmer » ;
+   - chevauchement d'un engagement avec un départ estimé ou saisi ;
+   - marges avant le départ et après l'arrivée (anciennes valeurs provisoires 45 et 30 minutes), et engagement qui commence pendant le changement de ville ou peu après l'arrivée ;
+   - repas et long changement de ville ;
+   - bandeaux éventuels (chevauchement, marge courte, arrivée proche), leur `kind` et leurs textes.
+
+   Raison : les revues ont trouvé à chaque tour une règle contradictoire ou incomplète, et la couche qui les tient (T11) comme l'heure de fin des engagements (T9) ne sont pas encore décidées.
+2. **Carte d'ensemble à plusieurs villes** : numérotation, terminus, étiquettes et groupes par ville, zoom minimal, et carte propre de la Journée d'un changement de ville.
+
+   Raison : la numérotation contredit la règle de Ligne (`docs/design-system/carte.md`, `StopMarker.test.tsx`) ; elle demande une décision UX/UI dans `docs/decisions/`.
+
+Jusqu'à M4-suite, M4a à M4c livrent ce que fixe cette spécification : la ligne « Vers {ville} » à sa place, l'arrivée « à confirmer » sans billet, aucun bandeau nouveau, et la carte d'ensemble d'aujourd'hui cadrée sur toutes les villes.
