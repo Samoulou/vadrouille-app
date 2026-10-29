@@ -133,13 +133,24 @@ test("génération simulée de bout en bout sur l'adaptateur api : écrans 1 à 
   expect(voyages).toEqual([tripId]);
   await expect(page.getByRole("main")).toContainText("Rome");
 
-  // Séjour : la feuille « Programme » affiche les journées de l'aperçu (voyage non débloqué : J1 et J2, 0136 § 3.5).
+  // Séjour : la feuille « Programme » sert les journées de l'aperçu avec leurs étapes (voyage non débloqué : J1 et J2,
+  // 0136 § 3.5) ; les jours 3 à 5 existent et sont listés verrouillés, « à débloquer », sans étape ni résumé.
   const reponse = await page.goto(`/voyages/${tripId}`);
   expect(reponse?.status()).toBe(200);
   await expect(sheet(page)).toBeVisible();
-  await expect(sheet(page)).toContainText("Jour 1");
-  await expect(sheet(page)).toContainText("Jour 2");
-  await expect(sheet(page)).not.toContainText("Jour 3");
+  const servis = sheet(page).locator("a[data-part='jour']");
+  await expect(servis).toHaveCount(2);
+  for (const [rang, jour] of [1, 2].entries()) {
+    await expect(servis.nth(rang)).toContainText(`Jour ${jour}`);
+    await expect(servis.nth(rang)).toContainText(/\d+ étapes? · /);
+  }
+  const verrouilles = sheet(page).locator("li[data-part='jour-a-debloquer']");
+  await expect(verrouilles).toHaveCount(3);
+  for (const [rang, jour] of [3, 4, 5].entries()) {
+    await expect(verrouilles.nth(rang)).toContainText(`Jour ${jour}, à débloquer`);
+    await expect(verrouilles.nth(rang)).toContainText("À débloquer");
+    await expect(verrouilles.nth(rang)).not.toContainText(/étapes? · /);
+  }
 
   // Journée 1 : servie (durées du relecteur simulé, aucune `travel_unknown`), avec le repas de midi et celui du soir de la
   // sortie simulée (critère 15) ; une journée hors aperçu n'est pas servie avant le déblocage.
