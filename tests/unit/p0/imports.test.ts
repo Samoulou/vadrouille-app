@@ -2144,12 +2144,14 @@ function atteintsServeurSeulement(
       const cible = specificateur === "?import-non-litteral" ? ({ type: "externe", nom: specificateur } as const) : resoudreCible(fichierCourant, specificateur);
       const cle = cible.type === "projet" ? cible.chemin : `externe:${cible.nom}`;
       const suivant = noeud(cle, viaAction);
+      // Arête nominative de la page de l'écran 1 vers le terminal de api : ni violation, ni parcours au-delà. Testée
+      // **avant** le marquage du nœud (revue du head `bc43913`, bloquant 1) : l'arête ne marque jamais le terminal comme
+      // vu, et un autre fichier qui l'importe directement reste contrôlé, quel que soit l'ordre du parcours.
+      if (!viaAction && cible.type === "projet" && aretePageVillesApiAdmise(fichierCourant, cle, lire)) continue;
       if (precedent.has(suivant)) continue;
       precedent.set(suivant, courant);
       // Terminal admis au-delà d'une entrée admise : ni violation, ni parcours au-delà.
       if (viaAction && cible.type === "projet" && terminalFrontiereAdmis(cle, lire)) continue;
-      // Arête nominative de la page de l'écran 1 vers le terminal de api : ni violation, ni parcours au-delà.
-      if (!viaAction && cible.type === "projet" && aretePageVillesApiAdmise(fichierCourant, cle, lire)) continue;
       const admis = viaAction && (FRONTIERE_P0R3B.admis as readonly string[]).includes(cle);
       // Terminal de B7a : admis, jamais parcouru au-delà (0077 § 3 point 1), au-delà d'une entrée de la frontière, ou
       // atteint par l'un de ses deux réexportateurs (`egress.ts`, `port.ts` : chaîne `src/features` → `src/adapters` →
@@ -2438,6 +2440,18 @@ describe("p0: clé côté serveur seulement", () => {
     expect(refusParRelais("@/server/p0/base", "src/server/p0/base.ts")).toEqual([`${PAGE} → src/server/p0/base.ts → src/server/env/p0.ts`]);
     expect(refusParRelais("@/server/p0/acces", "src/server/p0/acces.ts")).toEqual([`${PAGE} → src/server/p0/acces.ts → src/server/env/p0.ts`]);
     expect(refusParRelais("@/workflows", "src/workflows.ts")).toEqual([`${PAGE} → src/workflows.ts → src/server/env/p0.ts`]);
+    // Deux départs, dans les deux ordres (revue du head `bc43913`, bloquant 1) : l'arête de la page ne masque jamais
+    // l'import direct du terminal par un autre fichier (composant client ou autre page).
+    for (const autre of ["src/features/Ville.tsx", "src/app/(a)/page.tsx"]) {
+      const sources = new Map<string, string>([
+        [PAGE, 'import { o } from "@/server/composition/villes-api";\n'],
+        [autre, `${autre.endsWith("Ville.tsx") ? '"use client";\n' : ""}import { o } from "@/server/composition/villes-api";\n`],
+      ]);
+      const lireDeux = (f: string) => sources.get(f) ?? depot(`${SERVEUR}${VILLES}`).get(f) ?? "";
+      for (const departs of [[PAGE, autre], [autre, PAGE]]) {
+        expect(atteintsServeurSeulement(departs, lireDeux, resoudreFictif), departs.join(", ")).toEqual([`${autre} → src/server/composition/villes-api.ts`]);
+      }
+    }
     // Sur le dépôt : la page n'est pas une entrée, et son arête vers le terminal est admise.
     expect(FRONTIERE_P0R3B.entrees.map((e) => e.fichier)).not.toContain(PAGE);
     expect(aretePageVillesApiAdmise(PAGE, "src/server/composition/villes-api.ts", lireDepot)).toBe(true);

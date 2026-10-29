@@ -15,6 +15,7 @@ vi.mock("@/server/composition/villes-api", () => ({ rechercheVilleApiOuverte: vi
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.mocked(rechercheVilleApiOuverte).mockClear();
+  vi.mocked(rechercheVilleApiOuverte).mockResolvedValue(false);
 });
 
 describe("R1 : aiguillage de la recherche de ville", () => {
@@ -45,6 +46,5 @@ describe("R1 : aiguillage de la recherche de ville", () => {
     const element = await NouveauVoyagePage();
     expect(element.props).toEqual({});
     expect(rechercheVilleApiOuverte).not.toHaveBeenCalled();
-    vi.mocked(rechercheVilleApiOuverte).mockResolvedValue(false);
   });
 });

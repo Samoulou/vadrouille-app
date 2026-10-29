@@ -189,7 +189,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
       essai,
       suggestions: rechercheDisponible,
       rechercheApi: rechercheVille === "api",
-      horsTable: horsTableSaisie !== null && horsTableSaisie === trip.destination,
+      // Comparaison aux espaces près (revue du head `bc43913`, mineur 4) : la saisie exacte n'est pas redemandée à la recherche.
+      horsTable: horsTableSaisie !== null && horsTableSaisie.trim() === trip.destination.trim(),
     });
     setErrors(found);
     const first = found[0];

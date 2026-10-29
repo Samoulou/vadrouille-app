@@ -73,11 +73,27 @@ describe("création du voyage : exception de la page de l'écran 1 (décision 01
   const PAGE = "src/app/(creation)/voyages/nouveau/page.tsx";
 
   it("@/server/composition/villes-api admis dans la page de l'écran 1, et seulement là", async () => {
-    expect(await messagesFor(importOf("@/server/composition/villes-api"), PAGE, IMPORTS)).toHaveLength(0);
+    const predicat = 'import { rechercheVilleApiOuverte } from "@/server/composition/villes-api";\nexport const x = rechercheVilleApiOuverte;\n';
+    expect(await messagesFor(predicat, PAGE, IMPORTS)).toHaveLength(0);
     expect(await messagesFor(importOf("@/server/actions/villes"), PAGE, IMPORTS)).toHaveLength(0);
     for (const ailleurs of ["src/app/(creation)/voyages/nouveau/brief/page.tsx", "src/app/(creation)/voyages/nouveau/lancer/page.tsx", "src/features/creation/Exemple.tsx"]) {
-      expect((await messagesFor(importOf("@/server/composition/villes-api"), ailleurs, IMPORTS)).length, ailleurs).toBeGreaterThan(0);
+      expect((await messagesFor(predicat, ailleurs, IMPORTS)).length, ailleurs).toBeGreaterThan(0);
     }
+  });
+
+  it.each(["barriereApi", "suggererVillesApiTerminal", "choisirVilleApiTerminal", "journaliserExceptionApi", "NIVEAUX_VILLE_API"])(
+    "nom %s de villes-api refusé dans la page de l'écran 1 (seul rechercheVilleApiOuverte est admis)",
+    async (nom) => {
+      const code = `import { ${nom} } from "@/server/composition/villes-api";\nexport const x = ${nom};\n`;
+      expect((await messagesFor(code, PAGE, IMPORTS)).length).toBeGreaterThan(0);
+      expect((await messagesFor(importOf("@/server/composition/villes-api"), PAGE, IMPORTS)).length).toBeGreaterThan(0);
+    },
+  );
+
+  it("les autres motifs du bloc restent actifs dans la page : src/mocks, carte simulée, simulations", async () => {
+    expect((await messagesFor(importOf("@/mocks/creation-edimbourg"), PAGE, IMPORTS)).length).toBeGreaterThan(0);
+    expect((await messagesFor(importOf("@/components/carte/SimulatedMapRenderer"), PAGE, IMPORTS)).length).toBeGreaterThan(0);
+    expect((await messagesFor(importOf("@/adapters/simulation"), PAGE, IMPORTS)).length).toBeGreaterThan(0);
   });
 
   it.each([

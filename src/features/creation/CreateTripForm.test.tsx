@@ -681,6 +681,12 @@ describe("écran 1 api", () => {
     expect(champ()).toHaveAccessibleDescription(expect.stringContaining(HORS_TABLE));
     expect(champ()).not.toHaveAccessibleDescription(expect.stringContaining("Choisis ta ville dans la liste des suggestions."));
     expect(screen.getAllByText(HORS_TABLE).filter((n) => !n.classList.contains("sr-only"))).toHaveLength(1);
+    // Même saisie à un espace final près : la même consigne (aucune nouvelle demande à la recherche).
+    villesApi.choisirVilleApi.mockClear();
+    change("Destination", "Valence ");
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    await waitFor(() => expect(champ()).toHaveAccessibleDescription(expect.stringContaining(HORS_TABLE)));
+    expect(villesApi.choisirVilleApi).not.toHaveBeenCalled();
     // Saisie changée sans choix : la consigne de choix revient à « Continuer ».
     change("Destination", "Valencia");
     await screen.findAllByRole("option");

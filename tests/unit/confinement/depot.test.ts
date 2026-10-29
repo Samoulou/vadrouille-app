@@ -553,7 +553,19 @@ describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)"
       ts.SyntaxKind.AmpersandAmpersandEqualsToken,
       ts.SyntaxKind.QuestionQuestionEqualsToken,
     ]);
-    const nomme = (n: ts.Node) => (ts.isIdentifier(n) && n.text === NOM) || (ts.isPropertyAccessExpression(n) && n.name.text === NOM);
+    // Affectation directe, par propriété ou par crochets (revue du head `bc43913`, mineur 2) ; `Object.assign` et
+    // `Object.defineProperty` qui nomment la garde sont relevés aussi. Le reste (alias dynamiques) est pour M1h.
+    const nomme = (n: ts.Node) =>
+      (ts.isIdentifier(n) && n.text === NOM) ||
+      (ts.isPropertyAccessExpression(n) && n.name.text === NOM) ||
+      (ts.isElementAccessExpression(n) && ts.isStringLiteralLike(n.argumentExpression) && n.argumentExpression.text === NOM);
+    const ecritureObjet = (n: ts.Node) =>
+      ts.isCallExpression(n) &&
+      ts.isPropertyAccessExpression(n.expression) &&
+      ts.isIdentifier(n.expression.expression) &&
+      n.expression.expression.text === "Object" &&
+      ["assign", "defineProperty", "defineProperties"].includes(n.expression.name.text) &&
+      n.arguments.some((a) => a.getText().includes(NOM));
     for (const chemin of suivis.map((f) => f.chemin).filter(estAnalyse)) {
       const texte = lireFichier(chemin);
       if (!texte.includes(NOM)) continue;
@@ -561,6 +573,7 @@ describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)"
       const visiter = (n: ts.Node) => {
         if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === NOM) declarations.push(`${chemin}: ${n.parent.parent.getText(arbre)}`);
         if (ts.isBinaryExpression(n) && AFFECTATIONS.has(n.operatorToken.kind) && nomme(n.left)) affectations.push(`${chemin}: ${n.getText(arbre)}`);
+        if (ecritureObjet(n)) affectations.push(`${chemin}: ${n.getText(arbre)}`);
         ts.forEachChild(n, visiter);
       };
       visiter(arbre);
