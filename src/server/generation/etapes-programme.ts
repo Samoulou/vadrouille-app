@@ -28,7 +28,7 @@ import { ArretEtape, codeDeErreur, codeFerme } from "./codes";
 import type { DependancesGeneration, DependancesResolues } from "./dependances";
 import { resoudre } from "./dependances";
 import { lireEtatProgramme, type EtatProgramme } from "./etat";
-import { forfaitDuProgramme, type ForfaitDeLEtape } from "./forfait-etape";
+import { cibleDuForfait, forfaitDuProgramme, type ForfaitDeLEtape } from "./forfait-etape";
 import { cloreEnEchecAuRang, commencerEtapeAuRang } from "./garde";
 import { lireVoyage, type ExecuteurLecture, type VoyageLu } from "./lecture";
 import { publier } from "./publication";
@@ -69,7 +69,8 @@ type Contexte = {
   readonly barriere: EtatBarriere;
 };
 
-const sql = <T>(contexte: Pick<Contexte, "dep" | "organizationId">, travail: (executeur: Executeur) => Promise<T>): Promise<T> =>
+/** Une transaction de l'organisation, exécuteur SQL fourni (aussi utilisée par la révision, `etapes-revision.ts`). */
+export const sql = <T>(contexte: Pick<Contexte, "dep" | "organizationId">, travail: (executeur: Executeur) => Promise<T>): Promise<T> =>
   contexte.dep.transaction(contexte.organizationId, (tx) => travail(executeurSql(tx)));
 
 /**
@@ -161,8 +162,6 @@ export async function voyageEtBriefSansRecit(x: Executeur, organizationId: strin
   return { voyage, brief: conversion.brief };
 }
 
-const contexteForfait = (contexte: Contexte) => ({ organizationId: contexte.organizationId, tripId: contexte.tripId, generationRunId: contexte.generationRunId, barriere: contexte.barriere });
-
 // --- Étape a : brief et forfait ------------------------------------------------------------------------------------------
 
 /** Étape `a` (rang 1) : relecture, conversion, réservation du forfait du profil `programme` ; aucun appel externe. */
@@ -172,7 +171,7 @@ export function etapeProgrammeDebut(entree: unknown, dependances?: DependancesGe
     "a",
     async (contexte) => {
       await sql(contexte, (x) => briefOuArreter(contexte, x));
-      await forfaitDuProgramme(contexte.dep, contexteForfait(contexte));
+      await forfaitDuProgramme(contexte.dep, cibleDuForfait(contexte));
     },
     dependances,
   );
@@ -361,7 +360,7 @@ export function etapeProgrammeEcriture(entree: unknown, dependances?: Dependance
     "e",
     async (contexte) => {
       const { voyage, brief } = await sql(contexte, (x) => briefOuArreter(contexte, x));
-      const { forfait, registre, plafonds } = await forfaitDuProgramme(contexte.dep, contexteForfait(contexte));
+      const { forfait, registre, plafonds } = await forfaitDuProgramme(contexte.dep, cibleDuForfait(contexte));
       const options: OptionsEtape = {
         usage: registre,
         plafonds,

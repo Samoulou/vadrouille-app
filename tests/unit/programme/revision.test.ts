@@ -1,9 +1,14 @@
 // @vitest-environment node
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { beforeAll, describe, expect, expectTypeOf, it } from "vitest";
 
 import { EntreeRevisionSchema, type EntreeRevision } from "@/ai/entree-revision";
 import { TripSnapshotSchema, type TripSnapshot } from "@/contracts";
-import type { EntreeRevisionDuProgramme } from "@/server/composition/generation";
+import { PLAFONDS_VARIANTE_SIMULEE } from "@/server/config/usage";
+import { chargerDoubles } from "@/server/composition/fixtures-simulees";
+import { composerSimuleeAvec, type EntreeRevisionDuProgramme, type FiltreRevision } from "@/server/composition/generation";
+import { ArretEtape } from "@/server/generation/codes";
+import { resoudre } from "@/server/generation/dependances";
+import { forfaitDeLaRevision } from "@/server/generation/forfait-etape";
 import { choixDuTri } from "@/server/generation/etapes-revision";
 import * as p0 from "@/server/p0/revision";
 import type { EntreeProgramme } from "@/server/programme/entree";
@@ -14,7 +19,11 @@ import {
   retirerEtapesEcartees,
   type EntreeRevisionProgramme,
 } from "@/server/programme/revision";
+import { forfaitDuProfil, PROFILS_FORFAIT } from "@/server/usage/reservation";
 import type { SignalDuRecalcul, TriDuRecalcul } from "@/domain/recalcul";
+
+import { PLAFONDS_LARGES } from "../../support/banc-apercu";
+import { PLAFONDS_USAGE_TEST } from "../../support/plafonds-usage";
 
 /**
  * M1b (PR 868 ; décision 0126 § 3 et § 4) : le code de la révision est **partagé** par le site d'essai et la vraie app
@@ -158,5 +167,114 @@ describe("choix de la révision depuis le tri clos (PR 868)", () => {
       INSTANTANE,
     );
     expect(choix).toEqual({ pasPourMoi: [], jAime: [] });
+  });
+});
+
+// --- Capacité `reviser` et `FiltreRevision` (revue de la PR 875, bloquant 2) -------------------------------------------
+
+type CreneauLu = { readonly lieu?: string } & Record<string, unknown>;
+type ProgrammeLu = { readonly jours: readonly ({ readonly date: string; readonly creneaux: readonly CreneauLu[] } & Record<string, unknown>)[] } & Record<string, unknown>;
+
+const RUN = "00000000-0000-4000-8000-0000000008b1";
+const ORG = "00000000-0000-4000-8000-0000000008b2";
+const TRIP = "00000000-0000-4000-8000-0000000008b3";
+const SEJOUR_ROME = { arrivee: "2027-05-04", depart: "2027-05-08" } as const;
+const ENTREE = entreeRevisionDepuisJours(INSTANTANE.days, BRIEF, { pasPourMoi: ["j1-1"], jAime: [] });
+const sansFiltre: FiltreRevision = (programme) => ({ programme, retires: 0 });
+
+let doublesRome: Awaited<ReturnType<typeof chargerDoubles>>;
+beforeAll(async () => {
+  doublesRome = await chargerDoubles({ VADROUILLE_ENV: "ci" }, "Rome");
+});
+
+/** Capacité `programme` simulée sur les fixtures de Rome ; `transformer` réécrit la réponse du modèle (programme de Rome). */
+async function capaciteRome(transformer: (programme: ProgrammeLu) => ProgrammeLu = (p) => p) {
+  const fabrique = composerSimuleeAvec({
+    doubles: () => {
+      const d = doublesRome();
+      return {
+        ...d,
+        modeles: {
+          async envoyer(requete) {
+            const reponse = await d.modeles.envoyer(requete);
+            return { ...reponse, texte: JSON.stringify(transformer(JSON.parse(reponse.texte) as ProgrammeLu)) };
+          },
+        },
+      };
+    },
+  });
+  const dep = resoudre({ plafonds: PLAFONDS_VARIANTE_SIMULEE });
+  const { forfait, registre, plafonds } = await forfaitDeLaRevision(dep, { organizationId: ORG, tripId: TRIP, generationRunId: RUN, barriere: "simulee" });
+  return fabrique.programme({ usage: registre, plafonds, executionId: RUN, forfait, horloge: dep.horloge, echeance: Date.now() + 600_000 });
+}
+
+const lieux = (programme: { readonly jours: readonly { readonly creneaux: readonly { readonly lieu?: string }[] }[] } | null) =>
+  (programme?.jours ?? []).flatMap((jour) => jour.creneaux.flatMap((c) => (c.lieu === undefined ? [] : [nomNormalise(c.lieu)])));
+
+describe("capacité reviser et filet du code (PR 868 ; revue de la PR 875, bloquant 2)", () => {
+  it("PR 868 : profil de forfait `revision` (décision 0142) : même valeurs de test partout, aucune requête Routes", async () => {
+    expect(PROFILS_FORFAIT).toContain("revision");
+    const attendu = { coutModelesMicros: 700_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 };
+    expect(PLAFONDS_VARIANTE_SIMULEE.generations.revision).toEqual(attendu);
+    expect(PLAFONDS_USAGE_TEST.generations.revision).toEqual(attendu);
+    expect(PLAFONDS_LARGES.generations.revision).toEqual(attendu);
+    const dep = resoudre({ plafonds: PLAFONDS_VARIANTE_SIMULEE });
+    const { forfait } = await forfaitDeLaRevision(dep, { organizationId: ORG, tripId: TRIP, generationRunId: RUN, barriere: "simulee" });
+    expect(forfait).toEqual(forfaitDuProfil(PLAFONDS_VARIANTE_SIMULEE, dep.reglesPour("simulee")?.table ?? (undefined as never), "revision"));
+    expect(forfait.routesRequetes).toBe(0);
+    expect(forfait.coutModelesMicros).not.toBe(forfaitDuProfil(PLAFONDS_VARIANTE_SIMULEE, dep.reglesPour("simulee")?.table ?? (undefined as never), "programme").coutModelesMicros);
+    await expect(forfaitDeLaRevision(dep, { organizationId: ORG, tripId: TRIP, generationRunId: RUN, barriere: "production" })).rejects.toEqual(new ArretEtape("usage_unavailable"));
+  });
+
+  it("PR 868 (a) : un lieu écarté rendu par le modèle est retiré, compté dans creneauxRetires en plus de ceux de la lecture", async () => {
+    const temoin = await (await capaciteRome()).reviser(ENTREE, SEJOUR_ROME, sansFiltre);
+    expect(lieux(temoin.programme)).toContain(nomNormalise("Colisée"));
+    const revue = await (await capaciteRome()).reviser(ENTREE, SEJOUR_ROME, (p) => retirerEtapesEcartees(p, ["Colisée", "Forum romain"]));
+    expect(revue.programme).not.toBeNull();
+    expect(lieux(revue.programme)).not.toContain(nomNormalise("Colisée"));
+    expect(lieux(revue.programme)).not.toContain(nomNormalise("Forum romain"));
+    expect(revue.creneauxRetires).toBe(temoin.creneauxRetires + 2);
+    expect(lieux(revue.programme)).toHaveLength(lieux(temoin.programme).length - 2);
+  });
+
+  it("PR 868 (b) : le filtre vide toutes les journées : programme nul (l'étape s'arrête sur model_output_invalid, aucune version)", async () => {
+    // Chaque journée ne porte que le lieu écarté.
+    const seulEcarte = (p: ProgrammeLu): ProgrammeLu => {
+      const colisee = p.jours.flatMap((j) => j.creneaux).find((c) => c.lieu === "Colisée")!;
+      return { ...p, jours: p.jours.map((j) => ({ ...j, creneaux: [colisee] })) };
+    };
+    const temoin = await (await capaciteRome(seulEcarte)).reviser(ENTREE, SEJOUR_ROME, sansFiltre);
+    expect(temoin.programme).not.toBeNull();
+    const revue = await (await capaciteRome(seulEcarte)).reviser(ENTREE, SEJOUR_ROME, (p) => retirerEtapesEcartees(p, ["Colisée"]));
+    expect(revue.programme).toBeNull();
+    const capacite = await capaciteRome(seulEcarte);
+    await capacite.reviser(ENTREE, SEJOUR_ROME, (p) => retirerEtapesEcartees(p, ["Colisée"]));
+    // Rien n'a été lu : la suite de l'étape (lieux, vérification) n'a aucun programme.
+    expect(() => capacite.lieux("Rome")).toThrow(RangeError);
+  });
+
+  it("PR 868 (c) : une seule journée vidée par le filtre : les autres journées sont gardées", async () => {
+    // Première journée réduite au lieu écarté ; les autres inchangées.
+    const premiereEcartee = (p: ProgrammeLu): ProgrammeLu => ({
+      ...p,
+      jours: p.jours.map((j, i) => (i === 0 ? { ...j, creneaux: j.creneaux.filter((c) => c.lieu === "Colisée") } : j)),
+    });
+    const temoin = await (await capaciteRome(premiereEcartee)).reviser(ENTREE, SEJOUR_ROME, sansFiltre);
+    const revue = await (await capaciteRome(premiereEcartee)).reviser(ENTREE, SEJOUR_ROME, (p) => retirerEtapesEcartees(p, ["Colisée"]));
+    expect(revue.programme).not.toBeNull();
+    const autres = (programme: typeof revue.programme) => (programme?.jours ?? []).filter((j) => j.date !== "2027-05-04");
+    expect(autres(revue.programme)).toEqual(autres(temoin.programme));
+    expect(autres(revue.programme).length).toBeGreaterThan(0);
+    expect(lieux(revue.programme)).not.toContain(nomNormalise("Colisée"));
+  });
+
+  it("PR 868 : limite connue (décision 0142) : un lieu écarté rendu sous un autre nom n'est pas retiré par le filet", async () => {
+    const renomme = (p: ProgrammeLu): ProgrammeLu => ({
+      ...p,
+      jours: p.jours.map((j) => ({ ...j, creneaux: j.creneaux.map((c) => (c.lieu === "Colisée" ? { ...c, lieu: "Amphithéâtre Flavien" } : c)) })),
+    });
+    const revue = await (await capaciteRome(renomme)).reviser(ENTREE, SEJOUR_ROME, (p) => retirerEtapesEcartees(p, ["Colisée"]));
+    expect(lieux(revue.programme)).not.toContain(nomNormalise("Colisée"));
+    expect(lieux(revue.programme)).toContain(nomNormalise("Amphithéâtre Flavien"));
   });
 });

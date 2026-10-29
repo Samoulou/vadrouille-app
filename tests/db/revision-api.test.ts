@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createApiCreationAdapter } from "@/adapters/api-creation";
+import type { ClientModeles } from "@/ai/client";
 import { PROMPT_REVISION } from "@/ai/prompts/revision";
 import { TripSnapshotSchema, type TripDraft, type TripRequest, type TripSnapshot } from "@/contracts";
 import { chargerDoubles } from "@/server/composition/fixtures-simulees";
 import { composerSimuleeAvec, type DoublesGeneration, type FabriqueGeneration } from "@/server/composition/generation";
-import type { DependancesGeneration } from "@/server/generation/dependances";
+import type { DependancesGeneration, TransactionSysteme } from "@/server/generation/dependances";
 import { etapeLotDebut, etapeLotPlanification } from "@/server/generation/etapes-lot";
 import { etapeProgrammeDebut, etapeProgrammeEcriture } from "@/server/generation/etapes-programme";
 import type { EtatLot, EtatProgramme } from "@/server/generation/etat";
@@ -69,8 +70,8 @@ function dependances(fabrique?: () => FabriqueGeneration, surcharge: Partial<Dep
   };
 }
 
-/** Composition simulée de Rome : requêtes de modèles journalisées, appels Routes et compositions comptés. */
-function observee() {
+/** Composition simulée de Rome : requêtes de modèles journalisées, appels Routes et compositions comptés ; `modele` enveloppe le double. */
+function observee(modele: (client: ClientModeles) => ClientModeles = (client) => client) {
   const journaux: JournalPrompts[] = [];
   let routes = 0;
   let compositions = 0;
@@ -79,7 +80,7 @@ function observee() {
     return composerSimuleeAvec({
       doubles: () => {
         const d = doublesRome();
-        const j = journalDePrompts(d.modeles);
+        const j = journalDePrompts(modele(d.modeles));
         journaux.push(j);
         const comptees: DoublesGeneration["routes"] = {
           matrice: (requete) => {
@@ -295,7 +296,7 @@ describe("M1b : « Pas pour moi » change le programme sur api (PR 868 ; décisi
     expect((await versions(org, tripId)).map((v) => v.version)).toEqual([1, 2]);
   });
 
-  it("PR 868 : forfait du profil programme réservé par a sous l'identifiant de l'exécution, avant tout appel ; barrière de production : refus sans composition", async () => {
+  it("PR 868 : forfait du profil revision réservé par a sous l'identifiant de l'exécution, avant tout appel ; barrière de production : refus sans composition", async () => {
     const org = await createOrg(auth);
     const { tripId, apercu } = await voyageEcrit(org);
     const cases = await casesDeLApercu(org, tripId);
@@ -312,6 +313,93 @@ describe("M1b : « Pas pour moi » change le programme sur api (PR 868 ; décisi
     expect(obs.compositions()).toBe(0);
     const reservees = await lire<{ n: number }>(org, "SELECT count(*)::int AS n FROM public.usage_ledger WHERE generation_run_id = $1", [etat.generationRunId]);
     expect(reservees[0]!.n).toBeGreaterThan(0);
+    // Profil `revision` (décision 0142), pas `programme` : la part des modèles réservée est celle du profil `revision`.
+    const modeles = await lire<{ micros: string }>(
+      org,
+      "SELECT sum(cost_estimate_micros)::text AS micros FROM public.usage_ledger WHERE generation_run_id = $1 AND sku = $2",
+      [etat.generationRunId, PLAFONDS_LARGES.skus.modeles],
+    );
+    expect(Number(modeles[0]!.micros)).toBe(PLAFONDS_LARGES.generations.revision.coutModelesMicros);
+    expect(PLAFONDS_LARGES.generations.revision.coutModelesMicros).not.toBe(PLAFONDS_LARGES.generations.programme.coutModelesMicros);
     expect((await versions(org, tripId)).length).toBe(1);
+  });
+  it("PR 868 : confirmation perdue après une publication validée : le rejeu rend la version existante, sans seconde version (module `publier`)", async () => {
+    const org = await createOrg(auth);
+    const { tripId, apercu } = await voyageEcrit(org);
+    const cases = await casesDeLApercu(org, tripId);
+    const obs = observee();
+    const etat = await lotDuTri(org, tripId, apercu, [{ signal: "dislike", cas: cases[0]! }], 1);
+    const apresA = await etapeLotDebut(etat, dependances(obs.fabrique));
+    // La transaction de publication (résultat `{ version, dejaPubliee }`) est validée, puis sa confirmation se perd une fois.
+    let perdues = 0;
+    const base = creerWithSystemOrgPourTests(db);
+    const perdante: TransactionSysteme = async (organizationId, fn) => {
+      const resultat = await base(organizationId, fn);
+      if (perdues === 0 && resultat !== null && typeof resultat === "object" && "dejaPubliee" in resultat) {
+        perdues += 1;
+        throw new Error("confirmation perdue");
+      }
+      return resultat;
+    };
+    const fin = await etapeLotPlanification(apresA, dependances(obs.fabrique, { transaction: perdante }));
+    expect(perdues).toBe(1);
+    expect(fin.arret).toBeUndefined();
+    expect(obs.requetes()).toHaveLength(1);
+    expect((await versions(org, tripId)).map((v) => v.version)).toEqual([1, 2]);
+    expect(await ligneDuLot(org, etat.generationRunId)).toMatchObject({ phase: "ready", stop_reason: null, last_version: 2 });
+  });
+
+  it("PR 868 : programme modifié pendant la requête revision : rien n'est écrit sous le verrou des versions, même après une confirmation perdue", async () => {
+    const org = await createOrg(auth);
+    const { tripId, apercu } = await voyageEcrit(org);
+    const cases = await casesDeLApercu(org, tripId);
+    const v1 = (await versions(org, tripId))[0]!.snapshot;
+    // La personne modifie le programme (version 2) pendant que le modèle rédige la révision.
+    const obs = observee((client) => ({
+      async envoyer(requete) {
+        await ecrireVersion(admin, { organizationId: org.org, tripId, requestId: crypto.randomUUID(), auteur: "workflow", instantane: TripSnapshotSchema.parse(v1) });
+        return client.envoyer(requete);
+      },
+    }));
+    const etat = await lotDuTri(org, tripId, apercu, [{ signal: "dislike", cas: cases[0]! }], 1);
+    let perdues = 0;
+    const base = creerWithSystemOrgPourTests(db);
+    const perdante: TransactionSysteme = async (organizationId, fn) => {
+      const resultat = await base(organizationId, fn);
+      if (perdues === 0 && resultat !== null && typeof resultat === "object" && "dejaPubliee" in resultat) {
+        perdues += 1;
+        throw new Error("confirmation perdue");
+      }
+      return resultat;
+    };
+    const fin = await derouler(etat, dependances(obs.fabrique, { transaction: perdante }));
+    expect(fin.arret).toBeUndefined();
+    expect(perdues).toBe(1);
+    expect(obs.requetes()).toHaveLength(1);
+    expect((await versions(org, tripId)).map((v) => v.version)).toEqual([1, 2]);
+    expect(await ligneDuLot(org, etat.generationRunId)).toMatchObject({ phase: "ready", stop_reason: null, last_version: null });
+  });
+
+  it("PR 868 (b) : le modèle ne rend que des lieux écartés : arrêt model_output_invalid, aucune version", async () => {
+    const org = await createOrg(auth);
+    const { tripId, apercu } = await voyageEcrit(org);
+    const cases = await casesDeLApercu(org, tripId);
+    const ecartee = cases[0]!;
+    type Programme = { readonly jours: readonly { readonly creneaux: readonly { readonly lieu?: string }[] }[] };
+    const obs = observee((client) => ({
+      async envoyer(requete) {
+        const reponse = await client.envoyer(requete);
+        const programme = JSON.parse(reponse.texte) as Programme;
+        const creneau = programme.jours.flatMap((j) => j.creneaux).find((c) => c.lieu !== undefined && nomNormalise(c.lieu) === nomNormalise(ecartee.nom));
+        expect(creneau).toBeDefined();
+        return { ...reponse, texte: JSON.stringify({ ...programme, jours: programme.jours.map((j) => ({ ...j, creneaux: [creneau] })) }) };
+      },
+    }));
+    const etat = await lotDuTri(org, tripId, apercu, [{ signal: "dislike", cas: ecartee }], 1);
+    const fin = await derouler(etat, dependances(obs.fabrique));
+    expect(fin.arret).toBe("model_output_invalid");
+    expect(obs.requetes()).toHaveLength(1);
+    expect((await versions(org, tripId)).map((v) => v.version)).toEqual([1]);
+    expect(await ligneDuLot(org, etat.generationRunId)).toMatchObject({ phase: "failed", stop_reason: "model_output_invalid" });
   });
 });
