@@ -1,6 +1,6 @@
 # M5 — Retouches du programme et « À faire avant de partir » (B11 adaptée à la chaîne inversée, vraie app)
 
-Rédaction : Product Owner · Date : 2026-10-29 · `main` relu : `a936717` · Ticket : #874 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 5, ligne M5-spec · Rôles des tâches qui suivent : tech-lead et sécurité (M5-TL), data si M5-TL exige une migration (M5-D), backend avec frontend (M5a à M5e), UX/UI (écrans non maquettés) · Revue : Tech Lead, Sécurité, UX/UI.
+Rédaction : Product Owner · Date : 2026-10-29 · `main` relu : `a936717`, puis `56a560f` à la correction 2 (fusionné dans la branche ; porte 0141) · Ticket : #874 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 5, ligne M5-spec · Rôles des tâches qui suivent : tech-lead et sécurité (M5-TL), data si M5-TL exige une migration (M5-D), backend avec frontend (M5a à M5e), UX/UI (écrans non maquettés) · Revue : Tech Lead, Sécurité, UX/UI.
 
 **Prérequis, dans cet ordre** :
 1. cette spécification fusionnée ;
@@ -13,7 +13,7 @@ Le code ne commence pas avant le point 2, sauf M5e, qui ne dépend que des quest
 
 **Écarts relevés dans le ticket et les documents**, sans effet sur le fond :
 - `StopReport` n'existe pas dans `src/contracts` (seuls `TripPatch`, `PatchResult`, `ChecklistItem`, `ChecklistMoment`, `ChecklistUpdate` et les contrats de révision de F7 existent). Le handover back-end (`docs/handovers/backend.md`, l. 254) le décrit avec « motif (code), texte libre facultatif » : M5-PO-9 retire le texte libre. La ligne du handover est à aligner par la décision M5-TL (T1).
-- Les décisions du Product Owner (§ 13) suivent la décision 0093 et `.claude/agents/product-owner.md` : définitives dès la fusion, sans délai de veto (arbitrage du CEO, correction 1).
+- Les décisions du Product Owner (§ 13) suivent la décision 0093 et `.claude/agents/product-owner.md` : définitives dès la fusion, sans délai de veto. Le ticket #874 demandait une fenêtre de veto de 2 jours ; la spécification s'en écarte au profit de 0093, sur l'arbitrage du CEO transmis avec la revue consolidée du head `1098f2d` (PR #881, commentaire 6492238863, mineur 7).
 - Le plan (`docs/plans/mvp-etapes-1-9.md`, ligne M5e) ne donne à M5e que le prérequis M1a ; cette spécification la fait aussi dépendre de T8 et T9 (compteur et lignes écrites à la génération). Le plan n'est pas modifié ici : écart signalé au CEO.
 - Sur la vraie app, les engagements (billets, réservations saisis à l'écran 1) sont écrits en `Day.events`, avec `commitment` et `locked: true` (`src/server/programme/assemblage.ts`, l. 275-286). La Fiche les montre en lecture seule, sans action. Le cas « déverrouiller un engagement » (Q71) ne se pose donc pas sur `api` : M5-PO-3 le ferme.
 
@@ -55,7 +55,7 @@ Deux faits pèsent sur les règles qui suivent :
 - Verrouiller ou déverrouiller crée une version (opération `lock` ou `unlock`, seule dans son patch quand la personne la demande depuis la fiche, `author_kind = 'user'` ; seule autre combinaison prévue : `add` suivi de `lock`, § 6, sous T11). Rien d'autre ne change dans le programme. Le toast reste celui de `mock` (« Étape verrouillée. » ou « Verrou retiré. »), sans bouton « Annuler » : le geste inverse suffit (F5-PO-10, inchangé).
 - Une étape verrouillée n'est **jamais** remplacée, déplacée, décalée ni retirée par une écriture du serveur : remplacement (M1g), ajout (M5d), déplacement, révision après le tri (M1b), voyage complet (M1c). **Seule exception, nommée : le retour à une version (M5b, M5-PO-2)**, ci-dessous. Le test R3 de B5 (`validation: R3 étapes verrouillées inchangées`, définition de B5-PO-11 : nom, jour, heures, `placeId`) est rejoué sur chacun de ces chemins. Une écriture qui la modifierait est refusée en entier, sans version.
 - « Remplacer » et « Déplacer » restent absents de la fiche d'une étape verrouillée (F7-PO-1, inchangé).
-- **Exception du retour à une version** (M5-PO-2). Le retour (`revert`) recopie l'instantané de la version choisie sans replanifier ni revalider (`src/domain/patch.ts`) : il peut déplacer ou retirer une étape verrouillée, ou retirer un verrou, et il rétablit les verrous de la version choisie. C'est admis parce que c'est un geste explicite de la personne, toujours précédé de l'aperçu « Ce qui change », qui nomme chaque étape verrouillée retirée ou changée et chaque verrou retiré ou rétabli (§ 4). Aucune autre écriture ne bénéficie de cette exception.
+- **Exception du retour à une version** (M5-PO-2). Le retour (`revert`) recopie l'instantané de la version choisie sans replanifier ni revalider (`src/domain/patch.ts`) : il peut déplacer ou retirer une étape verrouillée, ou retirer un verrou, et il rétablit les verrous de la version choisie. C'est admis parce que c'est un geste explicite de la personne, toujours précédé de l'aperçu « Ce qui change » (§ 4), qui dit combien d'étapes verrouillées le retour concerne. Aucune autre écriture ne bénéficie de cette exception.
 - **Engagements** (M5-PO-3) : toujours verrouillés, jamais déverrouillables. Leur fiche garde sa lecture seule et reçoit la mention « Déjà réservé : cette étape ne bouge pas. ».
 
 **Concurrence.** Toute écriture porte `baseVersion` (handover, « Concurrence ») : `version_conflict` si le programme a changé, avec le message du § 9 et le rechargement de la fiche.
@@ -71,7 +71,7 @@ Deux faits pèsent sur les règles qui suivent :
 - sur chaque version **proposée au retour** (M5-PO-6) : « Revenir à cette version ».
 
 **Retour à une version** :
-1. « Revenir à cette version » ouvre un aperçu : « Ce qui change » entre la version actuelle et la version choisie (`ChangeSet` de F7 : étapes ajoutées, retirées, déplacées, verrous), puis « Appliquer » et « Annuler ». Une étape verrouillée que le retour retire ou change, et un verrou retiré ou rétabli, y sont toujours nommés (exception du § 3). Rien ne change sans cet aperçu (principe produit 5).
+1. « Revenir à cette version » ouvre un aperçu : « Ce qui change » entre la version actuelle et la version choisie (`ChangeSet` de F7), puis « Appliquer » et « Annuler ». **Avec le contrat actuel** (`ChangeSchema`, `src/contracts/trip.ts` : `replaced`, `added`, `moved`, `segment`, `budget`, `unchanged`), l'aperçu liste les étapes remplacées, ajoutées et déplacées, puis une phrase « {n} étapes verrouillées concernées » quand le retour retire, change, verrouille ou déverrouille des étapes verrouillées (exception du § 3). Nommer une étape retirée et un verrou changé demande une extension de `Change` : question T5 au Tech Lead ; tant qu'elle n'a pas de réponse, l'aperçu s'en tient à ce qui précède. Rien ne change sans cet aperçu (principe produit 5).
 2. « Appliquer » écrit une version nouvelle, copie identique du programme de la version choisie (opération `revert`, seule dans son patch, `1 ≤ toVersion < baseVersion`), puis ramène au Séjour avec le toast « Programme rétabli. » et « Annuler » pendant 5 secondes (F7-PO-1). « Annuler » écrit à son tour un `revert` vers la version d'avant.
 3. La liste « À faire avant de partir » suit le programme rétabli selon les règles du § 7.4. Les cases cochées ne sont jamais décochées par un retour.
 
@@ -130,8 +130,11 @@ Deux faits pèsent sur les règles qui suivent :
 - le serveur écrit `Stop.name` depuis ce champ seulement, et aucun nom Google ne lui parvient dans la demande (T3). Il ne compare pas le nom saisi au nom affiché : la personne a le droit de recopier le nom elle-même (F7 : « c'est alors sa saisie »).
 
 **Moment et durée** (M5-PO-12) :
-- un moment libre seulement (F7-PO-11) : temps libre d'au moins 45 minutes, ou repas pas encore choisi ;
-- l'heure de début et la durée suivent les règles du moteur pour un `add` : durée prévue de son type tirée de la configuration (`configuration.dureesParDefaut`, `src/domain/configuration.ts`, B5-PO-1), sans valeur fixée par cette spécification. Seule exigence du Product Owner : l'étape tient dans le moment choisi, sinon le moteur refuse l'ajout (`no_option`) et le moment n'est pas proposé ;
+- un moment libre seulement (F7-PO-11) : temps libre ou repas pas encore choisi ;
+- **durée** : celle du moteur pour un `add`, la durée prévue de son type dans la configuration (`dureesParDefaut`, `src/server/config/moteur.json` : aujourd'hui 90 min pour une activité, 75 min pour un déjeuner, 90 min pour un dîner) ;
+- **heure proposée** (le moteur ne la choisit pas : `add` exige un `time` fourni par l'appelant) : le début du **premier temps libre du jour choisi qui dure au moins la durée prévue** du type, ce temps libre commençant à la fin de l'étape précédente. Pour un repas pas encore choisi, l'heure de ce repas. Si l'entrée désigne un moment (`de` et `a`, ou `de` et `repas`) assez long, c'est lui ;
+- **sinon** (aucun temps libre assez long) : aucune heure n'est proposée, et la personne choisit dans la liste des temps libres du jour (« Temps libre {from} – {to} ») ; l'heure est alors le début du temps libre choisi ;
+- **essai à blanc** : « Voir l'effet » demande l'aperçu au moteur sans rien écrire. S'il refuse (`no_option`), l'écran affiche « Pas de place ce jour-là, choisis un autre jour. » et n'écrit rien ;
 - `kind` : `meal` si le moment est un repas, `activity` sinon ;
 - l'aperçu montre l'étape, « Ce qui change » et « Ce qui ne bouge pas », comme F7. Les temps de trajet viennent du relecteur de la lecture (B8b, 0074) ; si l'aperçu ne peut pas les donner sans appel payant, il dit « Temps de trajet calculé après l'ajout » (choix : T4).
 
@@ -209,6 +212,7 @@ Clés dans `src/i18n/fr/sejour.json` et `src/i18n/fr/revision.json` (noms des cl
 | Recherche, plafond | Tu as fait beaucoup de recherches aujourd'hui pour ce voyage. Réessaie demain. |
 | Recherche, indisponible | La recherche n'est pas disponible pour le moment. Réessaie plus tard. |
 | Aperçu d'ajout, trajets | Temps de trajet calculé après l'ajout |
+| Ajout refusé par le moteur | Pas de place ce jour-là, choisis un autre jour. |
 | Séjour, lien | Versions du programme |
 | Versions, titre | Versions du programme |
 | Versions, actuelle | Version actuelle |
@@ -227,7 +231,7 @@ Clés dans `src/i18n/fr/sejour.json` et `src/i18n/fr/revision.json` (noms des cl
 - **T2 — Stockage des signalements.** Table propre (`stop_reports` : organisation, voyage, étape, `placeId` de l'étape au moment du signalement, motif, `request_id`, date ; RLS, effacée avec le compte), ou journal seulement ? *Proposition* : une table, donc une tâche M5-D (rôle data) avant M5c. Le `placeId` permet de regrouper les signalements d'un même lieu sans stocker de nom.
 - **T3 — Recherche d'un lieu à soi.** SKU et masque de champs (proposition : Text Search `places.id,places.displayName,places.shortFormattedAddress`, au plus 5 résultats), orientation vers la ville (cache `place_coordinates` du logement, 30 jours, 0027, ou centre de la ville), compteurs et forfait (réutiliser les compteurs de M1f et le crochet `accesReelApi` de 0141, fusionnée : compteurs `autocomplete_daily_counts`, débit par le limiteur, coûts dérivés ?), débit par session, double simulé en CI. **Forme de la demande d'ajout** : elle ne porte que le texte saisi, l'identifiant opaque du résultat (`resultId`), le jour, le moment et le nom saisi ; le serveur retrouve le `placeId` côté serveur (aucun nom Google ne revient du navigateur).
 - **T4 — Temps de trajet de l'aperçu d'ajout.** Une relecture Routes dans le forfait de la retouche, ou « Temps de trajet calculé après l'ajout » (aucun appel, durées relues à la lecture par B8b) ? *Préférence du Product Owner* : pas d'appel tant que Q637 n'est pas tranchée.
-- **T5 — Versions.** Contrat de la liste (`TripVersionSummary` : numéro, date, sorte, opérations utiles au libellé, proposée au retour ou non), adresse de l'écran, pagination, aperçu d'un `revert` (`RevisionPreview` réutilisé ?), et la règle « après le déblocage » (M5-PO-6) : comment la lecture sait quelles versions précèdent le droit `tripUnlocked`. `lock` et `unlock` restent-ils des versions (proposition : oui, comme le contrat de B2) ?
+- **T5 — Versions.** Contrat de la liste (`TripVersionSummary` : numéro, date, sorte, opérations utiles au libellé, proposée au retour ou non), adresse de l'écran, pagination, aperçu d'un `revert` (`RevisionPreview` réutilisé ?), et la règle « après le déblocage » (M5-PO-6) : comment la lecture sait quelles versions précèdent le droit `tripUnlocked`. **Aperçu d'un `revert`** : `ChangeSchema` n'a ni étape « retirée » ni verrou ; faut-il l'étendre (par exemple `removed` et `lock`, `unlock`), par une PR de contrat d'abord, et comment `changements()` calcule-t-il le diff entre la version courante et la version visée d'un `revert` (qui ne passe pas par le moteur) ? En attendant, l'aperçu donne seulement ce que permet le contrat actuel, plus le nombre d'étapes verrouillées concernées (§ 4). `lock` et `unlock` restent-ils des versions (proposition : oui, comme le contrat de B2) ?
 - **T6 — Marque d'un lieu à soi.** La fiche doit dire « Ajouté par toi. » et M8b (« adresse découverte ») en aura besoin. Champ de contrat (par exemple `Stop.addedBy: "person"`), ou déduction depuis le patch `add` ? Si un champ est retenu, PR de contrat d'abord.
 - **T7 — Liste et versions dans une même écriture.** Les règles du § 7.4 s'appliquent dans la transaction qui écrit la version (`src/server/versions`), pour tous les écrivains (M1b, M1c, M1g, M5b, M5d). Une fonction pure de `src/domain` (lignes avant, programme après → lignes après) ? Comment M1g, en cours, s'y raccorde ?
 - **T8 — `kind` dans le contrat `ChecklistItem`.** Le compteur (M5-PO-13) doit distinguer réservations, billets et bons plans. Ajouter `kind` au contrat (la colonne existe), ou un autre moyen ?
@@ -249,7 +253,7 @@ Chaque critère est vérifié par un test nommé dans la PR de sa tâche. Les te
 
 **M5a — Verrou**
 1. `verrou: verrouiller écrit une version` : sur `api`, voyage débloqué, `lock` crée la version `n + 1` (`author_kind = 'user'`, patch `{ requestId, baseVersion: n, operations: [{ op: "lock", stopId }] }`) ; après rechargement, la fiche montre l'étape verrouillée.
-2. `verrou: une étape verrouillée survit à toute écriture` : le test R3 de B5 est rejoué sur le remplacement (M1g), l'ajout (M5d), le déplacement, la révision après le tri (M1b) et le voyage complet (M1c) : nom, jour, heures et `placeId` inchangés ; une écriture qui la modifierait est refusée sans version. **Exception nommée** : `revert` (critère 7 bis).
+2. `verrou: une étape verrouillée survit à toute écriture` : le test R3 de B5 est rejoué sur le remplacement (M1g), l'ajout (M5d), le déplacement, la révision après le tri (M1b) et le voyage complet (M1c) : nom, jour, heures et `placeId` inchangés ; une écriture qui la modifierait est refusée sans version. **Exception nommée** : `revert` (critère 8).
 3. `verrou: refusé avant le déblocage` : sur un voyage non débloqué, `lock` est refusé côté serveur, sans écriture, et la fiche ne montre pas « Verrouiller ».
 4. `verrou: un engagement ne se déverrouille pas` : `unlock` sur un engagement est refusé sans écriture ; sa fiche montre « Déjà réservé : cette étape ne bouge pas. ».
 5. `verrou: conflit de version` : une demande sur une `baseVersion` dépassée rend `version_conflict`, sans écriture.
@@ -257,48 +261,48 @@ Chaque critère est vérifié par un test nommé dans la PR de sa tâche. Les te
 **M5b — Versions**
 6. `versions: liste de la plus récente à la plus ancienne` : après trois retouches, l'écran liste 4 versions au moins, la première marquée « Version actuelle », libellés composés depuis `Stop.name`, jamais depuis un nom Google (valeurs sentinelles).
 7. `versions: revenir crée une version identique` : « Revenir à cette version » puis « Appliquer » crée la version `n + 1` dont le `snapshot` est égal à celui de la version choisie (test de B5 `versions: annuler crée une version identique`, rejoué) ; aucune version n'est modifiée ni supprimée.
-7 bis. `versions: le retour est la seule exception au verrou` : une version choisie où une étape aujourd'hui verrouillée est absente, ou à une autre heure, est rétablie telle quelle par `revert` ; l'aperçu nomme cette étape et le verrou retiré ; aucune autre écriture (critère 2) ne passe outre le verrou.
-8. `versions: aperçu avant le retour` : « Ce qui change » est affiché avant « Appliquer » ; « Annuler » ne crée aucune version.
-9. `versions: pas de retour avant le déblocage` : les versions écrites avant le droit `tripUnlocked` sont listées sous « Avant le déblocage », sans bouton ; un `revert` vers elles est refusé côté serveur.
-10. `versions: annuler le retour` : le toast « Programme rétabli. » propose « Annuler » 5 s ; « Annuler » écrit un `revert` vers la version d'avant.
+8. `versions: le retour est la seule exception au verrou` : une version choisie où une étape aujourd'hui verrouillée est absente, ou à une autre heure, est rétablie telle quelle par `revert` ; l'aperçu liste les étapes `replaced`, `added` et `moved` et affiche « 1 étape verrouillée concernée » (ou « {n} étapes verrouillées concernées ») ; aucune autre écriture (critère 2) ne passe outre le verrou. Si T5 étend `Change`, le critère est complété par la PR de contrat.
+9. `versions: aperçu avant le retour` : « Ce qui change » est affiché avant « Appliquer » ; « Annuler » ne crée aucune version.
+10. `versions: pas de retour avant le déblocage` : les versions écrites avant le droit `tripUnlocked` sont listées sous « Avant le déblocage », sans bouton ; un `revert` vers elles est refusé côté serveur.
+11. `versions: annuler le retour` : le toast « Programme rétabli. » propose « Annuler » 5 s ; « Annuler » écrit un `revert` vers la version d'avant.
 
 **M5c — Signaler une erreur**
-11. `signalement: motifs fermés, aucun texte` : la feuille montre les cinq motifs du § 5 et aucun champ de texte ; le contrat refuse un motif inconnu et tout champ de plus (objet strict).
-12. `signalement: rien ne change` : après « Envoyer », la version courante, le programme, les badges et la liste sont identiques ; aucun appel de modèle ni de Google n'est fait (doubles comptés).
-13. `signalement: idempotent` : le même `requestId`, ou le même motif sur la même étape, ne crée qu'un enregistrement.
-14. `signalement: jamais dans un prompt` : les tests à valeurs sentinelles des prompts (`tests/unit/ia/prompts-sentinelles.test.ts`) montrent qu'aucun motif ni aucun signalement n'entre dans une requête de modèle.
-15. `signalement: plafond` : le 21e signalement du jour sur un voyage rend `rate_limited` et le texte du § 9.
-16. `signalement: isolation` : une autre organisation ne peut ni signaler une étape du voyage ni lire ses signalements (`not_found`, aucune écriture).
-17. `signalement: motif closed propose Remplacer` : seulement si l'étape n'est pas verrouillée et que le voyage est débloqué.
+12. `signalement: motifs fermés, aucun texte` : la feuille montre les cinq motifs du § 5 et aucun champ de texte ; le contrat refuse un motif inconnu et tout champ de plus (objet strict).
+13. `signalement: rien ne change` : après « Envoyer », la version courante, le programme, les badges et la liste sont identiques ; aucun appel de modèle ni de Google n'est fait (doubles comptés).
+14. `signalement: idempotent` : le même `requestId`, ou le même motif sur la même étape, ne crée qu'un enregistrement.
+15. `signalement: jamais dans un prompt` : les tests à valeurs sentinelles des prompts (`tests/unit/ia/prompts-sentinelles.test.ts`) montrent qu'aucun motif ni aucun signalement n'entre dans une requête de modèle.
+16. `signalement: plafond` : le 21e signalement du jour sur un voyage rend `rate_limited` et le texte du § 9.
+17. `signalement: isolation` : une autre organisation ne peut ni signaler une étape du voyage ni lire ses signalements (`not_found`, aucune écriture).
+18. `signalement: motif closed propose Remplacer` : seulement si l'étape n'est pas verrouillée et que le voyage est débloqué.
 
 **M5d — Lieu à soi**
-18. `ajouter: le nom n'est jamais prérempli par le nom Google` (C28 de F7, rejoué sur `api`) : après le choix d'un résultat, le champ « Nom dans ton programme » est vide ; l'étape écrite a le `name` saisi et le `placeId` du résultat.
-19. `ajouter: aucune donnée Google stockée` : après un ajout, ni `trip_versions`, ni `checklist_items`, ni le journal, ni l'état d'un workflow ne contiennent le nom ou l'adresse sentinelle du résultat ; seul son `placeId` est écrit.
-20. `ajouter: la demande ne porte aucun nom Google` : la demande d'ajout envoyée par le navigateur ne contient ni `displayName` ni adresse (T3).
-21. `ajouter: moment libre seulement` : un moment occupé ou un temps libre de moins de 45 minutes n'est pas proposé ; l'heure et la durée suivent le § 6.
-22. `ajouter: le lieu à soi est verrouillé` : après l'ajout, une seule version nouvelle, dont le patch est `[add, lock]` sur le même `stopId` (ou la forme retenue par T11) ; l'étape a `locked: true` et survit au critère 2.
-23. `ajouter: plafond de recherche` : la 21e recherche du jour sur un voyage rend `rate_limited` sans appel ; une recherche à moins de 2 caractères n'appelle rien.
-24. `ajouter: refusé avant le déblocage` : recherche et ajout refusés côté serveur sur un voyage non débloqué.
-25. `ajouter: résultats jamais sur la carte` : aucun marqueur nouveau pendant la recherche ; « Données de lieux : Google » visible tant qu'un nom Google est à l'écran.
+19. `ajouter: le nom n'est jamais prérempli par le nom Google` (C28 de F7, rejoué sur `api`) : après le choix d'un résultat, le champ « Nom dans ton programme » est vide ; l'étape écrite a le `name` saisi et le `placeId` du résultat.
+20. `ajouter: aucune donnée Google stockée` : après un ajout, ni `trip_versions`, ni `checklist_items`, ni le journal, ni l'état d'un workflow ne contiennent le nom ou l'adresse sentinelle du résultat ; seul son `placeId` est écrit.
+21. `ajouter: la demande ne porte aucun nom Google` : la demande d'ajout envoyée par le navigateur ne contient ni `displayName` ni adresse (T3).
+22. `ajouter: heure proposée et refus` : avec `dureesParDefaut.activity` = 90, sur un jour « A 09:00 – 10:30, temps libre 10:30 – 11:15, B 11:15 – 13:00 (verrouillée), temps libre 14:30 – 18:00 », l'heure proposée pour une activité est 14:30 et l'étape écrite va de 14:30 à 16:00. Sur le même jour sans le temps libre de l'après-midi, aucune heure n'est proposée, la liste offre « Temps libre 10:30 – 11:15 » ; le choisir puis « Voir l'effet » rend `no_option`, affiche « Pas de place ce jour-là, choisis un autre jour. » et n'écrit aucune version.
+23. `ajouter: le lieu à soi est verrouillé` : après l'ajout, une seule version nouvelle, dont le patch est `[add, lock]` sur le même `stopId` (ou la forme retenue par T11) ; l'étape a `locked: true` et survit au critère 2.
+24. `ajouter: plafond de recherche` : la 21e recherche du jour sur un voyage rend `rate_limited` sans appel ; une recherche à moins de 2 caractères n'appelle rien.
+25. `ajouter: refusé avant le déblocage` : recherche et ajout refusés côté serveur sur un voyage non débloqué.
+26. `ajouter: résultats jamais sur la carte` : aucun marqueur nouveau pendant la recherche ; « Données de lieux : Google » visible tant qu'un nom Google est à l'écran.
 
 **M5e — À faire avant de partir**
-26. `a-faire: lignes écrites à la génération` : sur la sortie simulée de Rome, une ligne par étape `toReserve` (libellé stocké = nom de l'étape seul, affiché « Réserver : {nom} »), une ligne faite par engagement, puis les bons plans, dans l'ordre du § 7.1, avec des identifiants stables.
-27. `a-faire: compteur des réservations seulement` : le compteur vaut le nombre de lignes de réservation non faites ; il est absent sans réservation à faire.
-28. `a-faire: cocher reste coché` : sur `api`, cocher une ligne puis recharger la page la montre cochée (`toggleChecklistItem`) ; un échec rétablit la case et affiche le message du § 9.
-29. `a-faire: une retouche met la liste à jour` : remplacer une étape `toReserve` retire sa ligne non faite et garde une ligne faite sans lien ; une étape nouvelle `toReserve` ajoute la sienne ; jamais de ligne orpheline (`checklist_orphan`).
-30. `a-faire: avant le déblocage` : seules les lignes des journées de l'aperçu sont servies (0136 § 3.5, rejoué).
+27. `a-faire: lignes écrites à la génération` : sur la sortie simulée de Rome, une ligne par étape `toReserve` (libellé stocké = nom de l'étape seul, affiché « Réserver : {nom} »), une ligne faite par engagement, puis les bons plans, dans l'ordre du § 7.1, avec des identifiants stables.
+28. `a-faire: compteur des réservations seulement` : le compteur vaut le nombre de lignes de réservation non faites ; il est absent sans réservation à faire.
+29. `a-faire: cocher reste coché` : sur `api`, cocher une ligne puis recharger la page la montre cochée (`toggleChecklistItem`) ; un échec rétablit la case et affiche le message du § 9.
+30. `a-faire: une retouche met la liste à jour` : remplacer une étape `toReserve` retire sa ligne non faite et garde une ligne faite sans lien ; une étape nouvelle `toReserve` ajoute la sienne ; jamais de ligne orpheline (`checklist_orphan`).
+31. `a-faire: avant le déblocage` : seules les lignes des journées de l'aperçu sont servies (0136 § 3.5, rejoué).
 
 **Transverses**
-31. **Bout en bout** (projet Playwright `api`) : connexion par code lu dans Mailpit, voyage simulé débloqué, verrou, ajout d'un lieu à soi, retour à une version, signalement, cochage d'une ligne, rechargement : tout est conservé.
-32. Accessibilité (axe) sur la feuille de signalement, l'écran « Versions du programme » et « Ajouter un lieu » ; inventaire des routes à jour.
-33. `pnpm verify` vert (variante du studio : `env -u GOOGLE_MAPS_SERVER_KEY SKIP_DB_TESTS=1 pnpm verify`, tests de base de données en CI). Aucun test supprimé ni désactivé.
+32. **Bout en bout** (projet Playwright `api`) : connexion par code lu dans Mailpit, voyage simulé débloqué, verrou, ajout d'un lieu à soi, retour à une version, signalement, cochage d'une ligne, rechargement : tout est conservé.
+33. Accessibilité (axe) sur la feuille de signalement, l'écran « Versions du programme » et « Ajouter un lieu » ; inventaire des routes à jour.
+34. `pnpm verify` vert (variante du studio : `env -u GOOGLE_MAPS_SERVER_KEY SKIP_DB_TESTS=1 pnpm verify`, tests de base de données en CI). Aucun test supprimé ni désactivé.
 
 ## 13. Décisions du Product Owner
 
 **Définitives dès la fusion de cette spécification**, sans délai de veto (décision 0093) ; Samuel peut les remettre en cause à tout moment par une nouvelle décision. Elles seront listées dans la note de version suivante (rubrique « Décisions prises par le studio »). Elles restent dans le cadre du cadrage (§ 3.5 « Programme » : verrou, versions, signalement d'erreur, ajout d'un lieu personnel ; § 6.6) et ne touchent ni au prix, ni à l'argent, ni à l'architecture.
 
 - **M5-PO-1 — Retouches après le déblocage, signalement toujours.** Verrou, ajout d'un lieu à soi et retour à une version ne sont permis que sur un voyage débloqué, refusés côté serveur sinon. Le signalement est permis avant et après : il ne modifie pas le voyage. C'est la règle prudente **en attendant Samuel** sur Q88 (« modification d'un voyage non débloqué ») : sa réponse peut l'élargir (question 2) sans autre changement.
-- **M5-PO-2 — Une étape verrouillée ne change jamais par le serveur, sauf au retour à une version.** Aucun remplacement, ajout, déplacement, révision ni voyage complet ne la modifie ; une écriture qui le ferait est refusée en entier. **Exception nommée** : le retour à une version (`revert`), geste explicite de la personne précédé d'un aperçu qui nomme chaque étape verrouillée touchée et chaque verrou changé, rétablit la version choisie telle quelle, verrous compris. Le verrou se pose et se retire par une version, sans « Annuler » (geste inverse).
+- **M5-PO-2 — Une étape verrouillée ne change jamais par le serveur, sauf au retour à une version.** Aucun remplacement, ajout, déplacement, révision ni voyage complet ne la modifie ; une écriture qui le ferait est refusée en entier. **Exception nommée** : le retour à une version (`revert`), geste explicite de la personne précédé d'un aperçu qui dit combien d'étapes verrouillées il concerne (et les nommera si T5 étend `Change`), rétablit la version choisie telle quelle, verrous compris. Le verrou se pose et se retire par une version, sans « Annuler » (geste inverse).
 - **M5-PO-3 — Engagements (tranche Q71, partie Product Owner).** Un engagement reste verrouillé et ne se déverrouille pas. Sa fiche dit « Déjà réservé : cette étape ne bouge pas. ». Le rendu reste à UX/UI.
 - **M5-PO-4 — Toute retouche est une version.** Remplacement, ajout, déplacement, verrou, retrait du verrou et retour créent chacun une version ; aucune n'est modifiée ni supprimée hors de la suppression du compte.
 - **M5-PO-5 — Écran « Versions du programme ».** Liste de la plus récente à la plus ancienne, par pages de 20, libellés composés à l'affichage depuis les noms du programme, entrée depuis le Séjour.
@@ -308,7 +312,7 @@ Chaque critère est vérifié par un test nommé dans la PR de sa tâche. Les te
 - **M5-PO-9 — Pas de texte libre dans un signalement.** Ni saisi, ni stocké, ni envoyé à un modèle. Motifs : aucune donnée personnelle inutile, aucun contenu à modérer, aucun risque d'instruction cachée dans un texte relu plus tard. Écart au handover (« texte libre facultatif », l. 254), à aligner par M5-TL.
 - **M5-PO-10 — Nom d'un lieu à soi.** Toujours saisi par la personne, vide à l'ouverture sur `api` (aucun nom maison n'existe dans la chaîne inversée), sauf l'idée de « Surprends-moi » ; jamais prérempli par le nom Google ni par la requête. Le serveur ne reçoit jamais de nom Google.
 - **M5-PO-11 — Limites.** 20 recherches de lieu et 20 signalements par voyage et par jour, plus le débit par session. Les valeurs sont proposées ; le coût des recherches est soumis à Samuel (question 1) et le code les lit dans la configuration.
-- **M5-PO-12 — Lieu à soi.** Recherche par nom → `placeId` seulement ; moment libre d'au moins 45 minutes ou repas pas encore choisi ; heure et durée selon les règles du moteur et sa configuration (`dureesParDefaut`), jamais fixées par cette spécification ; étape verrouillée à l'ajout (séquence `[add, lock]` dans un seul patch, forme : T11), sans raison, source, badge ni ligne « À faire ».
+- **M5-PO-12 — Lieu à soi.** Recherche par nom → `placeId` seulement ; moment libre ou repas pas encore choisi ; durée prévue de la configuration (`dureesParDefaut`) ; heure proposée = début du premier temps libre du jour au moins aussi long que cette durée, sinon choix de la personne dans la liste des temps libres ; refus du moteur (`no_option`) : « Pas de place ce jour-là, choisis un autre jour. » ; étape verrouillée à l'ajout (séquence `[add, lock]` dans un seul patch, forme : T11), sans raison, source, badge ni ligne « À faire ».
 - **M5-PO-13 — Contenu de la liste.** Réservations (une par étape « À réserver »), engagements déjà réservés (cochés), puis bons plans de l'IA. Le compteur ne compte que les réservations non faites. Pas de lien de réservation ni de lien rémunéré, pas de ligne saisie par la personne dans ce lot.
 - **M5-PO-14 — Cases hors des versions.** Cochage enregistré sur `api`, idempotent, sans version ni « Annuler » ; permis avant le déblocage sur les lignes servies.
 - **M5-PO-15 — La liste suit les retouches.** F7-PO-19 vaut sur `api` pour toutes les écritures du programme, dans la même écriture que la version.
