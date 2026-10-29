@@ -4,9 +4,12 @@ import { RESEND_SENDER_ADDRESS } from "@/server/config/email";
 import { cleResend, type ResultatCleResend } from "@/server/env/cle-resend";
 import { logEvent } from "@/server/log";
 
-import { type AvantTransportDeps, preparerMessageCode } from "./avant-transport";
+import type { EmailUsage } from "@/server/config/email";
+
+import { type AvantTransportDeps, preparerMessageApercu, preparerMessageCode } from "./avant-transport";
+import type { MessageControle } from "./enveloppe";
 import { purgeEmailCounts, reserveEmail, type ReserveEmail } from "./plafond";
-import { CodeMailerCapError, type CodeMailer, type LoginCodeMessage } from "./port";
+import { type ApercuPretMessage, CodeMailerCapError, type CodeMailer, type LoginCodeMessage, type NotificationMailer, PlafondIndisponibleError } from "./port";
 import {
   ECHEC_DELAI,
   ECHEC_RESEAU,
@@ -34,6 +37,10 @@ import {
  * 7. traduction par le tableau de `./reponses-resend.ts` → `email.sent`, ou `email.provider_refused` et une erreur ;
  * 8. **après** le transport, quelle qu'en soit l'issue : purge des jours échus du plafond (`purgeEmailCounts`), qui ne
  *    lève jamais et ne court qu'à l'ouverture d'un jour nouveau (revue de la PR 850, mineur 2).
+ *
+ * L'e-mail « propositions prêtes » (M7a, `createResendNotificationMailer`) suit **le même chemin** (`envoyerControle`) avec
+ * l'usage `notification` : préparation commune `preparerMessageApercu` (étapes 1 à 3), puis les étapes 4 à 8 ci-dessus à
+ * l'identique ; la réservation n'est acceptée que sous le seuil des notifications (80, `EMAIL_THRESHOLDS`).
  *
  * Erreurs : `name` fixe, message fixe, jamais de `cause` ni de propriété (C5) : ni adresse, ni code, ni clé, ni corps, ni
  * en-tête, ni message de Resend. La clé est relue à chaque envoi et ne vit que le temps de l'appel (C3).
@@ -79,14 +86,8 @@ export class ResendRefusError extends Error {
   }
 }
 
-/** Plafond global indisponible (base, configuration) : échec fermé, aucun envoi (B3d point 3). Aucune valeur. */
-export class PlafondIndisponibleError extends Error {
-  override name = "PlafondIndisponibleError";
-
-  constructor() {
-    super("Plafond des envois indisponible.");
-  }
-}
+/** Plafond global indisponible (défini avec le port, M7a), réexporté pour les tests et les appelants de ce module. */
+export { PlafondIndisponibleError };
 
 /** Échec de l'envoi par Resend (réponse refusée, délai, réseau) ; aucune valeur ni cause. */
 export class ResendEnvoiError extends Error {
@@ -155,61 +156,80 @@ async function traduire(reponse: Response, signal: AbortSignal): Promise<Resulta
   return traduireReponseResend(statut, nomErreurResend(corps));
 }
 
-export function createResendCodeMailer(deps: ResendDeps = {}): CodeMailer {
+/**
+ * Étapes 4 à 8 de l'ordre C2 sur la copie contrôlée `envoi` (rendue par la préparation commune), pour l'usage donné : clé,
+ * réservation, un seul appel, purge, traduction. Une seule définition pour le code et pour les notifications.
+ */
+async function envoyerControle(envoi: MessageControle, usage: EmailUsage, deps: ResendDeps): Promise<void> {
   const lireCle = deps.lireCle ?? (() => cleResend());
   const reserver = deps.reserver ?? reserveEmail;
   const purger = deps.purger ?? purgeEmailCounts;
 
+  const cle = lireCle();
+  if (!cle.ok) {
+    logEvent("email.transport_refused", { reason: cle.code }, "error");
+    throw new ResendRefusError();
+  }
+
+  const reservation = await reserver(usage);
+  if (!reservation.ok) {
+    if (reservation.reason === "cap_reached") {
+      logEvent("email.cap_reached", { usage }, "warn");
+      throw new CodeMailerCapError();
+    }
+    throw new PlafondIndisponibleError();
+  }
+
+  const envoyer: TransportResend = deps.transport ?? fetch;
+  const signal = AbortSignal.timeout(RESEND_DELAI_MS);
+  let resultat: ResultatResend;
+  try {
+    const reponse = await envoyer(RESEND_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cle.cle}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: envoi.from, to: [envoi.to], subject: envoi.subject, text: envoi.text }),
+      redirect: "error",
+      credentials: "omit",
+      cache: "no-store",
+      signal,
+    });
+    resultat = await traduire(reponse, signal);
+  } catch (erreur) {
+    resultat = delaiDepasse(erreur, signal) ? ECHEC_DELAI : redirectionRefusee(erreur) ? ECHEC_SERVEUR : ECHEC_RESEAU;
+  }
+  // Hors du chemin d'avant-transport : la purge ne retarde jamais l'appel de Resend, et ne lève jamais.
+  await purger();
+
+  if (resultat.issue === "succes") {
+    logEvent("email.sent", { usage }, "info");
+    return;
+  }
+  if (resultat.issue === "plafond") {
+    logEvent("email.provider_refused", { reason: resultat.reason }, "warn");
+    throw new CodeMailerCapError();
+  }
+  const niveau = resultat.reason === "auth" || resultat.reason === "server_error" ? "error" : "warn";
+  logEvent("email.provider_refused", { reason: resultat.reason }, niveau);
+  throw new ResendEnvoiError();
+}
+
+export function createResendCodeMailer(deps: ResendDeps = {}): CodeMailer {
   return Object.freeze({
     async sendLoginCode(message: LoginCodeMessage): Promise<void> {
-      const envoi = preparerMessageCode(message, RESEND_SENDER_ADDRESS, deps);
+      await envoyerControle(preparerMessageCode(message, RESEND_SENDER_ADDRESS, deps), "connexion", deps);
+    },
+  });
+}
 
-      const cle = lireCle();
-      if (!cle.ok) {
-        logEvent("email.transport_refused", { reason: cle.code }, "error");
-        throw new ResendRefusError();
-      }
-
-      const reservation = await reserver("connexion");
-      if (!reservation.ok) {
-        if (reservation.reason === "cap_reached") {
-          logEvent("email.cap_reached", { usage: "connexion" }, "warn");
-          throw new CodeMailerCapError();
-        }
-        throw new PlafondIndisponibleError();
-      }
-
-      const envoyer: TransportResend = deps.transport ?? fetch;
-      const signal = AbortSignal.timeout(RESEND_DELAI_MS);
-      let resultat: ResultatResend;
-      try {
-        const reponse = await envoyer(RESEND_API_URL, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${cle.cle}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ from: envoi.from, to: [envoi.to], subject: envoi.subject, text: envoi.text }),
-          redirect: "error",
-          credentials: "omit",
-          cache: "no-store",
-          signal,
-        });
-        resultat = await traduire(reponse, signal);
-      } catch (erreur) {
-        resultat = delaiDepasse(erreur, signal) ? ECHEC_DELAI : redirectionRefusee(erreur) ? ECHEC_SERVEUR : ECHEC_RESEAU;
-      }
-      // Hors du chemin d'avant-transport : la purge ne retarde jamais l'appel de Resend, et ne lève jamais.
-      await purger();
-
-      if (resultat.issue === "succes") {
-        logEvent("email.sent", { usage: "connexion" }, "info");
-        return;
-      }
-      if (resultat.issue === "plafond") {
-        logEvent("email.provider_refused", { reason: resultat.reason }, "warn");
-        throw new CodeMailerCapError();
-      }
-      const niveau = resultat.reason === "auth" || resultat.reason === "server_error" ? "error" : "warn";
-      logEvent("email.provider_refused", { reason: resultat.reason }, niveau);
-      throw new ResendEnvoiError();
+/**
+ * Implémentation Resend du port des notifications (M7a) : préparation commune `preparerMessageApercu`, puis le chemin de
+ * `sendLoginCode` (`envoyerControle`) avec l'usage `notification`. Créée par la composition de `src/server/auth/index.ts`
+ * avec `EMAIL_TRANSPORT=resend`, c'est-à-dire dans le seul cas admis de 0138 § 3.
+ */
+export function createResendNotificationMailer(deps: ResendDeps = {}): NotificationMailer {
+  return Object.freeze({
+    async sendApercuPret(message: ApercuPretMessage): Promise<void> {
+      await envoyerControle(preparerMessageApercu(message, RESEND_SENDER_ADDRESS, deps), "notification", deps);
     },
   });
 }

@@ -73,6 +73,10 @@ export const LOG_EVENTS = [
   // B3d (revue de la PR 850, mineur 1) : purge des jours échus du plafond global en échec, après le transport ; `errorName`
   // seulement, comme `rate_limit.purge_failed`. La réservation reste acceptée.
   "email.purge_failed",
+  // M7a : e-mail « propositions prêtes » non envoyé à la fin de `generateProgramme` (base indisponible, composition refusée,
+  // panne du transport) ; `errorName` seulement, `warn`. Jamais bloquant pour le workflow ; aucune valeur (ni adresse, ni
+  // lien, ni identifiant). Les refus déjà journalisés (adresse, enveloppe, plafond, Resend) ne l'écrivent pas une seconde fois.
+  "email.notification_failed",
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",
