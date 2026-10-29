@@ -125,7 +125,7 @@ B4b (écrans sur `api`), B4c (adaptateur Stripe en mode test, Checkout `card` et
 | B4c-TL | Préalables de B4c : version du paquet `stripe` (amendement de 0006), webhook, vérification de signature, refus des clés `sk_live` (déjà exigé par `src/server/env/`) | tech-lead, securite | B4b |
 | B4c | Adaptateur `stripe` en mode test, codé et testé sur des événements signés de test (fixtures), sans compte | backend | B4c-TL |
 | B4d | Reçu : lien vers le reçu Stripe sur l'écran de retour et dans « Mes voyages » ; avec le simulé, un reçu maison marqué « simulé » | backend avec frontend | B4c |
-| B4e | Reçu de Stripe (ticket #887 ; décision 0144, § 7) : **migration d'abord** (colonne `checkouts.stripe_receipt_url`, 0144 § 5.3 point 1, tâche `data`), puis écriture depuis le webhook et rendu sur `R9-recu` (tâche `back`) ; essai réel après Q26, Q353 et l'ouverture des gardes de `mvp-essai` (0144 § 7) | data puis backend | 0144 fusionnée (#890) ; #884 (B4d) fusionnée ; une seule tâche `db/migrations` par cycle, après #866 (M1i) (0144 § 7) |
+| B4e | Reçu de Stripe (ticket #887 ; décision 0144, § 7) : **migration d'abord** (colonne `checkouts.stripe_receipt_url`, 0144 § 5.3 point 1, tâche `data`), puis écriture depuis le webhook et rendu sur `R9-recu` (tâche `back`) ; essai réel après Q26, Q353 et l'ouverture des gardes de `mvp-essai` (0144 § 7) | data puis backend | 0144 fusionnée (#890) ; #884 (B4d) fusionnée ; une seule tâche `db/migrations` par cycle, après la **fusion** de #866 (M1i), pas seulement son ouverture (0144 § 7) |
 
 **Action de Samuel** : S5 (§ 11), quand B4c est fusionnée.
 
@@ -150,7 +150,7 @@ Un prompt `programme` qui écrit un programme sur plusieurs villes, avec la jour
 | M4c | Écrans : Séjour à plusieurs villes, journée de transfert (UX/UI pour l'écran non maquetté) | frontend | M4b |
 | M4d | Plusieurs fuseaux par voyage (contrat `Stay.timeZone`, amendement de B9-PO-18) | tech-lead puis backend | M4b ; lot séparé, après le premier essai de Samuel |
 
-**Découpage M4 / M4-suite** (décision du CEO avec le Tech Lead, Q697 ; description de la PR #876, « Découpage » et correction 5) : la spécification M4 garde la ligne « Vers {ville} » entre les deux villes, l'arrivée à l'heure de fin du billet sinon « à confirmer », et la carte d'ensemble d'aujourd'hui cadrée sur toutes les villes (rendu intermédiaire). Ses valeurs du § 3.4 (départ estimé = fin du dernier engagement du jour, sinon 09:00 ; créneau de 3 heures sans durée connue) sont **provisoires, révisées par M4-suite** ; M4a à M4c les appliquent en attendant. M4-suite ne bloque pas M4a à M4c.
+**Découpage M4 / M4-suite** (décision du CEO avec le Tech Lead, Q697 ; description de la PR #876) : deux sujets sortent de la spécification M4 vers M4-suite, les règles de planification de la journée du changement de ville et la carte d'ensemble numérotée à plusieurs villes. Ce plan ne recopie aucune valeur de ces règles : elles sont celles de la spécification M4 **une fois fusionnée (#876)**, avec la précédence M4-TL, puis M4-suite, puis la spécification. M4-suite ne bloque pas M4a à M4c.
 
 ---
 
@@ -168,7 +168,7 @@ La spécification B11 ; les actions de révision sur `api` (verrouiller, revenir
 | M5-spec | Spécification B11 (retouches) adaptée à la chaîne inversée : verrou, versions, signalement, lieu à soi, liste | product-owner | M1a |
 | M5-TL | Décision du Tech Lead : contrat `StopReport`, recherche d'un lieu à soi (Text Search par nom → `placeId`, nom jamais prérempli par le nom Google), versions | tech-lead, securite | M5-spec |
 | M5-C | PR de contrat (0147 § 14) : `ChangeSchema` étendu et `changements()` complété, `not_unlocked`, `StopReportSchema`, `Stop.addedBy`, `ChecklistItem.kind`, schémas de la recherche de lieu et du retour à une version ; aucun cas d'usage | backend avec frontend | M5-TL |
-| M5-D | Migration `0022` (0147 § 2 et § 6.4 point 3) : `feedback` durcie, colonne `lieux` des compteurs d'autocomplétion ; seule tâche `db/migrations` de M5 | data | M5-TL |
+| M5-D | Migration `0022` (0147 § 2 et § 6.4 point 3) : `feedback` durcie, colonne `lieux` des compteurs d'autocomplétion ; seule tâche `db/migrations` de M5. **Fusionnée** (PR #899, 2026-10-29 19:08 UTC) ; sa ligne de `MIGRATIONS_APPROUVEES` passe par une PR de workflow séparée, après la fusion de #866 (Q713) | data | M5-TL |
 | M5e | « À faire avant de partir » écrit à la génération et cochable sur `api` (0147 § 7) | backend avec frontend | M5-C, M1g (fusionnée, #877) ; M1a (fait) — Q684, 0147 § 14 |
 | M5a | Verrouiller une étape (sur `api`), conservée par la révision et par le remplacement | backend avec frontend | M5-C, M5e, M1b (fait) — 0147 § 14 |
 | M5b | Revenir à une version précédente : nouvelle version identique (B5, `versions: annuler crée une version identique`) ; écran « Versions » (UX/UI) | backend puis frontend | M5-C, M5a — 0147 § 14 |
@@ -286,7 +286,7 @@ Lecture du tableau :
 - Les retours de Samuel sur ses essais (cycles 221 et suivants) passent avant la suite : le CEO réserve un fil aux corrections dès qu'un essai en remonte.
 - M7a (étape 7) passe au cycle 219, avant les étapes 4 à 6 : elle ne touche que le fil B, qui est libre, et l'e-mail sert à l'essai de Samuel. Elle n'est utile sur la préversion qu'après S1. C'est le seul écart à l'ordre des étapes, et il ne retarde aucune étape plus prioritaire.
 - Si une décision (M1-TL, M1-S) demande une PR de plus, tout le fil A glisse d'un cycle ; les autres fils continuent.
-- **Note du CEO (2026-10-29)** : les lignes M5 des cycles 222 à 226 (M5e, M5a, M5b, M5c, M5d) précèdent le découpage de 0147 § 14 ; l'ordre de M5 qui fait foi est celui du § 5 (c) : M5-C et M5-D d'abord, M5d coupée en M5d-1 et M5d-2. De même, M4-suite (§ 4 (c), Q697) n'y figure pas. Le tableau n'est pas réécrit.
+- **Note du CEO (2026-10-29)** : les lignes M5 des cycles 222 à 226 (M5e, M5a, M5b, M5c, M5d) précèdent le découpage de 0147 § 14 ; l'ordre de M5 qui fait foi est celui du § 5 (c) : M5-C et M5-D d'abord, M5d coupée en M5d-1 et M5d-2. De même, M4-suite (§ 4 (c), Q697) n'y figure pas, ni les deux tâches `db/migrations` ajoutées depuis : B4e (§ 3 (c), 0144 § 7 ; après la fusion de #866) et M5-D (§ 5 (c), fusionnée par la PR #899 le 2026-10-29 à 19:08 UTC ; sa ligne de `MIGRATIONS_APPROUVEES` passe par une PR de workflow séparée après #866, Q713). Le tableau n'est pas réécrit.
 - Les tâches du site d'essai encore ouvertes (#822, #826, #827, #692, #687) se terminent sur leur branche. Le CEO n'en ouvre pas de nouvelles sur le prototype, sauf correction demandée par Samuel (0115 § 5.5 : aucune nouvelle tâche de qualité sur l'ancienne chaîne non plus).
 
 ---
