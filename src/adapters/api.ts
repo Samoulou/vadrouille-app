@@ -8,9 +8,11 @@ import {
   TripSummarySchema,
 } from "@/contracts";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
+import { annulerRemplacement, appliquerRemplacement, proposerRemplacement, versionDuVoyage } from "@/server/versions/remplacement";
+import type { DependancesAction } from "@/server/voyages/actions";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
 
-import type { TripAdapter } from "./types";
+import type { AdapterContext, RevisionAdapter, TripAdapter } from "./types";
 
 /**
  * Adaptateur `api` (spécification B6, B6a point 5 ; handover § 11 : aucun appel HTTP vers soi-même) : implémente
@@ -25,10 +27,25 @@ import type { TripAdapter } from "./types";
  */
 export type OptionsAdaptateurApi = DependancesLecture;
 
+/**
+ * Révision enregistrée (M1g, ticket 869) : cas d'usage de `src/server/versions/remplacement.ts`, dans le même processus,
+ * avec le contexte de la session reçu de l'action serveur. Ni relecture ni appel externe : le port de relectures ne sert pas.
+ */
+function revisionApi(withOrg: DependancesLecture["withOrg"]): RevisionAdapter {
+  const dependances = (ctx: AdapterContext | null): DependancesAction => ({ contexte: async () => ctx, ...(withOrg === undefined ? {} : { withOrg }) });
+  return {
+    currentVersion: (ctx, input) => versionDuVoyage(dependances(ctx), input),
+    previewReplacement: (ctx, input) => proposerRemplacement(dependances(ctx), input),
+    applyReplacement: (ctx, input) => appliquerRemplacement(dependances(ctx), input),
+    undoReplacement: (ctx, input) => annulerRemplacement(dependances(ctx), input),
+  };
+}
+
 export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter {
   const lecture = creerLectureVoyages(options);
   const getDeckSession = creerLectureDuTri(options.withOrg === undefined ? {} : { withOrg: options.withOrg });
   return {
+    revision: revisionApi(options.withOrg),
     async listTrips(ctx) {
       return TripSummarySchema.array().parse(await lecture.listTrips(ctx));
     },

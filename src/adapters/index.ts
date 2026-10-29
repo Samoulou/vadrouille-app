@@ -30,7 +30,7 @@ import { realShareAvailable, shareAvailable } from "./share-guard";
 import { createSignedShareAdapter } from "./signed-share";
 import { paiementSimule } from "./simulated-payment-instance";
 import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
-import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
+import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, RevisionAdapter, ShareAdapter, TripAdapter } from "./types";
 
 export type {
   AdapterContext,
@@ -40,6 +40,7 @@ export type {
   MemberRole,
   PaymentAdapter,
   PaymentSimulator,
+  RevisionAdapter,
   ShareAdapter,
   TripAdapter,
 } from "./types";
@@ -359,6 +360,28 @@ export async function getRevisionFixtures(
 ): Promise<RevisionFixtures | null> {
   if (!isMockAdapter(value)) return null;
   return getMockRevisionFixtures(ctx, tripId);
+}
+
+/**
+ * Révision enregistrée (écran 14 ; tâche M1g, ticket 869) : celle de l'adaptateur `api` (`TripAdapter.revision`),
+ * `null` pour `mock` et `prototype` (l'écran garde alors son implémentation en mémoire et le jeu simulé de révision).
+ * Lue par les actions serveur de `src/server/actions/remplacement.ts` et par la mise en page du voyage.
+ */
+export function revisionEnregistree(value: string | undefined = process.env.DATA_ADAPTER): RevisionAdapter | null {
+  if (adapterChoice(value) !== "api") return null;
+  return getTripAdapter(value).revision ?? null;
+}
+
+/**
+ * Version courante d'un voyage pour la révision enregistrée (M1g) : base de la première demande d'aperçu, transmise par
+ * la mise en page du voyage à `TripShell`. `null` hors adaptateur `api`, pour un voyage inconnu ou d'une autre
+ * organisation, ou si la lecture échoue (l'écran garde alors son implémentation en mémoire).
+ */
+export async function getRevisionVersion(ctx: AdapterContext, tripId: string, value: string | undefined = process.env.DATA_ADAPTER): Promise<number | null> {
+  const revision = revisionEnregistree(value);
+  if (revision === null) return null;
+  const version = await revision.currentVersion(ctx, { tripId });
+  return version.ok ? version.value : null;
 }
 
 /**

@@ -136,6 +136,23 @@ describe("double de relectures : table des quatre voyages simulés (B6a point 7 
     }
   });
 
+  it("PR 869 : une option d'un créneau prend les durées de l'étape du créneau vers ses voisins (remplacement sur api)", () => {
+    // Dîner du J1 d'Édimbourg et son option « [Bistrot de Victoria Street] » (même jour, même heure, repas).
+    const depuisDiner = [...complete.durees].filter(([cle]) => cle.startsWith("mock_place_old_town_diner|"));
+    expect(depuisDiner.length).toBeGreaterThan(0);
+    for (const [cle, minutes] of depuisDiner) {
+      const [, vers, mode] = cle.split("|");
+      expect(complete.durees.get(`mock_place_old_town_diner_2|${vers}|${mode}`), cle).toBe(minutes);
+    }
+    const versDiner = [...complete.durees].filter(([cle]) => cle.split("|")[1] === "mock_place_old_town_diner");
+    for (const [cle] of versDiner) {
+      const [de, , mode] = cle.split("|");
+      expect(complete.durees.has(`${de}|mock_place_old_town_diner_2|${mode}`), cle).toBe(true);
+    }
+    // Une proposition sans étape au même créneau ne reçoit rien de plus que son trajet d'arrivée.
+    expect([...complete.durees.keys()].filter((cle) => cle.startsWith("mock_place_jardin_botanique|") && cle.includes("old_town_diner_2"))).toEqual([]);
+  });
+
   it("une étape que mock marque toConfirm a des plages inconnues", () => {
     const marquees = VOYAGES_SIMULES.flatMap(({ trip }) =>
       trip.days.flatMap((day) => day.items.flatMap((item) => (item.type === "stop" && item.stop.exceptions.includes("toConfirm") ? [{ lieu: lieuConverti(item.stop), date: day.date }] : []))),

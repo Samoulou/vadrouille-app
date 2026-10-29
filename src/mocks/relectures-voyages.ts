@@ -150,6 +150,21 @@ export function tableDesRelectures(voyages: readonly VoyageSimule[] = VOYAGES_SI
       if (existante === undefined) durees.set(cle, trajet.minutes);
       else if (existante !== trajet.minutes) ecartsPropositions.push(`${proposal.id} : ${trajet.minutes} dans mock, ${existante} par le segment`);
     }
+    // Remplacement d'une étape par une autre proposition du même créneau (M1g, ticket 869) : une option d'un créneau (même
+    // jour, même heure, même nature qu'une étape du programme) prend les durées de cette étape vers ses voisins, si son
+    // couple n'en a pas déjà une. Aucune durée n'est inventée pour un lieu sans étape au même créneau.
+    for (const proposal of proposals) {
+      const jour = joursParIndex.get(proposal.day);
+      const occupee = jour === undefined ? undefined : etapes(jour.items).find(({ stop }) => stop.id !== proposal.stop.id && stop.start === proposal.time && stop.kind === proposal.kind);
+      if (occupee === undefined) continue;
+      const option = lieuConverti(proposal.stop);
+      for (const [cle, minutes] of [...durees]) {
+        const [de, vers, mode] = cle.split("|");
+        if (de === undefined || vers === undefined || mode === undefined) continue;
+        const reprise = de === occupee.lieu && vers !== option ? cleTrajet(option, vers, mode as ModeTrajet) : vers === occupee.lieu && de !== option ? cleTrajet(de, option, mode as ModeTrajet) : undefined;
+        if (reprise !== undefined && !durees.has(reprise)) durees.set(reprise, minutes);
+      }
+    }
   }
   return { plages, durees, conflits, ecartsPropositions };
 }
