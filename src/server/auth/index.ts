@@ -9,10 +9,11 @@ import type { MemberRole } from "@/adapters/types";
 import { type CanonicalEmail, isCanonicalEmail } from "@/server/email";
 import { serverEnv } from "@/server/env";
 import { errorNameOf, logEvent } from "@/server/log";
-import { disabledCodeMailer } from "@/server/mail/disabled";
+import type { CompositionNotifications } from "@/server/mail/apercu-pret";
+import { disabledCodeMailer, disabledNotificationMailer } from "@/server/mail/disabled";
 import type { CodeMailer } from "@/server/mail/port";
-import { createResendCodeMailer } from "@/server/mail/resend";
-import { createSmtpCodeMailer } from "@/server/mail/smtp";
+import { createResendCodeMailer, createResendNotificationMailer } from "@/server/mail/resend";
+import { createSmtpCodeMailer, createSmtpNotificationMailer } from "@/server/mail/smtp";
 import { creerAuth, type InstanceAuth, OrganisationEnSuppressionError } from "@/tenancy/auth";
 import { avecAdresse } from "@/tenancy/code-otp";
 import { hacherJeton } from "@/tenancy/jetons-haches";
@@ -371,6 +372,26 @@ export function authOperations(): AuthOperations {
           : disabledCodeMailer,
   });
   return parDefaut;
+}
+
+/**
+ * Composition du port des notifications (M7a, e-mail « propositions prêtes »), dans ce module parce qu'il est le seul, hors
+ * des tests, à lire `serverEnv()` pour l'e-mail et à construire l'implémentation Resend (0138 § 9, ligne 7b) : **mêmes règles
+ * que le port du code** de `authOperations()`. `EMAIL_TRANSPORT=resend` (cas admis de 0138 § 3 seulement) → Resend ;
+ * `EMAIL_TRANSPORT=smtp` (Mailpit, `local` et `ci`) → SMTP ; sinon, ou sans connexion réelle (`AUTH_ADAPTER` autre que
+ * `better-auth` : aucune adresse de compte, aucune `APP_URL`), port désactivé et origine nulle. Lue à chaque appel (aucun
+ * cache) ; lève une `ServerEnvError` (sans valeur) si la configuration est refusée.
+ */
+export function notificationsDuServeur(): CompositionNotifications {
+  const env = serverEnv();
+  if (env.authAdapter !== "better-auth" || env.betterAuth === null) return { mailer: disabledNotificationMailer, origine: null };
+  const mailer =
+    env.emailTransport === "resend"
+      ? createResendNotificationMailer()
+      : env.emailTransport === "smtp" && env.smtp !== null
+        ? createSmtpNotificationMailer(env.smtp)
+        : disabledNotificationMailer;
+  return { mailer, origine: env.betterAuth.appUrl };
 }
 
 /** Le rappel d'envoi n'a pas été appelé ; ne porte aucune valeur. */

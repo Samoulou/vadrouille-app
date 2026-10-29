@@ -12,8 +12,12 @@ const etapes = vi.hoisted(() => ({
   etapeClotureProgramme: vi.fn(),
 }));
 vi.mock("@/server/generation/etapes-programme", () => etapes);
+const mail = vi.hoisted(() => ({ envoyerApercuPret: vi.fn() }));
+vi.mock("@/server/mail/apercu-pret", () => mail);
+const composition = vi.hoisted(() => ({ notificationsDuServeur: vi.fn() }));
+vi.mock("@/server/auth", () => composition);
 
-import { etapeClore, etapeDebut, etapeProgramme, generateProgramme } from "./programme";
+import { etapeApercuPret, etapeClore, etapeDebut, etapeProgramme, generateProgramme } from "./programme";
 
 const ENTREE: EtatProgramme = { generationRunId: "00000000-0000-4000-8000-000000000001", organizationId: "00000000-0000-4000-8000-000000000002", rang: 0 };
 const avance = async (e: EtatProgramme): Promise<EtatProgramme> => ({ ...e, rang: e.rang + 1 });
@@ -22,6 +26,7 @@ describe("workflow generateProgramme (chaîne inversée ; décision 0136 § 2)",
   beforeEach(() => {
     for (const f of Object.values(etapes)) f.mockReset().mockImplementation(avance);
     etapes.etapeClotureProgramme.mockImplementation(async (e: EtatProgramme) => ({ ...e, arret: "upstream_unavailable" }));
+    mail.envoyerApercuPret.mockReset().mockResolvedValue("sent");
   });
 
   it("generateProgramme: rangs a = 1 et e = 2, RANG_ETAPE inchangé ; maxRetries de MAX_RETRIES_PROGRAMME", () => {
@@ -31,14 +36,15 @@ describe("workflow generateProgramme (chaîne inversée ; décision 0136 § 2)",
     expect(etapeDebut.maxRetries).toBe(MAX_RETRIES_PROGRAMME.a);
     expect(etapeProgramme.maxRetries).toBe(MAX_RETRIES_PROGRAMME.e);
     expect(etapeClore.maxRetries).toBe(0);
+    expect(etapeApercuPret.maxRetries).toBe(0);
   });
 
   it("chaque étape porte la directive use step, le workflow use workflow, et aucun appel ne vient du pont", () => {
     const source = readFileSync(path.join(process.cwd(), "src/workflows/programme.ts"), "utf8");
-    expect(source.match(/^ +"use step";$/gm)).toHaveLength(3);
+    expect(source.match(/^ +"use step";$/gm)).toHaveLength(4);
     expect(source.match(/^ +"use workflow";$/gm)).toHaveLength(1);
     expect(source).not.toMatch(/from "@\/(ai|research|grounding|server\/composition|server\/p0|server\/essai|prototype|adapters)/);
-    expect([...source.matchAll(/^import .* from "([^"]+)";$/gm)].map((m) => m[1]).sort()).toEqual(["@/server/generation/etapes-programme", "@/server/generation/etat"]);
+    expect([...source.matchAll(/^import .* from "([^"]+)";$/gm)].map((m) => m[1]).sort()).toEqual(["@/server/auth", "@/server/generation/etapes-programme", "@/server/generation/etat", "@/server/mail/apercu-pret"]);
   });
 
   it("enchaîne a puis e et rend l'état de e", async () => {
@@ -47,6 +53,37 @@ describe("workflow generateProgramme (chaîne inversée ; décision 0136 § 2)",
     expect(etapes.etapeProgrammeDebut).toHaveBeenCalledWith(ENTREE);
     expect(etapes.etapeProgrammeEcriture).toHaveBeenCalledWith({ ...ENTREE, rang: 1 });
     expect(etapes.etapeClotureProgramme).not.toHaveBeenCalled();
+  });
+
+  it("PR 870 : après e sans arrêt, une seule étape d'e-mail, avec les seuls identifiants et la composition du serveur", async () => {
+    const fin = await generateProgramme(ENTREE);
+    expect(fin).toEqual({ ...ENTREE, rang: 2 });
+    expect(mail.envoyerApercuPret).toHaveBeenCalledTimes(1);
+    expect(mail.envoyerApercuPret).toHaveBeenCalledWith(
+      { organizationId: ENTREE.organizationId, generationRunId: ENTREE.generationRunId },
+      { composer: composition.notificationsDuServeur },
+    );
+    expect(composition.notificationsDuServeur).not.toHaveBeenCalled();
+  });
+
+  it("PR 870 : un e-mail en échec (issue ou erreur) ne bloque pas le workflow et ne change pas l'état rendu", async () => {
+    for (const issue of ["failed", "cap_reached", "already_sent", "disabled"]) {
+      mail.envoyerApercuPret.mockResolvedValueOnce(issue);
+      expect(await generateProgramme(ENTREE)).toEqual({ ...ENTREE, rang: 2 });
+    }
+    mail.envoyerApercuPret.mockRejectedValueOnce(new Error("panne"));
+    expect(await generateProgramme(ENTREE)).toEqual({ ...ENTREE, rang: 2 });
+    expect(etapes.etapeClotureProgramme).not.toHaveBeenCalled();
+  });
+
+  it("PR 870 : aucun e-mail après un arrêt ni après une erreur inattendue", async () => {
+    etapes.etapeProgrammeEcriture.mockImplementationOnce(async (e: EtatProgramme) => ({ ...e, rang: 2, arret: "model_output_invalid" }));
+    expect((await generateProgramme(ENTREE)).arret).toBe("model_output_invalid");
+    etapes.etapeProgrammeEcriture.mockRejectedValueOnce(new Error("panne"));
+    expect((await generateProgramme(ENTREE)).arret).toBe("upstream_unavailable");
+    etapes.etapeProgrammeDebut.mockImplementationOnce(async (e: EtatProgramme) => ({ ...e, rang: 1, arret: "invalid_input" }));
+    expect((await generateProgramme(ENTREE)).arret).toBe("invalid_input");
+    expect(mail.envoyerApercuPret).not.toHaveBeenCalled();
   });
 
   it("s'arrête sur un code d'arrêt sans appeler l'étape suivante", async () => {

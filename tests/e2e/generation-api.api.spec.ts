@@ -110,7 +110,8 @@ test("génération simulée de bout en bout sur l'adaptateur api : écrans 1 à 
 
   // Écran 4 : connexion réelle, puis lancement.
   await expectPath(page, R4_LANCER);
-  await connecterDepuisLEcran4(page, request, `b9e-${randomBytes(6).toString("hex")}@example.test`);
+  const adresse = `b9e-${randomBytes(6).toString("hex")}@example.test`;
+  await connecterDepuisLEcran4(page, request, adresse);
 
   // Écran 5 du voyage créé en base (`uuid`), jusqu'à l'état final : les étapes de `generateProgramme` tournent sur les doubles.
   await expect(page).toHaveURL((url) => PREPARATION.test(url.pathname), { timeout: 30_000 });
@@ -124,6 +125,19 @@ test("génération simulée de bout en bout sur l'adaptateur api : écrans 1 à 
   await expect(page.locator("main [role='alert']")).toHaveText("");
   await expect(page.locator("[data-compteur]")).toHaveText(/^8 propositions prêtes sur 8$/);
   await expect(page.getByRole("link", { name: "Voir mes propositions", exact: true })).toHaveAttribute("href", `/voyages/${tripId}/presentation`);
+
+  // M7a (PR 870) : à la fin de `generateProgramme`, un seul e-mail « propositions prêtes » à l'adresse du compte, dans
+  // Mailpit (SMTP du serveur `api`), avec le lien de la présentation du voyage ; le code de connexion reste le seul autre.
+  let notifications: { Subject?: string; Text?: string }[] = [];
+  await expect
+    .poll(async () => {
+      const details = await Promise.all((await identifiantsMailpit(request, adresse)).map(async (id) => (await request.get(`${API_MAILPIT}/message/${id}`)).json()));
+      notifications = (details as { Subject?: string; Text?: string }[]).filter((m) => m.Subject === "Tes premières propositions sont prêtes");
+      return notifications.length;
+    })
+    .toBe(1);
+  expect(notifications[0]?.Text).toContain(`/voyages/${tripId}/presentation`);
+  expect(notifications[0]?.Text).not.toContain("Rome");
 
   // « Mes voyages » liste le voyage (organisation neuve : ce seul voyage).
   await page.goto(R17);
