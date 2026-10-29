@@ -81,16 +81,12 @@ function observee() {
         const d = doublesRome();
         const j = journalDePrompts(d.modeles);
         journaux.push(j);
-        const comptees = new Proxy(d.routes, {
-          get(cible, cle, recepteur) {
-            const valeur = Reflect.get(cible, cle, recepteur) as unknown;
-            if (typeof valeur !== "function") return valeur;
-            return (...args: unknown[]) => {
-              routes += 1;
-              return (valeur as (...a: unknown[]) => unknown).apply(cible, args);
-            };
+        const comptees: DoublesGeneration["routes"] = {
+          matrice: (requete) => {
+            routes += 1;
+            return d.routes.matrice(requete);
           },
-        });
+        };
         return { ...d, modeles: j.client, routes: comptees };
       },
     });

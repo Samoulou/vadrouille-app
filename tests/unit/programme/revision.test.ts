@@ -22,7 +22,7 @@ import type { SignalDuRecalcul, TriDuRecalcul } from "@/domain/recalcul";
  * les catégories de repli comme des préférences (PO, 0136 § 11 question 2).
  */
 
-const PLACE = "ChIJ_SENTINELLE_PLACE_REVISION";
+const PLACE = "SENTINELLE_PLACE_REVISION";
 const SITE = "https://sentinelle-site.example/officiel";
 
 const BRIEF: EntreeProgramme = {
