@@ -66,6 +66,7 @@ function messageFor(field: string, code: FieldError, motif: MotifIndisponible = 
     if (code === "length") return length(DESTINATION_LENGTH);
     if (code === "selectCity") return err.villeChoisir;
     if (code === "cityUnavailable") return VILLE_NON_SERVIE[motif];
+    if (code === "cityNotOffered") return err.horsTable;
     if (code === "cityCharacters") return err.villeCaracteres;
     return err.destination;
   }
@@ -97,6 +98,12 @@ export interface CreateTripFormProps {
    * `creationRoutes.nouveau`), car la page est prérendue et ne lit pas l'adaptateur.
    */
   essai?: boolean;
+  /**
+   * Adaptateur `api` (décision 0141 § 6.4) : la page monte la recherche de ville de `api` (`DestinationVille`, actions de
+   * `src/server/actions/villes.ts`) seulement si les seuils sont validés et la barrière réelle ; ville hors des 62 villes
+   * du MVP : message `err.horsTable` (code `cityNotOffered` à « Continuer »). Les autres champs restent ceux de `api` (plusieurs villes, durée).
+   */
+  recherche?: "api";
   /** Actions de la recherche de ville (doubles des tests et des captures, décision 0129 § 5) ; par défaut les actions serveur. */
   villes?: ActionsVilles;
 }
@@ -126,9 +133,11 @@ function useEssaiDepuisAdresse(): boolean {
  * décision 0129, qui y lève F8-PO-14). Ailleurs, destination, logement, villes et engagements restent saisis en texte
  * libre, sans autocomplétion (aucune donnée Google, F8-PO-14).
  */
-export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps = {}) {
+export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTripFormProps = {}) {
   const essaiAdresse = useEssaiDepuisAdresse();
   const essai = essaiProp ?? essaiAdresse;
+  // Recherche de ville montée : site d'essai, ou `api` (0141 § 6.4) ; ailleurs, le champ texte d'aujourd'hui.
+  const rechercheVille = essai ? "essai" : recherche === "api" ? "api" : null;
   const router = useRouter();
   const { state, dispatch } = useDraft();
   const { trip } = state;
@@ -137,6 +146,8 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
   // quand elle ne répond pas (repli sur la table maison des villes).
   const [rechercheDisponible, setRechercheDisponible] = useState(false);
   const [motifIndisponible, setMotifIndisponible] = useState<MotifIndisponible>("panne");
+  // `api` (décision 0141 § 8.2) : saisie que la recherche a refusée hors des 62 villes, tant qu'elle n'a pas changé.
+  const [horsTableSaisie, setHorsTableSaisie] = useState<string | null>(null);
   // Cookie d'accès absent ou expiré pendant la recherche : saisie du code, puis relance de la recherche.
   const [accesDemande, setAccesDemande] = useState(false);
   const [relance, setRelance] = useState(0);
@@ -174,7 +185,13 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const found = validateTrip(trip, todayIso(), { essai, suggestions: rechercheDisponible });
+    const found = validateTrip(trip, todayIso(), {
+      essai,
+      suggestions: rechercheDisponible,
+      rechercheApi: rechercheVille === "api",
+      // Comparaison aux espaces près (revue du head `bc43913`, mineur 4) : la saisie exacte n'est pas redemandée à la recherche.
+      horsTable: horsTableSaisie !== null && horsTableSaisie.trim() === trip.destination.trim(),
+    });
     setErrors(found);
     const first = found[0];
     if (first) {
@@ -240,7 +257,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
       </div>
       <div role="alert" className={EMPTY_LIVE_REGION_CLASS} />
       <h1 className={TITLE_CLASS}>{e1.titre}</h1>
-      {essai ? (
+      {rechercheVille !== null ? (
         // Hors du `<form>` (décision 0129 § 5) : la saisie du code d'accès est son propre formulaire (pas de formulaires
         // imbriqués). Ordre de lecture inchangé : titre, Destination (et la saisie du code sous elle), puis le formulaire.
         // Entrée dans le champ choisit une suggestion et ne soumet rien ; « Continuer » valide la destination comme les
@@ -251,7 +268,11 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
             value={trip.destination}
             choisie={trip.placeId && trip.country && trip.timeZone ? { country: trip.country, timeZone: trip.timeZone } : null}
             error={errorOf("destination")}
-            onSaisie={(destination) => dispatch({ type: "trip", patch: { destination, placeId: "", country: "", timeZone: "" } })}
+            onSaisie={(destination) => {
+              // Comme sur le site d'essai : une erreur de « Continuer » reste jusqu'au choix d'une ville ; l'erreur rendue
+              // par la recherche (ville non proposée) tombe à la frappe, dans le champ.
+              dispatch({ type: "trip", patch: { destination, placeId: "", country: "", timeZone: "" } });
+            }}
             onChoix={(choix) => {
               dispatch({ type: "trip", patch: choix });
               setErrors((precedentes) => precedentes.filter((erreur) => erreur.field !== "destination"));
@@ -261,10 +282,17 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
               if (motif) setMotifIndisponible(motif);
             }}
             onAcces={() => setAccesDemande(true)}
+            onHorsTable={(saisie) => {
+              // `api` (0141 § 8.2) : le champ affiche `err.horsTable` ; une erreur de « Continuer » antérieure s'efface,
+              // pour qu'une seule consigne reste sous le champ.
+              setHorsTableSaisie(saisie);
+              setErrors((precedentes) => precedentes.filter((erreur) => erreur.field !== "destination"));
+            }}
             relance={relance}
+            recherche={rechercheVille}
             {...(villes ? { actions: villes } : {})}
           />
-          {accesDemande ? (
+          {essai && accesDemande ? (
             <SaisieCodeAcces
               ouverte={false}
               parcours={{
@@ -282,7 +310,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
         </>
       ) : null}
       <form noValidate onSubmit={submit} className="flex flex-col gap-6">
-        {essai ? null : (
+        {rechercheVille !== null ? null : (
           <TextField
             field="destination"
             label={e1.destination}

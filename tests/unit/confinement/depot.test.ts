@@ -512,6 +512,77 @@ describe("confinement: aucune exception à la section 2.4 (0040 D1 retirée par 
   });
 });
 
+describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)", () => {
+  const COMPTEURS = "src/server/villes/compteurs.ts";
+  const RECHERCHE = "src/server/villes/recherche.ts";
+  const TERMINAL_API = "src/server/composition/villes-api.ts";
+  const CONFIG = "src/server/config/villes.ts";
+  const horsTests = (chemin: string) => !estFichierTest(chemin) && !chemin.startsWith("docs/");
+  const importateursHorsTests = (cible: string) =>
+    resultats
+      .filter((r) => horsTests(r.fichier) && r.imports.some((i) => i.cible === cible))
+      .map((r) => r.fichier)
+      .sort();
+  /** Fichiers suivis hors des tests et de `docs/` : code analysé, et migrations de `db/migrations/` (SQL et clichés). */
+  const fichiersDuCode = () => suivis.map((f) => f.chemin).filter((c) => horsTests(c) && (estAnalyse(c) || c.startsWith("db/migrations/")));
+  const contenant = (texte: string) => fichiersDuCode().filter((c) => lireFichier(c).includes(texte)).sort();
+
+  it("compteurs : seul importateur hors des tests, le terminal de api ; cœur : les deux terminaux seulement", () => {
+    expect(importateursHorsTests(COMPTEURS)).toEqual([TERMINAL_API]);
+    expect(importateursHorsTests(RECHERCHE)).toEqual(["src/server/composition/villes-api.ts", "src/server/composition/villes.ts"]);
+  });
+
+  it("rôle des compteurs pris dans le seul module des compteurs ; nom de la table dans le module, le schéma et la migration 0021", () => {
+    expect(contenant("SET LOCAL ROLE vadrouille_autocomplete_counter")).toEqual([COMPTEURS]);
+    const table = contenant("autocomplete_daily_counts");
+    expect(table.filter((c) => c !== COMPTEURS && c !== "db/schema/auth.ts" && !/^db\/migrations\/(meta\/)?0021_/.test(c))).toEqual([]);
+    for (const attendu of [COMPTEURS, "db/schema/auth.ts", "db/migrations/0021_compteurs_autocompletion.sql"]) expect(table).toContain(attendu);
+  });
+
+  it("crochet accesReelApi : défini dans acces-reel.ts, lu par le seul terminal de api (jamais par la page de l'écran 1)", () => {
+    expect(contenant("accesReelApi")).toEqual(["src/server/composition/villes-api.ts", "src/server/generation/acces-reel.ts"]);
+  });
+
+  it("SEUILS_AUTOCOMPLETION_VALIDES : une seule déclaration, `export const …: boolean = false`, aucune affectation", () => {
+    const NOM = "SEUILS_AUTOCOMPLETION_VALIDES";
+    const declarations: string[] = [];
+    const affectations: string[] = [];
+    const AFFECTATIONS = new Set([
+      ts.SyntaxKind.EqualsToken,
+      ts.SyntaxKind.BarBarEqualsToken,
+      ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+      ts.SyntaxKind.QuestionQuestionEqualsToken,
+    ]);
+    // Affectation directe, par propriété ou par crochets (revue du head `bc43913`, mineur 2) ; `Object.assign` et
+    // `Object.defineProperty` qui nomment la garde sont relevés aussi. Le reste (alias dynamiques) est pour M1h.
+    const nomme = (n: ts.Node) =>
+      (ts.isIdentifier(n) && n.text === NOM) ||
+      (ts.isPropertyAccessExpression(n) && n.name.text === NOM) ||
+      (ts.isElementAccessExpression(n) && ts.isStringLiteralLike(n.argumentExpression) && n.argumentExpression.text === NOM);
+    const ecritureObjet = (n: ts.Node) =>
+      ts.isCallExpression(n) &&
+      ts.isPropertyAccessExpression(n.expression) &&
+      ts.isIdentifier(n.expression.expression) &&
+      n.expression.expression.text === "Object" &&
+      ["assign", "defineProperty", "defineProperties"].includes(n.expression.name.text) &&
+      n.arguments.some((a) => a.getText().includes(NOM));
+    for (const chemin of suivis.map((f) => f.chemin).filter(estAnalyse)) {
+      const texte = lireFichier(chemin);
+      if (!texte.includes(NOM)) continue;
+      const arbre = ts.createSourceFile(chemin, texte, ts.ScriptTarget.Latest, true);
+      const visiter = (n: ts.Node) => {
+        if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === NOM) declarations.push(`${chemin}: ${n.parent.parent.getText(arbre)}`);
+        if (ts.isBinaryExpression(n) && AFFECTATIONS.has(n.operatorToken.kind) && nomme(n.left)) affectations.push(`${chemin}: ${n.getText(arbre)}`);
+        if (ecritureObjet(n)) affectations.push(`${chemin}: ${n.getText(arbre)}`);
+        ts.forEachChild(n, visiter);
+      };
+      visiter(arbre);
+    }
+    expect(declarations).toEqual([`${CONFIG}: export const ${NOM}: boolean = false;`]);
+    expect(affectations).toEqual([]);
+  });
+});
+
 describe("confinement: le régime s'applique à lui-même", () => {
   const DU_REGIME = (chemin: string) => chemin.startsWith("tests/unit/confinement/") || chemin.startsWith("tests/support/");
 

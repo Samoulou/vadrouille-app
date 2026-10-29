@@ -39,6 +39,8 @@ export type FieldError =
   | "selectCity"
   | "cityCharacters"
   | "cityUnavailable"
+  // Écran 1 de `api` (décision 0141 § 8.2) : la recherche a répondu, la ville n'est pas l'une des 62 villes du MVP.
+  | "cityNotOffered"
   | "singleCity"
   | "tooLong";
 
@@ -134,10 +136,21 @@ export interface ValidateTripOptions {
    */
   essai?: boolean;
   /**
-   * Site d'essai : la recherche de ville a répondu (`true`) : un choix dans les suggestions est exigé, même pour une
-   * ville de la table. Absent ou faux (recherche indisponible, écran 2) : une ville de la table suffit.
+   * Site d'essai (ou écran 1 de `api` avec `rechercheApi`) : la recherche de ville a répondu (`true`) : un choix dans les
+   * suggestions est exigé, même pour une ville de la table. Absent ou faux (recherche indisponible, écran 2) : une ville
+   * de la table suffit (site d'essai), ou le champ d'aujourd'hui (`api`).
    */
   suggestions?: boolean;
+  /**
+   * Écran 1 de `api`, recherche de ville montée par la page (décision 0141 § 6.4) : avec `suggestions`, un choix dans les
+   * suggestions est exigé ; sans, aucun changement (champ d'aujourd'hui, contrôle des 62 villes par `createTrip`).
+   */
+  rechercheApi?: boolean;
+  /**
+   * Écran 1 de `api` : la saisie actuelle est celle que la recherche a refusée hors des 62 villes (`hors_table`) ;
+   * « Continuer » répète alors `cityNotOffered` au lieu de `selectCity` (une seule consigne pour le champ).
+   */
+  horsTable?: boolean;
 }
 
 /** Vrai si la destination saisie (non vide) est absente de la table maison des villes. */
@@ -167,11 +180,16 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
   const essai = options.essai === true;
   const destinationError = textError(trip.destination, DESTINATION_LENGTH);
   push("destination", destinationError);
-  const region = essai && destinationError === null ? destinationRegion(trip) : null;
+  const api = !essai && options.rechercheApi === true && options.suggestions === true;
+  const region = (essai || api) && destinationError === null ? destinationRegion(trip) : null;
   if (essai && destinationError === null && region === null) {
     // Recherche disponible : choisir dans les suggestions ; sinon (repli sans réseau), une ville de la table suffit.
     if (options.suggestions === true) push("destination", "selectCity");
     else if (fuseauDeVille(trip.destination) === null) push("destination", "cityUnavailable");
+  } else if (api && destinationError === null && region === null) {
+    // Écran 1 de `api`, recherche montée et disponible (décision 0141 § 6.4) : choisir dans les suggestions. Sans
+    // réponse de la recherche, le champ d'aujourd'hui (62 villes, contrôle de `createTrip`).
+    push("destination", options.horsTable === true ? "cityNotOffered" : "selectCity");
   }
   // Ville choisie hors de la table : seul un nom fait de lettres atteint le brief (décision 0129 § 4, même règle que le serveur).
   if (region !== null && villeDuPays(trip.destination, region.country) === null && destinationEssaiFiltree(trip.destination) === null) {

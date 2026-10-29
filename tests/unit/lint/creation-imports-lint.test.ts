@@ -157,6 +157,27 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     expect(await signalements(imp(CREATION), "src/adapters/mock-creation.ts")).not.toHaveLength(0);
   });
 
+  // Décision 0141 § 6.2 point 3 et § 11 ligne 8 (T23, PR 885 ; Tech Lead, bloquant 1 de la revue du head d8b9f0b).
+  it("villes-api.ts n'importe que barriere et acces-reel de src/server/generation (0141 § 6.2) ; la page de l'écran 1 et tout autre module de la génération sont refusés", async () => {
+    const TERMINAL = "src/server/composition/villes-api.ts";
+    const PAGE = "src/app/(creation)/voyages/nouveau/page.tsx";
+    for (const source of ["@/server/generation/barriere", "@/server/generation/acces-reel", "../generation/barriere", "../generation/acces-reel"]) {
+      for (const code of formes(source)) expect(await signalements(code, TERMINAL), `${source} ${code}`).toEqual([]);
+    }
+    for (const source of [GENERATION, REPRISE, "@/server/generation/dependances", "@/server/generation/barriere-autre", "@/server/generation/acces-reel/x", CREATION, COMPOSITION, SYSTEME]) {
+      for (const code of formes(source)) expect(await signalements(code, TERMINAL), `${source} ${code}`).not.toHaveLength(0);
+    }
+    // La page passe par `rechercheVilleApiOuverte` (0141 § 6.4) : la barrière et le crochet y sont refusés.
+    for (const source of ["@/server/generation/barriere", "@/server/generation/acces-reel"]) {
+      for (const code of formes(source)) expect(await signalements(code, PAGE), `${source} ${code}`).not.toHaveLength(0);
+    }
+    // Les voisins du terminal ne sont pas admis.
+    for (const fichier of ["src/server/composition/villes.ts", "src/server/villes/recherche.ts", "src/server/actions/villes.ts", "src/server/composition/villes-api.ts/x.ts"]) {
+      expect(await signalements(imp("@/server/generation/barriere"), fichier), fichier).not.toHaveLength(0);
+      expect(await signalements(imp("@/server/generation/acces-reel"), fichier), fichier).not.toHaveLength(0);
+    }
+  });
+
   it("le module feuille de reprise est le seul de src/server/generation que la commande du studio charge (0087 § 1.6)", async () => {
     expect(await signalements(imp(REPRISE), "scripts/reprise-studio.ts")).toEqual([]);
     expect(await signalements(imp("@/server/generation/codes"), "scripts/reprise-studio.ts")).not.toHaveLength(0);

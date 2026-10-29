@@ -516,8 +516,11 @@ describe("journal: generation.programme_written (0139 § 2)", () => {
         "errorName",
       ].sort(),
     );
-    expect([...CHAMPS_ADMIS_PAR_EVENEMENT.keys()]).toEqual([
+    // Décision 0141 § 6.3 point 4 (PR 885) : `ville.refusee` et `ville.purge_failed` ont aussi leur liste fermée.
+    expect([...CHAMPS_ADMIS_PAR_EVENEMENT.keys()].sort()).toEqual([
       "generation.programme_written",
+      "ville.purge_failed",
+      "ville.refusee",
     ]);
     // Ligne `warn` : le nom de l'erreur passe, jamais son message.
     const warn = JSON.parse(

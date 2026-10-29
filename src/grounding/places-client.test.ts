@@ -21,6 +21,7 @@ import {
   JETON_SESSION,
   MASQUE_DETAILS,
   MASQUE_FICHE_VILLE,
+  MASQUE_FICHE_VILLE_SANS_POSITION,
   MASQUE_MEDIA_PHOTO,
   MASQUE_PHOTOS,
   MASQUE_IDENTIFIANT,
@@ -693,6 +694,29 @@ describe("places : recherche de ville du site d'essai (demande de Samuel du 23 o
     expect((await erreurDe(client.ficheVille("a/b", SESSION))).code).toBe("invalid_request");
     expect((await erreurDe(client.ficheVille(PLACE_ID, "a&b=c"))).code).toBe("invalid_request");
     expect(transport).toHaveBeenCalledTimes(4);
+  });
+});
+
+// Décision 0141 § 6.3 point 3 (T27, PR 885 ; Sécurité, mineur 9) : la fiche de la ville de `api` ne demande pas la position.
+describe("fiche de ville", () => {
+  const SESSION = "jeton-session-1";
+  it("sans position : masque id,addressComponents, position null ; avec position : masque inchangé", async () => {
+    const composantes = [{ longText: "SENTINELLE-PAYS", shortText: "PT", types: ["country", "political"] }];
+    const { client, appels, port } = monter([
+      // Une position renvoyée malgré le masque n'est pas lue.
+      async () => json({ id: PLACE_ID, addressComponents: composantes, location: { latitude: 38.72, longitude: -9.14 } }),
+      async () => json({ id: PLACE_ID, addressComponents: composantes }),
+      async () => json({ id: PLACE_ID, addressComponents: composantes, location: { latitude: 38.72, longitude: -9.14 } }),
+    ]);
+    expect(await client.ficheVille(PLACE_ID, SESSION, { position: false })).toStrictEqual({ placeId: PLACE_ID, pays: "PT", position: null });
+    expect(await client.ficheVille(PLACE_ID, SESSION, { position: false })).toStrictEqual({ placeId: PLACE_ID, pays: "PT", position: null });
+    expect(await client.ficheVille(PLACE_ID, SESSION)).toStrictEqual({ placeId: PLACE_ID, pays: "PT", position: { lat: 38.72, lng: -9.14 } });
+    const masques = appels.map(({ init }) => new Headers(init.headers).get("x-goog-fieldmask"));
+    expect(masques).toEqual([MASQUE_FICHE_VILLE_SANS_POSITION, MASQUE_FICHE_VILLE_SANS_POSITION, MASQUE_FICHE_VILLE]);
+    expect(MASQUE_FICHE_VILLE_SANS_POSITION).toBe("id,addressComponents");
+    expect(MASQUE_FICHE_VILLE).toBe("id,addressComponents,location");
+    // Même SKU Essentials dans les deux cas.
+    expect(port.lignes.map((l) => l.demande.sku)).toEqual([SKU_FICHE_VILLE, SKU_FICHE_VILLE, SKU_FICHE_VILLE]);
   });
 });
 

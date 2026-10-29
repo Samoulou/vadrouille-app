@@ -5,7 +5,9 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { format } from "@/i18n";
 import { IconCoche } from "@/components/ligne/icons";
 import * as messages from "@/i18n/messages";
+import type { IssueChoix, IssueSuggestions, SuggestionVille } from "@/contracts/villes";
 import { cleVille, paysParCode } from "@/lib/fuseaux";
+import { choisirVilleApi, suggererVillesApi } from "@/server/actions/villes";
 import { choisirVille, suggererVilles } from "@/server/actions/villes-essai";
 
 import { describedBy, errorId, FieldHelp, FieldLabel, FieldMessage, fieldId, helpId, INPUT_CLASS } from "./fields";
@@ -18,15 +20,24 @@ const err = e1.erreurs;
 export const DELAI_RECHERCHE_MS = 300;
 const SAISIE_MIN = 2;
 
-/** Suggestion affichée (donnée Google, en mémoire du composant seulement, jamais dans le brouillon). */
-type Suggestion = { readonly placeId: string; readonly principal: string; readonly secondaire: string | null };
-
 /** Ville choisie, valeurs maison et `placeId` : seules valeurs remontées au brouillon. */
 export type ChoixVille = { readonly destination: string; readonly placeId: string; readonly country: string; readonly timeZone: string };
 
-/** Actions serveur de la recherche (`src/server/actions/villes-essai.ts`) ; doublées par les tests et les captures. */
-export type ActionsVilles = { readonly suggerer: typeof suggererVilles; readonly choisir: typeof choisirVille };
-const ACTIONS_SERVEUR: ActionsVilles = { suggerer: suggererVilles, choisir: choisirVille };
+/**
+ * Actions serveur de la recherche : site d'essai (`src/server/actions/villes-essai.ts`) ou `api`
+ * (`src/server/actions/villes.ts`, décision 0141) ; doublées par les tests et les captures. Réponses : union des types
+ * des deux adaptateurs (`@/contracts/villes`).
+ */
+export type ActionsVilles = {
+  readonly suggerer: (entree: Parameters<typeof suggererVilles>[0]) => Promise<IssueSuggestions>;
+  readonly choisir: (entree: Parameters<typeof choisirVille>[0]) => Promise<IssueChoix>;
+};
+/** Recherche montée : site d'essai (barrière du lancement, cookie d'accès) ou `api` (décision 0141 § 6.4). */
+export type RechercheVille = "essai" | "api";
+const ACTIONS_SERVEUR: Readonly<Record<RechercheVille, ActionsVilles>> = {
+  essai: { suggerer: suggererVilles, choisir: choisirVille },
+  api: { suggerer: suggererVillesApi, choisir: choisirVilleApi },
+};
 
 type Etat = "repos" | "recherche" | "liste" | "aucune" | "acces" | "indisponible" | "limite" | "limiteJour" | "choix" | "choisie";
 
@@ -37,7 +48,7 @@ type Etat = "repos" | "recherche" | "liste" | "aucune" | "acces" | "indisponible
 export type MotifIndisponible = "panne" | "minute" | "jour";
 
 /** Statut de refus du serveur → état affiché et motif remonté. */
-function refusDe(statut: "indisponible" | "limite" | "limite_jour" | "entree_invalide" | "pays_inconnu"): { readonly etat: Etat; readonly motif: MotifIndisponible } {
+function refusDe(statut: Exclude<IssueChoix["statut"] | IssueSuggestions["statut"], "ok">): { readonly etat: Etat; readonly motif: MotifIndisponible } {
   if (statut === "limite") return { etat: "limite", motif: "minute" };
   if (statut === "limite_jour") return { etat: "limiteJour", motif: "jour" };
   return { etat: "indisponible", motif: "panne" };
@@ -57,11 +68,18 @@ export interface DestinationVilleProps {
    * panne, plafond de la minute ou plafond du jour.
    */
   onDisponibilite: (disponible: boolean, motif?: MotifIndisponible) => void;
-  /** Cookie d'accès absent ou expiré : l'appelant affiche la saisie du code. */
+  /** Cookie d'accès absent ou expiré (site d'essai seulement) : l'appelant affiche la saisie du code. */
   onAcces: () => void;
+  /**
+   * Ville hors des 62 villes du MVP (`api`, décision 0141 § 8.2) : le champ affiche et annonce `err.horsTable` ;
+   * l'appelant retient la saisie refusée, pour que « Continuer » répète ce message tant qu'elle n'a pas changé.
+   */
+  onHorsTable?: (saisie: string) => void;
   /** Incrémenté par l'appelant après la saisie du code : la recherche est relancée. */
   relance: number;
-  /** Actions de la recherche ; par défaut les actions serveur. */
+  /** Recherche montée (défaut : site d'essai) ; choisit les actions serveur. Sur `api`, jamais l'état « accès ». */
+  recherche?: RechercheVille;
+  /** Actions de la recherche ; par défaut les actions serveur de `recherche`. */
   actions?: ActionsVilles;
 }
 
@@ -88,11 +106,26 @@ function nomIncomplet(saisie: string, principal: string): boolean {
  * `status` présente dès l'affichage. Aucun état sans issue : sans réponse de la recherche, une ville de la table maison
  * est acceptée (repli) ; sans cookie, la saisie du code s'affiche sous le champ.
  */
-export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onDisponibilite, onAcces, relance, actions = ACTIONS_SERVEUR }: DestinationVilleProps) {
+export function DestinationVille({
+  value,
+  choisie,
+  error,
+  onSaisie,
+  onChoix,
+  onDisponibilite,
+  onAcces,
+  onHorsTable,
+  relance,
+  recherche = "essai",
+  actions = ACTIONS_SERVEUR[recherche],
+}: DestinationVilleProps) {
+  // `api` (décision 0141 § 6.1 point 5) : aucun cookie d'accès, l'état « accès » n'existe pas ; un tel statut se replie.
+  const accesPossible = recherche === "essai";
   const id = fieldId("destination");
   const listeId = `${id}-liste`;
   const statutId = `${id}-statut`;
-  const [suggestions, setSuggestions] = useState<readonly Suggestion[]>([]);
+  // Suggestions affichées (données Google, en mémoire du composant seulement, jamais dans le brouillon).
+  const [suggestions, setSuggestions] = useState<readonly SuggestionVille[]>([]);
   const [ouverte, setOuverte] = useState(false);
   const [active, setActive] = useState(-1);
   const [etat, setEtat] = useState<Etat>("repos");
@@ -118,7 +151,7 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
     const numero = ++requete.current;
     session.current ??= crypto.randomUUID();
     setEtat("recherche");
-    let issue: Awaited<ReturnType<typeof suggererVilles>>;
+    let issue: IssueSuggestions;
     try {
       issue = await actions.suggerer({ saisie, session: session.current });
     } catch {
@@ -135,7 +168,7 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
     }
     setSuggestions([]);
     setOuverte(false);
-    if (issue.statut === "acces") {
+    if (issue.statut === "acces" && accesPossible) {
       setEtat("acces");
       onAcces();
     } else {
@@ -172,7 +205,7 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
     setEtat("choix");
     // La fiche clôt la session Google : la prochaine frappe en ouvre une nouvelle.
     session.current = null;
-    let issue: Awaited<ReturnType<typeof choisirVille>>;
+    let issue: IssueChoix;
     try {
       issue = await actions.choisir({ placeId: suggestion.placeId, session: jeton, saisie: value, principal: suggestion.principal });
     } catch {
@@ -189,10 +222,15 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
       setSuggestions([]);
       setEtat("choisie");
       onChoix({ destination: issue.ville.nomMaison ?? value.trim(), placeId: issue.ville.placeId, country: issue.ville.country, timeZone: issue.ville.timeZone });
+    } else if (issue.statut === "hors_table") {
+      // `api` (0141 § 8.2) : la recherche a répondu, mais la ville n'est pas l'une des 62 villes du MVP.
+      setErreurChoix(err.horsTable);
+      setEtat("repos");
+      onHorsTable?.(value);
     } else if (issue.statut === "pays_inconnu") {
       setErreurChoix(err.paysInconnu);
       setEtat("repos");
-    } else if (issue.statut === "acces") {
+    } else if (issue.statut === "acces" && accesPossible) {
       setEtat("acces");
       onAcces();
     } else {
@@ -239,7 +277,11 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
   // Ville choisie (à l'instant, ou gardée dans le brouillon) : la confirmation, en `ink` semi-gras ; sinon l'état. Une
   // erreur affichée remplace l'état (même texte qu'« indisponible » au repli : une seule ligne, jamais deux).
   const montrerConfirmation = confirmation !== null && message === null && (etat === "choisie" || etat === "repos");
-  const statut = message !== null ? null : montrerConfirmation ? confirmation : (textes[etat] ?? null);
+  // Erreur rendue par la recherche après un choix (nom incomplet, pays ou ville non proposés) : elle n'a pas de
+  // « Continuer » pour la faire lire ; la région d'état l'annonce, pour les lecteurs d'écran seulement (texte visible
+  // une seule fois, sous le champ).
+  const annonceErreur = error === null && erreurChoix !== null;
+  const statut = annonceErreur ? erreurChoix : message !== null ? null : montrerConfirmation ? confirmation : (textes[etat] ?? null);
   const visible = ouverte && suggestions.length > 0;
 
   return (
@@ -270,7 +312,7 @@ export function DestinationVille({ value, choisie, error, onSaisie, onChoix, onD
       />
       <FieldMessage id={errorId(id)} message={message} />
       {/* Région présente dès l'affichage ; texte en flux, masqué pour les yeux seulement quand elle est vide. */}
-      <p id={statutId} role="status" className={montrerConfirmation ? "flex items-start gap-2 text-corps-s font-semibold text-ink" : "text-corps-s text-ink-soft empty:sr-only"}>
+      <p id={statutId} role="status" className={annonceErreur ? "sr-only" : montrerConfirmation ? "flex items-start gap-2 text-corps-s font-semibold text-ink" : "text-corps-s text-ink-soft empty:sr-only"}>
         {/* Coche `line` (revue du head de4ab92, mineur 11) : la confirmation ne se lit pas comme l'erreur du champ. */}
         {montrerConfirmation ? <IconCoche data-part="ville-coche" className="size-5 text-line" /> : null}
         {statut}

@@ -1950,7 +1950,6 @@ const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/
 const IMPORTS_TERMINAL_VILLES: readonly string[] = [
   "server-only",
   "../../../prototype/config/prix-google.json",
-  "@/contracts/values",
   "@/lib/fuseaux",
   "@/server/composition/clients-google",
   "@/server/log",
@@ -1958,8 +1957,28 @@ const IMPORTS_TERMINAL_VILLES: readonly string[] = [
   "@/server/p0/base",
   "@/server/usage/cout-google",
   "@/server/usage/neon",
-  "@/server/usage/periodes",
-  "@/server/usage/port",
+  // Décision 0141 § 6.1 point 3 (PR 885) : cœur commun ; `@/contracts/values`, `periodes` et `port` y sont passés.
+  "@/server/villes/recherche",
+];
+
+/**
+ * Seuls imports exécutés admis dans le terminal `src/server/composition/villes-api.ts` (recherche de ville de l'écran 1
+ * de `api`, décision 0141 § 6.1 point 4 et § 11 ligne 2) : tables maison, pont des clients Google, plafonds de la
+ * génération (barrière), garde des seuils, crochet d'accès et barrière B9-TL-8, journal, limiteur, compteurs du jour et
+ * cœur commun ; ni `periodes`, ni `port`, ni la table de prix (au cœur ou dans les compteurs), et rien du chemin d'essai.
+ */
+const IMPORTS_TERMINAL_VILLES_API: readonly string[] = [
+  "server-only",
+  "@/lib/fuseaux",
+  "@/server/composition/clients-google",
+  "@/server/config/usage",
+  "@/server/config/villes",
+  "@/server/generation/acces-reel",
+  "@/server/generation/barriere",
+  "@/server/log",
+  "@/server/rate-limit",
+  "@/server/villes/compteurs",
+  "@/server/villes/recherche",
 ];
 
 /**
@@ -1999,6 +2018,14 @@ const IMPORTS_TERMINAL_VILLES: readonly string[] = [
  * `src/server/composition/villes.ts`, admis sans être parcouru au-delà d'une entrée seulement, s'il importe
  * `server-only`, ne porte aucune directive et si ses imports exécutés sont ceux d'`IMPORTS_TERMINAL_VILLES`. Verdicts
  * Tech Lead et Sécurité : décision 0129 (définitive à la fusion, 0093).
+ *
+ * Recherche de ville de l'écran 1 de `api` (décision 0141 § 6.1 point 4 et § 11 lignes 1 et 2 ; PR 885) : entrée
+ * `src/server/actions/villes.ts` (`"use server"`) et terminal `src/server/composition/villes-api.ts` (imports exécutés
+ * bornés par `IMPORTS_TERMINAL_VILLES_API`). La page de l'écran 1 (`src/app/(creation)/voyages/nouveau/page.tsx`,
+ * composant serveur sans directive) lit `rechercheVilleApiOuverte` dans ce terminal (0141 § 6.4) : elle n'est **pas** une
+ * entrée (revue consolidée du head `bcaa346`, bloquant 1 de la Sécurité) ; elle a une seule arête nominative,
+ * `ARETE_PAGE_VILLES_API` : vers ce terminal seulement, page sans directive et terminal qui porte sa propriété. Tous ses
+ * autres imports restent contrôlés comme ceux d'un fichier ordinaire.
  */
 const FRONTIERE_P0R3B = {
   entrees: [
@@ -2006,6 +2033,8 @@ const FRONTIERE_P0R3B = {
     { fichier: "src/server/actions/p0-lancement.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129).
     { fichier: "src/server/actions/villes-essai.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Recherche de ville de api (décision 0141 § 6.1).
+    { fichier: "src/server/actions/villes.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
     // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
@@ -2051,8 +2080,28 @@ const FRONTIERE_P0R3B = {
         return directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source) && bornes;
       },
     },
+    {
+      // Recherche de ville de api (décision 0141 § 11 ligne 2) : non parcouru, imports exécutés bornés par nom.
+      fichier: "src/server/composition/villes-api.ts",
+      admis: (f: string, source: string) => {
+        const bornes = importsExecutesDe(f, source).every((i) => IMPORTS_TERMINAL_VILLES_API.includes(i));
+        return directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source) && bornes;
+      },
+    },
   ],
 } as const;
+
+/**
+ * Arête nominative unique de la page de l'écran 1 (décision 0141 § 6.4 ; revue consolidée du head `bcaa346`, bloquant 1) :
+ * `src/app/(creation)/voyages/nouveau/page.tsx` → `src/server/composition/villes-api.ts`, sans régime d'entrée. Admise
+ * seulement si la page ne porte aucune directive (ni paquet client, ni action) et si le terminal porte sa propriété
+ * (`FRONTIERE_P0R3B.terminaux`) ; le terminal n'est alors pas parcouru. Aucune autre arête de la page n'est admise.
+ */
+const ARETE_PAGE_VILLES_API = { de: "src/app/(creation)/voyages/nouveau/page.tsx", vers: "src/server/composition/villes-api.ts" } as const;
+
+function aretePageVillesApiAdmise(de: string, vers: string, lire: (fichier: string) => string): boolean {
+  return de === ARETE_PAGE_VILLES_API.de && vers === ARETE_PAGE_VILLES_API.vers && directivesDuPrologue(de, lire(de)).length === 0 && terminalFrontiereAdmis(vers, lire);
+}
 
 /** Vrai si `fichier` est un terminal de la frontière de P0r3b dont la propriété est vérifiée sur sa source. */
 function terminalFrontiereAdmis(fichier: string, lire: (fichier: string) => string): boolean {
@@ -2095,6 +2144,10 @@ function atteintsServeurSeulement(
       const cible = specificateur === "?import-non-litteral" ? ({ type: "externe", nom: specificateur } as const) : resoudreCible(fichierCourant, specificateur);
       const cle = cible.type === "projet" ? cible.chemin : `externe:${cible.nom}`;
       const suivant = noeud(cle, viaAction);
+      // Arête nominative de la page de l'écran 1 vers le terminal de api : ni violation, ni parcours au-delà. Testée
+      // **avant** le marquage du nœud (revue du head `bc43913`, bloquant 1) : l'arête ne marque jamais le terminal comme
+      // vu, et un autre fichier qui l'importe directement reste contrôlé, quel que soit l'ordre du parcours.
+      if (!viaAction && cible.type === "projet" && aretePageVillesApiAdmise(fichierCourant, cle, lire)) continue;
       if (precedent.has(suivant)) continue;
       precedent.set(suivant, courant);
       // Terminal admis au-delà d'une entrée admise : ni violation, ni parcours au-delà.
@@ -2234,12 +2287,13 @@ describe("p0: clé côté serveur seulement", () => {
       "src/server/actions/p0-acces.ts",
       "src/server/actions/p0-lancement.ts",
       "src/server/actions/villes-essai.ts",
+      "src/server/actions/villes.ts",
       "src/server/routes/simulated-webhook.ts",
       "src/server/routes/stripe-webhook.ts",
       "src/server/p0/page-acces.ts",
     ]);
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);
-    expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts", "src/server/composition/villes.ts"]);
+    expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts", "src/server/composition/villes.ts", "src/server/composition/villes-api.ts"]);
     for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
     expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./programme", "./recalcul", "./voyage-complet", "server-only", "workflow/api"]);
     // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
@@ -2334,6 +2388,77 @@ describe("p0: clé côté serveur seulement", () => {
     ]);
     // Sur le dépôt : imports exécutés du terminal réel, exactement la liste bornée.
     expect([...new Set(importsExecutesDe("src/server/composition/villes.ts", lireDepot("src/server/composition/villes.ts")))].sort()).toEqual([...IMPORTS_TERMINAL_VILLES].sort());
+  });
+
+  // Décision 0141 § 11 lignes 1 et 2 (PR 885) : même forme que le terminal du site d'essai.
+  it("terminal de la recherche de ville de api (src/server/composition/villes-api.ts) : admis au-delà de l'action villes ou par l'arête nominative de la page de l'écran 1 seulement, avec server-only, sans directive, imports bornés", () => {
+    const resoudreFictif = (depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/") ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` } : { type: "externe", nom: specificateur };
+    const SERVEUR = 'import "server-only";\n';
+    const VILLES = 'import { a } from "@/lib/fuseaux";\nimport { b } from "@/server/composition/clients-google";\nimport { c } from "@/server/generation/barriere";\n';
+    const depot = (villes: string, action = '"use server";\nimport { v } from "@/server/composition/villes-api";\n', depart = '"use client";\nimport { s } from "@/server/actions/villes";\n') =>
+      new Map<string, string>([
+        ["src/features/Ville.tsx", depart],
+        ["src/server/actions/villes.ts", action],
+        ["src/server/composition/villes-api.ts", villes],
+        ["src/server/composition/clients-google.ts", `${SERVEUR}import { c } from "@/grounding/client-fictif";\n`],
+        ["src/grounding/client-fictif.ts", `${SERVEUR}import { k } from "@/server/env/grounding";\n`],
+      ]);
+    const violations = (...args: Parameters<typeof depot>) => {
+      const d = depot(...args);
+      return atteintsServeurSeulement(["src/features/Ville.tsx"], (f) => d.get(f) ?? "", resoudreFictif).sort();
+    };
+    const PARCOURU = "src/features/Ville.tsx → src/server/actions/villes.ts → src/server/composition/villes-api.ts";
+    expect(violations(`${SERVEUR}${VILLES}`)).toEqual([]);
+    // Sans server-only, avec une directive, ou un import exécuté hors de la liste bornée (chemin d'essai, client réel) : refusé.
+    for (const villes of [VILLES, `"use client";\n${SERVEUR}${VILLES}`, `${SERVEUR}${VILLES}import { g } from "@/grounding/client-fictif";\n`, `${SERVEUR}${VILLES}import { p } from "@/server/p0/base";\n`]) {
+      expect(violations(villes), JSON.stringify(villes)).toEqual([PARCOURU]);
+    }
+    expect(violations(`${SERVEUR}${VILLES}`, 'import { v } from "@/server/composition/villes-api";\n')).toEqual([PARCOURU]);
+    expect(violations(`${SERVEUR}${VILLES}`, undefined, '"use client";\nimport { v } from "@/server/composition/villes-api";\n')).toEqual([
+      "src/features/Ville.tsx → src/server/composition/villes-api.ts",
+    ]);
+    // La page de l'écran 1 : une seule arête admise, vers ce terminal, sans directive ; avec "use client" ou "use server",
+    // ou un terminal qui ne porte plus sa propriété, l'arête est refusée.
+    const PAGE = "src/app/(creation)/voyages/nouveau/page.tsx";
+    const page = (source: string, villes = `${SERVEUR}${VILLES}`) =>
+      atteintsServeurSeulement([PAGE], (f) => (f === PAGE ? source : (depot(villes).get(f) ?? "")), resoudreFictif).sort();
+    const VERS_TERMINAL = `${PAGE} → src/server/composition/villes-api.ts`;
+    expect(page('import { o } from "@/server/composition/villes-api";\n')).toEqual([]);
+    expect(page('"use client";\nimport { o } from "@/server/composition/villes-api";\n')).toEqual([VERS_TERMINAL]);
+    expect(page('"use server";\nimport { o } from "@/server/composition/villes-api";\n')).toEqual([VERS_TERMINAL]);
+    expect(page('import { o } from "@/server/composition/villes-api";\n', `${SERVEUR}${VILLES}import { p } from "@/server/p0/base";\n`)).toEqual([VERS_TERMINAL]);
+    // Aucune autre arête : la page n'est pas une entrée (revue du head `bcaa346`, bloquant 1).
+    expect(page('import { o } from "@/server/composition/villes-api";\nimport { e } from "@/server/env/index";\n')).toEqual([`${PAGE} → src/server/env/index.ts`]);
+    expect(page('import { o } from "@/server/composition/villes";\n')).toEqual([`${PAGE} → src/server/composition/villes.ts`]);
+    const refusParRelais = (specificateur: string, relais: string) =>
+      atteintsServeurSeulement(
+        [PAGE],
+        (f) => (f === PAGE ? `import { x } from "${specificateur}";\n` : f === relais ? `${SERVEUR}import { k } from "@/server/env/p0";\n` : ""),
+        resoudreFictif,
+      );
+    expect(refusParRelais("@/server/p0/base", "src/server/p0/base.ts")).toEqual([`${PAGE} → src/server/p0/base.ts → src/server/env/p0.ts`]);
+    expect(refusParRelais("@/server/p0/acces", "src/server/p0/acces.ts")).toEqual([`${PAGE} → src/server/p0/acces.ts → src/server/env/p0.ts`]);
+    expect(refusParRelais("@/workflows", "src/workflows.ts")).toEqual([`${PAGE} → src/workflows.ts → src/server/env/p0.ts`]);
+    // Deux départs, dans les deux ordres (revue du head `bc43913`, bloquant 1) : l'arête de la page ne masque jamais
+    // l'import direct du terminal par un autre fichier (composant client ou autre page).
+    for (const autre of ["src/features/Ville.tsx", "src/app/(a)/page.tsx"]) {
+      const sources = new Map<string, string>([
+        [PAGE, 'import { o } from "@/server/composition/villes-api";\n'],
+        [autre, `${autre.endsWith("Ville.tsx") ? '"use client";\n' : ""}import { o } from "@/server/composition/villes-api";\n`],
+      ]);
+      const lireDeux = (f: string) => sources.get(f) ?? depot(`${SERVEUR}${VILLES}`).get(f) ?? "";
+      for (const departs of [[PAGE, autre], [autre, PAGE]]) {
+        expect(atteintsServeurSeulement(departs, lireDeux, resoudreFictif), departs.join(", ")).toEqual([`${autre} → src/server/composition/villes-api.ts`]);
+      }
+    }
+    // Sur le dépôt : la page n'est pas une entrée, et son arête vers le terminal est admise.
+    expect(FRONTIERE_P0R3B.entrees.map((e) => e.fichier)).not.toContain(PAGE);
+    expect(aretePageVillesApiAdmise(PAGE, "src/server/composition/villes-api.ts", lireDepot)).toBe(true);
+    // Sur le dépôt : imports exécutés du terminal réel, exactement la liste bornée.
+    expect([...new Set(importsExecutesDe("src/server/composition/villes-api.ts", lireDepot("src/server/composition/villes-api.ts")))].sort()).toEqual(
+      [...IMPORTS_TERMINAL_VILLES_API].sort(),
+    );
   });
 
   /**

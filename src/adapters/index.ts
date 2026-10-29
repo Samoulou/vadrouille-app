@@ -70,6 +70,15 @@ export function isMockAdapter(value: string | undefined = process.env.DATA_ADAPT
 }
 
 /**
+ * Vrai quand l'adaptateur de données est exactement `api` (`DATA_ADAPTER`, après `trim()`), faux pour toute autre valeur,
+ * sans lever d'erreur ni rien construire (décision 0141 § 6.4) : l'écran 1 n'y monte la recherche de ville de `api` que si
+ * `rechercheVilleApiOuverte()` rend aussi vrai.
+ */
+export function isApiAdapter(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  return adapterChoice(value) === "api";
+}
+
+/**
  * Garde du site d'essai (spécification E2E-essai, lot 2), pour une page qui n'a rien à lire : faux avec `mock` et `api` ;
  * avec `prototype`, vrai dans la liste blanche (`prototypeAdapterAllowed`, décision 0032 § A4.2), sinon lève la même
  * erreur que `getTripAdapter()` (erreur 500), sans construire l'adaptateur ni rien lire.

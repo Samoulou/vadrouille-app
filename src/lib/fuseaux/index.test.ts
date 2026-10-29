@@ -5,6 +5,7 @@ import {
   distanceKm,
   fuseauParPosition,
   villeDuPays,
+  villeMvpDuPays,
   fuseauDuPays,
   fuseauxDesPays,
   listeDesPays,
@@ -351,6 +352,26 @@ describe("fuseaux : table du MVP isolée de la table élargie (décision 0129 §
     for (const ville of ["Valence", "Bilbao", "Kyoto", "Tokyo", "New York"]) {
       expect(fuseauDeVille(ville), ville).not.toBeNull();
       expect(controlerVilles([ville], "2027-07-10", "2027-07-12"), ville).toEqual({ ok: false, indice: 0, raison: "inconnue" });
+    }
+  });
+});
+
+// Décision 0141 § 8.2 (T18, PR 885) : recherche de ville de l'écran 1 de `api`, bornée aux 62 villes du MVP.
+describe("villeMvpDuPays", () => {
+  it("Lisbonne au Portugal admise ; Valence en Espagne refusée (hors des 62) ; ville des 62 dans un autre pays refusée", () => {
+    expect(villeMvpDuPays("Lisbonne", "PT")).toEqual({ nom: "Lisbonne", zone: "Europe/Lisbon" });
+    expect(villeMvpDuPays("lisbonne", "PT")).toEqual({ nom: "Lisbonne", zone: "Europe/Lisbon" });
+    // Valence est dans la table élargie du site d'essai, pas dans les 62 villes du MVP.
+    expect(villeDuPays("Valence", "ES")).not.toBeNull();
+    expect(villeMvpDuPays("Valence", "ES")).toBeNull();
+    expect(villeMvpDuPays("Lisbonne", "ES")).toBeNull();
+    expect(villeMvpDuPays("Paris", "US")).toBeNull();
+    // Chaque ville admise est une clé de la table du MVP, donc admise par `controlerVilles`.
+    for (const cle of villesDuMvp()) {
+      const code = codePaysDeVille(cle);
+      if (code === null) continue;
+      const ville = villeMvpDuPays(cle, code);
+      if (ville !== null) expect(villesDuMvp(), cle).toContain(cleVille(ville.nom));
     }
   });
 });

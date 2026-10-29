@@ -151,7 +151,9 @@ export const IMPORTATEURS_RELECTURE = ["src/server/composition/generation.ts", "
  * de la recherche de ville de l'écran 1 du site d'essai (`villes.ts`, demande de Samuel du 23 octobre 2026, décision
  * 0129), qui n'importe pas `@/server/relecture`.
  */
-export const IMPORTATEURS_CLIENTS_GOOGLE = [...IMPORTATEURS_RELECTURE, "src/server/composition/villes.ts"];
+// Recherche de ville de l'écran 1 : terminal du site d'essai (0129) et terminal de `api` (décision 0141 § 6.1 et § 11
+// ligne 3 ; le cœur `src/server/villes/recherche.ts` n'en est pas importateur, il reçoit la fabrique).
+export const IMPORTATEURS_CLIENTS_GOOGLE = [...IMPORTATEURS_RELECTURE, "src/server/composition/villes.ts", "src/server/composition/villes-api.ts"];
 /**
  * Importateur admis de `@/server/composition/lecture` hors des tests (0100 § 5.2, amendé par 0108) : le branchement au
  * démarrage par `src/instrumentation.ts` (`import()`), seul. Un import depuis `src/adapters/index.ts`, même par
@@ -165,8 +167,8 @@ const estTestOuSupport = (importateur) => estTest(importateur) || importateur.st
 /**
  * Vrai si `importateur` peut importer `source` (0100 § 5.2) :
  * - `@/server/relecture/*` : les deux compositions, les fichiers de `src/server/relecture/` et les tests ;
- * - `@/server/composition/clients-google` : les deux compositions, la composition `villes.ts` et les tests (ni
- *   `p0-reel.ts`, ni un autre module) ;
+ * - `@/server/composition/clients-google` : les deux compositions, les terminaux `villes.ts` et `villes-api.ts` (0141)
+ *   et les tests (ni `p0-reel.ts`, ni un autre module) ;
  * - `@/server/composition/lecture` : `src/instrumentation.ts` (B6b, 0108) et les tests seulement.
  * Un module de `src/server/voyages/` n'est donc jamais admis : il reçoit la source par injection.
  */
@@ -188,7 +190,7 @@ export const relectureImports = {
     schema: [],
     messages: {
       forbidden:
-        "@/server/relecture n'est importable que depuis les compositions src/server/composition/generation.ts et lecture.ts, src/server/relecture et les tests ; composition/clients-google, depuis ces deux compositions, composition/villes.ts et les tests ; composition/lecture, depuis src/instrumentation.ts et les tests (décisions 0085 § 1.8, 0100 § 5.2 et 0108) ({{source}}).",
+        "@/server/relecture n'est importable que depuis les compositions src/server/composition/generation.ts et lecture.ts, src/server/relecture et les tests ; composition/clients-google, depuis ces deux compositions, composition/villes.ts, composition/villes-api.ts (décision 0141) et les tests ; composition/lecture, depuis src/instrumentation.ts et les tests (décisions 0085 § 1.8, 0100 § 5.2 et 0108) ({{source}}).",
     },
   },
   create(context) {
