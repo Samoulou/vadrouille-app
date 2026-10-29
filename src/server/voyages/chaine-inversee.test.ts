@@ -62,10 +62,10 @@ const snapshot = TripSnapshotSchema.parse({
 
 /** Lignes « À faire » : J3 et étape `d` (hors aperçu), étape `a` et avant le départ (gardées). */
 const A_FAIRE = [
-  { id: "l1", label: "[Avant le départ]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: null },
-  { id: "l2", label: "[Pour l'étape a]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: "a" },
-  { id: "l3", label: "[Le jour 3]", moment: { type: "tripDay", day: 3 }, done: false, booking_url: null, sponsored: false, stop_id: null },
-  { id: "l4", label: "[Pour l'étape d]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: "d" },
+  { id: "l1", kind: "other", label: "[Avant le départ]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: null },
+  { id: "l2", kind: "reservation", label: "[Pour l'étape a]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: "a" },
+  { id: "l3", kind: "other", label: "[Le jour 3]", moment: { type: "tripDay", day: 3 }, done: false, booking_url: null, sponsored: false, stop_id: null },
+  { id: "l4", kind: "reservation", label: "[Pour l'étape d]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: "d" },
 ];
 
 /** Texte et paramètres d'une requête de `executeurSql`, parcourue par sa forme (comme `lecture.test.ts`). */
@@ -85,12 +85,12 @@ function requeteDe(requete: unknown): { texte: string; params: unknown[] } {
 }
 
 /** Transaction simulée : `debloque` dit si le voyage porte `tripUnlocked` ; chaque requête est notée. */
-function base(debloque: boolean) {
+function base(debloque: boolean, aFaire: readonly Record<string, unknown>[] = A_FAIRE) {
   const requetes: { texte: string; params: unknown[] }[] = [];
   const lignes = (texte: string, params: readonly unknown[]): Record<string, unknown>[] => {
     if (texte.startsWith("SET TRANSACTION")) return [];
     if (texte.includes("FROM public.trips")) {
-      return [{ id: TRIP, destination: "Testville", start: "2028-03-01", end: "2028-03-03", adults: 2, children: 0, time_zone: "Europe/Zurich", current_version: 1 }];
+      return [{ id: TRIP, destination: "Testville", start: "2028-03-01", end: "2028-03-03", adults: 2, children: 0, time_zone: "Europe/Zurich", current_version: 1, jours: 3 }];
     }
     if (texte.includes("trip_versions")) return [{ version: 1, snapshot, created_ms: Date.parse("2028-01-01T00:00:00Z") }];
     if (texte.includes("public.stays")) {
@@ -99,7 +99,7 @@ function base(debloque: boolean) {
     if (texte.includes("public.briefs")) return [{ mobility: "walk" }];
     if (texte.includes("generation_runs")) return [{ en_cours: false }];
     if (texte.includes("public.entitlements")) return [{ debloque }];
-    if (texte.includes("public.checklist_items")) return A_FAIRE;
+    if (texte.includes("public.checklist_items")) return [...aFaire];
     if (texte.includes("public.place_coordinates")) {
       const demandes = Array.isArray(params[0]) ? (params[0] as unknown[]) : [];
       return [LOGEMENT, "test_place_a", "test_place_c", "test_place_d"].flatMap((place_id, rang) => (demandes.includes(place_id) ? [{ place_id, lat: 46 + rang / 100, lng: 6 }] : []));
@@ -218,5 +218,20 @@ describe("lecture de api : badge « à confirmer » d'une étape sans lieu (0136
     };
     expect(await etapesDuJ1("inversee")).toEqual({ a: [], b: ["toConfirm"] });
     expect(await etapesDuJ1(undefined)).toEqual({ a: [], b: [] });
+  });
+});
+
+describe("lecture de api : compteur des réservations à faire (décision 0147 § 6.2, M5-C)", () => {
+  const ligne = (kind: unknown, done = false) => ({ ...A_FAIRE[0], trip_id: TRIP, kind, done });
+  const resumes = (aFaire: readonly Record<string, unknown>[]) =>
+    creerLectureVoyages({ relectures: source().port, withOrg: base(true, aFaire).withOrg, chaine: "inversee" }).listTrips(ctx);
+
+  it("listTrips ne compte que les lignes `reservation` non faites", async () => {
+    const [resume] = await resumes([ligne("reservation"), ligne("reservation", true), ligne("ticket"), ligne("other")]);
+    expect(resume?.toReserveCount).toBe(1);
+  });
+
+  it("une sorte hors de CHECKLIST_KINDS n'est pas ramenée à `other` : output_invalid", async () => {
+    await expect(resumes([ligne("reservation"), ligne("booking")])).rejects.toMatchObject({ name: "LectureVoyageError", reason: "output_invalid" });
   });
 });

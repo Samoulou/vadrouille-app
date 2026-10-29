@@ -66,7 +66,9 @@ export type EntreePatch = {
   versionsAnterieures?: ReadonlyMap<number, TripSnapshot>;
   /**
    * Identifiants des étapes ajoutées par la personne dans les versions précédentes (R1 selon B5-PO-4, R7 selon
-   * B5-PO-8) ; le serveur les déduit des patches `add` de l'historique. Ceux du patch courant s'y ajoutent.
+   * B5-PO-8). Depuis la décision 0147 § 6.1, le moteur y ajoute lui-même les étapes de la base marquées
+   * `addedBy: "person"` (le serveur n'a plus à relire l'historique) ; le paramètre reste pour `mock` et les tests. Ceux
+   * du patch courant s'y ajoutent.
    */
   ajouts?: ReadonlySet<string>;
 };
@@ -305,11 +307,36 @@ function etapesSituees(jours: readonly DaySnapshot[]): Map<string, { jour: numbe
 }
 
 /**
- * Changements d'un patch (B5-PO-15, F7-PO-6) : d'abord ceux des étapes visées (`replaced`, `added`, `moved`, forme
- * de 0016 § 4.5), puis, jour touché par jour touché : `moved` pour une autre étape dont l'heure ou le jour change
- * (décalage de la replanification ; pour `revert`, étape qui revient ailleurs), `added` pour une étape qui apparaît
- * sans être visée (`revert`), `segment` pour chaque trajet dont la durée change, `budget` (B5-PO-10) et `unchanged`
- * pour chaque étape qui garde son lieu et son heure, verrouillées comprises. Noms maison seulement (`Stop.name`).
+ * Identité d'une étape pour « Ce qui change » (décision 0147 § 5.2 point 1) : l'identifiant, le `placeId` et le nom.
+ * Depuis M1b, un identifiant `j<jour>-<rang>` est réutilisé d'une version à l'autre (0142 § 5.1) : une étape de même
+ * `id` mais d'autre lieu ou d'autre nom n'est pas la même étape (`removed` puis `added`, jamais `moved`).
+ */
+function identite(stop: StopSnapshot): string {
+  return JSON.stringify([stop.id, stop.placeId ?? null, stop.name]);
+}
+
+function etapesParIdentite(jours: readonly DaySnapshot[]): Map<string, { jour: number; stop: StopSnapshot }> {
+  return new Map(jours.flatMap((jour) => etapesDuJour(jour).map((stop) => [identite(stop), { jour: jour.index, stop }] as const)));
+}
+
+/** Verrou posé ou retiré entre deux états de la même étape (0147 § 5.2 point 3), ou rien. */
+function changementDeVerrou(avant: StopSnapshot, apres: StopSnapshot): Change | undefined {
+  if (avant.locked === apres.locked) return undefined;
+  return { type: apres.locked ? "locked" : "unlocked", label: apres.name, time: apres.start };
+}
+
+/**
+ * Changements d'un patch (B5-PO-15, F7-PO-6 ; complétés par la décision 0147 § 5.2) : d'abord ceux des étapes visées
+ * (`replaced`, `added`, `moved`, forme de 0016 § 4.5, `moved` suivi de `locked` ou `unlocked` si le verrou change
+ * aussi), puis, jour touché par jour touché : `removed` pour une étape de la version de départ dont l'identité
+ * (`identite` : `id`, `placeId`, nom) n'existe dans **aucun** jour de la version d'arrivée, sauf l'ancienne étape d'un
+ * remplacement, déjà nommée par `replaced` (bloquant 1 de la revue de 0147) ; `moved` pour une autre étape dont l'heure
+ * ou le jour change (décalage de la replanification ; pour `revert`, étape qui revient ailleurs), suivi de `locked` ou
+ * `unlocked` si son verrou change aussi ; `added` pour une étape qui apparaît sans être visée (`revert`, ou étape de
+ * même identifiant mais d'autre lieu ou d'autre nom) ; `segment` pour chaque trajet dont la durée change ; `budget`
+ * (B5-PO-10) ; enfin `locked` ou `unlocked` à la place d'`unchanged` pour une étape qui garde son lieu et son heure mais
+ * pas son verrou, et `unchanged` pour les autres, verrouillées comprises. Les lignes `checklist` ne viennent jamais
+ * d'ici (0147 § 5.2 point 4). Noms maison seulement (`Stop.name`).
  */
 function changements(
   base: readonly DaySnapshot[],
@@ -318,10 +345,14 @@ function changements(
   cibles: readonly Cible[],
   contexte: ContextePatch,
 ): Change[] {
-  const avant = etapesSituees(base);
+  const avant = etapesParIdentite(base);
+  const avantParId = etapesSituees(base);
   const ensuite = etapesSituees(apres);
+  const identitesEnsuite = new Set(etapesParIdentite(apres).keys());
   const visees = new Set(cibles.map((cible) => cible.id));
   const remplaceDe = new Map(cibles.flatMap((cible) => (cible.type === "replaced" ? [[cible.id, cible.remplacee] as const] : [])));
+  /** Anciennes étapes des remplacements : jamais `removed`, le `replaced` les nomme déjà (0147 § 5.2 point 2). */
+  const remplacees = new Set(remplaceDe.values());
   const resultat: Change[] = [];
 
   for (const cible of cibles) {
@@ -335,9 +366,13 @@ function changements(
       case "added":
         resultat.push({ type: "added", time: stop.start, label: stop.name });
         break;
-      case "moved":
+      case "moved": {
         resultat.push({ type: "moved", label: stop.name, before: cible.avant, after: { day: jour, time: stop.start } });
+        const precedente = avantParId.get(cible.id);
+        const verrou = precedente === undefined ? undefined : changementDeVerrou(precedente.stop, stop);
+        if (verrou !== undefined) resultat.push(verrou);
         break;
+      }
     }
   }
 
@@ -345,15 +380,26 @@ function changements(
   for (const index of joursTouches) {
     const jourApres = apres.find((jour) => jour.index === index);
     const jourBase = base.find((jour) => jour.index === index);
+    if (jourBase !== undefined) {
+      for (const stop of etapesDuJour(jourBase)) {
+        if (remplacees.has(stop.id) || identitesEnsuite.has(identite(stop))) continue;
+        resultat.push({ type: "removed", label: stop.name, before: { day: index, time: stop.start } });
+      }
+    }
     if (jourApres === undefined) continue;
     const gardees: Change[] = [];
     for (const stop of etapesDuJour(jourApres)) {
       if (visees.has(stop.id)) continue;
-      const precedente = avant.get(stop.id);
+      const precedente = avant.get(identite(stop));
       if (precedente === undefined) {
         resultat.push({ type: "added", time: stop.start, label: stop.name });
-      } else if (precedente.jour === index && precedente.stop.placeId === stop.placeId && precedente.stop.start === stop.start) {
-        gardees.push({ type: "unchanged", label: stop.name, time: stop.start });
+        continue;
+      }
+      const verrou = changementDeVerrou(precedente.stop, stop);
+      if (precedente.jour === index && precedente.stop.start === stop.start) {
+        // Même lieu, même heure : `locked` ou `unlocked` à la place d'`unchanged` si seul le verrou change.
+        if (verrou !== undefined) resultat.push(verrou);
+        else gardees.push({ type: "unchanged", label: stop.name, time: stop.start });
       } else {
         resultat.push({
           type: "moved",
@@ -361,6 +407,7 @@ function changements(
           before: { day: precedente.jour, time: precedente.stop.start },
           after: { day: index, time: stop.start },
         });
+        if (verrou !== undefined) resultat.push(verrou);
       }
     }
     if (jourBase !== undefined) {
@@ -368,7 +415,11 @@ function changements(
       const trajetsApres = trajetsDuJour(jourApres, contexte);
       for (const stop of etapesDuJour(jourApres)) {
         const apresTrajet = trajetsApres.versEtape.get(stop.id);
-        const avantTrajet = trajetsAvant.versEtape.get(remplaceDe.get(stop.id) ?? stop.id);
+        // Trajet comparé à celui de la même étape (même identité) ou de l'étape remplacée, jamais d'une autre étape de
+        // même identifiant (identifiant réutilisé, 0147 § 5.2 point 1).
+        const remplacee = remplaceDe.get(stop.id);
+        const memeEtape = avant.has(identite(stop));
+        const avantTrajet = remplacee !== undefined ? trajetsAvant.versEtape.get(remplacee) : memeEtape ? trajetsAvant.versEtape.get(stop.id) : undefined;
         if (apresTrajet !== undefined && avantTrajet !== undefined && apresTrajet.minutes !== avantTrajet.minutes) {
           resultat.push({ type: "segment", label: stop.name, before: avantTrajet.minutes, after: apresTrajet.minutes, estimated: apresTrajet.estimee });
         }
@@ -471,7 +522,11 @@ export function appliquerPatch(entree: EntreePatch): ResultatPatch {
   const cibles: Cible[] = [];
   const remplacees = new Map<string, string>();
   const choix = new Map<string, EtatChoix>(moteur.choix);
-  const ajouts = new Set(entree.ajouts ?? []);
+  const ajouts = new Set([
+    ...(entree.ajouts ?? []),
+    // Lieux à soi de la base (décision 0147 § 6.1) : marqués dans l'instantané, rétablis par un `revert`.
+    ...base.days.flatMap((jour) => etapesDuJour(jour).flatMap((stop) => (stop.addedBy === "person" ? [stop.id] : []))),
+  ]);
   const deverrouillees = new Set<string>();
   const candidats = new Map(moteur.candidats.map((candidat) => [candidat.id, candidat]));
   const { configuration } = moteur;
@@ -547,6 +602,8 @@ export function appliquerPatch(entree: EntreePatch): ResultatPatch {
           facts: {},
           exceptions: [],
           locked: false,
+          // Lieu à soi (décision 0147 § 6.1) : marque stockée dans l'instantané ; « Ajouté par toi. » sur la fiche.
+          addedBy: "person",
         };
         retirerRepasOuvert(jour, stop, configuration);
         jour.lignes.push({ genre: "etape", stop, fixe: true });

@@ -362,7 +362,7 @@ describe("patch: PatchResult", () => {
   });
 
   for (const pace of ["relaxed", "balanced", "intense"] satisfies Pace[]) {
-    it(`lock (${pace}) : chaque étape non verrouillée de chaque jour ; jour identique au drapeau près, toutes ses étapes « unchanged »`, () => {
+    it(`lock (${pace}) : chaque étape non verrouillée de chaque jour ; jour identique au drapeau près, « locked » pour l'étape visée, « unchanged » pour les autres (décision 0147 § 5.2 point 3)`, () => {
       const base = version2(pace);
       let verifiees = 0;
       for (const jourBase of base.days) {
@@ -373,7 +373,12 @@ describe("patch: PatchResult", () => {
           jour.items = jour.items.map((item) => (item.type === "stop" && item.stop.id === cible.id ? { ...item, stop: { ...item.stop, locked: true } } : item));
           expect(instantane, `${pace}, jour ${jourBase.index}, ${cible.id}`).toEqual(attendu);
           expect(resultat.touchedDays).toEqual([jourBase.index]);
-          expect(resultat.changes).toEqual(etapes(jourBase).map((stop) => ({ type: "unchanged", label: stop.name, time: stop.start })));
+          expect(resultat.changes).toEqual([
+            { type: "locked", label: cible.name, time: cible.start },
+            ...etapes(jourBase)
+              .filter((stop) => stop.id !== cible.id)
+              .map((stop) => ({ type: "unchanged", label: stop.name, time: stop.start })),
+          ]);
           verifiees += 1;
         }
       }
@@ -569,5 +574,135 @@ describe("moteur: durée estimée reprise dans le trajet", () => {
     const { instantane, rapport } = reussi(appliquerPatch({ moteur: contexte, patch: p, versionCourante: 2, base }));
     expect(segments(instantane).filter((s) => s.mode === "transit").every((s) => s.estimated)).toBe(true);
     expect(JSON.stringify(rapport)).not.toContain("estimee");
+  });
+});
+
+/**
+ * « Ce qui change » complété par M5-C (décision 0147 § 5.2) : `removed`, `locked`, `unlocked`, identité d'une étape
+ * (`id`, `placeId`, nom), exclusion de l'ancienne étape d'un remplacement ; marque `addedBy` écrite par `add` (§ 6.1).
+ */
+describe("changements: M5-C (décision 0147 § 5.2)", () => {
+  const types = (resultat: { changes: readonly { type: string }[] }) => resultat.changes.map((change) => change.type);
+
+  it("changements: un remplacement ne produit aucun removed", () => {
+    const base = version2();
+    let verifies = 0;
+    for (const jour of base.days) {
+      for (const cible of etapes(jour).filter((stop) => !stop.locked && stop.commitment === undefined)) {
+        const resultat = appliquerPatch(entree(base, patch(2, [{ op: "replace", stopId: cible.id, candidateId: RESERVE.autre.id, newStopId: `r-${cible.id}` }])));
+        if (!resultat.ok) continue;
+        verifies += 1;
+        expect(types(resultat.resultat), cible.id).not.toContain("removed");
+        expect(resultat.resultat.changes.at(0), cible.id).toEqual({
+          type: "replaced",
+          time: cible.start,
+          before: cible.name,
+          after: RESERVE.autre.nom,
+        });
+      }
+    }
+    expect(verifies).toBeGreaterThanOrEqual(base.days.length);
+    // Remplacements enchaînés dans un patch : l'étape d'origine reste nommée par `replaced`, jamais `removed`.
+    const cible = activiteDuJour(base, 2);
+    const double = reussi(
+      appliquerPatch(
+        entree(
+          base,
+          patch(2, [
+            { op: "replace", stopId: cible.id, candidateId: RESERVE.autre.id, newStopId: "r-1" },
+            { op: "replace", stopId: "r-1", candidateId: RESERVE.proche.id, newStopId: "r-2" },
+          ]),
+        ),
+      ),
+    );
+    expect(types(double.resultat)).not.toContain("removed");
+    expect(double.resultat.changes.at(0)).toEqual({ type: "replaced", time: cible.start, before: cible.name, after: RESERVE.proche.nom });
+  });
+
+  it("revert : étape retirée (removed, jour et heure de départ), étape revenue (added), verrous changés (locked, unlocked), jamais replaced", () => {
+    const v2 = version2();
+    const retiree = activiteDuJour(v2, 2);
+    const verrouillee = activiteDuJour(v2, 3);
+    // Version courante fabriquée : J2 sans l'étape `retiree`, J3 avec l'étape `verrouillee` verrouillée.
+    const courante = structuredClone(v2);
+    jourN(courante, 2).items = jourN(courante, 2).items.filter((item) => !(item.type === "stop" && item.stop.id === retiree.id));
+    jourN(courante, 3).items = jourN(courante, 3).items.map((item) =>
+      item.type === "stop" && item.stop.id === verrouillee.id ? { ...item, stop: { ...item.stop, locked: true } } : item,
+    );
+    // Retour de la version courante (3) vers la version 2 : l'étape revient, le verrou est retiré.
+    const retour = reussi(appliquerPatch(entree(courante, patch(3, [{ op: "revert", toVersion: 2 }]), { versionsAnterieures: new Map([[2, v2]]) })));
+    expect(retour.resultat.changes).toContainEqual({ type: "added", time: retiree.start, label: retiree.name });
+    expect(retour.resultat.changes).toContainEqual({ type: "unlocked", label: verrouillee.name, time: verrouillee.start });
+    expect(retour.resultat.changes).not.toContainEqual(expect.objectContaining({ type: "unchanged", label: verrouillee.name }));
+    expect(types(retour.resultat)).not.toContain("replaced");
+
+    // Dans l'autre sens (de la version 2 vers la version fabriquée) : l'étape est retirée, le verrou est posé.
+    const aller = reussi(appliquerPatch(entree(v2, patch(4, [{ op: "revert", toVersion: 3 }]), { versionCourante: 4, versionsAnterieures: new Map([[3, courante]]) })));
+    expect(aller.resultat.changes).toContainEqual({ type: "removed", label: retiree.name, before: { day: 2, time: retiree.start } });
+    expect(aller.resultat.changes).toContainEqual({ type: "locked", label: verrouillee.name, time: verrouillee.start });
+    expect(types(aller.resultat)).not.toContain("replaced");
+  });
+
+  it("identifiant réutilisé (0142 § 5.1) : même id, autre placeId ou autre nom → removed puis added, jamais moved ni replaced", () => {
+    const v2 = version2();
+    const ancienne = activiteDuJour(v2, 2);
+    for (const autre of [{ placeId: place("autre") }, { name: "Autre nom maison" }]) {
+      const visee = structuredClone(v2);
+      jourN(visee, 2).items = jourN(visee, 2).items.map((item) =>
+        item.type === "stop" && item.stop.id === ancienne.id ? { ...item, stop: { ...item.stop, ...autre } } : item,
+      );
+      const nouvelle = etape(visee, (stop) => stop.id === ancienne.id);
+      const retour = reussi(appliquerPatch(entree(v2, patch(3, [{ op: "revert", toVersion: 2 }]), { versionCourante: 3, versionsAnterieures: new Map([[2, visee]]) })));
+      expect(retour.resultat.changes).toContainEqual({ type: "removed", label: ancienne.name, before: { day: 2, time: ancienne.start } });
+      expect(retour.resultat.changes).toContainEqual({ type: "added", time: nouvelle.start, label: nouvelle.name });
+      expect(types(retour.resultat)).not.toContain("moved");
+      expect(types(retour.resultat)).not.toContain("replaced");
+    }
+  });
+
+  it("une étape qui change de jour sort en moved (jamais removed) ; avec un verrou changé, moved puis locked", () => {
+    const v2 = version2();
+    const deplacee = activiteDuJour(v2, 3);
+    const visee = structuredClone(v2);
+    jourN(visee, 3).items = jourN(visee, 3).items.filter((item) => !(item.type === "stop" && item.stop.id === deplacee.id));
+    const jour2 = jourN(visee, 2);
+    jour2.items = [...jour2.items.slice(0, -1), { type: "stop", stop: { ...deplacee, start: "21:00", end: "22:30", locked: true } }, ...jour2.items.slice(-1)];
+    const retour = reussi(appliquerPatch(entree(v2, patch(3, [{ op: "revert", toVersion: 2 }]), { versionCourante: 3, versionsAnterieures: new Map([[2, visee]]) })));
+    const moved = { type: "moved", label: deplacee.name, before: { day: 3, time: deplacee.start }, after: { day: 2, time: "21:00" } };
+    const indexMoved = retour.resultat.changes.findIndex((change) => JSON.stringify(change) === JSON.stringify(moved));
+    expect(indexMoved).toBeGreaterThanOrEqual(0);
+    expect(retour.resultat.changes.at(indexMoved + 1)).toEqual({ type: "locked", label: deplacee.name, time: "21:00" });
+    expect(retour.resultat.changes).not.toContainEqual(expect.objectContaining({ type: "removed", label: deplacee.name }));
+  });
+
+  it("unlock seul : unlocked à la place d'unchanged pour l'étape visée", () => {
+    const base = version2();
+    const ticket = billet(base);
+    const jour = base.days.find((d) => etapes(d).some((stop) => stop.id === ticket.id));
+    const { resultat } = reussi(appliquerPatch(entree(base, patch(2, [{ op: "unlock", stopId: ticket.id }]))));
+    expect(resultat.changes).toContainEqual({ type: "unlocked", label: ticket.name, time: ticket.start });
+    expect(resultat.changes.filter((change) => change.type === "unchanged")).toHaveLength(etapes(jour!).length - 1);
+  });
+
+  it("add écrit addedBy: \"person\" ; un patch suivant compte l'étape comme un ajout sans paramètre `ajouts`", () => {
+    const base = version2();
+    const { instantane, resultat } = reussi(
+      appliquerPatch(
+        entree(base, patch(2, [
+          { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time: "21:00", name: "Mon lieu à moi", placeId: place("proche") },
+          { op: "lock", stopId: "ajout-1" },
+        ])),
+      ),
+    );
+    const ajoutee = etape(instantane, (stop) => stop.id === "ajout-1");
+    expect(ajoutee).toMatchObject({ addedBy: "person", locked: true, name: "Mon lieu à moi" });
+    // `[add, lock]` : la ligne `added` suffit, aucune ligne `locked` pour une étape absente de la base.
+    expect(resultat.changes.at(0)).toEqual({ type: "added", time: "21:00", label: "Mon lieu à moi" });
+    expect(types(resultat)).not.toContain("locked");
+    // Les étapes de la version d'arrivée sont toutes marquées par `add` seul : aucune autre n'a `addedBy`.
+    expect(instantane.days.flatMap(etapes).filter((stop) => stop.addedBy !== undefined).map((stop) => stop.id)).toEqual(["ajout-1"]);
+    // Un `revert` rétablit la marque telle quelle.
+    const suivant = reussi(appliquerPatch(entree(base, patch(4, [{ op: "revert", toVersion: 3 }]), { versionCourante: 4, versionsAnterieures: new Map([[3, instantane]]) })));
+    expect(etape(suivant.instantane, (stop) => stop.id === "ajout-1").addedBy).toBe("person");
   });
 });

@@ -228,9 +228,9 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 | `MoveOptions` | Jours et points d'insertion possibles (0016 § 4.3) | F7b ; complété par B11 |
 | `MoveDraft` | Brouillon simulé de déplacement : aperçu sans identifiant ni version (0016 § 6), phase 0 | F7b ; remplacé par le moteur en B11 |
 | `MoveFixture` | Options et brouillons de déplacement d'une étape du jeu simulé (0016 § 6), phase 0 | F7b ; remplacé par B11 |
-| `AddRequest` | Ajout d'un lieu : source opaque, nom saisi, moment (0016 § 4.1) | F7c |
+| `AddRequest` | Ajout d'un lieu : source opaque, nom saisi, moment (0016 § 4.1) ; sur `api`, forme `AddPlaceRequest` `{ tripId, baseVersion, day, time, kind, name, resultId }` (et `AddPlaceApply`, avec `requestId`), nom saisi en `texteMaison`, aucun champ pour un nom Google, une adresse ou la requête (décision 0147 § 3 point 5) | F7c ; forme `api` : PR de contrat M5-C (fait) |
 | `AddMoment` | Moment d'un ajout : temps libre ou repas laissé vide (0016 § 4.3) | F7c |
-| `PlaceSearchResult` | Résultat de recherche : `resultId`, `placeId`, nom chargé à la demande et jamais recopié dans `Stop.name`, moments (0016 § 4.3) | F7c ; complété par B11 |
+| `PlaceSearchResult` | Résultat de recherche d'un lieu à soi : `{ resultId, name, address? }`, objet strict, 5 au plus (`PlaceSearchResultsSchema`) ; `resultId` est le `placeId` lui-même (aucun jeton ni stockage entre recherche et ajout) ; `name` et `address` sont du contenu Google affiché (`GooglePlaceLabel`, 200 caractères au plus), jamais stockés ni recopiés dans `Stop.name` ; demande : `PlaceSearchRequest` `{ tripId, day, query }` (décision 0147 § 3) (`src/contracts/retouches.ts`) | PR de contrat M5-C (fait, 0147 § 14) ; action `searchPlaces` : M5d-1 |
 | `TripSummary` | Carte de « Mes voyages », sans `organizationId`, avec `dayCount` (décision 0021) | F11 ; complété par B6 |
 | `TripReview` | Avis rapide, adresse découverte, préférences retenues (décision 0021) | F11 ; complété par B12 |
 | `TripPatch` | Patch, contrat interne du serveur : `requestId`, `baseVersion`, opérations (`replace`, `add`, `move`, `lock`, `unlock`, `revert`) désignant les étapes par identifiant ; `replace` porte `newStopId` (identifiant attribué par le serveur) ; `add` porte `kind` (`activity` ou `meal`), le `placeId` et le nom saisi par la personne (jamais le nom Google, § 5) | B2 (fait) |
@@ -251,7 +251,7 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 | `AdjustmentSummary` | `{ tripId, retained: RetainedPreference[], days: { day, changes: Change[] }[], toReserveCount, generatingDays }` (décision 0020 § 7, `src/contracts/adjustment.ts`) | F9b ; complété par B10 (calcul déplacé dans `src/domain`, réponse du serveur) |
 | `ChecklistUpdate` | `{ tripId, itemId, done }`, objet strict : état coché voulu d'une ligne « À faire » (`src/contracts/trip.ts`) | B6b (fait ; déplacé de B11 par la décision 0086 § 2.2) |
 | `PlaceDetails` | Détail d'un lieu chargé à la demande (contenu Google, jamais stocké, affiché avec attribution) | B11 |
-| `StopReport` | Signalement d'erreur sur une étape : motif (code), texte libre facultatif | B11 |
+| `StopReport` | Signalement d'erreur sur une étape : `{ tripId, stopId, reason, requestId }`, objet strict ; motif (code fermé `STOP_REPORT_REASONS` : `closed`, `hours`, `wrongPlace`, `price`, `other`), aucun texte (M5-PO-9, décision 0147 § 1) (`src/contracts/trip.ts`) | PR de contrat M5-C (fait, 0147 § 14) ; action `reportStop` : M5c |
 | `AccountExport` | Export des données de la personne (format JSON) | B11 |
 | `ShareLink` | Adresse du lien privé, expiration | B12 |
 | `SharedTrip` | Lecture seule des écrans 11 et 12, sans information de logement tant que Q50 n'est pas tranchée, **sans `organizationId`** (schéma strict ; test `partage: SharedTrip n'expose pas organizationId`) | B12 |
@@ -302,7 +302,7 @@ Décision 0010. Catégories :
 - **chargé à la demande** : contenu Google obtenu côté serveur à l'affichage, jamais persisté, affiché sur la carte Google ou avec la mention « Données de lieux : Google » ;
 - **calculé** : à la lecture, par le moteur (`src/domain`, appelé par le serveur), par le serveur (configuration, identifiants) ou par l'interface (formatage) ; jamais persisté.
 
-Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exporté par `src/contracts` au 2026-10-11 (144 clés, notation du critère § 5 de la spécification B0), **sauf les 7 clés qui dépendent de Q5**, classées dans « Partie Q5 » (décision 0011, point 5) : 137 lignes ici, 7 là-bas, sans recouvrement ; les 144 clés ont donc une catégorie. **Après B2** (2026-10-13) : 6 lignes retirées (`Day.weekday`, `Day.title`, `Proposal.weekday`, `Proposal.context`, `Stop.meta`, `SurpriseIdea.meta`) et 56 ajoutées (`Trip.timeZone` comprise) : 187 lignes ici, 194 clés avec les 7 de 0011 ; les contrats de création (`TripDraft`, `Brief`, `BriefRequest`, `InferredBrief`, `Lodging`, `OtherCity`, `TripCommitment`, `Travellers`, tâche B9) et `TripSummary` (B6) n'avaient pas encore de lignes à cette date, et les schémas de stockage dérivés (`TripSnapshot`, `DaySnapshot`, `DayLineItemSnapshot`, `StopSnapshot`, `EventSnapshot`, `SegmentSnapshot`, `SurpriseIdeaSnapshot`, `ProposalRecord`) n'en ont pas (exclusions du test `contrats: chaque champ a une seule catégorie`, `tests/unit/contracts/categories.test.ts`, décision 0037). **Après la PR de contrat de B9b** (2026-10-17, décision 0081 § B9-TL-14) : 66 lignes ajoutées pour les contrats de création de l'écran 1 et du lancement (`TripRequest`, `TripDraft`, `OtherCity`, `TripCommitment`, `Lodging`, `Brief`, `Travellers`, `GenerationStatus` et `GenerationDay`, exporté pour l'occasion), retirés des exclusions ; `BriefRequest`, `InferredBrief`, `LodgingRequest` et `LodgingSuggestion` (actions sans compte, B9a) restent exclus. **Après B6a** (2026-10-18, spécification B6, B6-PO-12) : 11 lignes `TripSummary.*` ajoutées, `TripSummary` retiré des exclusions. **Après la PR de contrat de B10a** (2026-10-21, décision 0112 § 1) : 33 lignes ajoutées (`DeckDecision`, `DeckCounts`, `DeckDecisionResult`, `PreferenceAnswerRequest`, `PreferenceAnswerResult`, `UndoDecisionRequest`, `UndoDecisionResult`, `CompleteDeckRequest`, `CompleteDeckResult`, `DeckSession`, `PreferenceSignal`). **Après le lot 3 d'E2E-essai** (2026-10-22, décision 0125 § 5) : 1 ligne ajoutée (`TripRequest.story`). **Après le lot 4 d'E2E-essai** (2026-10-23, décision 0126) : 4 lignes ajoutées (`TrialRevisionRequest.tripId`, `TrialRevisionRequest.notForMe`, `TrialRevisionRequest.liked`, `TrialRevisionResult.status`). Un champ dont le type est un autre schéma exporté a une ligne ; ses sous-champs sont dans les lignes du schéma référencé.
+Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exporté par `src/contracts` au 2026-10-11 (144 clés, notation du critère § 5 de la spécification B0), **sauf les 7 clés qui dépendent de Q5**, classées dans « Partie Q5 » (décision 0011, point 5) : 137 lignes ici, 7 là-bas, sans recouvrement ; les 144 clés ont donc une catégorie. **Après B2** (2026-10-13) : 6 lignes retirées (`Day.weekday`, `Day.title`, `Proposal.weekday`, `Proposal.context`, `Stop.meta`, `SurpriseIdea.meta`) et 56 ajoutées (`Trip.timeZone` comprise) : 187 lignes ici, 194 clés avec les 7 de 0011 ; les contrats de création (`TripDraft`, `Brief`, `BriefRequest`, `InferredBrief`, `Lodging`, `OtherCity`, `TripCommitment`, `Travellers`, tâche B9) et `TripSummary` (B6) n'avaient pas encore de lignes à cette date, et les schémas de stockage dérivés (`TripSnapshot`, `DaySnapshot`, `DayLineItemSnapshot`, `StopSnapshot`, `EventSnapshot`, `SegmentSnapshot`, `SurpriseIdeaSnapshot`, `ProposalRecord`) n'en ont pas (exclusions du test `contrats: chaque champ a une seule catégorie`, `tests/unit/contracts/categories.test.ts`, décision 0037). **Après la PR de contrat de B9b** (2026-10-17, décision 0081 § B9-TL-14) : 66 lignes ajoutées pour les contrats de création de l'écran 1 et du lancement (`TripRequest`, `TripDraft`, `OtherCity`, `TripCommitment`, `Lodging`, `Brief`, `Travellers`, `GenerationStatus` et `GenerationDay`, exporté pour l'occasion), retirés des exclusions ; `BriefRequest`, `InferredBrief`, `LodgingRequest` et `LodgingSuggestion` (actions sans compte, B9a) restent exclus. **Après B6a** (2026-10-18, spécification B6, B6-PO-12) : 11 lignes `TripSummary.*` ajoutées, `TripSummary` retiré des exclusions. **Après la PR de contrat de B10a** (2026-10-21, décision 0112 § 1) : 33 lignes ajoutées (`DeckDecision`, `DeckCounts`, `DeckDecisionResult`, `PreferenceAnswerRequest`, `PreferenceAnswerResult`, `UndoDecisionRequest`, `UndoDecisionResult`, `CompleteDeckRequest`, `CompleteDeckResult`, `DeckSession`, `PreferenceSignal`). **Après le lot 3 d'E2E-essai** (2026-10-22, décision 0125 § 5) : 1 ligne ajoutée (`TripRequest.story`). **Après le lot 4 d'E2E-essai** (2026-10-23, décision 0126) : 4 lignes ajoutées (`TrialRevisionRequest.tripId`, `TrialRevisionRequest.notForMe`, `TrialRevisionRequest.liked`, `TrialRevisionResult.status`). **Après la PR de contrat M5-C** (2026-10-29, décision 0147 § 14) : 57 lignes ajoutées (`Stop.addedBy`, `ChecklistItem.kind`, `StopReport`, variantes `removed`, `locked`, `unlocked` et `checklist` de `Change`, `TripVersionSummary`, `TripVersionPage`, `RevertPreview`, `PlaceSearchRequest`, `PlaceSearchResult`, `AddPlaceRequest`, `AddPlaceApply`). Un champ dont le type est un autre schéma exporté a une ligne ; ses sous-champs sont dans les lignes du schéma référencé.
 
 | Champ | Catégorie | Règle |
 |---|---|---|
@@ -317,6 +317,7 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `Stop.source` | stocké | Source web relue (jamais Google) |
 | `Stop.locked` | stocké | Choix de la personne, ou engagement verrouillé à la création (décision 0015 § 9) |
 | `Stop.commitment` | stocké | Engagement saisi par la personne à l'écran 1 (`TripDraft`), décision 0015 § 9 |
+| `Stop.addedBy` | stocké | `"person"` : lieu à soi, écrit par le moteur à l'opération `add` (décision 0147 § 6.1) ; dans l'instantané, rétabli par un `revert` ; absent de la vue partagée (liste blanche de `shared_stop`) |
 | `StopFacts.durationMinutes` | stocké | Durée de visite estimée par notre recherche web (minutes, entier positif) ; jamais tirée de Google |
 | `StopFacts.costPerPerson` | stocké | Coût estimé par personne en CHF (0 = gratuit), issu de notre recherche web ; jamais un niveau de prix Google |
 | `StopFacts.area` | stocké | Secteur ou quartier, texte maison ; jamais l'adresse Google |
@@ -357,6 +358,7 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `SurpriseIdea.reason` | stocké | Justification maison |
 | `SurpriseIdea.source` | stocké | Source web relue (jamais Google) |
 | `ChecklistItem.id` | stocké | Identifiant |
+| `ChecklistItem.kind` | stocké | `checklist_items.kind` (`reservation`, `ticket`, `other`, décision 0147 § 6.2) ; seule `reservation` non faite est comptée par `countToReserve` |
 | `ChecklistItem.label` | stocké | Contenu maison : ce qu'il faut réserver |
 | `ChecklistItem.when` | stocké | `ChecklistMoment` (PO-2, évolution E4) |
 | `ChecklistItem.done` | stocké | Choix de l'utilisateur |
@@ -366,6 +368,10 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `ChecklistUpdate.tripId` | stocké | Identifiant du voyage (`trips.id`) désigné par l'action `toggleChecklistItem` (B6b) ; jamais l'organisation, lue de la session |
 | `ChecklistUpdate.itemId` | stocké | Identifiant de la ligne (`checklist_items.id`) |
 | `ChecklistUpdate.done` | stocké | État final voulu, écrit dans `checklist_items.done` ; `done_at` posé à l'horloge de la base, remis à nul au décochage |
+| `StopReport.tripId` | stocké | `feedback.trip_id` du voyage désigné par `reportStop` (M5c) ; jamais l'organisation, lue de la session (décision 0147 § 1) |
+| `StopReport.stopId` | stocké | `feedback.target_stop_id` : identifiant interne de l'étape, jamais un `placeId` (le serveur écrit le `placeId` de l'étape lu dans la version courante, `feedback.place_id`) |
+| `StopReport.reason` | stocké | `feedback.reason`, code fermé `STOP_REPORT_REASONS` ; aucun texte (M5-PO-9) |
+| `StopReport.requestId` | stocké | `feedback.request_id` (idempotence, migration M5-D) |
 | `ChecklistMoment[deadline].type` | stocké | Discriminant (`checklist_items.moment`, PO-2) |
 | `ChecklistMoment[deadline].date` | stocké | Date limite ISO ; l'interface affiche « Avant le {date} » |
 | `ChecklistMoment[beforeDeparture].type` | stocké | Discriminant |
@@ -481,6 +487,56 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `Change[unchanged].type` | calculé | Moteur |
 | `Change[unchanged].label` | calculé | Moteur, depuis `Stop.name` |
 | `Change[unchanged].time` | calculé | Moteur |
+| `Change[removed].type` | calculé | Moteur (variante de M5, décision 0147 § 5.1) |
+| `Change[removed].label` | calculé | Moteur, depuis `Stop.name` de l'étape retirée |
+| `Change[removed].before.day` | calculé | Moteur, jour de l'étape dans la version de départ |
+| `Change[removed].before.time` | calculé | Moteur, heure de l'étape dans la version de départ |
+| `Change[locked].type` | calculé | Moteur (décision 0147 § 5.1) |
+| `Change[locked].label` | calculé | Moteur, depuis `Stop.name` |
+| `Change[locked].time` | calculé | Moteur, heure de l'étape dans la version d'arrivée |
+| `Change[unlocked].type` | calculé | Moteur (décision 0147 § 5.1) |
+| `Change[unlocked].label` | calculé | Moteur, depuis `Stop.name` |
+| `Change[unlocked].time` | calculé | Moteur, heure de l'étape dans la version d'arrivée |
+| `Change[checklist].type` | calculé | Serveur, fonction de liste « À faire » (décision 0147 § 5.1 et § 7), jamais `changements()` |
+| `Change[checklist].action` | calculé | Serveur, ligne ajoutée ou retirée par l'écriture |
+| `Change[checklist].label` | calculé | Serveur, depuis `ChecklistItem.label` (contenu maison) |
+| `TripVersionSummary.version` | stocké | `trip_versions.version` (décision 0147 § 5.3) |
+| `TripVersionSummary.createdAt` | stocké | `trip_versions.created_at` (instant ISO ; l'écran l'affiche à l'heure de l'appareil) |
+| `TripVersionSummary.kind` | calculé | Serveur, depuis `generation_runs` (versions du workflow) ou la première opération de `trip_versions.patch` |
+| `TripVersionSummary.subject` | calculé | Serveur, nom de l'étape tiré de l'instantané (`Stop.name`), jamais un nom Google |
+| `TripVersionSummary.previous` | calculé | Serveur, ancien nom tiré de l'instantané précédent (`replaced`) |
+| `TripVersionSummary.day` | calculé | Serveur, jour d'arrivée tiré du patch (`moved`) |
+| `TripVersionSummary.revertedTo.version` | stocké | `toVersion` du patch `revert` |
+| `TripVersionSummary.revertedTo.createdAt` | stocké | `trip_versions.created_at` de la version visée |
+| `TripVersionSummary.revertible` | calculé | Serveur : version écrite après `entitlements.granted_at` du droit `tripUnlocked` et autre que la courante (0147 § 5.3 point 4) |
+| `TripVersionSummary.current` | calculé | Serveur : version courante du voyage |
+| `TripVersionPage.items` | calculé | Voir `TripVersionSummary.*` ; 20 au plus, de la plus récente à la plus ancienne |
+| `TripVersionPage.nextBefore` | calculé | Serveur, borne exclusive de la page suivante, `null` en fin de liste |
+| `RevertPreview.baseVersion` | stocké | `trip_versions.version` courante |
+| `RevertPreview.toVersion` | stocké | `trip_versions.version` visée |
+| `RevertPreview.changes` | calculé | Moteur (`appliquerPatch` sur `[revert]` à blanc) et fonction de liste ; jamais `replaced` ni `segment` |
+| `RevertPreview.currentHasLockedStop` | calculé | Serveur, depuis l'instantané courant |
+| `PlaceSearchRequest.tripId` | stocké | Identifiant du voyage désigné par `searchPlaces` (M5d-1) ; jamais l'organisation |
+| `PlaceSearchRequest.day` | stocké | Jour du voyage ; la ville de son séjour (`stays.city`, nom maison) oriente la requête |
+| `PlaceSearchRequest.query` | calculé | Texte saisi, envoyé à Google par le seul client Places ; **jamais stocké, journalisé ni mis dans un prompt** (décision 0147 § 12 S2) |
+| `PlaceSearchResult.resultId` | stocké | `placeId` du résultat (identifiant de lieu Google, seul élément conservable), écrit dans `Stop.placeId` seulement si la personne ajoute le lieu (0147 § 3 point 4) |
+| `PlaceSearchResult.name` | chargé à la demande | Nom Google affiché avec attribution, jamais stocké ni recopié dans `Stop.name` |
+| `PlaceSearchResult.address` | chargé à la demande | Adresse Google courte, affichée avec attribution, jamais stockée |
+| `AddPlaceRequest.tripId` | stocké | Identifiant du voyage ; jamais l'organisation |
+| `AddPlaceRequest.baseVersion` | stocké | `TripPatch.baseVersion` |
+| `AddPlaceRequest.day` | stocké | Jour de l'opération `add` |
+| `AddPlaceRequest.time` | stocké | Heure de l'opération `add` |
+| `AddPlaceRequest.kind` | stocké | `activity` ou `meal` de l'opération `add` |
+| `AddPlaceRequest.name` | stocké | Nom saisi par la personne (`texteMaison`, 0147 § 12 S4), écrit dans `Stop.name` ; jamais un nom Google |
+| `AddPlaceRequest.resultId` | stocké | `placeId` du résultat choisi, écrit dans `Stop.placeId` |
+| `AddPlaceApply.tripId` | stocké | Règle de `AddPlaceRequest.tripId` |
+| `AddPlaceApply.baseVersion` | stocké | Règle de `AddPlaceRequest.baseVersion` |
+| `AddPlaceApply.day` | stocké | Règle de `AddPlaceRequest.day` |
+| `AddPlaceApply.time` | stocké | Règle de `AddPlaceRequest.time` |
+| `AddPlaceApply.kind` | stocké | Règle de `AddPlaceRequest.kind` |
+| `AddPlaceApply.name` | stocké | Règle de `AddPlaceRequest.name` |
+| `AddPlaceApply.resultId` | stocké | Règle de `AddPlaceRequest.resultId` |
+| `AddPlaceApply.requestId` | stocké | `TripPatch.requestId` ; l'étape ajoutée prend l'identifiant `ajout-<requestId>` |
 | `DayMap.tripId` | calculé | Serveur, identifiant du voyage demandé |
 | `DayMap.dayIndex` | calculé | Serveur, jour demandé |
 | `DayMap.points` | chargé à la demande | Positions pour la carte Google (décision 0013 § 1), voir `MapPoint.*` ; jamais persistées par le navigateur |

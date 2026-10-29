@@ -44,6 +44,8 @@ interface HandoverStop {
   locked: boolean;
   /** Ajout signalé (décision 0015, § 9) : engagement saisi par la personne. */
   commitment?: "ticket" | "reservation";
+  /** Ajout signalé (décision 0147 § 6.1, M5-C) : lieu à soi, écrit par l'opération `add`. */
+  addedBy?: "person";
 }
 /** `minutes` et `Day.travelMinutes` : `null` pour un temps indisponible (prototype seulement, décision 0092 § 4). */
 interface HandoverSegment { mode: "walk" | "transit" | "car"; minutes: number | null; estimated: boolean }
@@ -82,6 +84,8 @@ interface HandoverSurpriseIdea {
 type HandoverChecklistMoment = { type: "deadline"; date: string } | { type: "beforeDeparture" } | { type: "tripDay"; day: number };
 interface HandoverChecklistItem {
   id: string;
+  /** Ajout signalé (décision 0147 § 6.2, M5-C) : sorte de la ligne, seule `reservation` est comptée. */
+  kind: "reservation" | "ticket" | "other";
   label: string;
   when: HandoverChecklistMoment;
   done: boolean;
@@ -129,7 +133,12 @@ type HandoverChange =
   | { type: "moved"; label: string; before: { day: number; time: string }; after: { day: number; time: string } }
   | { type: "segment"; label: string; before: number; after: number; estimated: boolean }
   | { type: "budget"; deltaPerPerson: number }
-  | { type: "unchanged"; label: string; time: string };
+  | { type: "unchanged"; label: string; time: string }
+  // Ajouts signalés (décision 0147 § 5.1, M5-C), à la fin de l'union.
+  | { type: "removed"; label: string; before: { day: number; time: string } }
+  | { type: "locked"; label: string; time: string }
+  | { type: "unlocked"; label: string; time: string }
+  | { type: "checklist"; action: "added" | "removed"; label: string };
 
 const validStop: Stop = {
   id: "s1",
@@ -478,7 +487,7 @@ describe("TripSchema, ChecklistItem et Change", () => {
     travellers: { adults: 2, children: 0 },
     days: [],
     checklist: [
-      { id: "c1", label: "[Billet]", when: { type: "beforeDeparture" }, done: false, sponsored: false },
+      { id: "c1", kind: "ticket", label: "[Billet]", when: { type: "beforeDeparture" }, done: false, sponsored: false },
     ],
     unlocked: false,
   };

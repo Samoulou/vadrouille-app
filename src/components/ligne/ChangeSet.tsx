@@ -52,7 +52,7 @@ function moment(value: { day: number; time: string }): string {
   return format(t.jourHeure, { day: value.day, time: value.time });
 }
 
-function Ligne({ change }: { change: Change }) {
+function Ligne({ change }: { change: Change }): ReactNode {
   switch (change.type) {
     case "replaced":
       // « à la place de » porte l'information : pas de « avant : » masqué (décision 0018 § 8).
@@ -100,6 +100,28 @@ function Ligne({ change }: { change: Change }) {
     }
     case "unchanged":
       return null;
+    // Variantes de M5 (décision 0147 § 5.1) ; textes provisoires, à valider par UX/UI.
+    case "removed":
+      // Ancien moment (jour et heure) et nom barré ; « retiré » porte l'information (le barré ne la porte jamais seul).
+      return (
+        <>
+          <span className={HEURE}>{moment(change.before)}</span> <del className={ANCIEN}>{change.label}</del> {t.retire}
+        </>
+      );
+    case "locked":
+      return (
+        <>
+          <span className={HEURE}>{change.time}</span> {format(t.verrouille, { label: change.label })}
+        </>
+      );
+    case "unlocked":
+      return (
+        <>
+          <span className={HEURE}>{change.time}</span> {format(t.verrouRetire, { label: change.label })}
+        </>
+      );
+    case "checklist":
+      return <>{format(change.action === "added" ? t.aFaireAjoutee : t.aFaireRetiree, { label: change.label })}</>;
   }
 }
 

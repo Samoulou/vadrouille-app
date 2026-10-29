@@ -58,6 +58,7 @@ function doubleWithOrg(reponses: Record<string, unknown>[][]) {
 
 const ligne = (done: boolean) => ({
   id: ITEM,
+  kind: "ticket",
   label: "[Billets du Tattoo]",
   moment: { type: "beforeDeparture" },
   done,
@@ -112,7 +113,7 @@ describe("actions: le contexte vient de la session, jamais du client", () => {
   it("contexte de withOrg : celui de la session ; voyage contrôlé dans l'organisation de la session", async () => {
     const { withOrg, requetes, contextes } = doubleWithOrg([[{ present: 1 }], [ligne(true)]]);
     const resultat = await basculerAFaire({ ...session(CTX), withOrg }, { tripId: TRIP, itemId: ITEM, done: true });
-    expect(resultat).toEqual({ ok: true, value: { id: ITEM, label: "[Billets du Tattoo]", when: { type: "beforeDeparture" }, done: true, sponsored: false } });
+    expect(resultat).toEqual({ ok: true, value: { id: ITEM, kind: "ticket", label: "[Billets du Tattoo]", when: { type: "beforeDeparture" }, done: true, sponsored: false } });
     expect(contextes).toEqual([CTX]);
     expect(requetes).toHaveLength(2);
     expect(requetes[0]?.texte).toMatch(/FROM public\.trips WHERE organization_id = \$1 AND id = \$2/);

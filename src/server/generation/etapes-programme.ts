@@ -219,7 +219,7 @@ export function lignesAFaire(checklist: Trip["checklist"], generationRunId: stri
     .map((item) => item.label.trim())
     .filter((label) => label !== "")
     .map((label, rang) => {
-      const item = ChecklistItemSchema.parse({ id: identifiantBonPlan(generationRunId, rang), label, when: { type: "beforeDeparture" }, done: false, sponsored: false });
+      const item = ChecklistItemSchema.parse({ id: identifiantBonPlan(generationRunId, rang), kind: "other", label, when: { type: "beforeDeparture" }, done: false, sponsored: false });
       return { id: item.id, label: item.label };
     });
 }
