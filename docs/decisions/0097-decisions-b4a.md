@@ -117,6 +117,7 @@ Le webhook répond `200` dès que la transaction du droit est validée, même si
 Ces écarts de portée touchent un document du CEO (0078) : le Tech Lead les constate ici, et le CEO les reporte dans 0078 § 2 (question au CEO, plus bas). Ils s'appliquent dès cette fusion à la lecture des tickets.
 - **Disparition de la porte `owner-approved` de B4a.** La ligne B4a du tableau de 0078 § 2 liste la porte « `owner-approved` (0035) pour la ligne `docker run … -e SIMULATED_WEBHOOK_ENABLED=true` de `ci.yml` (A10) » : B4a ne modifie plus `.github/workflows/`, cette porte ne s'applique plus à B4a (B4-TL-8).
 - **Transfert à B4b.** La partie « job `docker` » de A10 (404 sans drapeau sur l'image de production ; refus de démarrer avec `-e SIMULATED_WEBHOOK_ENABLED=true`) et l'exception de A26 sur la ligne `docker run` entrent dans le périmètre de **B4b**, qui modifie déjà un workflow sous `owner-approved` : B4b l'inscrit à son ticket, et la ligne B4b du tableau de 0078 § 2 le mentionne.
+- **Report et livraison (CEO, 2026-10-29 ; Q661).** Les deux écarts sont reportés dans 0078 § 2 (note « Corrections de portée » sous le tableau). La partie « job `docker` » de A10 et l'exception de A26 sont **livrées** par la PR #853 (B4b-ci, ticket #843, commit `b62e7b8` sur `main`).
 
 ## Ce qui n'est pas tranché ici
 - **B4-TL-14** (amendement de 0020 § 2.3 et § 3) : avant B4b seulement.
