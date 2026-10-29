@@ -2,7 +2,8 @@
   "titreDocument": {
     "debloquer": "{destination} · Débloquer",
     "simule": "Paiement simulé",
-    "confirmation": "{destination} · Confirmation du paiement"
+    "confirmation": "{destination} · Confirmation du paiement",
+    "recu": "{destination} · Reçu simulé"
   },
   "retour": "Retour",
   "plaque": {
@@ -51,7 +52,8 @@
       "cancelled": "Paiement annulé.",
       "expired": "Ce paiement a expiré. Tu peux recommencer."
     },
-    "voirProgramme": "Voir le programme"
+    "voirProgramme": "Voir le programme",
+    "voirRecu": "Voir le reçu"
   },
   "simule": {
     "titre": "Paiement simulé",
@@ -77,5 +79,21 @@
     "propositions": "Voir mes premières propositions",
     "verifier": "Vérifier de nouveau",
     "attenteArretee": "La confirmation n'est pas encore arrivée. Ton voyage sera débloqué dès qu'elle arrivera : vérifie de nouveau dans un moment."
+  },
+  "recu": {
+    "titre": "Reçu simulé",
+    "mention": "Reçu de démonstration : aucun paiement réel n'a eu lieu et ce document n'a aucune valeur comptable.",
+    "details": "Détails du paiement simulé",
+    "voyage": "Voyage",
+    "voyageValeur": "{destination}, {dates}",
+    "montant": "Montant",
+    "moyen": "Moyen",
+    "moyens": {
+      "twint": "TWINT",
+      "card": "carte"
+    },
+    "date": "Date",
+    "dateHeure": "{date} à {heure}",
+    "identifiant": "Identifiant du paiement"
   }
 }
