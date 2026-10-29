@@ -62,3 +62,18 @@ export type EtatLot = z.infer<typeof EtatLotSchema>;
 export function lireEtatLot(valeur: unknown): EtatLot {
   return EtatLotSchema.parse(valeur);
 }
+
+/**
+ * État sérialisé de `generateProgramme` (chaîne inversée, décision 0136 § 2.6) : le même `z.strictObject` que `EtatEtapeSchema`
+ * (0105 § 1 ; `{ generationRunId, organizationId, rang }` plus le code fermé d'un arrêt), rang borné à 2 (`a` = 1, `e` = 2,
+ * `RANG_PROGRAMME`). Ni brief, ni récit, ni nom, ni `placeId`.
+ */
+export const EtatProgrammeSchema = EtatEtapeSchema.extend({
+  rang: z.number().int().min(0).max(2),
+});
+export type EtatProgramme = z.infer<typeof EtatProgrammeSchema>;
+
+/** Entrée d'une étape de `generateProgramme`, validée par son contrat strict. */
+export function lireEtatProgramme(valeur: unknown): EtatProgramme {
+  return EtatProgrammeSchema.parse(valeur);
+}

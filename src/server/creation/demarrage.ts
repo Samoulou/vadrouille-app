@@ -26,6 +26,16 @@ export const demarrerApercuReel: DemarrerApercu = async (generationRunId, organi
   return issue.ok ? issue.workflowRunId : null;
 };
 
+/**
+ * Démarrage réel de `generateProgramme` (chaîne inversée, décision 0136 § 4.3), même forme que `demarrerApercuReel` : choisi
+ * par la dépendance `chaine` des cas d'usage, jamais par l'appelant.
+ */
+export const demarrerProgrammeReel: DemarrerApercu = async (generationRunId, organizationId) => {
+  const { demarrerProgramme } = await import("@/workflows");
+  const issue = await demarrerProgramme(generationRunId, organizationId);
+  return issue.ok ? issue.workflowRunId : null;
+};
+
 /** Port et démarrages du workflow 4 (`generateFullTrip`, B9d) : ceux de `src/server/generation/`, partagés avec la suite du paiement. */
 export type { DemarrerVoyageComplet } from "@/server/generation/reconciliation";
 export { demarrerVoyageCompletReel, demarrerVoyageCompletSansAppel } from "@/server/generation/demarrage";

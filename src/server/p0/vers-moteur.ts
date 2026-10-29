@@ -1,4 +1,4 @@
-import type { Brief as BriefContrat, Day, MobilityMode, TripCommitment } from "@/contracts";
+import type { Brief as BriefContrat, Day, TripCommitment } from "@/contracts";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { CandidatEvenement, CandidatMoteur, EtatChoix, Nuit, VoyageMoteur } from "@/domain/entrees";
 import type { JourPlanifie } from "@/domain/planification";
@@ -11,7 +11,7 @@ import { jourSemaine } from "@/domain/temps";
 import type { AncrageResolu, Trajets } from "@/prototype/ancrage";
 import type { Brief } from "@/prototype/brief";
 import type { Candidat, CandidatNote } from "@/prototype/candidat";
-import { rythmeVersPace } from "@/server/programme/assemblage";
+import { modeDeTrajet, rythmeVersPace } from "@/server/programme/assemblage";
 
 /**
  * Adaptateur de P0 vers les entrées du moteur (décision 0045 § 1.3, B5-TL-1) : **seul** fichier qui convertit les
@@ -110,12 +110,8 @@ export function demandesDuSejour(
   return { demandes, serie, premiereSerie };
 }
 
-/** Mode de trajet de P0 : un seul mode, celui du calcul de la matrice. */
-export function modeDeTrajet(brief: Brief): MobilityMode {
-  if (brief.deplacements.includes("transit")) return "transit";
-  if (brief.deplacements.includes("walk")) return "walk";
-  return "car";
-}
+/** Mode de trajet de P0 (déplacé dans `@/server/programme/assemblage` par M1a-2, décision 0136 § 1, réexporté ici). */
+export { modeDeTrajet };
 
 function faitsDe(candidat: Candidat): CandidatMoteur["faits"] {
   // Le coût n'est repris que s'il est nul : la devise des prix trouvés sur le web n'est pas convertie (P0).

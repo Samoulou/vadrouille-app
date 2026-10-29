@@ -29,8 +29,8 @@ import {
   SQL_NOTES,
   SQL_OCCURRENCE,
   SQL_OCCURRENCES,
-  SQL_PLACE_SEJOUR,
 } from "./etapes";
+import { SQL_PLACE_SEJOUR } from "./sql-sejours";
 import { lireEtatComplet, type EtatComplet } from "./etat";
 import { forfaitDeLEtape, type ForfaitDeLEtape, type PartDuPassage } from "./forfait-etape";
 import { reserveDuPassage, type ReserveTextSearch } from "./reserve-text-search";
@@ -316,6 +316,16 @@ export function etapeCompletDebut(entree: unknown, dependances?: DependancesGene
     entree,
     "a",
     async (contexte) => {
+      // Chaîne inversée (décision 0136 § 4.4), en attendant M1c : la version 1 porte déjà tout le programme vérifié ; la ligne
+      // `full` est close en `ready` sur la version courante, sans rien écrire d'autre ni appeler (ni forfait, ni composition).
+      if (contexte.dep.chaine === "inversee") {
+        await sql(contexte, async (x) => {
+          const { version } = await lireInstantane(x, contexte.organizationId, contexte.tripId);
+          const fin = await x.query(SQL_FIN_COMPLET, [contexte.organizationId, contexte.generationRunId, contexte.rang, "ready", version, maintenant(contexte).toISOString()]);
+          if (fin.rows.length === 0) throw new ArretEtape("step_expired");
+        });
+        return;
+      }
       const passage = await sql(contexte, (x) => lirePassage(x, contexte));
       if (passage.jours.length === 0) {
         await sql(contexte, async (x) => {

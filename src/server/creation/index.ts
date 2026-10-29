@@ -25,7 +25,8 @@ export interface CasCreation {
   getFullTripStatus(ctx: AdapterContext, tripId: string): Promise<Result<FullTripStatus>>;
 }
 
-export function creerCasCreation(dependances: DependancesCreation = {}): CasCreation {
+/** `dependances` absent : composition de l'app (chaîne `CHAINE_APERCU` lue à l'appel, 0136 § 4.2) ; présent : tests. */
+export function creerCasCreation(dependances?: DependancesCreation): CasCreation {
   const o = outils(dependances);
   return {
     createTrip: (ctx, request) => creerVoyage(o, ctx, request),

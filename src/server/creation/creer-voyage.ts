@@ -3,6 +3,7 @@ import "server-only";
 import type { AdapterContext } from "@/adapters/types";
 import { TripRequestSchema, fail, ok, type CreatedTrip, type Result } from "@/contracts";
 import { controlerVilles, dateLocale } from "@/lib/fuseaux";
+import { briefDepuisFormulaire } from "@/server/programme/brief";
 
 import { lignesDuBrouillon } from "./brouillon";
 import {
@@ -20,6 +21,8 @@ import {
  * B9-TL-5 à B9-TL-7 et 0087 §§ 4 et 5). Ordre :
  * 1. contexte de la session (`unauthenticated` sinon, rien n'est lu ni écrit) et revalidation par `TripRequestSchema` ;
  *    puis le même `requestId` déjà écrit → le même voyage, avant tout autre contrôle (B9b point 3) ;
+ * 1 bis. sous la chaîne inversée seulement, refus de la conversion du site d'essai (`validation_failed` sur son champ,
+ *    décision 0136 § 3.8) ;
  * 2. villes : chacune connue de la table maison et de même décalage UTC que la destination pendant le voyage
  *    (`validation_failed` sur le nom de la première ville refusée) ; fuseau du voyage : celui de la destination, jamais
  *    tiré d'une réponse Google ;
@@ -77,6 +80,15 @@ export async function creerVoyage(o: Outils, ctx: AdapterContext | null | undefi
     return fail("provider_error");
   }
   if (deja !== null) return ok({ tripId: deja });
+
+  // Chaîne inversée (décision 0136 § 3.8) : la conversion du site d'essai (`briefDepuisFormulaire`, celle que relit l'étape
+  // `a` de `generateProgramme`) refuse **avant toute écriture** un brouillon qu'elle ne sait pas convertir, sur le champ
+  // qu'elle rend (`draft.otherCities`, `draft.destination`, `draft.end`). Récit : jamais lu ici tant que la garde
+  // `RECIT_API_AUTORISE` est fermée (0139 § 1.2 point 6), et `story` reste `NULL` (`SQL_BRIEF`). Ancienne chaîne : inchangée.
+  if (o.chaine() === "inversee") {
+    const conversion = briefDepuisFormulaire(draft, request.brief, undefined);
+    if (!conversion.ok) return fail("validation_failed", conversion.champ);
+  }
 
   const controle = controlerVilles([draft.destination, ...draft.otherCities.map((ville) => ville.name)], draft.start, draft.end);
   if (!controle.ok) return fail("validation_failed", champVille(controle.indice));

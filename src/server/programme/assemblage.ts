@@ -38,6 +38,17 @@ export function rythmeVersPace(rythme: RythmeEssai): Pace {
   }
 }
 
+/**
+ * Mode de trajet unique du programme (celui des segments écrits) : `transit` si coché, sinon `walk`, sinon `car`. Déplacé
+ * de `src/server/p0/vers-moteur.ts` par M1a-2 (décision 0136 § 1 : la vraie app ne peut pas importer `src/server/p0`), sans
+ * changement ; `vers-moteur.ts` le réexporte.
+ */
+export function modeDeTrajet(brief: Pick<BriefEssai, "deplacements">): Segment["mode"] {
+  if (brief.deplacements.includes("transit")) return "transit";
+  if (brief.deplacements.includes("walk")) return "walk";
+  return "car";
+}
+
 /** Terminus d'une journée : identifiants des logements de départ et d'arrivée (`""` : logement sans identifiant). */
 export type TerminusDuJour = { jour: number; depart: string; arrivee: string };
 

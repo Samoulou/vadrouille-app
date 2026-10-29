@@ -77,9 +77,16 @@ export const PlafondsUsageSchema = z.strictObject({
   /**
    * Profils de génération (B7-PO-5) : `apercu` (workflow 1), `complet` (workflow 4), `mini` (mini-recherche, B11) et `lot`
    * (recalcul des jours touchés par un tri, workflow 5 `batchRecompute`, décision 0119 § 4.1 : aucune recherche, des requêtes
-   * Routes ; plafond d'un recalcul, question 3 de la spécification B10, à Samuel).
+   * Routes ; plafond d'un recalcul, question 3 de la spécification B10, à Samuel) ; `programme` (aperçu de la chaîne inversée,
+   * workflow `generateProgramme`, décision 0136 § 6 : une requête de modèle, Text Search et fiches, aucune requête Routes).
    */
-  generations: z.strictObject({ apercu: ProfilGenerationSchema, complet: ProfilGenerationSchema, mini: ProfilGenerationSchema, lot: ProfilGenerationSchema }),
+  generations: z.strictObject({
+    apercu: ProfilGenerationSchema,
+    complet: ProfilGenerationSchema,
+    mini: ProfilGenerationSchema,
+    lot: ProfilGenerationSchema,
+    programme: ProfilGenerationSchema,
+  }),
   /** Relectures (0100 § 1.3) : `jour` (un jour, une présentation : `getDay`, `listProposals`, `listPreviewSlots`) et `voyage` (`getTrip`). */
   relecture: z.strictObject({ jour: ProfilRelectureSchema, voyage: ProfilRelectureSchema }),
   /** Actions sans compte (B7-TL-10, 0081 B9-TL-4 point 3). */
@@ -152,6 +159,10 @@ export const PLAFONDS_VARIANTE_SIMULEE: PlafondsUsage = chargerPlafondsUsage({
     // réserve exacte), deux relectures d'un jour (2 × 20 fiches), la part de deux jours du profil `complet` en Routes (2 × 2
     // requêtes, 2 × 100 éléments), au plus deux villes `area` ou `none` par jour touché. Valeurs de test, pas des montants.
     lot: { coutModelesMicros: 20_000, placesTextSearch: 4, placesDetails: 40, routesRequetes: 4, routesElements: 200 },
+    // Aperçu de la chaîne inversée (décision 0136 § 6.4) : Text Search et fiches de `prototype/config/mode-reel.json` (le
+    // programme simulé de Rome compte 30 lieux distincts et un logement), aucune requête Routes à la génération (§ 2.4).
+    // Valeurs de test, pas des montants : la barrière ne les lit jamais.
+    programme: { coutModelesMicros: 600_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 },
   },
   relecture: {
     jour: { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 },

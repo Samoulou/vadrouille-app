@@ -134,6 +134,12 @@ export type ConfigurationIa = {
   };
   /** Étape `recherche` de l'agent (appel de modèle hors de la couche IA, `creerRecherche`). */
   readonly recherche: ReglageEtape;
+  /**
+   * Requête `programme` de la chaîne inversée (décision 0136 § 6.6 ; verdict 0139 § 1.1) : modèle de `modeles.json`
+   * (`etapes.programme`), `zdr.programme` de `ia.json`. `creerRedigerProgramme` impose de toute façon `zdr: true` et
+   * `data_collection: "deny"` (0117 § 5) : ce réglage en est une seconde déclaration, jamais un relâchement.
+   */
+  readonly programme: ReglageEtape;
   /** Forme de `ReglageRechercheWeb` sans `maxResultats` (posé par la composition à `MAX_RESULTATS_WEB`). */
   readonly rechercheWeb: ReglageEtape & { readonly moteur: string };
   readonly profils: {
@@ -187,6 +193,7 @@ export function chargerConfigurationIa(brute: unknown, modelesBruts: unknown, re
       raisons: reglage(modeles.etapes.raisons, ia.zdr.raisons),
     },
     recherche: reglage(modeles.etapes.recherche, ia.zdr.recherche),
+    programme: reglage(modeles.etapes.programme, ia.zdr.programme),
     // Le greffon `web` n'a pas de réglage `zdr` : la requête de recherche web ne le porte jamais (décision 0096 § 4.1).
     rechercheWeb: {
       ...reglage(modeles.etapes.recherche, undefined),

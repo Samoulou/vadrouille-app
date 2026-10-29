@@ -10,7 +10,8 @@ import { cibleDe, importateurDe, visiteurs } from "./ia-recherche-imports.mjs";
  * - `@/server/composition/generation` : `src/server/creation/`, `src/server/generation/` ;
  * - `@/server/generation/*` : `src/server/generation/`, `src/server/creation/`, `src/server/payment/` (suite de B4a),
  *   `src/workflows/apercu.ts`, `src/workflows/voyage-complet.ts`, `src/workflows/recalcul.ts` (pont du workflow 5, B10b,
- *   0119 § 1.8 et 0120 S9 point 2), `src/workflows/index.ts`, et le seul fichier `src/server/presentation/tri.ts` pour les
+ *   0119 § 1.8 et 0120 S9 point 2), `src/workflows/programme.ts` (pont de `generateProgramme`, chaîne inversée : 0136 § 2.1,
+ *   qui amende 0101 § 4 d'un importateur), `src/workflows/index.ts`, et le seul fichier `src/server/presentation/tri.ts` pour les
  *   seuls modules `lot`, `expiration` et `demarrage` (`completeDeck` crée la ligne `batch`, démarre le workflow 5 et expire les
  *   lots figés, 0119 § 1.3 point 2 et § 1.4 point 5 ; importateur admis par la Sécurité à la revue de la PR 667, 0120 S9 point 3) ;
  *   `@/server/generation/reprise` seul : aussi `scripts/reprise-studio.ts` (commande de reprise du studio, 0087 § 1.6 point 3) ;
@@ -42,6 +43,8 @@ export const IMPORTATEURS_GENERATION = [
   "src/workflows/apercu.ts",
   "src/workflows/voyage-complet.ts",
   "src/workflows/recalcul.ts",
+  // Décision 0136 § 2.1 (amende 0101 § 4) : pont de `generateProgramme` (chaîne inversée sur `api`).
+  "src/workflows/programme.ts",
   "src/workflows/index.ts",
 ];
 /**
@@ -81,7 +84,7 @@ export const creationImports = {
     schema: [],
     messages: {
       forbidden:
-        "Importateurs nommés (décisions 0081 B9-TL-1 point 3 et 0101 § 4) : @/server/creation/* depuis src/server/actions/creation.ts, src/adapters/api-creation.ts ou src/server/creation ; @/server/generation/* depuis src/workflows/{apercu,voyage-complet,recalcul,index}.ts, src/server/presentation/tri.ts (lot, expiration, demarrage), src/server/{creation,generation,payment} ; @/server/composition/generation depuis src/server/{creation,generation} ({{source}}).",
+        "Importateurs nommés (décisions 0081 B9-TL-1 point 3, 0101 § 4 et 0136 § 2.1) : @/server/creation/* depuis src/server/actions/creation.ts, src/adapters/api-creation.ts ou src/server/creation ; @/server/generation/* depuis src/workflows/{apercu,voyage-complet,recalcul,programme,index}.ts, src/server/presentation/tri.ts (lot, expiration, demarrage), src/server/{creation,generation,payment} ; @/server/composition/generation depuis src/server/{creation,generation} ({{source}}).",
     },
   },
   create(context) {

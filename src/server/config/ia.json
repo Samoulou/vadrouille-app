@@ -2,7 +2,8 @@
   "schema": 1,
   "variante": "b",
   "zdr": {
-    "structuration": true
+    "structuration": true,
+    "programme": true
   },
   "profils": {
     "apercu": {
