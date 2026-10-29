@@ -4,7 +4,8 @@
     "openrouter.ai",
     "googleapis.com",
     "ai-gateway.vercel.sh",
-    "resend.com"
+    "resend.com",
+    "stripe.com"
   ],
   "fragments": [
     "openrouter",
@@ -49,7 +50,8 @@
     "@openrouter/ai-sdk-provider",
     "pg",
     "lighthouse",
-    "@googlemaps/js-api-loader"
+    "@googlemaps/js-api-loader",
+    "stripe"
   ],
   "modulesCapaciteP0r1": [
     "src/ai/openrouter-client.ts",

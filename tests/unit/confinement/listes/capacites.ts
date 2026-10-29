@@ -492,6 +492,22 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "module de capacité réseau de B3d (décision 0138 § 1.1), cas admis de 0138 § 3 seulement : verdict Sécurité : approuvé par la Sécurité sur le head 68d6e69",
   },
+  // B4c (décision 0140 § 6 ligne 3, § 7 option A) : `stripe` parmi les paquets à capacité.
+  {
+    fichier: "src/server/payment/stripe.ts",
+    portee: "application",
+    usage:
+      "client Stripe en mode test (B4c) : création de session Checkout (appel HTTPS à l'API de Stripe, clé lue par cleStripe après la barrière de sortie, délai court, télémétrie coupée) et vérification de signature (constructEvent, tolérance 300 s). Justification côté serveur : module server-only, importé hors des tests par composition-stripe.ts et stripe-webhook.ts seulement (ligne 9)",
+    capacites: [{ capacite: "module:stripe", formes: ["default"], nombre: 1 }],
+    ecart: "module à capacité réseau de B4c (décision 0140 § 1.2) : verdict Sécurité rendu sur le head final de la PR de la décision 0140 (PR 848), à confirmer au head de la PR de B4c",
+  },
+  {
+    fichier: "tests/support/stripe-evenements.ts",
+    portee: "test",
+    usage: "signature d'événements de test par la fonction de test de la bibliothèque (critère C3) ; aucun client, aucun appel réseau",
+    capacites: [{ capacite: "module:stripe", formes: ["default"], nombre: 1 }],
+    ecart: "B4c (0140 § 9) : verdict Sécurité rendu sur le head final de la PR de la décision 0140 (PR 848), à confirmer au head de la PR de B4c",
+  },
 ] as const satisfies readonly LigneCapacite[];
 
 /** Lignes de textes (hôtes, fragments, noms secrets), lues dans les données du régime. */

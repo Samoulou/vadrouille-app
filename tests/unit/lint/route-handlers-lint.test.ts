@@ -26,9 +26,14 @@ describe("lint: route handlers (A20)", () => {
     ["tests/db/paiement.test.ts", "@/server/routes/simulated-webhook"],
     ["src/server/env/payment.test.ts", "@/server/routes/simulated-webhook"],
     ["src/server/actions/paiement.ts", "@/contracts"],
-    ["src/server/actions/paiement.ts", "stripe"],
     ["src/server/payment/webhook.ts", "@/server/env/payment"],
     ["src/server/routes/simulated-webhook.ts", "@/server/payment/webhook"],
+    // B4c (décision 0140 § 2.1) : route Stripe et son module.
+    ["src/app/api/v1/webhooks/stripe/route.ts", "@/server/routes/stripe-webhook"],
+    ["src/server/routes/stripe-webhook.ts", "@/server/payment/stripe"],
+    ["tests/db/paiement-stripe.test.ts", "@/server/routes/stripe-webhook"],
+    ["src/server/routes/stripe-webhook.ts", "./webhook-commun"],
+    ["src/server/routes/simulated-webhook.ts", "@/server/routes/webhook-commun"],
   ])("%s peut importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(0);
   });
@@ -46,10 +51,17 @@ describe("lint: route handlers (A20)", () => {
     ["src/app/api/v1/webhooks/simulated/route.ts", "@/server/payment/webhook"],
     ["src/app/api/v1/webhooks/simulated/route.ts", "@/server/env"],
     ["src/app/api/v1/webhooks/simulated/route.ts", "../../../../../server/log"],
-    // Actions : `@/server/env/payment` et le paquet `stripe` hors de paiement.ts.
+    // Actions : `@/server/env/payment` et le paquet `stripe` dans tout fichier, paiement.ts compris (0140 § 1.3 (b) :
+    // ce cas était admis par B4a, son attendu s'inverse par cette décision).
     ["src/server/actions/paiement.ts", "@/server/env/payment"],
+    ["src/server/actions/paiement.ts", "stripe"],
     ["src/server/actions/compte.ts", "stripe"],
     ["src/server/actions/compte.ts", "stripe/lib/x"],
+    // B4c : la route Stripe n'importe rien d'autre de src/server ; son module ne s'importe que depuis elle.
+    ["src/app/api/v1/webhooks/stripe/route.ts", "@/server/payment/stripe"],
+    ["src/app/page.tsx", "@/server/routes/stripe-webhook"],
+    ["src/server/actions/paiement.ts", "@/server/routes/stripe-webhook"],
+    ["src/server/payment/composition-stripe.ts", "@/server/routes/webhook-commun"],
   ])("%s ne peut pas importer %s", async (fichier, source) => {
     expect(await messagesFor(imp(source), fichier)).toHaveLength(1);
   });

@@ -2,17 +2,20 @@ import { expect, it } from "vitest";
 
 import type { AdapterContext, PaymentAdapter, PaymentSimulator } from "@/adapters/types";
 import type { OfferConfig } from "@/contracts";
+import { AppPathSchema, adressePrestataireAdmise, ORIGINE_PRESTATAIRE } from "@/contracts/billing";
 
 /**
  * Suite de contrat commune de `PaymentAdapter` et `PaymentSimulator` (spécification B4, critère A18 ; décision 0097
  * B4-TL-9) : exécutée sur `mock` (`tests/unit/adapters/paiement-contrat.test.ts`, `pnpm test`) et sur `simulated`
  * (`tests/db/paiement-contrat.test.ts`, `pnpm test:db`, prestataire simulé livrant au webhook simulé par le transport de
- * test) ; en B4c, sur `stripe` avec un double du client. Les cas propres au simulé en mémoire (portée, délai de
+ * test) ; en B4c, sur `stripe` avec un double du client (`tests/db/paiement-contrat.test.ts`, issues livrées au webhook Stripe
+ * par des événements signés, décision 0140 § 9, C1). Les cas propres au simulé en mémoire (portée, délai de
  * confirmation) restent dans `src/adapters/mock-payment.test.ts`. Ce fichier ne finit pas par `.test.ts` : il n'est
  * exécuté que par ses appelants.
  *
  * Cas : offre, création, idempotence par `requestId`, `already_unlocked`, réussite, refus, annulation, expiration,
- * `duplicate`, isolation.
+ * `duplicate`, isolation ; `redirectUrl` selon l'adaptateur (0140 § 9, C1 : chemin pour `mock` et `simulated`, adresse
+ * admise par `adressePrestataireAdmise` pour `stripe`).
  */
 
 /** Un voyage neuf, non débloqué, et son adaptateur, avec une horloge propre au banc. */
@@ -31,6 +34,10 @@ export type BancPaiement = {
   readonly offre: OfferConfig;
   readonly dureeVieMs: number;
   nouveau(): Promise<InstancePaiement>;
+  /** Forme de `redirectUrl` : chemin de l'application (`mock`, `simulated`) ou adresse du prestataire (`stripe`). */
+  readonly redirection: "chemin" | "prestataire";
+  /** `stripe` seulement : instance dont le double du prestataire rend cette adresse de session. */
+  avecAdresseSession?(url: string): Promise<InstancePaiement>;
 };
 
 const ID_PUBLIC = /^[A-Za-z0-9_-]{22}$/;
@@ -62,12 +69,12 @@ export function decrireContratPaiement(nom: string, banc: BancPaiement): void {
     expect(await instance.adapter.getOffer(instance.ctx, instance.tripId)).toEqual({ ok: true, value: { tripId: instance.tripId, ...banc.offre } });
   });
 
-  it(`${nom} : création, statut pending avec l'instantané du prix, adresse de la page simulée`, async () => {
+  it(`${nom} : création, statut pending avec l'instantané du prix, adresse de redirection`, async () => {
     const instance = await banc.nouveau();
     const depart = await instance.adapter.createCheckout(instance.ctx, { tripId: instance.tripId, method: "card", requestId: crypto.randomUUID() });
     expect(depart.ok).toBe(true);
     if (!depart.ok) return;
-    expect(depart.value.redirectUrl).toContain(depart.value.checkoutId);
+    if (banc.redirection === "chemin") expect(depart.value.redirectUrl).toContain(depart.value.checkoutId);
     expect(await instance.adapter.getCheckoutStatus(instance.ctx, depart.value.checkoutId)).toEqual({
       ok: true,
       value: {
@@ -160,5 +167,25 @@ export function decrireContratPaiement(nom: string, banc: BancPaiement): void {
     expect(await issue(instance, id, "succeeded")).toBe("succeeded");
     expect((await adapter.getEntitlement(autre, tripId)).unlocked).toBe(false);
     expect(await adapter.getCheckoutStatus(instance.ctx, "AAAAAAAAAAAAAAAAAAAAAA")).toEqual({ ok: false, error: { code: "not_found" } });
+  });
+
+  it(`adaptateurs: redirectUrl selon l'adaptateur (${nom})`, async () => {
+    const instance = await banc.nouveau();
+    const requestId = crypto.randomUUID();
+    const depart = await instance.adapter.createCheckout(instance.ctx, { tripId: instance.tripId, method: "twint", requestId });
+    const reprise = await instance.adapter.createCheckout(instance.ctx, { tripId: instance.tripId, method: "twint", requestId });
+    expect(depart.ok && reprise.ok).toBe(true);
+    if (!depart.ok || !reprise.ok) return;
+    for (const url of [depart.value.redirectUrl, reprise.value.redirectUrl]) {
+      expect(AppPathSchema.safeParse(url).success).toBe(banc.redirection === "chemin");
+      expect(adressePrestataireAdmise(url)).toBe(banc.redirection === "prestataire");
+    }
+    if (banc.avecAdresseSession === undefined) return;
+    // Hôte écrit en majuscules, construit depuis la constante (aucun hôte écrit dans les fichiers du régime).
+    for (const horsListe of ["https://evil.example/x", `${ORIGINE_PRESTATAIRE.toUpperCase().replace("HTTPS://", "https://")}/x`]) {
+      const autre = await banc.avecAdresseSession(horsListe);
+      const refus = await autre.adapter.createCheckout(autre.ctx, { tripId: autre.tripId, method: "twint", requestId: crypto.randomUUID() });
+      expect(refus).toEqual({ ok: false, error: { code: "provider_error", retryable: false } });
+    }
   });
 }
