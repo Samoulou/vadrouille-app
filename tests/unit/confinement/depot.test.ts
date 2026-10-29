@@ -539,10 +539,10 @@ describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)"
     expect(importateursHorsTests(RECHERCHE)).toEqual(["src/server/composition/villes-api.ts", "src/server/composition/villes.ts"]);
   });
 
-  it("rôle des compteurs pris dans le seul module des compteurs ; nom de la table dans le module, le schéma et la migration 0021", () => {
+  it("rôle des compteurs pris dans le seul module des compteurs ; nom de la table dans le module, le schéma et les migrations 0021 et 0022 (colonne `lieux`, décision 0147 § 6.4 point 3)", () => {
     expect(contenant("SET LOCAL ROLE vadrouille_autocomplete_counter")).toEqual([COMPTEURS]);
     const table = contenant("autocomplete_daily_counts");
-    expect(table.filter((c) => c !== COMPTEURS && c !== "db/schema/auth.ts" && !/^db\/migrations\/(meta\/)?0021_/.test(c))).toEqual([]);
+    expect(table.filter((c) => c !== COMPTEURS && c !== "db/schema/auth.ts" && !/^db\/migrations\/(meta\/)?002[12]_/.test(c))).toEqual([]);
     for (const attendu of [COMPTEURS, "db/schema/auth.ts", "db/migrations/0021_compteurs_autocompletion.sql"]) expect(table).toContain(attendu);
   });
 

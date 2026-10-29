@@ -69,10 +69,12 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     // B9b (migration 0012_creation_voyage) : même modèle que `stays`.
     trip_commitments: SIUD,
     ...Object.fromEntries(
-      ["trips", "briefs", "research_runs", "candidates", "event_occurrences", "feedback", "share_links"].map(
+      ["trips", "briefs", "research_runs", "candidates", "event_occurrences", "share_links"].map(
         (t) => [t, ["SELECT", "INSERT", "UPDATE"]],
       ),
     ),
+    // M5-D (migration 0022_feedback_signalements, décision 0147 § 2 point 4) : un signalement n'est jamais modifié.
+    feedback: ["SELECT", "INSERT"],
     // Migration 0016_restriction_update_generation_runs (décision 0120 S8) : `UPDATE` de table retiré, accordé par colonnes.
     generation_runs: ["SELECT", "INSERT"],
     checkouts: ["SELECT", "INSERT"],
@@ -137,6 +139,8 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     preference_signals: { UPDATE: ["cancel_request_id", "cancelled_at", "previous_status", "status"] },
     preference_prompts: { UPDATE: ["answer_signal_id", "state", "updated_at"] },
     deck_closures: { UPDATE: [] },
+    // M5-D (0022, décision 0147 § 2 point 4) : aucune colonne d'un signalement n'est modifiable.
+    feedback: { UPDATE: [] },
     // 0120 S8 (migration 0016) : colonnes écrites par les `UPDATE` de `src/` ; ni `base_version`, ni `deck_closure_id`,
     // ni `kind`, `organization_id`, `trip_id`, `request_id`, `started_at` ou `id`.
     generation_runs: {
@@ -164,8 +168,9 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
   // B3d (0138 § 11, T1 ; revue de la PR 850, réponse 2) : création de la ligne du jour par sa seule colonne `day` ; mise à
   // jour des compteurs seulement, jamais de la colonne du jour.
   vadrouille_mail_counter: { email_daily_counts: { INSERT: ["day"], UPDATE: ["connexion", "notification"] } },
-  // M1f-D (0021) : ligne du jour par sa seule colonne `day` ; mise à jour des deux compteurs seulement.
-  vadrouille_autocomplete_counter: { autocomplete_daily_counts: { INSERT: ["day"], UPDATE: ["choix", "suggestions"] } },
+  // M1f-D (0021) : ligne du jour par sa seule colonne `day` ; mise à jour des compteurs seulement. M5-D (0022, décision
+  // 0147 § 6.4 point 3) : compteur `lieux` de la recherche d'un lieu à soi.
+  vadrouille_autocomplete_counter: { autocomplete_daily_counts: { INSERT: ["day"], UPDATE: ["choix", "lieux", "suggestions"] } },
   vadrouille_fn_coords: { place_coordinates: { SELECT: ["expires_at", "organization_id", "place_id"] } },
   // B7c (0010_usage_forfait) : colonnes des sommes seulement, ni id, ni trip_id, ni generation_run_id ; aucune écriture.
   vadrouille_fn_usage: {
