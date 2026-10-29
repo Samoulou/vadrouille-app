@@ -22,6 +22,7 @@ const APPLICATIVE_ROLES = [
   "vadrouille_account_admin",
   "vadrouille_limiter",
   "vadrouille_mail_counter",
+  "vadrouille_autocomplete_counter",
 ];
 
 let app: DbClient;

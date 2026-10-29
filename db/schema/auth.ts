@@ -145,3 +145,22 @@ export const emailDailyCounts = pgTable(
   },
   (t) => [check("email_daily_counts_counts_check", sql`${t.connexion} >= 0 AND ${t.notification} >= 0`)],
 );
+
+/**
+ * Compteurs quotidiens de la ville par autocomplétion sur `api` (plan du MVP, M1f-D ; décisions 0129 § 3 et 0131, modèle
+ * d'`email_daily_counts`, 0138 § 11, T1). Hors du schéma `prototype` : la vraie app n'écrit pas dans
+ * `prototype.forfaits`. Exception à `organization_id` : compteur global, anonyme. Une ligne par jour (posé par la
+ * requête de M1f, jamais par le navigateur), une colonne par action facturée : `suggestions` (Autocomplete (New)) et
+ * `choix` (fiche Essentials du choix) ; aucune saisie, aucune donnée Google, aucune empreinte, aucun identifiant de
+ * session ni d'organisation. RLS, droits et rôle `vadrouille_autocomplete_counter` :
+ * `db/migrations/0021_compteurs_autocompletion.sql`.
+ */
+export const autocompleteDailyCounts = pgTable(
+  "autocomplete_daily_counts",
+  {
+    day: date("day").primaryKey(),
+    suggestions: integer("suggestions").notNull().default(0),
+    choix: integer("choix").notNull().default(0),
+  },
+  (t) => [check("autocomplete_daily_counts_counts_check", sql`${t.suggestions} >= 0 AND ${t.choix} >= 0`)],
+);
