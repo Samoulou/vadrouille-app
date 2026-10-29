@@ -1,4 +1,4 @@
-# État du studio — 2026-10-29 (218e cycle)
+# État du studio — 2026-10-29 (219e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
@@ -11,9 +11,12 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 
 - 2026-10-28 22:30 UTC : aucun nouveau message. Lien de la mise en ligne main → p0-reel (PR #837 : voyage lisible sans Google, partage par lien) envoyé à Samuel dans le fil du cycle ; fusion attendue de lui.
 - 2026-10-29 00:15 UTC : aucun nouveau message (#studio et fil du cycle). La carte Q634 à Q641 reste sans réponse ; #837 reste à fusionner.
+- 2026-10-29 02:15 UTC : aucun nouveau message. Lien de la PR #853 (B4b-ci, approuvée, libellé `owner-approved` réservé à Samuel) envoyé dans le fil du cycle, avec le rappel de #837.
 
 ## Fait
-- **Statut du 217e cycle** (#846) fusionné.
+- **Statut du 218e cycle** (#852) fusionné.
+- **B4b écrans du déblocage** (#831) : PR #836 fusionnée à 00:54 UTC (0bfaedb) après la fusion de `main` (seul conflit : imports de `src/adapters/index.ts`) et une nouvelle revue.
+- **M2a envoi réel par Resend** (#849) : PR #850 fusionnée à 01:06 UTC (798e0a6) après une correction (chemin d'avant-transport partagé `src/server/mail/avant-transport.ts`, événement `email.purge_failed`, purge après le transport, test de la descente de 0020, `GRANT INSERT (day)`). Migration 0020 non appliquée sur Neon : ligne `MIGRATIONS_APPROUVEES` par M1i.
 - **Décision 0138 M2-S** (#838) : PR #840 fusionnée (384af78) après une correction (Resend par API HTTPS, clé admise en préversion Vercel seule, compteur dans une table dédiée, rôle `vadrouille_mail_counter`).
 - **Décision 0139 M1-S** (#841) : PR #844 fusionnée (50cc7c9) après une correction (S1 à S5, événement `generation.programme_written`, table `CHAMPS_ADMIS_PAR_EVENEMENT` dans `log.ts`, amendements de 0122 pour `api`).
 - **M1a-1 code partagé** (#842) : PR #847 fusionnée (96d45af) après une correction (`src/server/programme/`, `src/domain/apercu.ts` avec `retenir`, listes P0 de `imports.test.ts`).
@@ -29,9 +32,9 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
 - **Audit UX « séduire les nouveaux clients »** (#801 à #804, #813) : tout est fusionné et sur le site d'essai depuis la mise en ligne #816 (18:55 UTC).
-- **MVP étape 1 (génération)** : M1-S (#844) et M1a-1 (#847) fusionnées. **M1a-2** = ticket #851 (backend, relecture ia-recherche ; génération et écriture de la chaîne inversée sur `api`, `CHAINE_APERCU` posée à `"ancienne"`, récit non écrit tant que Q636/Q645 sont sans réponse ; agent lancé 00:22 UTC). Suit M1a-3. Pas de M1-D (0136 T5).
-- **MVP étape 1 (paiement)** : B4b = PR #836 (#831), **techlead-approved** depuis 21:53 UTC mais **en conflit avec `main`** (aucune CI n'a tourné sur son head `5c2990b`) : fusion de `main` et résolution lancées 00:18 UTC (backend), puis revue relancée. Ticket B4b-ci #843 ouvert (partie `docker` de A10, `ci.yml`, owner-approved) ; #831 reste ouvert jusqu'à lui. B4c-TL = PR #848 (#845, Tech Lead, décision 0140 : `stripe` 23.0.0, webhook et signature, gardes des clés) ; revue 22:27 UTC : 7 bloquants (jonction `PrestatairePaiement`, validation unique de l'adresse dans `src/contracts/billing.ts`, horloge `maintenantMs`, décision à rendre définitive avec l'option A, liste déterministe pour 0020 § 1.3, erreurs du SDK neutralisées, prédicat de production partagé) et 12 mineurs ; **correction 1 lancée** 00:15 UTC.
-- **MVP étape 2 (e-mails)** : M2-S (#840) fusionnée. **M2a** = PR #850 (#849, backend : migration 0020 `email_daily_counts`, rôle `vadrouille_mail_counter`, `src/server/mail/{resend,plafond}.ts`, `reserveEmail`) ; revue 23:19 UTC : Sécurité approuve, Tech Lead 1 bloquant (chemin d'avant-transport dupliqué entre `resend.ts` et `smtp.ts`, à partager), 10 mineurs ; **correction 1 lancée** 00:15 UTC. La fusion attend aussi la PR de workflow ajoutant 0020 à `MIGRATIONS_APPROUVEES` (owner-approved, prévue avec M1h) et le rejeu de `roles.sql` sur la préversion (action S1). Puis M2c (frontend, écran 4).
+- **MVP étape 1 (génération)** : M1-S (#844) et M1a-1 (#847) fusionnées. **M1a-2** = PR #854 (#851, backend : workflow `generateProgramme` étapes `a` et `e`, `CHAINE_APERCU` posée à `"ancienne"`, récit non écrit, voyage complet et lot clos sans écriture, événement `generation.programme_written`) ; revue 01:43 UTC : Sécurité OK, Tech Lead 2 petits bloquants (prédicat de frontière `src/server/p0/` dans `imports.test.ts`, erratum en tête de 0136 pour `places/rome-chaine-inversee.json` et cinq attentes étendues) et 10 mineurs ; **correction 1 lancée** 02:15 UTC. Suit M1a-3. **M1f-D** = ticket #855 (data, migration 0021 : compteurs de l'autocomplétion hors du schéma `prototype`, modèle 0020 ; seule tâche du cycle sur `db/migrations` ; agent lancé 02:25 UTC). Pas de M1-D (0136 T5).
+- **MVP étape 1 (paiement)** : B4b (#836) fusionnée. **B4b-ci** = PR #853 (#843, `ci.yml` : 404 du webhook simulé sans drapeau, refus de démarrer avec le drapeau sur l'image, exception A26 testée) : **techlead-approved** 01:15 UTC, attend le libellé `owner-approved` de Samuel (décision 0035) ; ferme #831 après fusion. B4c-TL = PR #848 (#845, décision 0140) : correction 1 poussée 00:26 UTC (`1cd50d7` : port `creerSession` → `{ sessionId, redirectUrl }`, `adressePrestataireAdmise` dans `src/contracts/billing.ts`, horloge `maintenantMs`, option A définitive, prédicat `isProductionTarget`) ; revue : Sécurité approuve, Tech Lead 1 bloquant (plafond de 2048 caractères non sourcé) et 10 mineurs ; **correction 2 (dernière) poussée** 02:28 UTC (`deced8b` : plafond 8192 avec cas de 4096 accepté, journal `payment.provider_failed` à code fixe, un seul littéral `ORIGINE_PRESTATAIRE`), revue relancée. Puis B4c.
+- **MVP étape 2 (e-mails)** : M2-S (#840) et M2a (#850) fusionnées. Action S1 de Samuel quand M1h sera fusionnée (§ 11 du plan). M7a (e-mail « aperçu prêt », Mailpit) après M1a-3.
 - **Mise en ligne main → p0-reel (#837)** : attend la fusion par Samuel ; ensuite un seul réglage Vercel (protection des préversions, 0135 § 9 : contournement ciblé `/p/` de préférence) pour que son amie ouvre le lien, puis le lien du voyage de Tokyo.
 - **Réglages fins du programme (#800)** : en ligne depuis #816. Reste à lire : le journal du prochain lancement de Samuel une fois le quota Google rétabli (`sitesUnchecked`, `retoursDeQuartier`). Questions Q630 à Q633.
 - **#527 `[data]`** (`coords-purge`) : bloqué sur Q438 (Samuel) ; toujours en échec (dernier passage 20:16 UTC).
@@ -42,7 +45,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Revues : #848 (0140 B4c-TL) et #850 (M2a) après leur correction 1 (une correction restante chacune) ; #836 B4b après la fusion de `main` (fusion automatique) ; #851 M1a-2 (code). Après #848 : B4c (backend, sans compte). Après #850 : M2c (frontend). Après #836 : B4b-ci #843 (`ci.yml`, owner-approved, cycle sans autre PR sur `.github`). Après #851 : M1a-3. Candidats si un créneau reste : M1f-D, M1e.
+1. Revues : #848 (0140, dernière correction : si encore bloquée, CEO + Tech Lead décident d'une troisième tentative bornée ou d'un découpage) ; #854 M1a-2 après sa correction 1 ; #855 M1f-D (code). #853 : fusion automatique dès le libellé de Samuel. Après #848 : B4c (backend, sans compte). Après #854 : M1a-3 (backend avec frontend), puis M1b, M1e, M1g, M7a, M4-spec et M5-spec (Product Owner). Après #855 : M1f (data puis backend).
 2. #837 : dès la fusion par Samuel, vérifier le déploiement `p0-reel`, puis lui demander un seul réglage Vercel (lien de partage) et lui envoyer le lien du voyage de Tokyo.
 3. Lire les réponses de Samuel aux questions Q634 à Q641 (carte « Je suis tes recos ») ; Q638 bloque M1c ; Q645 (extension de Q636) bloque M1h.
 4. Zakynthos absent de « Mes voyages » : toujours en attente de la capture de Samuel. #527 : Q438.
@@ -67,7 +70,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q651 et Q652 (revue de M2a #850 : deux connexions de base par instance ajoutées par le pool du plafond, à reporter dans la limite de connexions de la préversion pour M1h ; `GRANT INSERT (day)` à examiner par le Tech Lead). La question 5 de #850 (trailer des commits des sous-agents) est tranchée par le CEO : on garde l'attribution de chaque session, sans action.
+- Q653 à Q661 (décision 0140 : protection Vercel sur la route du webhook et sous-traitant Stripe/nLPD pour Samuel, marge de 120 s et remboursements pour le Product Owner, S5 et C6 après M1h pour le CEO ; M2a : `User-Agent` explicite pour la Sécurité ; M1a-2 : lieu introuvable sans `placeId` pour ia-recherche, libellés d'engagements et `generations.programme` à poser avant M1h ; B4b-ci : renvoi dans 0078 et 0097 pour le CEO). Q652 répondue par #850 (`GRANT INSERT (day)`).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
