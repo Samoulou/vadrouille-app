@@ -99,7 +99,8 @@
       "fin": "L'heure de fin doit suivre l'heure de début.",
       "villeChoisir": "Choisis ta ville dans la liste des suggestions.",
       "nomIncomplet": "Écris le nom complet de ta ville, puis choisis-la dans la liste : c'est ce nom qui sert à ton programme.",
-      "paysInconnu": "Ce pays n'est pas encore disponible sur le site d'essai. Choisis une autre ville.",
+      "paysInconnu": "Ce pays n'est pas encore disponible. Choisis une autre ville.",
+      "horsTable": "Cette ville n'est pas encore proposée. Choisis une ville voisine ou une autre destination.",
       "villeCaracteres": "Écris le nom de ta ville avec des lettres seulement, sans chiffres ni symboles.",
       "uneSeuleVille": "Une seule ville sur le site d'essai : retire cette ville.",
       "tropLong": "{max} jours au plus sur le site d'essai : choisis un départ plus proche de l'arrivée."

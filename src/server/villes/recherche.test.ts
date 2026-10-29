@@ -5,7 +5,7 @@ import { CODE_CLE_ABSENTE } from "@/ai/erreurs";
 import { choisirVille, suggererVilles, type HorsTable, type PortsRecherche } from "./recherche";
 
 /**
- * Cœur commun de la recherche de ville (décision 0141 § 6.1 points 1 et 2, bloquant 3 ; T17b, PR 880) : ordre des ports,
+ * Cœur commun de la recherche de ville (décision 0141 § 6.1 points 1 et 2, bloquant 3 ; T17b, PR 885) : ordre des ports,
  * arrêt au premier refus, table et repli propres à l'adaptateur. Ports doublés : aucun appel Google, aucune base.
  */
 

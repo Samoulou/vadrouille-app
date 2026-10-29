@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { format } from "@/i18n";
 import { IconCoche } from "@/components/ligne/icons";
 import * as messages from "@/i18n/messages";
-import type { IssueChoix, IssueSuggestions } from "@/contracts/villes";
+import type { IssueChoix, IssueSuggestions, SuggestionVille } from "@/contracts/villes";
 import { cleVille, paysParCode } from "@/lib/fuseaux";
 import { choisirVilleApi, suggererVillesApi } from "@/server/actions/villes";
 import { choisirVille, suggererVilles } from "@/server/actions/villes-essai";
@@ -19,9 +19,6 @@ const err = e1.erreurs;
 /** Délai entre la dernière frappe et la recherche : une requête Google par pause, pas par touche. */
 export const DELAI_RECHERCHE_MS = 300;
 const SAISIE_MIN = 2;
-
-/** Suggestion affichée (donnée Google, en mémoire du composant seulement, jamais dans le brouillon). */
-type Suggestion = { readonly placeId: string; readonly principal: string; readonly secondaire: string | null };
 
 /** Ville choisie, valeurs maison et `placeId` : seules valeurs remontées au brouillon. */
 export type ChoixVille = { readonly destination: string; readonly placeId: string; readonly country: string; readonly timeZone: string };
@@ -74,10 +71,10 @@ export interface DestinationVilleProps {
   /** Cookie d'accès absent ou expiré (site d'essai seulement) : l'appelant affiche la saisie du code. */
   onAcces: () => void;
   /**
-   * Ville hors des 62 villes du MVP, ou pays hors de la table maison (`api`, décision 0141 § 8.2) : l'appelant pose sur
-   * le champ l'erreur existante `cityUnavailable`.
+   * Ville hors des 62 villes du MVP (`api`, décision 0141 § 8.2) : le champ affiche et annonce `err.horsTable` ;
+   * l'appelant retient la saisie refusée, pour que « Continuer » répète ce message tant qu'elle n'a pas changé.
    */
-  onHorsTable?: () => void;
+  onHorsTable?: (saisie: string) => void;
   /** Incrémenté par l'appelant après la saisie du code : la recherche est relancée. */
   relance: number;
   /** Recherche montée (défaut : site d'essai) ; choisit les actions serveur. Sur `api`, jamais l'état « accès ». */
@@ -127,7 +124,8 @@ export function DestinationVille({
   const id = fieldId("destination");
   const listeId = `${id}-liste`;
   const statutId = `${id}-statut`;
-  const [suggestions, setSuggestions] = useState<readonly Suggestion[]>([]);
+  // Suggestions affichées (données Google, en mémoire du composant seulement, jamais dans le brouillon).
+  const [suggestions, setSuggestions] = useState<readonly SuggestionVille[]>([]);
   const [ouverte, setOuverte] = useState(false);
   const [active, setActive] = useState(-1);
   const [etat, setEtat] = useState<Etat>("repos");
@@ -224,11 +222,11 @@ export function DestinationVille({
       setSuggestions([]);
       setEtat("choisie");
       onChoix({ destination: issue.ville.nomMaison ?? value.trim(), placeId: issue.ville.placeId, country: issue.ville.country, timeZone: issue.ville.timeZone });
-    } else if (issue.statut === "hors_table" || (issue.statut === "pays_inconnu" && !accesPossible)) {
-      // `api` (0141 § 8.2) : ville hors des 62 villes du MVP ; l'appelant pose `cityUnavailable` sur le champ.
-      setErreurChoix(null);
+    } else if (issue.statut === "hors_table") {
+      // `api` (0141 § 8.2) : la recherche a répondu, mais la ville n'est pas l'une des 62 villes du MVP.
+      setErreurChoix(err.horsTable);
       setEtat("repos");
-      onHorsTable?.();
+      onHorsTable?.(value);
     } else if (issue.statut === "pays_inconnu") {
       setErreurChoix(err.paysInconnu);
       setEtat("repos");
@@ -279,7 +277,11 @@ export function DestinationVille({
   // Ville choisie (à l'instant, ou gardée dans le brouillon) : la confirmation, en `ink` semi-gras ; sinon l'état. Une
   // erreur affichée remplace l'état (même texte qu'« indisponible » au repli : une seule ligne, jamais deux).
   const montrerConfirmation = confirmation !== null && message === null && (etat === "choisie" || etat === "repos");
-  const statut = message !== null ? null : montrerConfirmation ? confirmation : (textes[etat] ?? null);
+  // Erreur rendue par la recherche après un choix (nom incomplet, pays ou ville non proposés) : elle n'a pas de
+  // « Continuer » pour la faire lire ; la région d'état l'annonce, pour les lecteurs d'écran seulement (texte visible
+  // une seule fois, sous le champ).
+  const annonceErreur = error === null && erreurChoix !== null;
+  const statut = annonceErreur ? erreurChoix : message !== null ? null : montrerConfirmation ? confirmation : (textes[etat] ?? null);
   const visible = ouverte && suggestions.length > 0;
 
   return (
@@ -310,7 +312,7 @@ export function DestinationVille({
       />
       <FieldMessage id={errorId(id)} message={message} />
       {/* Région présente dès l'affichage ; texte en flux, masqué pour les yeux seulement quand elle est vide. */}
-      <p id={statutId} role="status" className={montrerConfirmation ? "flex items-start gap-2 text-corps-s font-semibold text-ink" : "text-corps-s text-ink-soft empty:sr-only"}>
+      <p id={statutId} role="status" className={annonceErreur ? "sr-only" : montrerConfirmation ? "flex items-start gap-2 text-corps-s font-semibold text-ink" : "text-corps-s text-ink-soft empty:sr-only"}>
         {/* Coche `line` (revue du head de4ab92, mineur 11) : la confirmation ne se lit pas comme l'erreur du champ. */}
         {montrerConfirmation ? <IconCoche data-part="ville-coche" className="size-5 text-line" /> : null}
         {statut}

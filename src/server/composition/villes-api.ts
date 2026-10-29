@@ -77,10 +77,17 @@ export function journaliserExceptionApi(action: Action, erreur: unknown): void {
 
 /**
  * Barrière B9-TL-8 de `api` (0141 § 6.2 point 2) : plafonds de génération posés et non nuls, crochet `accesReelApi`.
- * `surcharges` : tests seulement (environnement, branche, plafonds) ; le crochet reste celui-ci sauf surcharge explicite.
+ * `surcharges` : tests seulement (environnement, branche, plafonds). Le crochet n'est **jamais** surchargeable ici
+ * (revue du head `bcaa346`, mineur 8) : un test qui veut une barrière réelle injecte l'état par `barriere`.
  */
-export function barriereApi(surcharges: Partial<Parameters<typeof evaluerBarriere>[0]> = {}): Promise<EtatBarriere> {
-  return evaluerBarriere({ plafondsNonNuls: plafondsDeGenerationPoses(PLAFONDS_USAGE), cookieValide: accesReelApi, ...surcharges });
+export function barriereApi(surcharges: Omit<Partial<Parameters<typeof evaluerBarriere>[0]>, "cookieValide"> = {}): Promise<EtatBarriere> {
+  const { env, branche, plafondsNonNuls } = surcharges;
+  return evaluerBarriere({
+    plafondsNonNuls: plafondsNonNuls ?? plafondsDeGenerationPoses(PLAFONDS_USAGE),
+    ...(env !== undefined ? { env } : {}),
+    ...(branche !== undefined ? { branche } : {}),
+    cookieValide: accesReelApi,
+  });
 }
 
 /** Seuils validés **puis** barrière réelle ; toute erreur de la barrière la ferme. */
@@ -134,7 +141,7 @@ function ports(dependances: DependancesVillesApi): Ports {
         journaliser(action, "limite_jour");
         return "limite_jour";
       }
-      journaliser(action, "compteur_indisponible");
+      journaliser(action, "compteur_indisponible", reservation.errorName !== undefined ? { errorName: reservation.errorName } : {});
       return "indisponible";
     },
     apres: () => (dependances.purger ?? purgerAutocompletion)(),

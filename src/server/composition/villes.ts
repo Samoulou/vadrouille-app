@@ -49,11 +49,6 @@ import prixGoogle from "../../../prototype/config/prix-google.json";
  */
 export const LIMITES_VILLE: LimitesVille = { suggestionsParJour: 150, choixParJour: 40, actionsParMinuteEtCookie: 20 };
 
-/** Suggestions du site d'essai (types de `@/contracts/villes`, 0141 § 6.1 point 5). */
-export type IssueSuggestions = IssueSuggestionsEssai;
-export type { VilleChoisie } from "@/contracts/villes";
-export type IssueChoix = IssueChoixEssai;
-
 export type DependancesVilles = DependancesAcces & {
   /** Valeur du cookie `__Host-p0_acces` reçu avec la requête. */
   readonly cookie: string | undefined;
@@ -160,7 +155,7 @@ function ports(dependances: DependancesVilles): PortsRecherche<RefusEssai, "fuse
 }
 
 /** Suggestions de villes pour la saisie (Autocomplete (New), `(cities)`, en français, jeton de session). */
-export async function suggererVillesEssai(entree: { readonly saisie: unknown; readonly session: unknown }, dependances: DependancesVilles): Promise<IssueSuggestions> {
+export async function suggererVillesEssai(entree: { readonly saisie: unknown; readonly session: unknown }, dependances: DependancesVilles): Promise<IssueSuggestionsEssai> {
   return suggererVilles(entree, ports(dependances));
 }
 
@@ -172,6 +167,6 @@ export async function suggererVillesEssai(entree: { readonly saisie: unknown; re
 export async function choisirVilleEssai(
   entree: { readonly placeId: unknown; readonly session: unknown; readonly saisie: unknown; readonly principal: unknown },
   dependances: DependancesVilles,
-): Promise<IssueChoix> {
+): Promise<IssueChoixEssai> {
   return choisirVille(entree, ports(dependances));
 }

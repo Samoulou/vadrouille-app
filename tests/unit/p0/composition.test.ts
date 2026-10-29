@@ -66,7 +66,7 @@ const IMPORTATEURS_COMPOSITION: readonly string[] = [IMPORTATEUR_COMPOSITION, RE
 const CLIENTS_GOOGLE = "src/server/composition/clients-google.ts";
 const COMPOSITION_LECTURE = "src/server/composition/lecture.ts";
 // Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129).
-// Décision 0141 § 11 ligne 3 (PR 880) : terminal de la recherche de ville de `api` ; le cœur n'en est pas importateur.
+// Décision 0141 § 11 ligne 3 (PR 885) : terminal de la recherche de ville de `api` ; le cœur n'en est pas importateur.
 const IMPORTATEURS_CLIENTS_GOOGLE: readonly string[] = [
   COMPOSITION_LECTURE,
   "src/server/composition/generation.ts",

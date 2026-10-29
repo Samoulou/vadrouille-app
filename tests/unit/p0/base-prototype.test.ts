@@ -47,7 +47,7 @@ describe("ancrage: masques de champs exacts", () => {
     // suggestions (identifiant et textes de la suggestion seulement) et fiche Essentials de la ville choisie (pays et position).
     expect(constante("MASQUE_SUGGESTIONS")).toBe("suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat");
     expect(constante("MASQUE_FICHE_VILLE")).toBe("id,addressComponents,location");
-    // Recherche de ville de `api` (décision 0141 § 6.3 point 3, PR 880) : même fiche sans la position.
+    // Recherche de ville de `api` (décision 0141 § 6.3 point 3, PR 885) : même fiche sans la position.
     expect(constante("MASQUE_FICHE_VILLE_SANS_POSITION")).toBe("id,addressComponents");
     // Décision 0128 (photos du tri) : la liste des photos (`photos`, SKU « IDs Only ») et le média (`photoUri`).
     expect(constante("MASQUE_PHOTOS")).toBe("photos");
@@ -82,7 +82,7 @@ describe("places: masque de champ inchangé", () => {
       // Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, soumise au verdict de la Sécurité).
       MASQUE_SUGGESTIONS: "suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat",
       MASQUE_FICHE_VILLE: "id,addressComponents,location",
-      // Recherche de ville de `api` (décision 0141 § 6.3 point 3, PR 880).
+      // Recherche de ville de `api` (décision 0141 § 6.3 point 3, PR 885).
       MASQUE_FICHE_VILLE_SANS_POSITION: "id,addressComponents",
       MASQUE_PHOTOS: "photos",
       MASQUE_MEDIA_PHOTO: "photoUri",

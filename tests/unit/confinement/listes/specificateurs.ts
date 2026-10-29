@@ -512,7 +512,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/neon", noms: ["reserverVille", "type:DemandeVille", "type:LimitesVille", "type:ResultatVille"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "../../../prototype/config/prix-google.json", noms: ["default"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/villes/recherche", noms: ["choisirVille", "suggererVilles", "type:ClientVilles", "type:PortsRecherche"], motif: COMPOSITION_VILLES },
-  // Recherche de ville de `api` (décision 0141 § 11 ligne 4, PR 880) : les lignes que l'analyseur relève pour `villes-api.ts`.
+  // Recherche de ville de `api` (décision 0141 § 11 ligne 4, PR 885) : les lignes que l'analyseur relève pour `villes-api.ts`.
   { fichier: "src/server/composition/villes-api.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_VILLES_API },
   { fichier: "src/server/composition/villes-api.ts", specificateur: "@/lib/fuseaux", noms: ["villeMvpDuPays"], motif: COMPOSITION_VILLES_API },
   { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/config/usage", noms: ["PLAFONDS_USAGE"], motif: COMPOSITION_VILLES_API },

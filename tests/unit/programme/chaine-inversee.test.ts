@@ -516,7 +516,7 @@ describe("journal: generation.programme_written (0139 § 2)", () => {
         "errorName",
       ].sort(),
     );
-    // Décision 0141 § 6.3 point 4 (PR 880) : `ville.refusee` et `ville.purge_failed` ont aussi leur liste fermée.
+    // Décision 0141 § 6.3 point 4 (PR 885) : `ville.refusee` et `ville.purge_failed` ont aussi leur liste fermée.
     expect([...CHAMPS_ADMIS_PAR_EVENEMENT.keys()].sort()).toEqual([
       "generation.programme_written",
       "ville.purge_failed",

@@ -23,7 +23,7 @@ import { creerBase, supprimerBases } from "./workflows-harnais";
  * Les premiers `describe` éprouvent la table, ses droits et sa politique par SQL, sous `vadrouille_app` puis `SET LOCAL
  * ROLE vadrouille_autocomplete_counter`, avec la forme de réservation que M1f reprend (ligne du jour par `INSERT (day) …
  * ON CONFLICT DO NOTHING`, puis un seul `UPDATE` conditionnel par action). Le `describe` « module de réservation (M1f) »
- * éprouve le module `src/server/villes/compteurs.ts` lui-même (décision 0141 § 5, T5 à T10 ; PR 880). Seul le
+ * éprouve le module `src/server/villes/compteurs.ts` lui-même (décision 0141 § 5, T5 à T10 ; PR 885). Seul le
  * rôle de test (`admin`, superutilisateur du conteneur, hors de l'application : aucune migration ne le crée) vide la
  * table et pose des jours passés.
  *
@@ -427,7 +427,8 @@ describe("autocomplétion: module de réservation (M1f)", () => {
     await migrateur.query(DOWN_0021);
     await migrateur.query("COMMIT");
 
-    for (const action of ["suggestions", "choix"] as const) expect(await compteur.reserve(action)).toEqual({ ok: false, raison: "indisponible" });
+    // Nom de classe de l'erreur seul (revue du head `bcaa346`, mineur 7), jamais son message ni son code SQL.
+    for (const action of ["suggestions", "choix"] as const) expect(await compteur.reserve(action)).toEqual({ ok: false, raison: "indisponible", errorName: "error" });
     expect(codes).toEqual(["42501", "42501"]);
     expect(evenements()).toEqual([]);
   });

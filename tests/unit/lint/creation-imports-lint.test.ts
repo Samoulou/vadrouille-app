@@ -150,7 +150,7 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     expect(await signalements(imp(CREATION), "src/adapters/mock-creation.ts")).not.toHaveLength(0);
   });
 
-  // Décision 0141 § 6.2 point 3 et § 11 ligne 8 (T23, PR 880 ; Tech Lead, bloquant 1 de la revue du head d8b9f0b).
+  // Décision 0141 § 6.2 point 3 et § 11 ligne 8 (T23, PR 885 ; Tech Lead, bloquant 1 de la revue du head d8b9f0b).
   it("villes-api.ts n'importe que barriere et acces-reel de src/server/generation (0141 § 6.2) ; la page de l'écran 1 et tout autre module de la génération sont refusés", async () => {
     const TERMINAL = "src/server/composition/villes-api.ts";
     const PAGE = "src/app/(creation)/voyages/nouveau/page.tsx";

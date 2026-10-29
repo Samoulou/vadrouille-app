@@ -23,7 +23,9 @@ export const metadata: Metadata = {
  *
  * Adaptateur `api` (décision 0141 § 6.4) : la recherche de ville de `api` n'est montée que si `isApiAdapter()` **et**
  * `rechercheVilleApiOuverte()` (seuils validés par Samuel et barrière réelle, crochet de M1h) ; sinon le champ
- * d'aujourd'hui (62 villes, sans appel serveur). La page n'importe ni la barrière, ni le crochet, ni la configuration.
+ * d'aujourd'hui (62 villes, sans appel serveur). La page n'importe de `src/server` que ce prédicat, par le terminal
+ * `@/server/composition/villes-api` (exception nominative de `eslint.config.mjs` et arête nominative de la frontière
+ * P0r3b) ; elle n'importe directement ni la barrière, ni le crochet, ni la configuration, que le terminal lit pour elle.
  */
 export default async function NouveauVoyagePage() {
   if (siteEssaiAutorise()) return <CreateTripForm essai />;

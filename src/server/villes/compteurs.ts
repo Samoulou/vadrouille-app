@@ -43,10 +43,15 @@ export type AutocompleteCounterClient = {
 };
 export type AutocompleteCounterPool = { connect(): Promise<AutocompleteCounterClient> };
 
-/** Résultat d'une réservation : accepté avec le compte de la colonne **après** l'incrément, ou refusé (aucune valeur personnelle). */
+/**
+ * Résultat d'une réservation : accepté avec le compte de la colonne **après** l'incrément, ou refusé (aucune valeur
+ * personnelle). Refus `indisponible` sur une erreur de connexion ou de requête : `errorName` seul (nom de classe de
+ * l'erreur, `errorNameOf`), jamais son message ni son code SQL (revue du head `bcaa346`, mineur 7).
+ */
 export type ReservationAutocompletion =
   | { readonly ok: true; readonly compte: number }
-  | { readonly ok: false; readonly raison: "plafond" | "indisponible" };
+  | { readonly ok: false; readonly raison: "plafond" }
+  | { readonly ok: false; readonly raison: "indisponible"; readonly errorName?: string };
 
 export type AutocompleteCounterOptions = {
   /** Tests seulement : pool injecté (sinon le pool propre de `vadrouille_app`, créé au premier appel). */
@@ -143,7 +148,8 @@ export function createAutocompleteCounter(options: AutocompleteCounterOptions = 
         await annuler(client);
         client.release(error instanceof Error ? error : true);
       }
-      return INDISPONIBLE;
+      const errorName = errorNameOf(error);
+      return errorName === undefined ? INDISPONIBLE : Object.freeze({ ok: false, raison: "indisponible", errorName });
     }
     if (jourOuvert) purgeDue = true;
     if (compte === null) return PLAFOND;

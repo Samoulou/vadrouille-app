@@ -15,10 +15,11 @@ import {
   suggererVillesApiTerminal,
   type DependancesVillesApi,
 } from "@/server/composition/villes-api";
+import { evaluerBarriere } from "@/server/generation/barriere";
 import { createRateLimiter, type RateLimitClient, type RateLimitPool } from "@/server/rate-limit";
 
 /**
- * Recherche de ville de l'écran 1 de `api` (décision 0141 ; PR 880) : garde des seuils, barrière B9-TL-8 et crochet
+ * Recherche de ville de l'écran 1 de `api` (décision 0141 ; PR 885) : garde des seuils, barrière B9-TL-8 et crochet
  * `accesReelApi`, limiteur `ville-recherche`, compteurs du jour, table des 62 villes du MVP, journal `ville.refusee`.
  * Client Places, limiteur, compteurs et purge doublés : aucun appel Google, aucune base.
  */
@@ -160,7 +161,7 @@ describe("villes api: barrière", () => {
   });
 
   it("réelle avec un crochet injecté vrai et des seuils injectés comme validés : client construit, limiteur puis réservation, un seul appel Google", async () => {
-    const barriere = () => barriereApi({ env: ENV_REUNI, branche: BRANCHE, plafondsNonNuls: true, cookieValide: async () => true });
+    const barriere = () => evaluerBarriere({ env: ENV_REUNI, branche: BRANCHE, plafondsNonNuls: true, cookieValide: async () => true });
     expect(await barriere()).toBe("reelle");
     const d = doubles();
     const dep = dependances(d, { seuilsValides: () => true, barriere });
@@ -182,7 +183,10 @@ describe("villes api: barrière", () => {
     const barriere = () => barriereApi({ env: ENV_REUNI, branche: BRANCHE, plafondsNonNuls: true });
     // Seul le crochet `accesReelApi` (fermé) manque : avec un crochet vrai, la même barrière serait réelle.
     expect(await barriere()).toBe("simulee");
-    expect(await barriereApi({ env: ENV_REUNI, branche: BRANCHE, plafondsNonNuls: true, cookieValide: async () => true })).toBe("reelle");
+    expect(await evaluerBarriere({ env: ENV_REUNI, branche: BRANCHE, plafondsNonNuls: true, cookieValide: async () => true })).toBe("reelle");
+    // Le crochet de `barriereApi` n'est pas surchargeable (mineur 8) : un crochet passé malgré le type est ignoré.
+    const forcee = { env: ENV_REUNI, branche: BRANCHE, plafondsNonNuls: true, cookieValide: async () => true } as unknown as Parameters<typeof barriereApi>[0];
+    expect(await barriereApi(forcee)).toBe("simulee");
     // Défaut complet (environnement des tests, `BRANCHE_APPELS_REELS` et `PLAFONDS_USAGE` à `null`) : jamais réelle.
     expect(["production", "simulee"]).toContain(await barriereApi());
     const d = doubles();
@@ -195,7 +199,7 @@ describe("villes api: barrière", () => {
 
   it("seuils non validés : indisponible avant la barrière, même réelle avec un crochet vrai injecté ; aucun client, aucun limiteur, ville.refusee seuils_non_valides", async () => {
     const d = doubles();
-    const barriere = vi.fn(() => barriereApi({ env: ENV_REUNI, branche: BRANCHE, plafondsNonNuls: true, cookieValide: async () => true }));
+    const barriere = vi.fn(() => evaluerBarriere({ env: ENV_REUNI, branche: BRANCHE, plafondsNonNuls: true, cookieValide: async () => true }));
     const dep = dependances(d, { seuilsValides: () => false, barriere });
     const lignes = await journal(async () => {
       expect(await suggerer(dep)).toEqual({ statut: "indisponible" });
@@ -269,10 +273,15 @@ describe("villes api: ordre", () => {
 
   it("compteur indisponible : indisponible, aucun appel Google", async () => {
     const d = doubles();
-    d.reserver.mockResolvedValueOnce({ ok: false, raison: "indisponible" }).mockRejectedValueOnce(new TypeError("SENTINELLE"));
+    d.reserver
+      .mockResolvedValueOnce({ ok: false, raison: "indisponible" })
+      .mockRejectedValueOnce(new TypeError("SENTINELLE"))
+      .mockResolvedValueOnce({ ok: false, raison: "indisponible", errorName: "DatabaseError" });
     const lignes = await journal(async () => {
       expect(await suggerer(dependances(d))).toEqual({ statut: "indisponible" });
       expect(await choisir(dependances(d))).toEqual({ statut: "indisponible" });
+      // Cause de la panne des compteurs (mineur 7 de la revue du head `bcaa346`) : nom de classe seul.
+      expect(await suggerer(dependances(d))).toEqual({ statut: "indisponible" });
     });
     expect(d.client.suggererVilles).not.toHaveBeenCalled();
     expect(d.client.ficheVille).not.toHaveBeenCalled();
@@ -280,6 +289,7 @@ describe("villes api: ordre", () => {
     expect(lignes).toEqual([
       { level: "warn", event: "ville.refusee", reason: "compteur_indisponible", action: "suggestions" },
       { level: "warn", event: "ville.refusee", reason: "compteur_indisponible", action: "choix", errorName: "TypeError" },
+      { level: "warn", event: "ville.refusee", reason: "compteur_indisponible", action: "suggestions", errorName: "DatabaseError" },
     ]);
     expect(JSON.stringify(lignes)).not.toContain("SENTINELLE");
   });

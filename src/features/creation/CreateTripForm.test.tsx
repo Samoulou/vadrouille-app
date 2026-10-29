@@ -583,11 +583,13 @@ describe("CreateTripForm : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", ()
   });
 });
 
-// Décision 0141 § 6.3 point 2 et § 8.2 (T20, PR 880) : écran 1 de api, recherche montée par la page.
+// Décision 0141 § 6.3 point 2 et § 8.2 (T20, PR 885) : écran 1 de api, recherche montée par la page.
 describe("écran 1 api", () => {
   const LISBONNE = { placeId: "lieu_fictif_lisbonne_pt", principal: "Lisbonne", secondaire: "Portugal" };
   const VALENCE = { placeId: "lieu_fictif_valence_es", principal: "Valence", secondaire: "Espagne" };
   const champ = () => screen.getByRole("combobox", { name: "Destination" });
+  const HORS_TABLE = "Cette ville n'est pas encore proposée. Choisis une ville voisine ou une autre destination.";
+  const PANNE = "La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.";
   function renderApi() {
     return render(
       <DraftProvider>
@@ -597,7 +599,7 @@ describe("écran 1 api", () => {
     );
   }
 
-  it("hors_table : erreur cityUnavailable sur le champ ; limite et limite_jour : messages de 0129 ; jamais l'état accès", async () => {
+  it("hors_table : erreur propre sur le champ (cityNotOffered), annoncée ; limite et limite_jour : messages de 0129 ; jamais l'état accès", async () => {
     villesApi.suggererVillesApi.mockResolvedValue({ statut: "ok", suggestions: [VALENCE, LISBONNE] });
     villesApi.choisirVilleApi.mockResolvedValueOnce({ statut: "hors_table" });
     const { container } = renderApi();
@@ -608,10 +610,13 @@ describe("écran 1 api", () => {
     expect(villes.suggererVilles).not.toHaveBeenCalled();
     expect(screen.getByText("Google Maps")).toHaveAttribute("translate", "no");
     fireEvent.click(screen.getAllByRole("option")[0]!);
-    // `hors_table` : l'erreur existante `cityUnavailable` (texte de 0129, aucun texte nouveau), reliée au champ.
-    const indisponible = "La recherche des villes ne répond pas pour le moment. Réessaie dans un instant.";
+    // `hors_table` : message propre (la recherche répond, la ville n'est pas proposée), relié au champ et annoncé par la
+    // région d'état (lecteurs d'écran seulement) ; jamais le message de panne.
     await waitFor(() => expect(champ()).toHaveAttribute("aria-invalid", "true"));
-    expect(champ()).toHaveAccessibleDescription(expect.stringContaining(indisponible));
+    expect(champ()).toHaveAccessibleDescription(expect.stringContaining(HORS_TABLE));
+    const annonce = screen.getAllByRole("status").find((region) => region.textContent === HORS_TABLE);
+    expect(annonce).toHaveClass("sr-only");
+    expect(screen.queryByText(PANNE)).not.toBeInTheDocument();
     expect(latest?.trip).toMatchObject({ destination: "Vale", placeId: "", country: "", timeZone: "" });
     expect(await axeViolations(container)).toEqual([]);
     // Une ville des 62 choisie ensuite : l'erreur tombe, le nom maison est retenu.
@@ -638,7 +643,7 @@ describe("écran 1 api", () => {
     // Jamais l'état « accès » : un statut `acces` (impossible sur api) se replie, sans saisie du code d'accès.
     villesApi.suggererVillesApi.mockResolvedValue({ statut: "acces" });
     change("Destination", "Pari");
-    expect(await screen.findByText(indisponible)).toHaveAttribute("role", "status");
+    expect(await screen.findByText(PANNE)).toHaveAttribute("role", "status");
     expect(screen.queryByText("Pour chercher ta ville, saisis d'abord le code d'accès du site d'essai.")).not.toBeInTheDocument();
     expect(screen.queryByText("Code d'accès du site d'essai")).not.toBeInTheDocument();
     // Les champs de api restent ceux d'aujourd'hui (plusieurs villes : « Ajouter une ville » proposé).
@@ -658,5 +663,42 @@ describe("écran 1 api", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
     await waitFor(() => expect(champ()).toHaveAccessibleDescription(expect.stringContaining("Choisis ta ville dans la liste des suggestions.")));
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("hors_table puis « Continuer » : la même consigne (cityNotOffered), jamais selectCity ; une autre saisie revient à selectCity", async () => {
+    villesApi.suggererVillesApi.mockResolvedValue({ statut: "ok", suggestions: [VALENCE] });
+    villesApi.choisirVilleApi.mockResolvedValue({ statut: "hors_table" });
+    renderApi();
+    change("Destination", "Valence");
+    await screen.findAllByRole("option");
+    fireEvent.click(screen.getAllByRole("option")[0]!);
+    await waitFor(() => expect(champ()).toHaveAccessibleDescription(expect.stringContaining(HORS_TABLE)));
+    change("Arrivée", "2026-08-29");
+    change("Départ", "2026-09-03");
+    fireEvent.click(within(lodging()).getByRole("radio", { name: "Pas encore" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    await waitFor(() => expect(champ()).toHaveAttribute("aria-invalid", "true"));
+    expect(champ()).toHaveAccessibleDescription(expect.stringContaining(HORS_TABLE));
+    expect(champ()).not.toHaveAccessibleDescription(expect.stringContaining("Choisis ta ville dans la liste des suggestions."));
+    expect(screen.getAllByText(HORS_TABLE).filter((n) => !n.classList.contains("sr-only"))).toHaveLength(1);
+    // Saisie changée sans choix : la consigne de choix revient à « Continuer ».
+    change("Destination", "Valencia");
+    await screen.findAllByRole("option");
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }));
+    await waitFor(() => expect(champ()).toHaveAccessibleDescription(expect.stringContaining("Choisis ta ville dans la liste des suggestions.")));
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("pays_inconnu sur api : message neutre sur le champ, sans le site d'essai ni l'état accès", async () => {
+    villesApi.suggererVillesApi.mockResolvedValue({ statut: "ok", suggestions: [VALENCE] });
+    villesApi.choisirVilleApi.mockResolvedValueOnce({ statut: "pays_inconnu" });
+    renderApi();
+    change("Destination", "Vale");
+    await screen.findAllByRole("option");
+    fireEvent.click(screen.getAllByRole("option")[0]!);
+    await waitFor(() => expect(champ()).toHaveAccessibleDescription(expect.stringContaining("Ce pays n'est pas encore disponible. Choisis une autre ville.")));
+    expect(screen.queryByText(/site d'essai/)).not.toBeInTheDocument();
+    expect(screen.queryByText(HORS_TABLE)).not.toBeInTheDocument();
+    expect(latest?.trip).toMatchObject({ placeId: "", country: "", timeZone: "" });
   });
 });

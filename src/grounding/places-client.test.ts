@@ -697,7 +697,7 @@ describe("places : recherche de ville du site d'essai (demande de Samuel du 23 o
   });
 });
 
-// Décision 0141 § 6.3 point 3 (T27, PR 880 ; Sécurité, mineur 9) : la fiche de la ville de `api` ne demande pas la position.
+// Décision 0141 § 6.3 point 3 (T27, PR 885 ; Sécurité, mineur 9) : la fiche de la ville de `api` ne demande pas la position.
 describe("fiche de ville", () => {
   const SESSION = "jeton-session-1";
   it("sans position : masque id,addressComponents, position null ; avec position : masque inchangé", async () => {

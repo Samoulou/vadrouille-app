@@ -3,7 +3,7 @@ import { expect, test as base } from "@playwright/test";
 import { field, R1 } from "./creation-helpers";
 
 /**
- * Écran 1 de `api` (décision 0141 § 6.4 et § 10, T21 ; PR 880). Projet `api` : serveur `DATA_ADAPTER=api` du job `db`
+ * Écran 1 de `api` (décision 0141 § 6.4 et § 10, T21 ; PR 885). Projet `api` : serveur `DATA_ADAPTER=api` du job `db`
  * (`playwright.config.ts`, fichiers `*.api.spec.ts`). Dans le dépôt, `SEUILS_AUTOCOMPLETION_VALIDES` vaut `false` et le
  * crochet `accesReelApi` rend `false` : la page ne monte pas la recherche de ville de `api`. L'e2e ne couvre que cette
  * barrière fermée (comme 0129 § 6 ne couvrait que le repli) : champ texte d'aujourd'hui, aucune liste de suggestions,

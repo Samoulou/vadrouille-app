@@ -356,7 +356,7 @@ describe("fuseaux : table du MVP isolée de la table élargie (décision 0129 §
   });
 });
 
-// Décision 0141 § 8.2 (T18, PR 880) : recherche de ville de l'écran 1 de `api`, bornée aux 62 villes du MVP.
+// Décision 0141 § 8.2 (T18, PR 885) : recherche de ville de l'écran 1 de `api`, bornée aux 62 villes du MVP.
 describe("villeMvpDuPays", () => {
   it("Lisbonne au Portugal admise ; Valence en Espagne refusée (hors des 62) ; ville des 62 dans un autre pays refusée", () => {
     expect(villeMvpDuPays("Lisbonne", "PT")).toEqual({ nom: "Lisbonne", zone: "Europe/Lisbon" });

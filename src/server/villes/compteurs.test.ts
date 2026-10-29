@@ -7,7 +7,7 @@ import prixGoogle from "../../../prototype/config/prix-google.json";
 import { coutDesCompteurs, createAutocompleteCounter, type AutocompleteCounterClient, type AutocompleteCounterPool } from "./compteurs";
 
 /**
- * Compteurs de la recherche de ville de `api` sans base (décision 0141 § 2, § 5 et § 7 ; T1 à T4, PR 880). La base est
+ * Compteurs de la recherche de ville de `api` sans base (décision 0141 § 2, § 5 et § 7 ; T1 à T4, PR 885). La base est
  * remplacée par un pool simulé qui enregistre les requêtes ; les tests de base réels sont sous
  * `tests/db/compteurs-autocompletion.test.ts` (T5 à T10).
  */
@@ -81,16 +81,20 @@ describe("compteurs: échec fermé sans base", () => {
   it("connexion ou requête en erreur, compte illisible : indisponible, ROLLBACK, client rendu", async () => {
     // Connexion refusée : aucun client à rendre.
     const injoignable = poolSimule({ connexion: Object.assign(new Error("SENTINELLE"), { code: "ECONNREFUSED" }) });
-    expect(await createAutocompleteCounter({ pool: injoignable.pool, seuils: { suggestions: 3, choix: 2 } }).reserve("suggestions")).toEqual({ ok: false, raison: "indisponible" });
+    expect(await createAutocompleteCounter({ pool: injoignable.pool, seuils: { suggestions: 3, choix: 2 } }).reserve("suggestions")).toEqual({
+      ok: false,
+      raison: "indisponible",
+      errorName: "Error",
+    });
     // Table absente, droits retirés, rôle absent : ROLLBACK, client rendu avec l'erreur.
     for (const [code, etape] of [
       ["42P01", "INSERT"],
       ["42501", "UPDATE"],
       ["42704", "SET"],
     ] as const) {
-      const erreur = Object.assign(new Error("SENTINELLE"), { code });
+      const erreur = Object.assign(new Error("SENTINELLE"), { code, name: "DatabaseError" });
       const simule = poolSimule({ echec: (t) => (t.startsWith(etape) ? erreur : undefined) });
-      expect(await createAutocompleteCounter({ pool: simule.pool, seuils: { suggestions: 3, choix: 2 } }).reserve("choix"), code).toEqual({ ok: false, raison: "indisponible" });
+      expect(await createAutocompleteCounter({ pool: simule.pool, seuils: { suggestions: 3, choix: 2 } }).reserve("choix"), code).toEqual({ ok: false, raison: "indisponible", errorName: "DatabaseError" });
       expect(premiers(simule.requetes).at(-1), code).toBe("ROLLBACK");
       expect(simule.liberations, code).toEqual([erreur]);
     }

@@ -66,6 +66,7 @@ function messageFor(field: string, code: FieldError, motif: MotifIndisponible = 
     if (code === "length") return length(DESTINATION_LENGTH);
     if (code === "selectCity") return err.villeChoisir;
     if (code === "cityUnavailable") return VILLE_NON_SERVIE[motif];
+    if (code === "cityNotOffered") return err.horsTable;
     if (code === "cityCharacters") return err.villeCaracteres;
     return err.destination;
   }
@@ -100,7 +101,7 @@ export interface CreateTripFormProps {
   /**
    * Adaptateur `api` (décision 0141 § 6.4) : la page monte la recherche de ville de `api` (`DestinationVille`, actions de
    * `src/server/actions/villes.ts`) seulement si les seuils sont validés et la barrière réelle ; ville hors des 62 villes
-   * du MVP : erreur `cityUnavailable` sur le champ. Les autres champs restent ceux de `api` (plusieurs villes, durée).
+   * du MVP : message `err.horsTable` (code `cityNotOffered` à « Continuer »). Les autres champs restent ceux de `api` (plusieurs villes, durée).
    */
   recherche?: "api";
   /** Actions de la recherche de ville (doubles des tests et des captures, décision 0129 § 5) ; par défaut les actions serveur. */
@@ -145,6 +146,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
   // quand elle ne répond pas (repli sur la table maison des villes).
   const [rechercheDisponible, setRechercheDisponible] = useState(false);
   const [motifIndisponible, setMotifIndisponible] = useState<MotifIndisponible>("panne");
+  // `api` (décision 0141 § 8.2) : saisie que la recherche a refusée hors des 62 villes, tant qu'elle n'a pas changé.
+  const [horsTableSaisie, setHorsTableSaisie] = useState<string | null>(null);
   // Cookie d'accès absent ou expiré pendant la recherche : saisie du code, puis relance de la recherche.
   const [accesDemande, setAccesDemande] = useState(false);
   const [relance, setRelance] = useState(0);
@@ -182,7 +185,12 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const found = validateTrip(trip, todayIso(), { essai, suggestions: rechercheDisponible, rechercheApi: rechercheVille === "api" });
+    const found = validateTrip(trip, todayIso(), {
+      essai,
+      suggestions: rechercheDisponible,
+      rechercheApi: rechercheVille === "api",
+      horsTable: horsTableSaisie !== null && horsTableSaisie === trip.destination,
+    });
     setErrors(found);
     const first = found[0];
     if (first) {
@@ -260,9 +268,9 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
             choisie={trip.placeId && trip.country && trip.timeZone ? { country: trip.country, timeZone: trip.timeZone } : null}
             error={errorOf("destination")}
             onSaisie={(destination) => {
+              // Comme sur le site d'essai : une erreur de « Continuer » reste jusqu'au choix d'une ville ; l'erreur rendue
+              // par la recherche (ville non proposée) tombe à la frappe, dans le champ.
               dispatch({ type: "trip", patch: { destination, placeId: "", country: "", timeZone: "" } });
-              // `api` : l'erreur `cityUnavailable` d'une ville hors des 62 tombe dès que le texte change.
-              if (rechercheVille === "api") setErrors((precedentes) => precedentes.filter((erreur) => !(erreur.field === "destination" && erreur.code === "cityUnavailable")));
             }}
             onChoix={(choix) => {
               dispatch({ type: "trip", patch: choix });
@@ -273,10 +281,11 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
               if (motif) setMotifIndisponible(motif);
             }}
             onAcces={() => setAccesDemande(true)}
-            onHorsTable={() => {
-              // `api` (0141 § 8.2) : ville hors des 62 villes du MVP, erreur existante `cityUnavailable` sur le champ.
-              setMotifIndisponible("panne");
-              setErrors((precedentes) => [...precedentes.filter((erreur) => erreur.field !== "destination"), { field: "destination", code: "cityUnavailable" }]);
+            onHorsTable={(saisie) => {
+              // `api` (0141 § 8.2) : le champ affiche `err.horsTable` ; une erreur de « Continuer » antérieure s'efface,
+              // pour qu'une seule consigne reste sous le champ.
+              setHorsTableSaisie(saisie);
+              setErrors((precedentes) => precedentes.filter((erreur) => erreur.field !== "destination"));
             }}
             relance={relance}
             recherche={rechercheVille}

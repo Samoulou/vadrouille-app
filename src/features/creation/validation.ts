@@ -39,6 +39,8 @@ export type FieldError =
   | "selectCity"
   | "cityCharacters"
   | "cityUnavailable"
+  // Écran 1 de `api` (décision 0141 § 8.2) : la recherche a répondu, la ville n'est pas l'une des 62 villes du MVP.
+  | "cityNotOffered"
   | "singleCity"
   | "tooLong";
 
@@ -144,6 +146,11 @@ export interface ValidateTripOptions {
    * suggestions est exigé ; sans, aucun changement (champ d'aujourd'hui, contrôle des 62 villes par `createTrip`).
    */
   rechercheApi?: boolean;
+  /**
+   * Écran 1 de `api` : la saisie actuelle est celle que la recherche a refusée hors des 62 villes (`hors_table`) ;
+   * « Continuer » répète alors `cityNotOffered` au lieu de `selectCity` (une seule consigne pour le champ).
+   */
+  horsTable?: boolean;
 }
 
 /** Vrai si la destination saisie (non vide) est absente de la table maison des villes. */
@@ -182,7 +189,7 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
   } else if (api && destinationError === null && region === null) {
     // Écran 1 de `api`, recherche montée et disponible (décision 0141 § 6.4) : choisir dans les suggestions. Sans
     // réponse de la recherche, le champ d'aujourd'hui (62 villes, contrôle de `createTrip`).
-    push("destination", "selectCity");
+    push("destination", options.horsTable === true ? "cityNotOffered" : "selectCity");
   }
   // Ville choisie hors de la table : seul un nom fait de lettres atteint le brief (décision 0129 § 4, même règle que le serveur).
   if (region !== null && villeDuPays(trip.destination, region.country) === null && destinationEssaiFiltree(trip.destination) === null) {

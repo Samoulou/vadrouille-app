@@ -512,7 +512,7 @@ describe("confinement: aucune exception à la section 2.4 (0040 D1 retirée par 
   });
 });
 
-describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6, PR 880)", () => {
+describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)", () => {
   const COMPTEURS = "src/server/villes/compteurs.ts";
   const RECHERCHE = "src/server/villes/recherche.ts";
   const TERMINAL_API = "src/server/composition/villes-api.ts";
