@@ -1,4 +1,4 @@
-import type { Brief as BriefContrat, Day, MobilityMode, Pace, TripCommitment } from "@/contracts";
+import type { Brief as BriefContrat, Day, MobilityMode, TripCommitment } from "@/contracts";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import type { CandidatEvenement, CandidatMoteur, EtatChoix, Nuit, VoyageMoteur } from "@/domain/entrees";
 import type { JourPlanifie } from "@/domain/planification";
@@ -9,8 +9,9 @@ import { compterParRegle, validerProgramme } from "@/domain/validation";
 import type { JourSquelette } from "@/domain/squelette";
 import { jourSemaine } from "@/domain/temps";
 import type { AncrageResolu, Trajets } from "@/prototype/ancrage";
-import type { Brief, Rythme } from "@/prototype/brief";
+import type { Brief } from "@/prototype/brief";
 import type { Candidat, CandidatNote } from "@/prototype/candidat";
+import { rythmeVersPace } from "@/server/programme/assemblage";
 
 /**
  * Adaptateur de P0 vers les entrées du moteur (décision 0045 § 1.3, B5-TL-1) : **seul** fichier qui convertit les
@@ -27,16 +28,11 @@ import type { Candidat, CandidatNote } from "@/prototype/candidat";
  * - ancrages et matrice de trajets → doubles en mémoire des interfaces `Relectures` (0045 § 2).
  */
 
-export function rythmeVersPace(rythme: Rythme): Pace {
-  switch (rythme) {
-    case "tranquille":
-      return "relaxed";
-    case "equilibre":
-      return "balanced";
-    case "intense":
-      return "intense";
-  }
-}
+/**
+ * Rythme de P0 → rythme des contrats : déplacé dans `src/server/programme/assemblage.ts` par M1a-1 (décision 0136 § 1.1),
+ * réexporté ici sans changement d'import.
+ */
+export { rythmeVersPace };
 
 /** Voyage du moteur depuis le brief de P0. */
 export function voyageDepuisBrief(brief: Brief): VoyageMoteur {

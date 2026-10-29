@@ -664,6 +664,13 @@ export default defineConfig([
       "src/server/p0/vers-moteur.ts",
       // B7a (ticket 423, décision 0077 § 1 point 5) : adaptateur de P0 vers la couche IA, même régime que `vers-moteur.ts`.
       "src/server/p0/vers-couche-ia.ts",
+      // Décision 0136 § 1.5 (M1a-1) : code partagé de la chaîne inversée, déplacé de `src/server/p0` et réexporté par
+      // `assemblage.ts`, `vers-couche-ia.ts` et `vers-moteur.ts`, donc chargé par `pnpm p0` sous Node nu ; même
+      // justification et même condition de sortie que P0r3c-5a. `brief.ts`, `sites.ts` et `apercu.ts` du même dossier
+      // gardent `import "server-only"`.
+      "src/server/programme/forme.ts",
+      "src/server/programme/entree.ts",
+      "src/server/programme/assemblage.ts",
     ],
     rules: { "ligne/require-server-only": "error" },
   },

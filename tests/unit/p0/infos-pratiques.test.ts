@@ -8,6 +8,7 @@ import { texteMaison as texteMaisonCopie } from "@/ai/candidat";
 import { lireProgramme } from "@/ai/sorties";
 import { LONGUEURS_CONTRAT, TripSchema, contientUrl, texteMaison, type Stop } from "@/contracts";
 import { BriefSchema } from "@/prototype/brief";
+import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assemblerProgrammeIa, type CreneauAssemble } from "@/server/p0/assemblage";
 
@@ -93,6 +94,7 @@ describe("infos pratiques : assemblage dans les étapes et les jours (0116 § 6,
   const assembler = (titre: string | undefined, creneaux: CreneauAssemble[]) =>
     assemblerProgrammeIa({
       tripId: "proto_edimbourg_20261021_1",
+      organizationId: PROTOTYPE_ORG_ID,
       brief,
       jours: [{ date: brief.arrivee, ...(titre === undefined ? {} : { titre }), creneaux }],
       bonsPlans: [],
