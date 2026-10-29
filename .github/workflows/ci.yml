@@ -242,6 +242,9 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:3000/voyages/mock_trip_edimbourg/debloquer/confirmation?paiement=AAAAAAAAAAAAAAAAAAAAAA')" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H 'x-vadrouille-simulation: ci' -d '{"action":"advanceClock","ms":0}' http://127.0.0.1:3000/dev/api/simulation)" = "404"
           if curl -fsS http://127.0.0.1:3000/ | grep -q '/debloquer'; then echo "lien Débloquer sur l'accueil"; exit 1; fi
+          # Webhook simulé fermé dans l'image de production, sans drapeau (spécification B4, A10 ; décision 0097 B4-TL-7
+          # et B4-TL-11) : 404 au POST d'un corps JSON, avant toute lecture du corps.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:3000/api/v1/webhooks/simulated)" = "404" || { docker logs app; exit 1; }
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/etats)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/etats/erreur)" = "404"
           docker rm -f app
@@ -320,3 +323,7 @@ jobs:
           verifier gardes-entete-vercel TRUSTED_IP_HEADER -e "TRUSTED_IP_HEADER=x-vercel-forwarded-for"
           # Clé Stripe de production : refusée dans tous les environnements (production_prefix).
           verifier gardes-stripe STRIPE_SECRET_KEY -e "STRIPE_SECRET_KEY=sk_live_${sentinelle}"
+          # Webhook simulé ouvert par son drapeau dans l'image de production : refusé (forbidden ; spécification B4, A10 ;
+          # décision 0097 B4-TL-7). Seule ligne de configuration versionnée qui nomme ce drapeau (A26, exception de
+          # B4-TL-8, tests/unit/debloquer-regles.test.ts) ; le secret de signature n'est jamais nommé ici.
+          verifier gardes-webhook-simule SIMULATED_WEBHOOK_ENABLED -e "SIMULATED_WEBHOOK_ENABLED=true"
