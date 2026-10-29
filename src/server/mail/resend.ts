@@ -1,16 +1,12 @@
 import "server-only";
 
-import { PRODUCT_NAME } from "@/config/site";
-import { format } from "@/i18n";
-import * as messages from "@/i18n/messages";
 import { RESEND_SENDER_ADDRESS } from "@/server/config/email";
-import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
 import { cleResend, type ResultatCleResend } from "@/server/env/cle-resend";
 import { logEvent } from "@/server/log";
 
-import { checkEnvelope, type DonneesMessage } from "./enveloppe";
-import { reserveEmail, type ReserveEmail } from "./plafond";
-import { CodeMailerCapError, CodeMailerRefusalError, type CodeMailer, type LoginCodeMessage } from "./port";
+import { type AvantTransportDeps, preparerMessageCode } from "./avant-transport";
+import { purgeEmailCounts, reserveEmail, type ReserveEmail } from "./plafond";
+import { CodeMailerCapError, type CodeMailer, type LoginCodeMessage } from "./port";
 import {
   ECHEC_DELAI,
   ECHEC_RESEAU,
@@ -27,14 +23,17 @@ import {
  * `emailTransport: "resend"`, c'est-à-dire dans le seul cas admis de 0138 § 3 ; jusqu'à M1h, ce cas s'arrête sur
  * `AUTH_ADAPTER` refusé, et ce module n'est donc construit nulle part hors des tests.
  *
- * Ordre de `sendLoginCode` (0138 C2), chaque refus arrêtant tout ce qui suit :
+ * Ordre de `sendLoginCode` (0138 C2), chaque refus arrêtant tout ce qui suit ; les étapes 1 à 3 sont celles de
+ * `preparerMessageCode` (`./avant-transport.ts`), **communes** avec l'implémentation SMTP :
  * 1. contrôle refait de l'adresse par `parseEmailAddress` → `email.address_refused` ;
  * 2. construction des quatre champs (texte de B3b-envoi-PO-1, expéditeur `RESEND_SENDER_ADDRESS`) ;
  * 3. `checkEnvelope` → `email.envelope_refused` ;
  * 4. `cleResend` (barrière de sortie, cas admis, forme de la clé) → `email.transport_refused` ; rien n'est réservé ;
  * 5. réservation dans le plafond global du jour (`./plafond.ts`) → `email.cap_reached` et `CodeMailerCapError` ;
  * 6. **un seul** appel du transport, options fermées ; aucune nouvelle tentative, aucun repli (C4) ;
- * 7. traduction par le tableau de `./reponses-resend.ts` → `email.sent`, ou `email.provider_refused` et une erreur.
+ * 7. traduction par le tableau de `./reponses-resend.ts` → `email.sent`, ou `email.provider_refused` et une erreur ;
+ * 8. **après** le transport, quelle qu'en soit l'issue : purge des jours échus du plafond (`purgeEmailCounts`), qui ne
+ *    lève jamais et ne court qu'à l'ouverture d'un jour nouveau (revue de la PR 850, mineur 2).
  *
  * Erreurs : `name` fixe, message fixe, jamais de `cause` ni de propriété (C5) : ni adresse, ni code, ni clé, ni corps, ni
  * en-tête, ni message de Resend. La clé est relue à chaque envoi et ne vit que le temps de l'appel (C3).
@@ -60,17 +59,15 @@ export type OptionsEnvoiResend = {
 /** Seule opération du transport utilisée (signature de `fetch`, restreinte) ; injectable pour les tests (double). */
 export type TransportResend = (url: string, options: OptionsEnvoiResend) => Promise<Response>;
 
-export type ResendDeps = {
+export type ResendDeps = AvantTransportDeps & {
   /** Transport injecté (tests : double) ; sinon le `fetch` global de Node, lu à l'envoi. */
   readonly transport?: TransportResend;
   /** Lecture de la clé (tests : sentinelle) ; sinon `cleResend` sur `process.env`, à chaque envoi (0138 § 1.1 point 10). */
   readonly lireCle?: () => ResultatCleResend;
   /** Réservation dans le plafond (tests : compteur injecté) ; sinon `reserveEmail` (`./plafond.ts`). */
   readonly reserver?: ReserveEmail;
-  /** Contrôle de l'adresse reçue ; réservé aux doubles de test du critère R3 (aucun appel de production). */
-  readonly adresseAdmise?: (to: string) => boolean;
-  /** Réservé aux doubles de test du critère R3 : altère les données avant `checkEnvelope` (`bcc`, `envelope`). */
-  readonly completerDonnees?: (donnees: DonneesMessage) => DonneesMessage;
+  /** Purge des jours échus après le transport (tests : purge du plafond injecté) ; sinon `purgeEmailCounts`. */
+  readonly purger?: () => Promise<void>;
 };
 
 /** Refus avant tout contact de Resend : barrière de sortie, cas admis ou clé (0138 § 4 point 2). Aucune valeur. */
@@ -99,14 +96,6 @@ export class ResendEnvoiError extends Error {
     super("Envoi du code par Resend en échec.");
   }
 }
-
-/** Forme d'un code de connexion : 6 chiffres ASCII (B3-PO-4). */
-const FORME_CODE = /^[0-9]{6}$/;
-
-const adresseCanonique = (to: string): boolean => {
-  const lu = parseEmailAddress(to);
-  return lu.ok && lu.email === to;
-};
 
 /** Corps d'erreur lu par le flux, au plus `OCTETS_CORPS_MAX` octets (0138 § 1.1 point 9) ; le reste est abandonné. */
 async function corpsBorne(reponse: Response): Promise<string> {
@@ -167,32 +156,13 @@ async function traduire(reponse: Response, signal: AbortSignal): Promise<Resulta
 }
 
 export function createResendCodeMailer(deps: ResendDeps = {}): CodeMailer {
-  const adresseAdmise = deps.adresseAdmise ?? adresseCanonique;
   const lireCle = deps.lireCle ?? (() => cleResend());
   const reserver = deps.reserver ?? reserveEmail;
-  const completer = deps.completerDonnees ?? ((donnees: DonneesMessage) => donnees);
+  const purger = deps.purger ?? purgeEmailCounts;
 
   return Object.freeze({
     async sendLoginCode(message: LoginCodeMessage): Promise<void> {
-      const to: CanonicalEmail = message.to;
-      if (!adresseAdmise(to)) {
-        logEvent("email.address_refused", {}, "warn");
-        throw new CodeMailerRefusalError();
-      }
-      if (!FORME_CODE.test(message.code) || !Number.isInteger(message.expiresInMinutes) || message.expiresInMinutes < 1) {
-        throw new CodeMailerRefusalError();
-      }
-      const donnees = completer({
-        from: RESEND_SENDER_ADDRESS,
-        to,
-        subject: format(messages.emailCode.objet, { produit: PRODUCT_NAME }),
-        text: format(messages.emailCode.corps, { code: message.code, minutes: message.expiresInMinutes }),
-      });
-      const controle = checkEnvelope(donnees, { from: RESEND_SENDER_ADDRESS, to });
-      if (!controle.ok) {
-        logEvent("email.envelope_refused", {}, "warn");
-        throw new CodeMailerRefusalError();
-      }
+      const envoi = preparerMessageCode(message, RESEND_SENDER_ADDRESS, deps);
 
       const cle = lireCle();
       if (!cle.ok) {
@@ -211,7 +181,6 @@ export function createResendCodeMailer(deps: ResendDeps = {}): CodeMailer {
 
       const envoyer: TransportResend = deps.transport ?? fetch;
       const signal = AbortSignal.timeout(RESEND_DELAI_MS);
-      const envoi = controle.message;
       let resultat: ResultatResend;
       try {
         const reponse = await envoyer(RESEND_API_URL, {
@@ -227,6 +196,8 @@ export function createResendCodeMailer(deps: ResendDeps = {}): CodeMailer {
       } catch (erreur) {
         resultat = delaiDepasse(erreur, signal) ? ECHEC_DELAI : redirectionRefusee(erreur) ? ECHEC_SERVEUR : ECHEC_RESEAU;
       }
+      // Hors du chemin d'avant-transport : la purge ne retarde jamais l'appel de Resend, et ne lève jamais.
+      await purger();
 
       if (resultat.issue === "succes") {
         logEvent("email.sent", { usage: "connexion" }, "info");

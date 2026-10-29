@@ -70,6 +70,9 @@ export const LOG_EVENTS = [
   "email.cap_reached",
   "email.provider_refused",
   "email.transport_refused",
+  // B3d (revue de la PR 850, mineur 1) : purge des jours échus du plafond global en échec, après le transport ; `errorName`
+  // seulement, comme `rate_limit.purge_failed`. La réservation reste acceptée.
+  "email.purge_failed",
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",

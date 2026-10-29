@@ -1,16 +1,22 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { brancherConnexionReelle, debrancherConnexionReellePourTests, type OperationsConnexion } from "@/adapters/better-auth";
 import { ApiErrorSchema, ok } from "@/contracts/errors";
 import { EMAIL_THRESHOLDS, type EmailUsage } from "@/server/config/email";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
-import { createEmailCap, type EmailCapPool, type EmailReservation } from "@/server/mail/plafond";
+import { createEmailCap, type EmailCapOptions, type EmailCapPool, type EmailReservation, type ReserveEmail } from "@/server/mail/plafond";
 import { CodeMailerCapError } from "@/server/mail/port";
 import { createResendCodeMailer, PlafondIndisponibleError, ResendEnvoiError, type TransportResend } from "@/server/mail/resend";
 
 import { createDatabase } from "../../db/index";
+import { runMigrations } from "../../db/migrate";
 import { type Banc, preparerBanc } from "./auth-outils";
-import { closeAll, connect, type DbClient, unique } from "./helpers";
+import { urlBaseJetable } from "./env";
+import { closeAll, connect, connectBaseJetable, type DbClient, unique } from "./helpers";
+import { creerBase, supprimerBases } from "./workflows-harnais";
 
 /**
  * Plafond global quotidien des e-mails sur la base réelle (spécification B3d, critères R4 à R8 ; décision 0138 § 11, T1).
@@ -47,6 +53,12 @@ function pool(max = 2): EmailCapPool {
   const p = createDatabase("vadrouille_app", undefined, { max, connectionTimeoutMillis: 10_000, query_timeout: 10_000 }).$client;
   pools.push(p);
   return p;
+}
+
+/** Réservation et purge d'un même plafond sur la base, pour l'implémentation Resend (purge après le transport). */
+function plafondSur(p: EmailCapPool, options: Omit<EmailCapOptions, "pool"> = {}): { reserver: ReserveEmail; purger: () => Promise<void> } {
+  const plafond = createEmailCap({ pool: p, ...options });
+  return { reserver: plafond.reserve, purger: plafond.purge };
 }
 
 const adresse = (prefixe: string): CanonicalEmail => {
@@ -102,6 +114,7 @@ afterAll(async () => {
   await admin.query("DELETE FROM public.email_daily_counts");
   await Promise.all([...bancs.map((b) => b.fermer()), ...pools.map((p) => p.end())]);
   await closeAll();
+  await supprimerBases();
 });
 
 const evenements = () => journal.map((ligne) => JSON.parse(ligne) as { event: string; usage?: string; reason?: string });
@@ -109,7 +122,7 @@ const evenements = () => journal.map((ligne) => JSON.parse(ligne) as { event: st
 describe("email: plafond global de 100 par jour (R4)", () => {
   it("100 envois de connexion réussissent ; le 101e lève l'erreur de plafond sans appeler le double", async () => {
     const transport = vi.fn<TransportResend>(async () => reponse(200));
-    const mailer = createResendCodeMailer({ transport, lireCle, reserver: createEmailCap({ pool: pool() }).reserve });
+    const mailer = createResendCodeMailer({ transport, lireCle, ...plafondSur(pool()) });
     for (let i = 0; i < 100; i += 1) await mailer.sendLoginCode({ to: adresse("r4"), code: "123456", expiresInMinutes: 10 });
     expect(transport).toHaveBeenCalledTimes(100);
     expect(await ligneDuJour()).toEqual({ connexion: 100, notification: 0 });
@@ -122,7 +135,7 @@ describe("email: plafond global de 100 par jour (R4)", () => {
 
   describe("traversée par l'action requestCode (better-auth, port Resend sur le double, limiteur qui laisse passer)", () => {
     function brancher(transport: TransportResend) {
-      const b = preparerBanc({ port: createResendCodeMailer({ transport, lireCle, reserver: createEmailCap({ pool: pool() }).reserve }) });
+      const b = preparerBanc({ port: createResendCodeMailer({ transport, lireCle, ...plafondSur(pool()) }) });
       bancs.push(b);
       debrancherConnexionReellePourTests();
       brancherConnexionReelle({ operations: (): OperationsConnexion => b.operations, limiter: async () => ok(undefined), contexte: async () => null });
@@ -198,7 +211,7 @@ describe("email: plafond global de 100 par jour (R4)", () => {
 describe("email: plafond sans dépassement sous la concurrence (R5)", () => {
   it("120 envois connexion en parallèle sur un compteur vide : exactement 100 appels du double, 20 refus de plafond", async () => {
     const transport = vi.fn<TransportResend>(async () => reponse(200));
-    const mailer = createResendCodeMailer({ transport, lireCle, reserver: createEmailCap({ pool: pool(20) }).reserve });
+    const mailer = createResendCodeMailer({ transport, lireCle, ...plafondSur(pool(20)) });
     const issues = await Promise.allSettled(
       Array.from({ length: 120 }, () => mailer.sendLoginCode({ to: adresse("r5"), code: "123456", expiresInMinutes: 10 })),
     );
@@ -255,7 +268,7 @@ describe("email: seuil des notifications (R6)", () => {
 describe("email: nouveau jour (R7)", () => {
   it("le compteur du jour atteint, recul de sa date d'un jour par SQL : l'envoi suivant passe ; la purge retire les jours échus seulement", async () => {
     const transport = vi.fn<TransportResend>(async () => reponse(200));
-    const mailer = createResendCodeMailer({ transport, lireCle, reserver: createEmailCap({ pool: pool() }).reserve });
+    const mailer = createResendCodeMailer({ transport, lireCle, ...plafondSur(pool()) });
     await poser(100);
     await expect(mailer.sendLoginCode({ to: adresse("r7"), code: "123456", expiresInMinutes: 10 })).rejects.toBeInstanceOf(CodeMailerCapError);
     // Rôle de test seulement : la colonne du jour n'est pas modifiable par le rôle du compteur (ci-dessous).
@@ -275,8 +288,8 @@ describe("email: nouveau jour (R7)", () => {
     ]);
   });
 
-  it("une purge en erreur laisse la réservation acceptée", async () => {
-    const { reserve } = createEmailCap({
+  it("une purge en erreur laisse la réservation acceptée et écrit email.purge_failed (errorName seul)", async () => {
+    const { reserve, purge } = createEmailCap({
       pool: pool(),
       beforePurge: () => {
         throw new Error("purge en panne");
@@ -284,8 +297,28 @@ describe("email: nouveau jour (R7)", () => {
     });
     await admin.query("INSERT INTO public.email_daily_counts (day, connexion) VALUES ((pg_catalog.now() AT TIME ZONE 'UTC')::date - 30, 4)");
     expect(await reserve("connexion")).toEqual({ ok: true, total: 1 });
+    await expect(purge()).resolves.toBeUndefined();
     const { rows } = await admin.query("SELECT count(*)::int AS n FROM public.email_daily_counts");
     expect(rows[0].n).toBe(2);
+    expect(await ligneDuJour()).toEqual({ connexion: 1, notification: 0 });
+    expect(evenements()).toEqual([{ level: "warn", event: "email.purge_failed", errorName: "Error" }]);
+  });
+
+  it("la réservation ne purge pas ; la purge ne court qu'après l'ouverture d'un jour nouveau, une fois (revue de la PR 850, mineur 2)", async () => {
+    const { reserve, purge } = createEmailCap({ pool: pool() });
+    const echu = "INSERT INTO public.email_daily_counts (day, connexion) VALUES ((pg_catalog.now() AT TIME ZONE 'UTC')::date - 30, 4)";
+    const jours = async () => (await admin.query("SELECT count(*)::int AS n FROM public.email_daily_counts")).rows[0].n as number;
+    await admin.query(echu);
+    expect(await reserve("connexion")).toEqual({ ok: true, total: 1 });
+    expect(await jours()).toBe(2);
+    await purge();
+    expect(await jours()).toBe(1);
+    // Le jour est déjà ouvert : ni la réservation suivante ni la purge suivante ne retirent un jour échu ajouté entre-temps.
+    await admin.query(echu);
+    expect(await reserve("connexion")).toEqual({ ok: true, total: 2 });
+    await purge();
+    expect(await jours()).toBe(2);
+    expect(evenements()).toEqual([]);
   });
 
   it("rôle du compteur : UPDATE des compteurs seulement, jamais de la colonne du jour ; aucun accès sans SET LOCAL ROLE", async () => {
@@ -313,7 +346,7 @@ describe("email: échec fermé du plafond (R8)", () => {
   ])("%s : aucun appel du double, erreur d'envoi (provider_error)", async (_cas, plafond) => {
     expect(await plafond.reserve("connexion")).toEqual({ ok: false, reason: "unavailable" });
     const transport = vi.fn<TransportResend>(async () => reponse(200));
-    const mailer = createResendCodeMailer({ transport, lireCle, reserver: plafond.reserve });
+    const mailer = createResendCodeMailer({ transport, lireCle, reserver: plafond.reserve, purger: plafond.purge });
     const erreur = await mailer.sendLoginCode({ to: adresse("r8"), code: "123456", expiresInMinutes: 10 }).catch((e: unknown) => e);
     expect(erreur).toBeInstanceOf(PlafondIndisponibleError);
     expect(erreur).not.toBeInstanceOf(CodeMailerCapError);
@@ -323,8 +356,45 @@ describe("email: échec fermé du plafond (R8)", () => {
 
   it("erreur d'envoi du double après réservation : ResendEnvoiError, jamais l'erreur de plafond", async () => {
     const transport = vi.fn<TransportResend>(async () => reponse(503));
-    const mailer = createResendCodeMailer({ transport, lireCle, reserver: createEmailCap({ pool: pool() }).reserve });
+    const mailer = createResendCodeMailer({ transport, lireCle, ...plafondSur(pool()) });
     await expect(mailer.sendLoginCode({ to: adresse("r8"), code: "123456", expiresInMinutes: 10 })).rejects.toBeInstanceOf(ResendEnvoiError);
     expect(await totalDuJour()).toBe(1);
+  });
+});
+
+const DOWN_0020 = readFileSync(path.join(process.cwd(), "db/migrations/0020_plafond_emails.down.sql"), "utf8");
+
+describe("email: retour arrière de 0020 (base jetable ; revue de la PR 850, mineur 3)", () => {
+  it("la descente retire droits et politique, garde la table et ses compteurs ; la réservation échoue fermée (unavailable), aucun appel du double", async () => {
+    const nom = await creerBase("plafond_retour");
+    await runMigrations({ VADROUILLE_DATABASE_URL_MIGRATOR: urlBaseJetable("migrator", nom) });
+    const [appJ, adminJ, migrateur] = await Promise.all([connectBaseJetable("app", nom), connectBaseJetable("admin", nom), connectBaseJetable("migrator", nom)]);
+    // Une seule connexion de `vadrouille_app` sur la base jetable, prêtée à chaque transaction (appels en série).
+    const poolJetable: EmailCapPool = { connect: async () => ({ query: (texte, valeurs) => appJ.query(texte, valeurs), release: () => undefined }) };
+    const plafond = createEmailCap({ pool: poolJetable });
+    expect(await plafond.reserve("connexion")).toEqual({ ok: true, total: 1 });
+
+    await migrateur.query("BEGIN");
+    await migrateur.query(DOWN_0020);
+    expect((await migrateur.query("SELECT current_user::text AS u")).rows[0].u).toBe("vadrouille_migrator");
+    await migrateur.query("COMMIT");
+
+    expect(await plafond.reserve("connexion")).toEqual({ ok: false, reason: "unavailable" });
+    const transport = vi.fn<TransportResend>(async () => reponse(200));
+    const mailer = createResendCodeMailer({ transport, lireCle, reserver: plafond.reserve, purger: plafond.purge });
+    await expect(mailer.sendLoginCode({ to: adresse("down"), code: "123456", expiresInMinutes: 10 })).rejects.toBeInstanceOf(PlafondIndisponibleError);
+    expect(transport).not.toHaveBeenCalled();
+
+    const { rows } = await adminJ.query("SELECT connexion, notification FROM public.email_daily_counts");
+    expect(rows).toEqual([{ connexion: 1, notification: 0 }]);
+    const politiques = await adminJ.query("SELECT count(*)::int AS n FROM pg_catalog.pg_policies WHERE tablename = 'email_daily_counts'");
+    expect(politiques.rows[0].n).toBe(0);
+    const droits = await adminJ.query(
+      `SELECT pg_catalog.has_table_privilege('vadrouille_mail_counter', 'public.email_daily_counts', 'SELECT') AS lecture,
+              pg_catalog.has_any_column_privilege('vadrouille_mail_counter', 'public.email_daily_counts', 'INSERT') AS insertion,
+              pg_catalog.has_any_column_privilege('vadrouille_mail_counter', 'public.email_daily_counts', 'UPDATE') AS maj,
+              pg_catalog.has_table_privilege('vadrouille_mail_counter', 'public.email_daily_counts', 'DELETE') AS suppression`,
+    );
+    expect(droits.rows[0]).toEqual({ lecture: false, insertion: false, maj: false, suppression: false });
   });
 });

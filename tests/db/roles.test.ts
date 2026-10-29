@@ -102,9 +102,9 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     billing: ["INSERT"],
   },
   vadrouille_limiter: { action_rate_limits: SIUD },
-  // B3d (migration 0020_plafond_emails ; 0138 § 11, T1) : `UPDATE` par colonnes seulement (jamais `day`, droits par
+  // B3d (migration 0020_plafond_emails ; 0138 § 11, T1) : `INSERT` et `UPDATE` par colonnes seulement (droits par
   // colonne ci-dessous).
-  vadrouille_mail_counter: { email_daily_counts: ["SELECT", "INSERT", "DELETE"] },
+  vadrouille_mail_counter: { email_daily_counts: ["SELECT", "DELETE"] },
   vadrouille_share: {},
   vadrouille_account_admin: {},
   vadrouille_fn_share: {},
@@ -155,8 +155,9 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     checklist_items: { SELECT: ["booking_url", "done", "id", "kind", "label", "moment", "organization_id", "sponsored", "stop_id", "trip_id"] },
   },
   vadrouille_fn_checkout: { checkouts: { SELECT: ["organization_id", "stripe_checkout_session_id"] } },
-  // B3d (0138 § 11, T1) : compteurs seulement, jamais la colonne du jour.
-  vadrouille_mail_counter: { email_daily_counts: { UPDATE: ["connexion", "notification"] } },
+  // B3d (0138 § 11, T1 ; revue de la PR 850, réponse 2) : création de la ligne du jour par sa seule colonne `day` ; mise à
+  // jour des compteurs seulement, jamais de la colonne du jour.
+  vadrouille_mail_counter: { email_daily_counts: { INSERT: ["day"], UPDATE: ["connexion", "notification"] } },
   vadrouille_fn_coords: { place_coordinates: { SELECT: ["expires_at", "organization_id", "place_id"] } },
   // B7c (0010_usage_forfait) : colonnes des sommes seulement, ni id, ni trip_id, ni generation_run_id ; aucune écriture.
   vadrouille_fn_usage: {

@@ -64,8 +64,9 @@ function banc(reponse: TransportResend, extra: Partial<ResendDeps> = {}) {
   const transport = vi.fn<TransportResend>(reponse);
   const lireCle = vi.fn(() => ({ ok: true as const, cle: CLE }));
   const plafond = compteur();
-  const mailer = createResendCodeMailer({ transport, lireCle, reserver: plafond.reserver, ...extra });
-  return { mailer, transport, lireCle, plafond };
+  const purger = vi.fn(async () => undefined);
+  const mailer = createResendCodeMailer({ transport, lireCle, reserver: plafond.reserver, purger, ...extra });
+  return { mailer, transport, lireCle, plafond, purger };
 }
 
 let espions: ReturnType<typeof vi.spyOn>[];
@@ -207,6 +208,28 @@ describe("email: ordre des contrôles (0138 C2)", () => {
     expect(transport).not.toHaveBeenCalled();
     expect(evenements()).toEqual([{ level: "warn", event: "email.cap_reached", usage: "connexion" }]);
     erreurPropre(erreur, "plafond");
+  });
+
+  it("purge des jours échus : après le transport, une fois, quelle qu'en soit l'issue ; jamais sur un refus d'avant-transport ou de plafond (revue de la PR 850, mineur 2)", async () => {
+    const ordre: string[] = [];
+    const succes = banc(async () => {
+      ordre.push("transport");
+      return json(200, {});
+    }, { purger: vi.fn(async () => void ordre.push("purge")) });
+    await succes.mailer.sendLoginCode(MESSAGE);
+    expect(ordre).toEqual(["transport", "purge"]);
+    const echec = banc(async () => json(503, {}));
+    await expect(echec.mailer.sendLoginCode(MESSAGE)).rejects.toBeInstanceOf(ResendEnvoiError);
+    expect(echec.purger).toHaveBeenCalledTimes(1);
+    const reseau = banc(async () => Promise.reject(new TypeError("fetch failed")));
+    await expect(reseau.mailer.sendLoginCode(MESSAGE)).rejects.toBeInstanceOf(ResendEnvoiError);
+    expect(reseau.purger).toHaveBeenCalledTimes(1);
+    const plafond = banc(async () => json(200, {}), { reserver: compteur({ ok: false, reason: "cap_reached" }).reserver });
+    await expect(plafond.mailer.sendLoginCode(MESSAGE)).rejects.toBeInstanceOf(CodeMailerCapError);
+    expect(plafond.purger).not.toHaveBeenCalled();
+    const adresse = banc(async () => json(200, {}));
+    await expect(adresse.mailer.sendLoginCode({ ...MESSAGE, to: forcee("A@exemple.test") })).rejects.toBeInstanceOf(CodeMailerRefusalError);
+    expect(adresse.purger).not.toHaveBeenCalled();
   });
 
   it("plafond indisponible → erreur d'envoi (provider_error), double non appelé", async () => {

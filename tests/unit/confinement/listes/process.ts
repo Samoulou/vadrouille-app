@@ -192,7 +192,7 @@ export const LECTURES_ENV = [
   // B3d (M2a ; décision 0138 § 3 et § 10.7) : prédicat du cas admis de `EMAIL_TRANSPORT=resend` (`resendAdmis`) ;
   // `VADROUILLE_ENV` (absente ou vide exigée) et `VERCEL_TARGET_ENV` (absente ou exactement `preview`), lues par
   // propriété littérale, comparées à des constantes, jamais rendues. Ligne au-delà de 0138 § 9 (relevée par `pnpm test`) :
-  // verdict Sécurité à rendre à la revue de M2a.
+  // verdict : approuvé par la Sécurité sur le head 68d6e69.
   { fichier: "src/server/env/index.ts", noms: ["VADROUILLE_ENV", "VERCEL_TARGET_ENV"] },
   // B3b, correction 1 (revue consolidée du head `f0b8c5a`, bloquant 1 ; décision 0082) : variables que Better Auth 1.7.7
   // lit d'elle-même, refusées au démarrage par leur seule présence (`!== undefined`), valeur jamais lue ; le secret de
@@ -320,7 +320,7 @@ export const ENV_ENTIER = [
   { fichier: "src/server/env/grounding.ts", formes: ["defaut:lireCleGoogle", "argument:verifierSortie"] },
   { fichier: "src/server/env/garde-cles.ts", formes: ["defaut:clesDeServicePosees"] },
   // B3d (M2a), décision 0138 § 4 : environnement lu à l'appel, passé entier à la barrière de sortie et au prédicat du cas
-  // admis. Verdict Sécurité : approuvé par 0138.
+  // admis. Verdict : approuvé par la Sécurité sur le head 68d6e69.
   { fichier: "src/server/env/cle-resend.ts", formes: ["defaut:cleResend", "argument:verifierSortie", "argument:resendAdmis"] },
   // P0r3b (ticket 311 ; décision 0055, section 1 point 2) : module étroit du mode réel, environnement lu à l'appel,
   // passé entier à la barrière de sortie et au seul calcul de l'environnement (B3a). Verdict Sécurité à rendre.
@@ -340,7 +340,7 @@ export const ENV_ENTIER = [
   { fichier: "src/instrumentation.ts", formes: ["argument:parseServerEnv", "argument:assertServerProcessEnv"] },
   { fichier: "src/server/env/index.ts", formes: ["argument:parseServerEnv", "argument:resolveServerEnvironment"] },
   // B3d (M2a ; décision 0138 § 3, T2) : `parseServerEnv` passe l'objet reçu entier au prédicat du cas admis de
-  // `EMAIL_TRANSPORT=resend`. Ligne au-delà de 0138 § 9 (relevée par `pnpm test`) : verdict Sécurité à rendre à la revue de M2a.
+  // `EMAIL_TRANSPORT=resend`. Ligne au-delà de 0138 § 9 (relevée par `pnpm test`) : verdict : approuvé par la Sécurité sur le head 68d6e69.
   { fichier: "src/server/env/index.ts", formes: ["argument:resendAdmis"] },
   { fichier: "db/connection.ts", formes: ["argument:resolveServerEnvironment"] },
   // B3a (ticket 293 ; spécification B3, B3a point 3) : copie de l'environnement du lanceur, dont sont retirées
@@ -373,8 +373,8 @@ export const PARAMETRES_ENV = [
   { fichier: "src/server/env/index.ts", fonction: "assertServerProcessEnv", parametre: "env" },
   { fichier: "src/server/env/resolve.ts", fonction: "resolveServerEnvironment", parametre: "env" },
   // B3d (M2a ; décision 0138 § 3, T2) : prédicat du cas admis, lecture par propriété littérale de `VERCEL`, `VERCEL_ENV`,
-  // `VADROUILLE_ENV` et `VERCEL_TARGET_ENV`. Ligne au-delà de 0138 § 9 (relevée par `pnpm test`) : verdict Sécurité à
-  // rendre à la revue de M2a.
+  // `VADROUILLE_ENV` et `VERCEL_TARGET_ENV`. Ligne au-delà de 0138 § 9 (relevée par `pnpm test`) : verdict :
+  // approuvé par la Sécurité sur le head 68d6e69.
   { fichier: "src/server/env/index.ts", fonction: "resendAdmis", parametre: "env" },
 ] as const satisfies readonly ParametreEnv[];
 

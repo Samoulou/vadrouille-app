@@ -156,8 +156,9 @@ export type ServerEnv = {
   /** Octets décodés de `RATE_LIMIT_HMAC_SECRET` ; `null` si absente (le limiteur échoue alors fermé, à l'usage). */
   readonly rateLimitHmacSecret: Buffer | null;
   /**
-   * `null` ⇔ `EMAIL_TRANSPORT` absente ou `resend` : avec `null` et `emailTransport` `disabled`, port d'envoi désactivé,
-   * aucun envoi implicite (B3b-envoi-PO-2).
+   * Cible SMTP (Mailpit), non nulle seulement quand `emailTransport` vaut `smtp`. `null` sinon : sans
+   * `EMAIL_TRANSPORT` (`emailTransport` `disabled` : port d'envoi désactivé, aucun envoi implicite, B3b-envoi-PO-2) ou
+   * avec `EMAIL_TRANSPORT=resend` admis (`emailTransport` `resend`, aucune cible SMTP).
    */
   readonly smtp: SmtpSettings | null;
   /**
@@ -481,7 +482,9 @@ export function parseServerEnv(env: Env): ServerEnv {
   // EMAIL_TRANSPORT (0098 § 4 points 3 à 6, amendés par 0138 § 10.4) : après `trim()`, exactement `smtp` (minuscules),
   // avec `AUTH_ADAPTER=better-auth` en `local` ou `ci` seulement, `SMTP_URL` requise avec lui et refusée sans lui ; ou
   // exactement `resend`, dans le seul cas admis de 0138 § 3 et avec `AUTH_ADAPTER=better-auth` (`forbidden` en `local`
-  // et en `ci`, et avec `mock`) ; toute autre valeur, casse comprise (`SMTP`, `Resend`, `RESEND`, vide), `invalid_value`.
+  // et en `ci`, et avec `mock`). Toute autre valeur, casse comprise (`SMTP`, `Resend`, `RESEND`, vide), donne
+  // `invalid_value` en `local` et en `ci` hors de Vercel seulement : en `staging`, en `production` et sur Vercel, elle est
+  // déjà refusée plus haut (`forbidden`), sans que sa valeur soit examinée.
   let smtp: SmtpSettings | null = null;
   let emailTransport: EmailTransport = "disabled";
   if (env.EMAIL_TRANSPORT !== undefined) {

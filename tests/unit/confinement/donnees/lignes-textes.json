@@ -710,7 +710,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "module d'envoi réel de B3d (décision 0138 § 1.1) : verdict Sécurité : approuvé par 0138, à confirmer au head de la PR de M2a"
+      "ecart": "module d'envoi réel de B3d (décision 0138 § 1.1) : verdict Sécurité : approuvé par la Sécurité sur le head 68d6e69"
     }
   ]
 }

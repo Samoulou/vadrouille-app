@@ -2,6 +2,7 @@ import "server-only";
 
 import { createDatabase } from "../../../db/index.ts";
 import { EMAIL_COUNTS_RETENTION_DAYS, EMAIL_THRESHOLDS, EMAIL_USAGES, type EmailUsage } from "@/server/config/email";
+import { errorNameOf, logEvent } from "@/server/log";
 
 /**
  * Plafond global quotidien des envois d'e-mails (spécification B3d, point 3 ; décision 0138 § 11, T1 et T2, confirmés par
@@ -19,9 +20,12 @@ import { EMAIL_COUNTS_RETENTION_DAYS, EMAIL_THRESHOLDS, EMAIL_USAGES, type Email
  *   sous la condition `connexion + notification < seuil` ; le verrou de ligne et la réévaluation de la condition par
  *   Postgres sur la version verrouillée empêchent tout dépassement sous la concurrence ; zéro ligne rendue = refus, et
  *   rien n'est modifié (aucune réservation partielle entre usages).
- * - **Purge** à l'écriture, après une réservation acceptée et validée, dans une transaction distincte : les jours de
- *   plus de 7 jours (borne posée par la requête, à l'horloge de la base). Elle ne fait jamais échouer ni annuler la
- *   réservation (condition (a) du Tech Lead) : son erreur est rattrapée, sans journal.
+ * - **Purge** (`purge`, `purgeEmailCounts`) : les jours de plus de 7 jours (borne posée par la requête, à l'horloge de la
+ *   base), dans une transaction distincte. Elle n'est **pas** sur le chemin de la réservation : l'appelant l'appelle
+ *   **après** son transport (revue de la PR 850, mineur 2), et elle ne court que si une réservation de cette instance a ouvert
+ *   la ligne d'un jour nouveau depuis la dernière purge (au plus une fois par jour et par instance ; la table garde une
+ *   ligne par jour). Elle ne lève jamais et ne touche pas la réservation (condition (a) du Tech Lead) : son erreur est
+ *   rattrapée et écrit `email.purge_failed` (`errorName` seul, `warn`) ; la purge du jour suivant reprendra.
  * - **Échec fermé** : seuils absents ou invalides, connexion ou requête en erreur, résultat illisible → `unavailable`,
  *   jamais une absence de plafond ; l'appelant n'envoie rien (`provider_error`).
  */
@@ -45,11 +49,11 @@ export type EmailReservation =
 export type ReserveEmail = (usage: EmailUsage) => Promise<EmailReservation>;
 
 export type EmailCapOptions = {
-  /** Pool injecté (sinon le pool propre de `vadrouille_app`, créé au premier appel). */
+  /** Tests seulement : pool injecté (sinon le pool propre de `vadrouille_app`, créé au premier appel). */
   readonly pool?: EmailCapPool;
-  /** Seuils par usage (sinon `EMAIL_THRESHOLDS`, `src/server/config/email.ts`) ; invalides : échec fermé (R8). */
+  /** Tests seulement : seuils par usage (sinon `EMAIL_THRESHOLDS`, `src/server/config/email.ts`) ; invalides : échec fermé (R8). */
   readonly thresholds?: Readonly<Record<string, unknown>>;
-  /** Crochet de test : appelé dans la transaction de purge, avant la suppression (R7 : purge en erreur). */
+  /** Tests seulement : appelé dans la transaction de purge, avant la suppression (R7 : purge en erreur). */
   readonly beforePurge?: () => void | Promise<void>;
 };
 
@@ -58,7 +62,7 @@ const POOL_PLAFOND = { max: 2, connectionTimeoutMillis: 3_000, query_timeout: 3_
 
 const ROLE = "SET LOCAL ROLE vadrouille_mail_counter";
 const JOUR = "(pg_catalog.now() AT TIME ZONE 'UTC')::date";
-const LIGNE_DU_JOUR = `INSERT INTO public.email_daily_counts (day) VALUES (${JOUR}) ON CONFLICT (day) DO NOTHING`;
+const LIGNE_DU_JOUR = `INSERT INTO public.email_daily_counts (day) VALUES (${JOUR}) ON CONFLICT (day) DO NOTHING RETURNING day`;
 /** Une requête par usage, texte constant : le nom de colonne n'est jamais calculé à partir d'une entrée. */
 const RESERVATIONS: Readonly<Record<EmailUsage, string>> = Object.freeze({
   connexion: `UPDATE public.email_daily_counts SET connexion = connexion + 1
@@ -83,11 +87,18 @@ async function annuler(client: EmailCapClient): Promise<void> {
   await client.query("ROLLBACK").catch(() => undefined);
 }
 
-export function createEmailCap(options: EmailCapOptions = {}): { readonly reserve: ReserveEmail } {
+/** Plafond : réservation, puis purge des jours échus, à appeler **après** le transport (elle ne lève jamais). */
+export type EmailCap = { readonly reserve: ReserveEmail; readonly purge: () => Promise<void> };
+
+export function createEmailCap(options: EmailCapOptions = {}): EmailCap {
   const seuils = options.thresholds ?? EMAIL_THRESHOLDS;
   let pool: EmailCapPool | undefined = options.pool;
+  /** Une réservation de cette instance a ouvert la ligne d'un jour nouveau depuis la dernière purge. */
+  let purgeDue = false;
 
-  async function purger(): Promise<void> {
+  async function purge(): Promise<void> {
+    if (!purgeDue) return;
+    purgeDue = false;
     let client: EmailCapClient | undefined;
     try {
       client = await (pool ??= poolParDefaut()).connect();
@@ -103,6 +114,7 @@ export function createEmailCap(options: EmailCapOptions = {}): { readonly reserv
         await annuler(client);
         client.release(error instanceof Error ? error : true);
       }
+      logEvent("email.purge_failed", { errorName: errorNameOf(error) }, "warn");
     }
   }
 
@@ -112,11 +124,12 @@ export function createEmailCap(options: EmailCapOptions = {}): { readonly reserv
     if (!seuilValide(seuil)) return INDISPONIBLE;
     let client: EmailCapClient | undefined;
     let total: number | null;
+    let jourOuvert: boolean;
     try {
       client = await (pool ??= poolParDefaut()).connect();
       await client.query("BEGIN");
       await client.query(ROLE);
-      await client.query(LIGNE_DU_JOUR);
+      jourOuvert = (await client.query(LIGNE_DU_JOUR)).rows.length > 0;
       const ligne = (await client.query(RESERVATIONS[usage], [seuil])).rows[0] as { total?: unknown } | undefined;
       total = ligne === undefined ? null : Number(ligne.total);
       await client.query("COMMIT");
@@ -128,17 +141,17 @@ export function createEmailCap(options: EmailCapOptions = {}): { readonly reserv
       }
       return INDISPONIBLE;
     }
+    if (jourOuvert) purgeDue = true;
     if (total === null) return REFUS_PLAFOND;
     // Ligne rendue mais total illisible : la réservation est validée, l'envoi reste refusé (échec fermé).
     if (!Number.isSafeInteger(total) || total < 1) return INDISPONIBLE;
-    await purger();
     return Object.freeze({ ok: true, total });
   }
 
-  return Object.freeze({ reserve });
+  return Object.freeze({ reserve, purge });
 }
 
-let parDefaut: { readonly reserve: ReserveEmail } | undefined;
+let parDefaut: EmailCap | undefined;
 
 /**
  * Réserve un envoi de l'usage donné dans le plafond global du jour (pool propre de `vadrouille_app`, seuils de
@@ -146,4 +159,12 @@ let parDefaut: { readonly reserve: ReserveEmail } | undefined;
  */
 export function reserveEmail(usage: EmailUsage): Promise<EmailReservation> {
   return (parDefaut ??= createEmailCap()).reserve(usage);
+}
+
+/**
+ * Purge des jours échus du plafond global (instance par défaut), à appeler **après** le transport ; ne lève jamais.
+ * Sans réservation de cette instance ouvrant un jour nouveau depuis la dernière purge, ne fait rien (aucune connexion).
+ */
+export function purgeEmailCounts(): Promise<void> {
+  return (parDefaut ??= createEmailCap()).purge();
 }

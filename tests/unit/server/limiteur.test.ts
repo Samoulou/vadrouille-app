@@ -456,6 +456,8 @@ describe("module de journal", () => {
       "email.cap_reached",
       "email.provider_refused",
       "email.transport_refused",
+      // B3d (revue de la PR 850, mineur 1) : purge du plafond global en échec, nom d'erreur seulement.
+      "email.purge_failed",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",

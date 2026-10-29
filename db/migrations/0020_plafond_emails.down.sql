@@ -7,9 +7,9 @@
 -- après cette descente (son `CREATE TABLE` échouerait) : un retour passe par une migration corrective vers l'avant.
 SET LOCAL ROLE vadrouille_owner;
 --> statement-breakpoint
-REVOKE UPDATE (connexion, notification) ON public.email_daily_counts FROM vadrouille_mail_counter;
+REVOKE INSERT (day), UPDATE (connexion, notification) ON public.email_daily_counts FROM vadrouille_mail_counter;
 --> statement-breakpoint
-REVOKE SELECT, INSERT, DELETE ON public.email_daily_counts FROM vadrouille_mail_counter;
+REVOKE SELECT, DELETE ON public.email_daily_counts FROM vadrouille_mail_counter;
 --> statement-breakpoint
 DROP POLICY email_daily_counts_mail_counter ON public.email_daily_counts;
 --> statement-breakpoint
