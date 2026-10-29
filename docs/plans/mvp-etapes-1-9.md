@@ -78,10 +78,10 @@ Seuls deux usages attendent l'étape 2 : **l'essai de Samuel sur la préversion*
 | M1b | « Pas pour moi » change le programme sur `api` : la révision de 0126 (une seule par voyage, Q613) portée sur un recalcul `batch` de B10b (`deck_closures`), à la place du moteur | backend | M1a | `src/server/generation`, `src/workflows/recalcul.ts` |
 | B4b | Branchement des écrans du déblocage sur `api` avec le paiement simulé (`specs/B4-paiement-simule.md`, B4b ; amendement de 0020 § 2.3, B4-TL-14) | backend | B4a (fusionnée) | `src/adapters/payment-guard.ts`, `src/app/voyages/[id]/debloquer`, `src/server/payment` |
 | M1c | Voyage complet après le déblocage dans la chaîne inversée (B9d réécrite) : vérification des lieux restants, selon la réponse de Samuel à la question 5 | backend | M1a, B4b ; question 5 de la PR | `src/workflows/complet.ts`, `src/server/generation` |
-| M1e | Photos du tri sur `api` (0128 : `placeId` du voyage de l'organisation, jamais stockées) | frontend avec backend | M1a | `src/server/actions/photo-essai.ts` (généralisé), `src/features/presentation` |
+| M1e | Photos du tri sur `api` (0128 : `placeId` du voyage de l'organisation, jamais stockées). **Fusionnée** (#882, décision 0143) : livrée derrière la barrière fermée, **sans client des photos branché** (`CLIENT_PAR_DEFAUT` à `null`, 0143 § 4 point 1) ; le branchement du client passe à M1h (0143 § 4 point 2) | frontend avec backend | M1a | `src/server/actions/photo-essai.ts` (généralisé), `src/features/presentation` |
 | M1f | Ville par autocomplétion sur `api` (0129, 0131) : compteurs hors du schéma `prototype`, migration `data` dans la même tâche si M1-TL le permet, sinon M1f-D d'abord | data puis backend | M1-D ; Q626 (élargir les 62 villes de B9-PO-18 : Product Owner, tranché par M1f) | `src/server/actions/villes-essai.ts`, `db/migrations` |
 | M1g | Remplacer une étape (écran 14) sur `api`, par une autre proposition déjà vérifiée du voyage : nouvelle version (`TripPatch`), annulation 5 s | backend avec frontend | M1a | `src/server/actions`, `src/server/versions` |
-| M1h | Préversion `mvp-essai` : gardes `api` et `better-auth` ouvertes pour cette seule branche (amendements de 0077 § 5.1 et 0086 § 2.1 par le Tech Lead et la Sécurité), valeurs de `PLAFONDS_USAGE` et `BRANCHE_APPELS_REELS` validées par Samuel, liste des variables à poser | tech-lead, securite, backend | M1a à M1c, M2a ; questions 1, 2 et 6 de la PR | `src/adapters/api-guard.ts`, `auth-guard.ts`, `src/server/config` |
+| M1h | Préversion `mvp-essai` : gardes `api` et `better-auth` ouvertes pour cette seule branche (amendements de 0077 § 5.1 et 0086 § 2.1 par le Tech Lead et la Sécurité), valeurs de `PLAFONDS_USAGE` et `BRANCHE_APPELS_REELS` validées par Samuel, liste des variables à poser. **Photos du tri sur `api`** (0143 § 4 points 2, 4 et 5 ; Q685) : branchement du client Places Photos, décompte du coût hors de `prototype.forfaits`, plafond par organisation et par jour, crochet d'accès, place du limiteur (mineur 11), nouvelle revue Sécurité ; critère : la photo de la première proposition s'affiche avec son crédit, barrière ouverte (0143 § 4 point 3) | tech-lead, securite, backend | M1a à M1c, M1e (fusionnée), M2a ; questions 1, 2 et 6 de la PR ; **avant toute ouverture à un public, réponse explicite de Samuel au flux hors UE des photos (F13-Q4, Q696), consignée dans la décision de M1h** (0143 § 4 point 3) | `src/adapters/api-guard.ts`, `auth-guard.ts`, `src/server/config` |
 | M1i | Migrations du MVP vers Neon : PR de workflow (`MIGRATIONS_APPROUVEES`), puis action S3 de Samuel | data | M1-D, M1f, toute migration de l'étape ; verdict Sécurité G1 à G6 | `.github/workflows/db-migrate.yml` |
 
 **Actions de Samuel pour l'étape 1**, au moment exact où elles bloquent : voir § 11, actions S1 à S4 (une seule séance, quand M1h est prête).
@@ -125,6 +125,7 @@ B4b (écrans sur `api`), B4c (adaptateur Stripe en mode test, Checkout `card` et
 | B4c-TL | Préalables de B4c : version du paquet `stripe` (amendement de 0006), webhook, vérification de signature, refus des clés `sk_live` (déjà exigé par `src/server/env/`) | tech-lead, securite | B4b |
 | B4c | Adaptateur `stripe` en mode test, codé et testé sur des événements signés de test (fixtures), sans compte | backend | B4c-TL |
 | B4d | Reçu : lien vers le reçu Stripe sur l'écran de retour et dans « Mes voyages » ; avec le simulé, un reçu maison marqué « simulé » | backend avec frontend | B4c |
+| B4e | Reçu de Stripe (ticket #887 ; décision 0144, § 7) : **migration d'abord** (colonne `checkouts.stripe_receipt_url`, 0144 § 5.3 point 1, tâche `data`), puis écriture depuis le webhook et rendu sur `R9-recu` (tâche `back`) ; essai réel après Q26, Q353 et l'ouverture des gardes de `mvp-essai` (0144 § 7) | data puis backend | 0144 fusionnée (#890) ; #884 (B4d) fusionnée ; une seule tâche `db/migrations` par cycle, après la **fusion** de #866 (M1i), pas seulement son ouverture (0144 § 7) |
 
 **Action de Samuel** : S5 (§ 11), quand B4c est fusionnée.
 
@@ -143,10 +144,13 @@ Un prompt `programme` qui écrit un programme sur plusieurs villes, avec la jour
 |---|---|---|---|
 | M4-spec | Spécification « plusieurs villes » : journée de transfert, nombre de villes maximal (proposition : 3), même fuseau dans un premier lot, coût | product-owner | M1a fusionnée |
 | M4-TL | Décision du Tech Lead : trajet entre villes (durée saisie ou estimée, jamais une donnée Google stockée), forfait par ville | tech-lead | M4-spec |
+| M4-suite | Spécification « M4-suite » (découpage de la spécification M4, décision du CEO Q697, PR #876) : règles de planification de la journée du changement de ville (ancien § 3.4 : départ estimé, intervalle du changement de ville, chevauchement, marges, arrivée proche, engagement pendant le trajet, repas, long changement de ville, bandeaux et leurs textes) et carte d'ensemble à plusieurs villes numérotée (avec une décision UX/UI) | product-owner (revue Tech Lead et UX/UI) | M4-TL fusionnée (T9, T11, T12) |
 | M4a | Prompt `programme` v5 multi-villes et jeu d'évaluation (sorties simulées) | ia-recherche | M4-TL |
 | M4b | Vérification et assemblage par séjour ; refus de `draft.otherCities` levé pour la chaîne inversée | backend | M4a |
 | M4c | Écrans : Séjour à plusieurs villes, journée de transfert (UX/UI pour l'écran non maquetté) | frontend | M4b |
 | M4d | Plusieurs fuseaux par voyage (contrat `Stay.timeZone`, amendement de B9-PO-18) | tech-lead puis backend | M4b ; lot séparé, après le premier essai de Samuel |
+
+**Découpage M4 / M4-suite** (décision du CEO avec le Tech Lead, Q697 ; description de la PR #876) : deux sujets sortent de la spécification M4 vers M4-suite, les règles de planification de la journée du changement de ville et la carte d'ensemble numérotée à plusieurs villes. Ce plan ne recopie aucune valeur de ces règles : elles sont celles de la spécification M4 **une fois fusionnée (#876)**, avec la précédence M4-TL, puis M4-suite, puis la spécification. M4-suite ne bloque pas M4a à M4c.
 
 ---
 
@@ -163,11 +167,16 @@ La spécification B11 ; les actions de révision sur `api` (verrouiller, revenir
 |---|---|---|---|
 | M5-spec | Spécification B11 (retouches) adaptée à la chaîne inversée : verrou, versions, signalement, lieu à soi, liste | product-owner | M1a |
 | M5-TL | Décision du Tech Lead : contrat `StopReport`, recherche d'un lieu à soi (Text Search par nom → `placeId`, nom jamais prérempli par le nom Google), versions | tech-lead, securite | M5-spec |
-| M5a | Verrouiller une étape (sur `api`), conservée par la révision et par le remplacement | backend | M5-TL, M1b |
-| M5b | Revenir à une version précédente : nouvelle version identique (B5, `versions: annuler crée une version identique`) ; écran « Versions » (UX/UI) | backend puis frontend | M5-TL |
-| M5c | Signaler une erreur (fiche, écran 13) : enregistrement fermé (codes, jamais de texte Google) | backend avec frontend | M5-TL |
-| M5d | Ajouter un lieu à soi | backend avec frontend | M5-TL |
-| M5e | « À faire avant de partir » écrit à la génération et cochable sur `api` | backend avec frontend | M1a |
+| M5-C | PR de contrat (0147 § 14) : `ChangeSchema` étendu et `changements()` complété, `not_unlocked`, `StopReportSchema`, `Stop.addedBy`, `ChecklistItem.kind`, schémas de la recherche de lieu et du retour à une version ; aucun cas d'usage | backend avec frontend | M5-TL |
+| M5-D | Migration `0022` (0147 § 2 et § 6.4 point 3) : `feedback` durcie, colonne `lieux` des compteurs d'autocomplétion ; seule tâche `db/migrations` de M5. **Fusionnée** (PR #899, 2026-10-29 19:08 UTC) ; sa ligne de `MIGRATIONS_APPROUVEES` passe par une PR de workflow séparée, après la fusion de #866 (Q713) | data | M5-TL |
+| M5e | « À faire avant de partir » écrit à la génération et cochable sur `api` (0147 § 7) | backend avec frontend | M5-C, M1g (fusionnée, #877) ; M1a (fait) — Q684, 0147 § 14 |
+| M5a | Verrouiller une étape (sur `api`), conservée par la révision et par le remplacement | backend avec frontend | M5-C, M5e, M1b (fait) — 0147 § 14 |
+| M5b | Revenir à une version précédente : nouvelle version identique (B5, `versions: annuler crée une version identique`) ; écran « Versions » (UX/UI) | backend puis frontend | M5-C, M5a — 0147 § 14 |
+| M5c | Signaler une erreur (fiche, écran 13) : enregistrement fermé (codes, jamais de texte Google) | backend avec frontend | M5-C, M5-D — 0147 § 14 |
+| M5d-1 | Ajouter un lieu à soi, partie serveur (recherche Text Search, compteurs, limiteur, aperçu et application, adaptateurs `mock` et `api`) | backend (relecture Sécurité) | M5-C, M5-D, M5a, M1f (fusionnée, #885) — 0147 § 14 |
+| M5d-2 | Ajouter un lieu à soi, écran « Ajouter un lieu » (F7c, jamais livré ; Q708) | frontend (UX/UI pour le rendu) | M5d-1 — 0147 § 14 |
+
+**Découpage et ordre de M5** (décision 0147 § 14, qui prime sur les lignes ci-dessus pour le contenu détaillé et les fichiers) : M5-C et M5-D en parallèle, puis M5e, puis M5a, puis M5b et M5c (M5c jamais dans le même cycle que M5a : `StopSheet.tsx`), puis M5d-1, puis M5d-2. L'ancienne ligne M5d est coupée en M5d-1 et M5d-2. **Exception à « une tâche = une spécification »** (`CLAUDE.md`), accordée par le CEO le 2026-10-29 (0147 § 14 ; Q704), comme pour M1a (0136 § 12) : ces huit tâches partagent `specs/M5-retouches.md` et 0147, chacune sur sa branche et dans sa PR.
 
 ---
 
@@ -277,6 +286,7 @@ Lecture du tableau :
 - Les retours de Samuel sur ses essais (cycles 221 et suivants) passent avant la suite : le CEO réserve un fil aux corrections dès qu'un essai en remonte.
 - M7a (étape 7) passe au cycle 219, avant les étapes 4 à 6 : elle ne touche que le fil B, qui est libre, et l'e-mail sert à l'essai de Samuel. Elle n'est utile sur la préversion qu'après S1. C'est le seul écart à l'ordre des étapes, et il ne retarde aucune étape plus prioritaire.
 - Si une décision (M1-TL, M1-S) demande une PR de plus, tout le fil A glisse d'un cycle ; les autres fils continuent.
+- **Note du CEO (2026-10-29)** : les lignes M5 des cycles 222 à 226 (M5e, M5a, M5b, M5c, M5d) précèdent le découpage de 0147 § 14 ; l'ordre de M5 qui fait foi est celui du § 5 (c) : M5-C et M5-D d'abord, M5d coupée en M5d-1 et M5d-2. De même, M4-suite (§ 4 (c), Q697) n'y figure pas, ni les deux tâches `db/migrations` ajoutées depuis : B4e (§ 3 (c), 0144 § 7 ; après la fusion de #866) et M5-D (§ 5 (c), fusionnée par la PR #899 le 2026-10-29 à 19:08 UTC ; sa ligne de `MIGRATIONS_APPROUVEES` passe par une PR de workflow séparée après #866, Q713). Le tableau n'est pas réécrit.
 - Les tâches du site d'essai encore ouvertes (#822, #826, #827, #692, #687) se terminent sur leur branche. Le CEO n'en ouvre pas de nouvelles sur le prototype, sauf correction demandée par Samuel (0115 § 5.5 : aucune nouvelle tâche de qualité sur l'ancienne chaîne non plus).
 
 ---
