@@ -12,7 +12,8 @@ import type { EtatProgramme } from "@/server/generation/etat";
  *
  * - **État sérialisé** : `{ generationRunId, organizationId, rang }` plus, après un arrêt, le code fermé (`EtatProgrammeSchema`) ;
  *   ni brief, ni récit, ni nom, ni `placeId`.
- * - **Reprises** : celles de `MAX_RETRIES_PROGRAMME`, écrites en littéraux comme `apercu.ts` (test d'égalité) : `a` : 2, déterministe, sans appel ; `e` : 0, une étape rejouée repaierait).
+ * - **Reprises** : celles de `MAX_RETRIES_PROGRAMME`, écrites en littéraux comme dans `apercu.ts` (test d'égalité).
+ *   `a` : 2 reprises (déterministe, sans appel). `e` : aucune (une étape rejouée repaierait).
  * - **Arrêt** : une étape arrêtée a clos l'exécution en `failed` sur un code fermé ; une erreur inattendue qui sort d'une
  *   étape clôt l'exécution sur `upstream_unavailable` (`etapeClore`).
  */

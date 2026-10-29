@@ -26,11 +26,11 @@ import { ArretEtape, codeDeErreur, codeFerme } from "./codes";
 import type { DependancesGeneration, DependancesResolues } from "./dependances";
 import { resoudre } from "./dependances";
 import { lireEtatProgramme, type EtatProgramme } from "./etat";
-import { SQL_PLACE_SEJOUR } from "./etapes";
 import { forfaitDuProgramme } from "./forfait-etape";
 import { cloreEnEchecAuRang, commencerEtapeAuRang } from "./garde";
 import { lireVoyage, type ExecuteurLecture, type VoyageLu } from "./lecture";
 import { publier } from "./publication";
+import { SQL_PLACE_SEJOUR } from "./sql-sejours";
 
 /**
  * Étapes de `generateProgramme`, la chaîne inversée sur `api` (décision 0136 § 2 et § 3 ; verdict 0139). **Fonctions

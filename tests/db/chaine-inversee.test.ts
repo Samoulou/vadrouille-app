@@ -665,7 +665,7 @@ describe("chaîne inversée : chemin nominal (Rome)", () => {
     ).toBe(1);
   });
 
-  it("organisation qui ne possède pas l'exécution : arrêt, aucun appel, aucune écriture", async () => {
+  it("chaine-inversee: aucune écriture hors de l'organisation de l'exécution", async () => {
     const proprietaire = await createOrg(auth);
     const autre = await createOrg(auth);
     const { tripId, etat } = await lancer(proprietaire);
@@ -690,6 +690,12 @@ describe("chaîne inversée : chemin nominal (Rome)", () => {
         )
       )[0]!.n,
     ).toBe(0);
+    // Exécution par l'organisation qui la possède : chaque ligne écrite porte cette organisation, et aucune autre.
+    expect((await derouler(etat, dependances())).fin.arret).toBeUndefined();
+    for (const table of ["trip_versions", "proposals", "checklist_items", "stays", "generation_runs"]) {
+      const { rows } = await admin.query(`SELECT DISTINCT organization_id FROM public.${table} WHERE trip_id = $1`, [tripId]);
+      expect(rows, table).toEqual([{ organization_id: proprietaire.org }]);
+    }
   });
 });
 
@@ -786,7 +792,7 @@ describe("chaîne inversée : requête programme, prompts et journal", () => {
     }
   });
 
-  it("variante simulée : aucun site soumis (barrière fermée), aucune résolution ni connexion", async () => {
+  it("chaine-inversee: sites simulés, aucune résolution ni connexion (barrière fermée, aucun site soumis)", async () => {
     const org = await createOrg(auth);
     const { etat } = await lancer(org);
     const espion = vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -798,13 +804,12 @@ describe("chaîne inversée : requête programme, prompts et journal", () => {
     expect(champs.sitesUnchecked).toBe(champs.sitesProposed);
   });
 
-  it("journal : une ligne generation.programme_written (compteurs seuls), aucun événement p0.*", async () => {
+  it("chaine-inversee: aucun événement p0.* sur api", async () => {
+    const espion = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const erreurs = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // Exécution complète, puis `lodging_unresolved` et `model_output_invalid` (0139 § 2 point 7).
     const org = await createOrg(auth);
     const { tripId, etat } = await lancer(org);
-    const espion = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const erreurs = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
     expect((await derouler(etat, dependances())).fin.arret).toBeUndefined();
     const lignes = lignesDuJournal(espion, "generation.programme_written");
     expect(lignes).toHaveLength(1);
@@ -812,21 +817,19 @@ describe("chaîne inversée : requête programme, prompts et journal", () => {
     expect(champs.level).toBe("info");
     expect(champs.modelCalls).toBe(1);
     expect(champs.days).toBe(5);
-    for (const interdit of [
-      tripId,
-      org.org,
-      etat.generationRunId,
-      "Rome",
-      "placeId",
-    ])
-      expect(lignes[0]).not.toContain(interdit);
-    expect([
-      ...lignesDuJournal(espion, "p0."),
-      ...lignesDuJournal(erreurs, "p0."),
-    ]).toEqual([]);
+    for (const interdit of [tripId, org.org, etat.generationRunId, "Rome", "placeId"]) expect(lignes[0]).not.toContain(interdit);
+
+    const sansLogement = journalisee((d) => ({ places: { ...d.places, textSearch: async () => ({ placeIds: [] }) } }));
+    expect((await derouler((await lancer(org)).etat, dependances({}, sansLogement.fabrique))).fin.arret).toBe("lodging_unresolved");
+    const illisible: ClientModeles = { envoyer: async () => ({ texte: "pas du JSON", coutUsd: 0 }) };
+    const sortieIllisible = journalisee(() => ({ modeles: illisible }));
+    expect((await derouler((await lancer(org)).etat, dependances({}, sortieIllisible.fabrique))).fin.arret).toBe("model_output_invalid");
+
+    expect(lignesDuJournal(espion, "generation.programme_written").length).toBeGreaterThanOrEqual(2);
+    expect([...lignesDuJournal(espion, "p0."), ...lignesDuJournal(erreurs, "p0.")]).toEqual([]);
   });
 
-  it("journal : mêmes compteurs que l'ancrage réussisse ou non (aucun verdict de vérification)", async () => {
+  it("journal: generation.programme_written, compteurs indépendants de l'ancrage", async () => {
     const compteurs = async (
       remplacer?: (d: DoublesGeneration) => Partial<DoublesGeneration>,
     ) => {

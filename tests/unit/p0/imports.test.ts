@@ -1785,7 +1785,7 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       expect([...atteints("src/workflows/index.ts", voisinsReels)].some(interditPartout)).toBe(true);
     });
 
-    it("chaine-inversee: aucun accès au schéma prototype (graphe) : le chemin api et generateProgramme n'atteignent ni les adaptateurs prototype, ni la garde ni l'accès de P0, ni src/server/essai", () => {
+    it("chaine-inversee: aucun accès au schéma prototype (graphe) : le chemin api et generateProgramme n'atteignent ni les adaptateurs prototype, ni src/server/p0, ni src/server/essai", () => {
       // Spécification M1a, critère 6 (décision 0136 § 2.1) : imports **exécutés** (`import()` compris, imports de type
       // exclus : effacés à la compilation), depuis l'instance de l'adaptateur de création, la fabrique que
       // `src/instrumentation.ts` y branche (`api-creation.ts`) et le workflow de la chaîne inversée ; parcours arrêté au seul
@@ -1796,13 +1796,13 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
           return cible.type === "projet" ? [cible.chemin] : [];
         });
       const interditApi = (chemin: string) =>
-        /^src\/adapters\/prototype[^/]*\.ts$/.test(chemin) || chemin === "src/server/p0/garde.ts" || chemin === "src/server/p0/acces.ts" || chemin.startsWith("src/server/essai/");
+        /^src\/adapters\/prototype[^/]*\.ts$/.test(chemin) || chemin.startsWith("src/server/p0/") || chemin.startsWith("src/server/essai/");
       const arretP0Run = (chemin: string) => chemin === "src/workflows/p0-run.ts";
       for (const depart of ["src/adapters/api-creation-instance.ts", "src/adapters/api-creation.ts", "src/workflows/programme.ts"]) {
         expect([...atteints(depart, voisinsExecutes, arretP0Run)].filter(interditApi), depart).toEqual([]);
       }
       // Le parcours n'est pas vide par construction : le chemin api atteint, par l'`import()` du démarrage, le workflow
-      // inversé et ses étapes ; sans l'arrêt à p0Run, il atteindrait la garde de P0 (la frontière est exercée).
+      // inversé et ses étapes ; sans l'arrêt à p0Run, il atteindrait src/server/p0 (la frontière est exercée).
       const depuisApi = [...atteints("src/adapters/api-creation.ts", voisinsExecutes, arretP0Run)];
       expect(depuisApi).toEqual(expect.arrayContaining(["src/server/creation/demarrage.ts", "src/workflows/index.ts", "src/workflows/programme.ts", "src/server/generation/etapes-programme.ts"]));
       expect([...atteints("src/adapters/api-creation.ts", voisinsExecutes)].some(interditApi)).toBe(true);

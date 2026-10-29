@@ -22,6 +22,7 @@ import {
 } from "@/server/composition/fixtures-simulees";
 import {
   casesDuProgramme,
+  retenirApercu,
   statutDesCases,
 } from "@/server/generation/cases-programme";
 import { chaineDe } from "@/server/generation/chaine";
@@ -363,6 +364,17 @@ describe("chaîne inversée : cases de l'aperçu (0136 § 3.4, critère 4)", () 
     expect(cases.length).toBeGreaterThan(0);
     expect(cases.every((c) => c.type === "proposal")).toBe(true);
     expect(statutDesCases(cases, CASES_APERCU)).toBe("incomplete");
+  });
+  it("retenirApercu: fabrique exportée pour la lecture (M1a-3), neuve à chaque sélection ; créneau déjà pris et étape sans placeId écartés", () => {
+    const jours = voyageDeRome().complet.trip.days;
+    const etapes = jours.flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop] : [])));
+    const premiere = etapes.find((stop) => stop.placeId !== undefined && (stop.reason ?? "").trim() !== "")!;
+    const retenir = retenirApercu(jours);
+    expect(retenir(premiere)).toBe(true);
+    expect(retenir(premiere)).toBe(false);
+    expect(retenirApercu(jours)(premiere)).toBe(true);
+    expect(retenirApercu(jours)({ ...premiere, placeId: undefined })).toBe(false);
+    expect(retenirApercu(jours)({ ...premiere, reason: " " })).toBe(false);
   });
 });
 

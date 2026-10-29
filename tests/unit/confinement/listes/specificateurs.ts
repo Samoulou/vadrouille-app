@@ -515,7 +515,7 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     fichier: "src/workflows/programme.ts",
     specificateur: "server-only",
     noms: ["effet"],
-    motif: "marqueur `server-only` (sans capacité) du workflow `generateProgramme` (chaîne inversée), exigé par `ligne/require-server-only` ; M1a-2, ticket 851, décision 0136 § 2.1 ; verdict Sécurité à rendre sur la PR",
+    motif: "marqueur `server-only` (sans capacité) du workflow `generateProgramme` (chaîne inversée), exigé par `ligne/require-server-only` ; M1a-2, ticket 851, décision 0136 § 2.1 ; admis par le verdict Sécurité de la revue du head 3536d13 de la PR 854 (amende 0139 § 6 point 1 d'une ligne, précédent 0120 S9 point 1)",
   },
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.

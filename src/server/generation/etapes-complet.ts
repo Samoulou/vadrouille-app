@@ -29,8 +29,8 @@ import {
   SQL_NOTES,
   SQL_OCCURRENCE,
   SQL_OCCURRENCES,
-  SQL_PLACE_SEJOUR,
 } from "./etapes";
+import { SQL_PLACE_SEJOUR } from "./sql-sejours";
 import { lireEtatComplet, type EtatComplet } from "./etat";
 import { forfaitDeLEtape, type ForfaitDeLEtape, type PartDuPassage } from "./forfait-etape";
 import { reserveDuPassage, type ReserveTextSearch } from "./reserve-text-search";

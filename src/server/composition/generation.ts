@@ -616,14 +616,16 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
   };
   return {
     async logements(brief) {
-      // L'étape passe le `BriefEssai` entier, forme structurelle de `Brief` (`src/prototype/brief.ts`), que ce pont n'importe pas.
+      // L'étape passe le `BriefEssai` entier, forme structurelle de `Brief` (`src/prototype/brief.ts`), que ce pont n'importe pas
+      // (zone sensible). Cast gardé : `BriefEssai` est en lecture seule (listes `readonly`), `Brief` ne l'est pas, et l'ancrage
+      // ne modifie rien ; un type commun demanderait d'importer `src/server/programme/` ici (revue du head 3536d13, mineur 2).
       const issue = await ancrerLogementsDuSejour(brief as Parameters<typeof ancrerLogementsDuSejour>[0], { detailsLogement: ancrage.detailsLogement });
       zone = issue.zone;
       for (const logement of issue.logements) retenir(logement.placeId, logement.position);
       return issue.logements.map((logement) => logement.placeId);
     },
     async rediger(entree, sejour) {
-      const reponse = await rediger(entree as Parameters<typeof rediger>[0]);
+      const reponse = await rediger(entree);
       const lecture = lireProgramme(reponse.texte, sejour);
       lu = lecture.valeur === null ? undefined : ordreEcrit(lecture.valeur);
       return {
