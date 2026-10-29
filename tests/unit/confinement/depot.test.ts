@@ -435,7 +435,7 @@ describe("confinement: spécificateurs et paquets (dépôt)", () => {
 
   // B4d-TL (décision 0144 § 6) : un seul `.npmrc`, à la racine, dont le contenu est exactement l'âge minimal de
   // publication (20160 minutes) ; toute autre ligne (registre, jeton, script, hôte) le fait refuser.
-  it("aucun fichier .yarnrc ou pnpm-workspace.yaml suivi ; .npmrc seulement à la racine", () => {
+  it("aucun fichier .yarnrc ou pnpm-workspace.yaml suivi ; un seul .npmrc, à la racine, présent", () => {
     expect(suivis.map((f) => f.chemin).filter((c) => /(^|\/)(\.npmrc|\.yarnrc[^/]*|pnpm-workspace\.yaml)$/.test(c))).toEqual([".npmrc"]);
   });
 
