@@ -49,6 +49,21 @@ describe("écran du tri : photos (décision 0128)", () => {
     expect(carte().querySelector("img")).toBeNull();
   });
 
+  it("PR 879, api sous la barrière fermée (photos faux) : aucune demande, emplacement « Photo du lieu » ; barrière ouverte : demandée", async () => {
+    const demanderPhoto = vi.fn<DemanderPhoto>(async () => ({ photo: PHOTO }));
+    const { unmount } = setup({ demanderPhoto, photos: false, tripId: "0b6f2c1e-8a2d-4c1b-9d2e-3f4a5b6c7d8e" });
+    await flush();
+    expect(demanderPhoto).not.toHaveBeenCalled();
+    expect(carte()).toHaveTextContent("Photo du lieu");
+    expect(carte().querySelector("img")).toBeNull();
+    unmount();
+    setup({ demanderPhoto, photos: true, tripId: "0b6f2c1e-8a2d-4c1b-9d2e-3f4a5b6c7d8e" });
+    await flush();
+    expect(demanderPhoto.mock.calls).toEqual([[{ tripId: "0b6f2c1e-8a2d-4c1b-9d2e-3f4a5b6c7d8e", proposalId: AVEC_LIEU[0]!.id }]]);
+    expect(carte().querySelector("img")).toHaveAttribute("src", PHOTO.url);
+    expect(carte().querySelector("img")).toHaveAttribute("alt", "");
+  });
+
   it("carte affichée seulement : la suivante n'est jamais demandée en avance ; elle l'est quand elle s'affiche", async () => {
     const demanderPhoto = vi.fn<DemanderPhoto>(async () => ({ photo: PHOTO }));
     setup({ demanderPhoto, placesFromGoogle: true });

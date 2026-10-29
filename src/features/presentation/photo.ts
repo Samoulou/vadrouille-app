@@ -6,8 +6,8 @@ import type { PlacePhoto, PlacePhotoRequest, PlacePhotoResponse } from "@/contra
 import { photoDuLieuEssai } from "@/server/actions/photo-essai";
 
 /**
- * Photo d'une carte du tri d'un voyage d'essai (décision 0128) : demandée à l'action `photoDuLieuEssai` **quand la carte
- * s'affiche**, jamais avant, par la carte (`tripId`, `proposalId`) et jamais par un identifiant de lieu (le serveur lit
+ * Photo d'une carte du tri (décision 0128 ; site d'essai, et `api` depuis le ticket 879) : demandée à l'action
+ * `photoDuLieuEssai` **quand la carte s'affiche**, jamais avant, par la carte (`tripId`, `proposalId`) et jamais par un identifiant de lieu (le serveur lit
  * le lieu sur la proposition du voyage). Rien n'est écrit dans le navigateur (ni stockage, ni cache HTTP) : la seule
  * mémoire est celle de la page, pour que la carte et sa feuille de détail partagent la même demande ; chaque entrée en
  * est **supprimée** au bout de `DUREE_MEMOIRE_MS` (minuterie, et purge à chaque demande), exception nommée par 0128 § 2.
@@ -120,8 +120,8 @@ const SANS_PHOTO: EtatPhoto = { attente: false, photo: null };
 
 /**
  * Photo de la carte `proposalId` du voyage `tripId`. Aucune demande sans lieu (`avecLieu` faux), désactivée (`active`
- * faux : hors adaptateur `prototype`) ou sans carte. Une réponse déjà arrivée pour la même carte est rendue dès le
- * premier rendu (la feuille de détail s'ouvre avec la photo de la carte, sans saut de mise en page).
+ * faux : ni site d'essai, ni `api` barrière ouverte) ou sans carte. Une réponse déjà arrivée pour la même carte est
+ * rendue dès le premier rendu (la feuille de détail s'ouvre avec la photo de la carte, sans saut de mise en page).
  */
 export function usePhotoCarte(
   tripId: string,

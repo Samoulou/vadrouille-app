@@ -5,6 +5,7 @@ import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
 import { apiCreationAdapter } from "./api-creation-instance";
+import { photosApi, type PhotosApiBranchees } from "./api-photos-instance";
 import { apiTripAdapter } from "./api-instance";
 import { assertAuthAdapter } from "./auth-guard";
 import { betterAuthServerAdapter } from "./better-auth";
@@ -355,6 +356,58 @@ export async function photoLieuEssai(
     return (await photos.photo(lieu)) ?? null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Chemin des photos du tri selon l'adaptateur de données (décision 0128, ticket 879) : `prototype` (site d'essai),
+ * `api` (vraie app), `null` pour `mock` et toute autre valeur (aucune photo, rien n'est lu). Sans lever d'erreur.
+ */
+export function cheminPhotosDuTri(value: string | undefined = process.env.DATA_ADAPTER): "prototype" | "api" | null {
+  const choix = adapterChoice(value);
+  return choix === "prototype" || choix === "api" ? choix : null;
+}
+
+/**
+ * Photo d'une carte du tri sur l'adaptateur `api` (ticket 879, M1e ; décision 0128 généralisée) : barrière B9-TL-8, puis
+ * lieu, cadence et client de `src/server/photos/api.ts`, branchés au démarrage (`api-photos-instance.ts`). **Le lieu n'est jamais pris de l'entrée** : il est lu en base
+ * sur la proposition `proposalId` du voyage `tripId`, par `getTripReader()` dans le contexte d'organisation de la
+ * requête (mêmes cartes que l'écran, `lieuDeLaProposition`), et seulement barrière ouverte. Hors adaptateur `api`,
+ * voyage inconnu ou d'une autre organisation, proposition d'un autre voyage ou sans lieu, identifiant mal formé : `null`,
+ * photos non branchées, aucun appel. Ne lève jamais ; rien n'est stocké.
+ */
+export async function photoLieuApi(
+  ctx: AdapterContext,
+  demande: { readonly tripId: string; readonly proposalId: string },
+  lecteur: () => TripAdapter = getTripReader,
+): Promise<PlacePhoto | null> {
+  if (cheminPhotosDuTri() !== "api") return null;
+  try {
+    const photos = photosApi();
+    if (photos === null) return null;
+    const lieu = async () => {
+      const placeId = await lieuDeLaProposition(lecteur(), ctx, demande.tripId, demande.proposalId);
+      return placeId !== null && PLACE_ID_PHOTO.test(placeId) ? placeId : null;
+    };
+    return (await photos.photo(lieu)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Vrai si l'écran du tri demande la photo de la carte affichée : site d'essai (`prototype`, sa garde est celle de
+ * l'action), ou `api` barrière ouverte et client branché (`photosApiOuvertes`) ; faux sinon (`mock`, `api` sous la
+ * barrière fermée ou photos non branchées : l'emplacement « Photo du lieu » reste, sans appel à l'action).
+ */
+export async function photosDuTriActives(photos: () => PhotosApiBranchees | null = photosApi): Promise<boolean> {
+  const chemin = cheminPhotosDuTri();
+  if (chemin === "prototype") return true;
+  if (chemin !== "api") return false;
+  try {
+    return (await photos()?.ouvertes()) === true;
+  } catch {
+    return false;
   }
 }
 

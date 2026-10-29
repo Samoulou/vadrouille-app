@@ -85,6 +85,12 @@ export interface PresentationScreenProps {
   /** Mention « Données de lieux : Google » (adaptateur `prototype`, spécification P0) ; absente par défaut. */
   placesFromGoogle?: boolean;
   /**
+   * Photo de la carte affichée demandée à l'action (décision 0128 ; ticket 879 pour `api`) : la page passe
+   * `photosDuTriActives()` (site d'essai, ou `api` barrière ouverte). Absent : `placesFromGoogle`. Faux : aucune demande,
+   * l'emplacement « Photo du lieu » reste.
+   */
+  photos?: boolean;
+  /**
    * Voyage d'essai (adaptateur `prototype`, spécification E2E-essai, lot 1 ; D4) : le tri reste en mémoire, sans question
    * de préférence (le programme n'écrit pas de catégorie), et la fin du tri dit que les choix ne changent pas encore le
    * programme. Faux par défaut.
@@ -163,6 +169,7 @@ function Deck({
   noOptionSlots = [],
   canUnlock = true,
   placesFromGoogle = false,
+  photos = placesFromGoogle,
   essai = false,
   revisable = false,
   demanderRevision = demanderRevisionServeur,
@@ -205,10 +212,10 @@ function Deck({
   const revisionDemandeeRef = useRef(false);
 
   const card = currentCard(state);
-  // Décision 0128 : photo de la carte affichée seulement (voyage d'essai, données de lieux Google ; jamais la carte
+  // Décision 0128 : photo de la carte affichée seulement (voyage d'essai, ou `api` barrière ouverte ; jamais la carte
   // suivante en avance), puis celle du détail ouvert, servie par la même demande de la page.
-  const photoCarte = usePhotoCarte(tripId, card ? { proposalId: card.id, avecLieu: card.stop.placeId !== undefined } : null, placesFromGoogle, demanderPhoto);
-  const photoDetail = usePhotoCarte(tripId, detail ? { proposalId: detail.id, avecLieu: detail.stop.placeId !== undefined } : null, placesFromGoogle, demanderPhoto);
+  const photoCarte = usePhotoCarte(tripId, card ? { proposalId: card.id, avecLieu: card.stop.placeId !== undefined } : null, photos, demanderPhoto);
+  const photoDetail = usePhotoCarte(tripId, detail ? { proposalId: detail.id, avecLieu: detail.stop.placeId !== undefined } : null, photos, demanderPhoto);
   const position = offset + state.index + 1;
   const total = offset + state.cards.length;
   const programme = `/voyages/${encodeURIComponent(tripId)}`;
