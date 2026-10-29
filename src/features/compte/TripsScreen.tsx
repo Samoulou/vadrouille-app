@@ -109,7 +109,7 @@ function TripRow({
       </Link>
       {/* Lien à part, jamais dans le lien du voyage (pas de lien imbriqué) ; nom accessible avec la destination. */}
       {receiptHref ? (
-        <Button asChild variant="text" size="sm" className="-mt-2 mb-1 px-0">
+        <Button asChild variant="text" size="sm" className="mb-2 px-0">
           <Link href={receiptHref} aria-label={format(t.recuNom, { destination: summary.destination })} data-part="recu">
             {t.recu}
           </Link>

@@ -37,12 +37,12 @@ describe("ReceiptScreen", () => {
     const valeurs = within(details)
       .getAllByRole("definition")
       .map((dd) => dd.textContent);
-    expect(within(details).getAllByRole("term").map((dt) => dt.textContent)).toEqual(["Voyage", "Montant", "Moyen", "Date", "Identifiant du paiement"]);
+    expect(within(details).getAllByRole("term").map((dt) => dt.textContent)).toEqual(["Voyage", "Montant", "Moyen de paiement", "Date", "Identifiant du paiement"]);
     expect(valeurs).toEqual([
       "Édimbourg, sam. 29.08 – jeu. 03.09 · 2 adultes",
       "29 CHF",
       "TWINT",
-      "29 octobre 2026 à 14:05",
+      "29 octobre 2026 à 14:05 (heure de Zurich)",
       "nVpPQ49PSzmdDjwLT1srEQ",
     ]);
     expect(screen.getByRole("link", { name: "Voir le programme" })).toHaveAttribute("href", `/voyages/${TRIP}`);
@@ -52,19 +52,19 @@ describe("ReceiptScreen", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
-  it("PR 878 : moyen carte, montant avec centimes", () => {
+  it("PR 878 : moyen Carte, montant avec centimes", () => {
     rendre({ ...RECU, method: "card", amount: 3950 });
     const valeurs = screen.getAllByRole("definition").map((dd) => dd.textContent);
     expect(valeurs[1]).toBe("39.50 CHF");
-    expect(valeurs[2]).toBe("carte");
+    expect(valeurs[2]).toBe("Carte");
   });
 
   it("PR 878 : date lue à l'heure de Zurich, été comme hiver, premier du mois ; valeur illisible rendue telle quelle", () => {
     expect(FUSEAU_RECU).toBe("Europe/Zurich");
-    expect(formatInstantRecu("2026-07-31T22:30:00Z")).toBe("1er août 2026 à 00:30");
-    expect(formatInstantRecu("2026-12-31T23:59:00Z")).toBe("1er janvier 2027 à 00:59");
-    expect(formatInstantRecu("2026-03-29T00:59:00Z")).toBe("29 mars 2026 à 01:59");
-    expect(formatInstantRecu("2026-03-29T01:00:00Z")).toBe("29 mars 2026 à 03:00");
+    expect(formatInstantRecu("2026-07-31T22:30:00Z")).toBe("1er août 2026 à 00:30 (heure de Zurich)");
+    expect(formatInstantRecu("2026-12-31T23:59:00Z")).toBe("1er janvier 2027 à 00:59 (heure de Zurich)");
+    expect(formatInstantRecu("2026-03-29T00:59:00Z")).toBe("29 mars 2026 à 01:59 (heure de Zurich)");
+    expect(formatInstantRecu("2026-03-29T01:00:00Z")).toBe("29 mars 2026 à 03:00 (heure de Zurich)");
     expect(formatInstantRecu("pas une date")).toBe("pas une date");
   });
 });

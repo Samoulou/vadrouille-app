@@ -103,14 +103,14 @@ async function sansViolation(page: Page) {
  * Reçu simulé `R9-recu` (B4d, PR 878) : marqué « simulé » (titre, mention), puis voyage, montant, moyen, date et
  * identifiant public du paiement ; aucune violation axe.
  */
-async function verifierRecu(page: Page, recu: string, paiement: string, moyen: "TWINT" | "carte") {
+async function verifierRecu(page: Page, recu: string, paiement: string, moyen: "TWINT" | "Carte") {
   await expectPath(page, recu);
   await expect(enTete(page, "Reçu simulé")).toBeVisible();
   await expect(page).toHaveTitle("Édimbourg · Reçu simulé");
   await expect(main(page)).toContainText("Reçu de démonstration : aucun paiement réel n'a eu lieu et ce document n'a aucune valeur comptable.");
   const details = main(page).getByRole("region", { name: "Détails du paiement simulé" });
-  await expect(details.getByRole("term")).toHaveText(["Voyage", "Montant", "Moyen", "Date", "Identifiant du paiement"]);
-  await expect(details.getByRole("definition")).toHaveText([/^Édimbourg, /, /^29\s?CHF$/, moyen, /^\d{1,2}(er)? \S+ \d{4} à \d{2}:\d{2}$/, paiement]);
+  await expect(details.getByRole("term")).toHaveText(["Voyage", "Montant", "Moyen de paiement", "Date", "Identifiant du paiement"]);
+  await expect(details.getByRole("definition")).toHaveText([/^Édimbourg, /, /^29\s?CHF$/, moyen, /^\d{1,2}(er)? \S+ \d{4} à \d{2}:\d{2} \(heure de Zurich\)$/, paiement]);
   await sansViolation(page);
 }
 

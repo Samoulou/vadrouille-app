@@ -19,7 +19,10 @@ const t = messages.debloquer.recu;
  */
 export const FUSEAU_RECU = "Europe/Zurich";
 
-/** « 29 octobre 2026 à 14:05 » : instant ISO lu dans `FUSEAU_RECU`, sans dépendre de la langue de l'ICU. */
+/**
+ * « 29 octobre 2026 à 14:05 (heure de Zurich) » : instant ISO lu dans `FUSEAU_RECU`, sans dépendre de la langue de l'ICU.
+ * Le fuseau est nommé (revue de la PR 884, mineur 3) : écart assumé avec la règle « heure locale de la destination ».
+ */
 export function formatInstantRecu(iso: string, zone: string = FUSEAU_RECU): string {
   const instant = Date.parse(iso);
   if (Number.isNaN(instant)) return iso;

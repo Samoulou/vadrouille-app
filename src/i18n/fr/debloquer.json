@@ -87,13 +87,13 @@
     "voyage": "Voyage",
     "voyageValeur": "{destination}, {dates}",
     "montant": "Montant",
-    "moyen": "Moyen",
+    "moyen": "Moyen de paiement",
     "moyens": {
       "twint": "TWINT",
-      "card": "carte"
+      "card": "Carte"
     },
     "date": "Date",
-    "dateHeure": "{date} à {heure}",
+    "dateHeure": "{date} à {heure} (heure de Zurich)",
     "identifiant": "Identifiant du paiement"
   }
 }
