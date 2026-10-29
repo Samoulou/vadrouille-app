@@ -143,7 +143,23 @@ describe("voyage déjà débloqué", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/CHF/);
     expect(recorder.events).toEqual([]);
+    expect(screen.queryByRole("link", { name: "Voir le reçu" })).not.toBeInTheDocument();
     expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("PR 878 : avec un reçu, « Voir le reçu » vers R9-recu, après « Voir le programme » ; toujours aucun bouton", async () => {
+    const href = `/voyages/${TRIP}/debloquer/recu`;
+    const { container } = await renderOffer({ offer: null, receiptHref: href });
+    const liens = within(screen.getByRole("main")).getAllByRole("link");
+    expect(liens.map((lien) => lien.textContent)).toEqual(["", "Voir le programme", "Voir le reçu"]);
+    expect(screen.getByRole("link", { name: "Voir le reçu" })).toHaveAttribute("href", href);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("PR 878 : voyage non débloqué : aucun lien de reçu, même si une adresse est passée", async () => {
+    await renderOffer({ receiptHref: `/voyages/${TRIP}/debloquer/recu` });
+    expect(screen.queryByRole("link", { name: "Voir le reçu" })).not.toBeInTheDocument();
   });
 });
 

@@ -7,6 +7,7 @@ import type { PaymentMethod } from "@/contracts/values";
 import { logEvent } from "@/server/log";
 
 import { DUREE_VIE_PAIEMENT_MS } from "./dependances";
+import { objet } from "./evenement";
 import { SESSION_STRIPE } from "./formes";
 import type { PaiementPrestataire, PrestatairePaiement, ResultatPrestataire } from "./paiements";
 import { LONGUEUR_MAX_ENTETE, TOLERANCE_SECONDES } from "./signature";
@@ -14,7 +15,9 @@ import { LONGUEUR_MAX_ENTETE, TOLERANCE_SECONDES } from "./signature";
 /**
  * **Seul module qui importe le paquet `stripe`** (23.0.0 exacte ; décision 0140 § 1, amendement de 0006), en mode test
  * seulement. Importé hors des tests par `src/server/payment/composition-stripe.ts` et `src/server/routes/stripe-webhook.ts`
- * seulement (test du dépôt, 0140 § 6 ligne 9). N'exporte rien de la bibliothèque : deux fonctions et leurs types.
+ * seulement (test du dépôt, 0140 § 6 ligne 9). N'exporte rien de la bibliothèque : deux fonctions et leurs types, plus
+ * `fabriqueClientSdk`, fabrique du client réel sur un transport de test (épinglage du 409 d'idempotence, revue de la
+ * PR 867, mineur 4), dont le type de transport est dérivé du constructeur du SDK sans en exporter de valeur.
  *
  * - `creerClientSessionsStripe(cle, configuration)` : le port `PrestatairePaiement` (création et relecture d'une session
  *   Checkout) ; seul lieu où un client `Stripe` est construit, **à chaque appel** (aucun client en cache), avec
@@ -28,10 +31,14 @@ import { LONGUEUR_MAX_ENTETE, TOLERANCE_SECONDES } from "./signature";
  * exportées du SDK (ni `name` ni `constructor.name`), selon une liste fermée ; l'objet d'erreur (qui porte la clé
  * masquée, des en-têtes et les paramètres envoyés) n'est ni rendu, ni relancé, ni attaché en `cause`, ni journalisé.
  * Le résultat est fermé (`provider_error` et `retryable`) et une seule ligne `payment.provider_failed` est écrite, avec
- * le seul champ `errorClass`. Un 409 « clé d'idempotence en cours d'utilisation » (deux créations concurrentes sous la
- * même clé) est relancé une fois par le SDK 23.0.0 (`maxNetworkRetries: 1`), puis levé en `StripeAPIError`
- * (`retryable: true`) ; levé en `StripeIdempotencyError`, il donnerait `retryable: false`, ce qui est acceptable en mode
- * test (l'écran propose alors un nouveau paiement, F9).
+ * le seul champ `errorClass`. Une réponse 409 (conflit, dont « clé d'idempotence en cours d'utilisation » de deux
+ * créations concurrentes sous la même clé) est relancée une fois par le SDK 23.0.0 (`maxNetworkRetries: 1`, sauf
+ * en-tête `stripe-should-retry: false`), puis levée en `StripeAPIError` quel que soit le `type` du corps (le SDK ne
+ * classe par `type` que les réponses 400 et 404) : `retryable: true`. Épinglé par le test « 409 d'idempotence » de
+ * `stripe.test.ts`, sur le client réel du SDK et un transport HTTP de test (aucun réseau) ; la forme exacte du corps
+ * que l'API renvoie n'est pas vérifiée (aucun compte). Levé en `StripeIdempotencyError` (réponse 400 de `type`
+ * `idempotency_error`, paramètres différents sous la même clé), il donne `retryable: false`, ce qui est acceptable en
+ * mode test (l'écran propose alors un nouveau paiement, F9).
  */
 
 /** Options du client (0140 § 1.1 point 4) : rien n'est envoyé sans nécessité. */
@@ -70,9 +77,23 @@ export type ClientStripe = {
 
 export type FabriqueClientStripe = (cle: string) => ClientStripe;
 
-/** Client réel, construit à chaque appel ; la clé ne vit que dans ce client. */
-const clientReel: FabriqueClientStripe = (cle) => {
-  const client = new Stripe(cle, OPTIONS_CLIENT);
+/**
+ * Transport HTTP du SDK (option `httpClient`) : **tests seulement** (`fabriqueClientSdk`), pour éprouver le client réel
+ * (relances, classes d'erreur) sans réseau. Le client de l'application garde le transport par défaut du SDK.
+ */
+export type TransportHttpStripe = NonNullable<NonNullable<ConstructorParameters<typeof Stripe>[1]>["httpClient"]>;
+
+/**
+ * Client réel du SDK, construit à chaque appel avec `OPTIONS_CLIENT` ; la clé ne vit que dans ce client. Avec un
+ * `transport` (tests seulement), les requêtes vont à ce transport au lieu du réseau.
+ */
+export function fabriqueClientSdk(transport?: TransportHttpStripe): FabriqueClientStripe {
+  return (cle) => clientSdk(new Stripe(cle, transport === undefined ? OPTIONS_CLIENT : { ...OPTIONS_CLIENT, httpClient: transport }));
+}
+
+const clientReel: FabriqueClientStripe = fabriqueClientSdk();
+
+function clientSdk(client: Stripe): ClientStripe {
   return {
     checkout: {
       sessions: {
@@ -81,7 +102,7 @@ const clientReel: FabriqueClientStripe = (cle) => {
       },
     },
   };
-};
+}
 
 export type ConfigurationSessionsStripe = {
   /** Adresses de retour **absolues**, construites depuis `APP_URL` par le module d'adresses (B4c point 3, C2). */
@@ -119,8 +140,6 @@ function echecErreur(erreur: unknown): ResultatPrestataire<never> {
   }
   return echec("other", false);
 }
-
-const objet = (valeur: unknown): valeur is Record<string, unknown> => typeof valeur === "object" && valeur !== null && !Array.isArray(valeur);
 
 /** Paramètres de la session d'un paiement : montant et devise de l'instantané, moyens de l'offre, aucune donnée de la personne. */
 export function parametresSessionStripe(paiement: PaiementPrestataire, configuration: ConfigurationSessionsStripe): ParametresSessionStripe {

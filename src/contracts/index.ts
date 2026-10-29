@@ -168,6 +168,7 @@ export {
   OfferSchema,
   PaymentMethodSchema,
   PriceVariantSchema,
+  ReceiptSchema,
   SimulateOutcomeRequestSchema,
   TripIdSchema,
 } from "./billing";
@@ -178,6 +179,7 @@ export type {
   CheckoutStatusRequest,
   Offer,
   OfferConfig,
+  Receipt,
   SimulateOutcomeRequest,
 } from "./billing";
 export {

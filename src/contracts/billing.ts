@@ -132,6 +132,27 @@ export const CheckoutStatusSchema = z.strictObject({
 });
 export type CheckoutStatus = z.infer<typeof CheckoutStatusSchema>;
 
+/**
+ * Reçu d'un voyage débloqué (spécification B4, ligne B4d du plan `docs/plans/mvp-etapes-1-9.md`). Une seule forme pour
+ * l'instant : `simulated`, le **reçu maison** du prestataire simulé, construit à la lecture depuis le paiement qui a
+ * accordé le droit (`entitlements.billing_id` → `billing.checkout_id` → `checkouts`), sans rien stocker de plus. Le
+ * reçu de Stripe (lien `receipt_url` du paiement) demande une colonne qui n'existe pas encore (migration décrite dans
+ * la PR de B4d, tâche `data`) : il sera une seconde forme de cette union, jamais un champ libre.
+ */
+export const ReceiptSchema = z.strictObject({
+  kind: z.literal("simulated"),
+  /** Identifiant **public** du paiement (`R9-retour`, `R9-sim`), jamais l'`uuid` interne. */
+  checkoutId: CheckoutIdSchema,
+  tripId: TripIdSchema,
+  method: PaymentMethodSchema,
+  /** Instantané du prix du paiement (B4-PO-9), en centimes. */
+  amount: z.number().int().positive(),
+  currency: CurrencySchema,
+  /** Instant de l'enregistrement de la confirmation qui a accordé le droit (`billing.received_at`). */
+  paidAt: z.iso.datetime({ offset: true }),
+});
+export type Receipt = z.infer<typeof ReceiptSchema>;
+
 export const SimulateOutcomeRequestSchema = z.strictObject({
   checkoutId: CheckoutIdSchema,
   outcome: CheckoutOutcomeSchema,

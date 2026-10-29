@@ -215,3 +215,29 @@ describe("TripsScreen : accessibilité et vocabulaire", () => {
     }
   });
 });
+
+describe("TripsScreen : reçus (B4d)", () => {
+  const RECUS = { mock_trip_edimbourg_debloque: "/voyages/mock_trip_edimbourg_debloque/debloquer/recu" };
+
+  it("PR 878 : « Voir le reçu » sous le voyage payé seulement, hors du lien du voyage, nom avec la destination ; axe sans violation", async () => {
+    const { container } = render(<TripsScreen trips={await trips()} now={clock(AUG_01)} receiptHrefs={RECUS} />);
+    const recus = screen.getAllByRole("link", { name: /^Voir le reçu/ });
+    expect(recus).toHaveLength(1);
+    expect(recus[0]).toHaveAccessibleName("Voir le reçu (Édimbourg)");
+    expect(recus[0]).toHaveTextContent(/^Voir le reçu$/);
+    expect(recus[0]).toHaveAttribute("href", RECUS.mock_trip_edimbourg_debloque);
+    const ligne = container.querySelector("li[data-trip='mock_trip_edimbourg_debloque']");
+    expect(ligne?.contains(recus[0]!)).toBe(true);
+    // Jamais un lien dans un lien : le lien du voyage garde son nom et sa cible.
+    expect(recus[0]!.closest("a")).toBe(recus[0]);
+    const voyage = within(ligne as HTMLElement).getAllByRole("link")[0];
+    expect(voyage).toHaveAttribute("href", "/voyages/mock_trip_edimbourg_debloque");
+    expect(voyage).toHaveAccessibleName("Édimbourg sam. 29.08 – jeu. 03.09 · 2 adultes 4 réservations à faire");
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("PR 878 : sans reçu : aucun lien de reçu", async () => {
+    render(<TripsScreen trips={await trips()} now={clock(AUG_01)} receiptHrefs={{}} />);
+    expect(screen.queryByRole("link", { name: /Voir le reçu/ })).toBeNull();
+  });
+});
