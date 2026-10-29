@@ -36,7 +36,7 @@ Rédaction : Product Owner · Date : 2026-10-29 · `main` relu : `e428115` (0141
   - 5 : résumé de Séjour sur deux lignes (§ 7.5) ;
   - 6 : `{heure}` du départ estimé (§ 8) ;
   - 7 : `{n}` des annonces et aide existante (§ 7.1, § 8) ;
-  - 8 : nom accessible de `DayBadge` (§ 7.7) ;
+  - 8 : nom accessible de `DayBadge` de la Journée, texte masqué pour l'écran 5 (§ 7.7) ;
   - 9 : focus après un retrait (§ 7.1) ;
   - 10 : critère 22 ;
   - 11 : `context` et `detour` après l'arrivée (§ 7.3) ;
@@ -50,7 +50,7 @@ Rédaction : Product Owner · Date : 2026-10-29 · `main` relu : `e428115` (0141
   - les règles de planification de la journée du changement de ville (ancien § 3.4, marges et départ estimé de l'ancien § 3.2), d'où les bloquants 3, 4 et 5 et le mineur 9. Le départ estimé et le créneau sans durée ont depuis été repris par la correction 5, avec des valeurs provisoires (§ 3.4) ;
   - la numérotation, les repères et les étiquettes de la carte d'ensemble à plusieurs villes, et la carte de la Journée d'un changement de ville (§ 7.4), d'où le bloquant 1 et le mineur 10 ;
 - bloquant 2 : ville de l'écran 5 seulement « dès que le voyage a plus d'une ville » (§ 7.2, M4-PO-9, critère 13) ;
-- mineurs 6 et 7 : nom accessible de `DayBadge` et de la mini-ligne (§ 7.7, § 8, critère 17) ;
+- mineurs 6 et 7 : nom accessible de `DayBadge` de la Journée, et texte masqué de la pastille de l'écran 5 (§ 7.7, § 8, critère 17) ;
 - mineur 8 : citation exacte de 0141 § 4 point 5 (§ 4.2) ;
 - mineur 9 : le seuil de 30 minutes part avec l'ancien § 3.4 ;
 - mineur 10 : carte d'ensemble inchangée, forme renvoyée à UX/UI dans M4-suite ; `ink-2` est le token existant (§ 7.5) ;
@@ -63,7 +63,7 @@ Rédaction : Product Owner · Date : 2026-10-29 · `main` relu : `e428115` (0141
 
 **Report du CEO, Q703** (revue du head `baa6610` ; modification non comptée) : la spécification est fusionnée avec ses points ouverts reportés à M4-TL :
 - bloquant 1 : le créneau provisoire de 3 heures ne vaut que pour un départ estimé sans billet ni vol ; il est retiré du critère 7. L'intervalle d'un billet sans heure de fin reste renvoyé à M4-suite (§ 15) ;
-- bloquant 2 : le départ estimé est borné (ville quittée, avant 18:00, sinon 09:00), et M4-TL peut remplacer ces bornes (§ 3.4, T11, critère 8) ;
+- bloquant 2 : le départ estimé est borné (avant 18:00, sinon 09:00), et M4-TL peut remplacer ces bornes (§ 3.4, T11, critère 8). Revue du head `b303b88` : « de la ville quittée » retiré, car un engagement n'a pas de ville ; son rattachement à une ville est reporté à M4-TL (T9) ; chevauchement toléré jusqu'à M4-suite ;
 - mineurs 3 à 9 : T9 en « comment », renvois par le § 3.4, historique de la correction 4, extension de `DayBadge`, texte masqué lu par le lecteur d'écran, disposition et style de la rangée de jour (§ 7.2, § 7.6, § 7.7, T9, T11, critères 13 et 17).
 
 **Vocabulaire.** Dans cette spécification et dans l'interface :
@@ -166,7 +166,7 @@ Dans l'ordre de la ligne du jour :
 1. **Avant le départ, dans la ville quittée.** La ligne part du logement, puis montre les étapes de la ville quittée, ou une ligne « Temps libre » (`free`) jusqu'au départ : il n'y a jamais de trou.
 2. **La ligne « Vers {ville} »**, avec le mode, l'heure et la durée (§ 3.3).
    - Ce n'est **pas une étape** : elle n'a pas de fiche, pas de numéro sur la carte, et ni « Remplacer », ni « Déplacer », ni « Verrouiller ».
-   - Elle occupe son créneau : il n'y a pas de trou dans le programme (principe produit 4).
+   - Elle occupe son créneau : il n'y a pas de trou dans le programme (principe produit 4), sauf l'intervalle renvoyé à M4-suite (§ 3.4).
 3. **Après l'arrivée, dans la ville d'arrivée.** Les étapes de la ville d'arrivée, puis le retour au nouveau logement.
 
 **Règles de remplissage.** Elles sont provisoires et révisables après le premier essai de Samuel. Si M4-TL les met dans le moteur, le Product Owner propose de les placer dans `moteur.json`, à côté de `activitesParRythme` (T11).
@@ -212,7 +212,8 @@ Il y a deux cas, dans cet ordre de priorité.
 - La journée du changement de ville montre la ligne « Vers {ville} » entre les étapes de la ville quittée et celles de la ville d'arrivée.
 - L'arrivée est l'heure de fin du billet ou du vol, sinon elle est « à confirmer ».
 - **Départ estimé** (sans billet ni vol seulement), valeurs du Product Owner, **provisoires** :
-  - le départ estimé est la fin du dernier engagement **de la ville quittée** le jour du départ (son heure de début s'il n'a pas d'heure de fin), **s'il finit avant 18:00** ; sinon, et sans engagement, il est à 09:00. Un engagement de la ville d'arrivée, par exemple un dîner à 20:00, ne compte jamais ;
+  - le départ estimé est la fin du dernier engagement du jour du départ (son heure de début s'il n'a pas d'heure de fin), **s'il finit avant 18:00** ; sinon, et sans engagement, il est à 09:00. Un engagement n'a pas de ville dans le contrat (`src/contracts/creation.ts`) : son rattachement à une ville est reporté à M4-TL (T9, Q703) ;
+  - si le départ estimé tombe avant ou pendant un engagement (par exemple 09:00 avec une Sortie de 17:00 à 19:00), ce **chevauchement est toléré jusqu'à M4-suite** : la ligne « Vers {ville} » et l'engagement gardent chacun leur heure ;
   - sans durée connue, le créneau réservé à la ligne « Vers {ville} » d'un départ estimé est de 3 heures. Ce créneau ne vaut pas pour un billet ou un vol saisi sans heure de fin, dont l'intervalle est renvoyé à M4-suite (§ 15).
 
   **Précédence** (report du CEO, Q703) : M4-TL peut remplacer ces bornes et ces valeurs par un défaut technique (T11 : couche et valeur par défaut), puis M4-suite les révise. Ordre : M4-TL, puis M4-suite, puis cette spécification.
@@ -301,7 +302,7 @@ Ordre de grandeur : quelques centimes de Google par ville en plus, et une part f
 - **Dès que le voyage a plus d'une ville**, chaque rangée de jour nomme sa ville :
   - **texte lu par le lecteur d'écran** : la pastille `DayBadge size="sm"` de la rangée est un `<span>` sans nom ARIA ; seul son texte masqué (`sr-only`, `dayBadgeName`) est lu aujourd'hui. Ce texte masqué est suivi de « , {ville} » pour un jour ordinaire, ou de « , de {ville} à {ville} » pour la journée du changement de ville (§ 7.7) ;
   - **rendu visible** : une légende en `corps-s`, couleur `ink-2`, au-dessus de la mini-ligne, qui affiche « {ville} » ou « De {ville} à {ville} ». Elle est `aria-hidden`, puisque le texte masqué de la pastille porte déjà la ville, et passe à la ligne sans troncature ;
-  - **disposition** : la rangée garde sa sous-grille à 3 colonnes (`items-center`, `PreparationView.tsx`). La légende et la mini-ligne sont empilées dans la colonne centrale. La pastille et l'état du jour restent alignés sur la mini-ligne ;
+  - **disposition** : la rangée garde sa sous-grille à 3 colonnes (`items-center`, `PreparationView.tsx`). La légende et la mini-ligne sont empilées dans la colonne centrale. La pastille et l'état du jour sont alignés sur la **mini-ligne**, pas sur la cellule entière : la rangée passe de `items-center` à un alignement sur la mini-ligne (par exemple `items-end`, ou la légende placée hors de l'alignement), pour qu'une légende sur deux lignes ne les décale pas ;
   - la mini-ligne reste `aria-hidden`, comme aujourd'hui (`PreparationView.tsx`).
 - **Avec une seule ville**, les rangées de jour ne changent pas (critère 25).
 - Les cases suivent le § 7.3. Le changement de ville n'est jamais une case.
@@ -438,6 +439,7 @@ Formats : « 10:12 », « 10:12 – 11:47 », « 45 min », « 1 h 30 ».
   - Les règles des engagements autour du changement de ville sont renvoyées à M4-suite (§ 3.4) ; M4-TL dit seulement dans quelle couche elles vivront.
   - L'**heure de fin** des engagements doit atteindre la couche qui planifie. `BriefEssai.engagements` n'a que `heure` : comment la faire passer, par un champ `fin` (évolution du brief et du prompt) ou hors du brief ?
   - Le « Vol » d'une journée de changement de ville ne doit pas être écarté par `engagementsDuBrief`, ni lu par `heuresDeVol`.
+  - **Ville d'un engagement** (report du CEO, Q703) : un engagement n'a pas de ville (`kind`, `label`, `date`, `start`, `end?`). D'où vient la ville à laquelle il se rattache le jour d'un changement de ville : un champ saisi, une déduction par l'heure, ou la vérification du lieu ? M4-TL tranche ; la règle provisoire du § 3.4 ne s'en sert pas.
 - **T10 — Tests.** Le critère 13 de M1a (`chaine-inversee: une seule ville`) et le test qui le porte changent d'attente pour `api` : 1 à 3 villes y sont acceptées. M4-TL écrit ce changement dans sa décision, avec la liste fermée des attentes modifiées, comme 0136 § 9. Aucun test n'est supprimé ni désactivé sans décision écrite (CLAUDE.md).
 - **T11 — Qui tient les règles du changement de ville (§ 3.2 à § 3.4).** Les règles visées sont le nombre d'activités et le thème (§ 3.2), et les valeurs provisoires du départ estimé, que M4-TL peut remplacer par un défaut technique (§ 3.4). Les marges, les repas, le long changement de ville et le placement des engagements vont à M4-suite (§ 3.4). Elles peuvent vivre :
   - dans le **prompt `programme` v5**, où l'IA les applique ;
@@ -493,9 +495,9 @@ Les tests de base de données tournent en CI (`pnpm test:db`), en composition si
    - Variante : le même « Billet » saisi de 15:05 sans heure de fin. Le détail est « Train Rome–Florence, départ à 15:05, arrivée à confirmer ». Aucun créneau n'est fixé ici : l'intervalle est renvoyé à M4-suite (§ 3.4).
 8. `changement de ville: départ estimé`.
    - Contexte : sans billet, sans vol, et sans engagement le 2027-05-06. La ligne affiche « départ vers 09:00 (estimation) ».
-   - Variante : une « Sortie » à Rome le 2027-05-06 de 10:00 à 11:30. La ligne affiche « départ vers 11:30 (estimation) ».
-   - Variante : une « Sortie » à Rome le 2027-05-06 de 17:00 à 19:00. Elle finit après 18:00 : la ligne affiche « départ vers 09:00 (estimation) ».
-   - Variante : un dîner réservé (« Sortie ») à Florence le 2027-05-06 à 20:00. Il est de la ville d'arrivée et ne compte pas : la ligne affiche « départ vers 09:00 (estimation) ».
+   - Variante : une « Sortie » le 2027-05-06 de 10:00 à 11:30. La ligne affiche « départ vers 11:30 (estimation) ».
+   - Variante : une « Sortie » le 2027-05-06 de 17:00 à 19:00. Elle finit après 18:00 : la ligne affiche « départ vers 09:00 (estimation) », et l'engagement garde son heure (chevauchement toléré jusqu'à M4-suite, § 3.4).
+   - Variante : un dîner réservé (« Sortie ») le 2027-05-06 à 20:00. Il finit après 18:00 : la ligne affiche « départ vers 09:00 (estimation) ».
    - Sans durée estimée, la ligne affiche « durée à confirmer » et occupe un créneau de 3 heures.
    - Si M4-TL remplace ces valeurs (§ 3.4), ce critère suit sa décision.
    - Dans tous les cas, la ligne affiche « départ vers {heure} (estimation) », puis « environ {durée} (estimation) », ou « durée à confirmer » sans estimation. Aucune heure de départ n'est affichée sans « vers » et « (estimation) ».
@@ -517,6 +519,7 @@ Les tests de base de données tournent en CI (`pnpm test:db`), en composition si
 13. `Écran 5: ville de chaque jour`.
     - Pour Rome puis Florence, le texte masqué (`sr-only`) des pastilles `DayBadge size="sm"` est « Jour 1, Rome » et « Jour 3, de Rome à Florence ». Le test porte sur ce texte, pas sur `getByRole(..., { name })`, puisque la pastille `sm` est un `<span>` sans rôle.
     - Les légendes visibles « Rome » et « De Rome à Florence » sont en `corps-s`, `ink-2`, au-dessus de la mini-ligne dans la colonne centrale, `aria-hidden`, et la mini-ligne reste `aria-hidden`.
+    - À 390 px, avec « Saint-Jacques-de-Compostelle » comme nom de ville, la légende passe sur deux lignes sans troncature ni débordement, et la pastille et l'état du jour restent alignés sur la mini-ligne.
     - Pour Édimbourg seul, aucune rangée ne nomme de ville, et les tests existants de l'écran 5 passent sans modification.
     - Le mot « Aperçu » n'apparaît dans aucun texte d'interface ajouté.
 14. `Présentation: plusieurs villes`.
@@ -612,7 +615,7 @@ Elles restent dans le cadre du cadrage (§ 3.5 « plusieurs villes », tableau d
   - La source de l'estimation revient à M4-TL (T2).
 - **M4-PO-8 — Planification de la journée, découpée** (correction 4, décision du CEO Q697).
   - La ligne « Vers {ville} » est entre les étapes de la ville quittée et celles de la ville d'arrivée.
-  - Départ estimé sans billet ni vol : fin du dernier engagement de la ville quittée s'il finit avant 18:00, sinon 09:00 ; créneau de 3 heures sans durée connue. Valeurs provisoires, que M4-TL peut remplacer, puis M4-suite (§ 3.4).
+  - Départ estimé sans billet ni vol : fin du dernier engagement du jour du départ s'il finit avant 18:00, sinon 09:00 ; créneau de 3 heures sans durée connue. Valeurs provisoires, que M4-TL peut remplacer, puis M4-suite (§ 3.4).
   - Les autres règles sont renvoyées à M4-suite (§ 3.4). Cette spécification n'ajoute aucun bandeau.
 - **M4-PO-9 — Aperçu et présentation** (amendée par les corrections 2 et 4).
   - Les 8 propositions viennent des deux premiers jours qui ne sont pas des changements de ville, J1 compris. Cela amende M1a-PO-2 (« J1 puis J2 ») pour les voyages à plusieurs villes ; il ne change rien pour une seule ville.
@@ -701,6 +704,7 @@ Décision du CEO **Q697** (revue du head `4d771bb`) : plutôt qu'une quatrième 
 1. **Règles de planification de la journée du changement de ville** (ancien § 3.4, et marges, repas et départ estimé de l'ancien § 3.2) :
    - révision du départ estimé et du créneau sans durée (valeurs provisoires du § 3.4) ;
    - intervalle du changement de ville quand l'arrivée est « à confirmer » ;
+   - rattachement d'un engagement à une ville, une fois que M4-TL en aura fixé la source (T9, report du CEO Q703) ;
    - chevauchement d'un engagement avec un départ estimé ou saisi ;
    - marges avant le départ et après l'arrivée (anciennes valeurs provisoires 45 et 30 minutes), et engagement qui commence pendant le changement de ville ou peu après l'arrivée ;
    - repas et long changement de ville ;
@@ -714,6 +718,6 @@ Décision du CEO **Q697** (revue du head `4d771bb`) : plutôt qu'une quatrième 
 Jusqu'à M4-suite, M4a à M4c livrent ce que fixe cette spécification :
 - la ligne « Vers {ville} » à sa place ;
 - l'arrivée « à confirmer » sans heure de fin ;
-- le départ estimé provisoire (fin du dernier engagement de la ville quittée s'il finit avant 18:00, sinon 09:00) et son créneau provisoire de 3 heures sans durée connue, sauf remplacement par M4-TL (§ 3.4) ;
+- le départ estimé provisoire (fin du dernier engagement du jour du départ s'il finit avant 18:00, sinon 09:00) et son créneau provisoire de 3 heures sans durée connue, sauf remplacement par M4-TL (§ 3.4) ;
 - aucun bandeau nouveau ;
 - la carte d'ensemble d'aujourd'hui cadrée sur toutes les villes. C'est un **rendu intermédiaire provisoire**, avec des anneaux sans repère par ville : M4c n'est pas jugée sur sa forme, que fixera la décision UX/UI de M4-suite.
