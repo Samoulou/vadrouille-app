@@ -35,6 +35,8 @@ export const MAX_SHARE_LINKS_PER_SCOPE = 20;
 export const MAX_AUTH_ADDRESSES_PER_SCOPE = 50;
 /** Voyages créés gardés par portée (0017 § 10.4) ; au-delà, le lancement le plus ancien est retiré. */
 export const MAX_LAUNCHES_PER_SCOPE = 20;
+/** Signalements d'erreur gardés par portée (M5c) ; au-delà, le plus ancien est retiré. */
+export const MAX_STOP_REPORTS_PER_SCOPE = 200;
 
 /** Issues de la génération simulée, choisies par `R-sim` (`configureGeneration`) dans une portée explicite. */
 export const GENERATION_OUTCOMES = MOCK_GENERATION_OUTCOMES;
@@ -141,6 +143,25 @@ export interface CreationStore {
   outcome: GenerationOutcome;
 }
 
+/**
+ * Un signalement d'erreur simulé (M5c, décision 0147 § 1 et § 2, forme de `feedback`) : organisation, voyage, étape,
+ * identifiant de lieu de l'étape, motif fermé, `requestId`, instant. **Aucun texte.**
+ */
+export interface StopReportRecord {
+  organizationId: string;
+  tripId: string;
+  stopId: string;
+  placeId: string | null;
+  reason: string;
+  requestId: string;
+  createdAt: number;
+}
+
+/** Signalements simulés de la portée, du plus ancien au plus récent ; au plus `MAX_STOP_REPORTS_PER_SCOPE`. */
+export interface StopReportStore {
+  records: StopReportRecord[];
+}
+
 export interface SimulationScope {
   name: string;
   explicit: boolean;
@@ -149,6 +170,11 @@ export interface SimulationScope {
   share: ShareStore;
   auth: AuthStore;
   creation: CreationStore;
+  /**
+   * Signalements d'erreur (M5c). Facultatif : une portée gardée sur `globalThis` d'avant M5c (rechargement à chaud) n'en a
+   * pas ; l'adaptateur le crée au premier signalement.
+   */
+  reports?: StopReportStore;
 }
 
 interface ManualClock extends Clock {
@@ -222,6 +248,7 @@ function registry(): Registry {
       share: initialShareStore(),
       auth: emptyAuthStore(),
       creation: emptyCreationStore(),
+      reports: { records: [] },
     },
     explicit: new Map(),
     authKey: randomBytes(32),
@@ -255,6 +282,7 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
       share: initialShareStore(),
       auth: emptyAuthStore(),
       creation: emptyCreationStore(),
+      reports: { records: [] },
     };
   }
   scopes.set(name, scope);
@@ -269,7 +297,7 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
 /**
  * Vide paiements et droits de la portée, remet le délai de confirmation à 0, efface les liens de partage créés et
  * rétablit les liens fixes (F10-PO-18), vide les codes, compteurs et session de la connexion simulée (F8b), vide les
- * lancements et remet l'issue de la génération à `ready` (F8c), et fixe l'horloge.
+ * lancements et remet l'issue de la génération à `ready` (F8c), vide les signalements (M5c), et fixe l'horloge.
  */
 export function resetScope(name: string, now: number): void {
   const scope = explicitScope(name);
@@ -277,6 +305,7 @@ export function resetScope(name: string, now: number): void {
   scope.share = initialShareStore();
   scope.auth = emptyAuthStore();
   scope.creation = emptyCreationStore();
+  scope.reports = { records: [] };
   scope.clock.set(now);
 }
 

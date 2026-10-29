@@ -13,8 +13,9 @@ import {
 import { creerLectureDuTri } from "@/server/presentation/lecture";
 import { annulerRemplacement, appliquerRemplacement, proposerRemplacement, versionDuVoyage, type DependancesRemplacement } from "@/server/versions/remplacement";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
+import { signalerEtape } from "@/server/voyages/signalement";
 
-import type { AdapterContext, RevisionAdapter, TripAdapter } from "./types";
+import type { AdapterContext, RevisionAdapter, StopReportAdapter, TripAdapter } from "./types";
 
 /**
  * Adaptateur `api` (spécification B6, B6a point 5 ; handover § 11 : aucun appel HTTP vers soi-même) : implémente
@@ -46,11 +47,24 @@ function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
   };
 }
 
+/**
+ * Signalement d'une erreur sur une étape (M5c, ticket 904) : cas d'usage de `src/server/voyages/signalement.ts`, dans le
+ * même processus, avec le contexte de la session reçu de l'action serveur. Aucun appel du port de relectures.
+ */
+function signalementsApi(options: OptionsAdaptateurApi): StopReportAdapter {
+  const { withOrg, chaine } = options;
+  return {
+    reportStop: (ctx, input) =>
+      signalerEtape({ contexte: async () => ctx, ...(withOrg === undefined ? {} : { withOrg }), ...(chaine === undefined ? {} : { chaine }) }, input),
+  };
+}
+
 export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter {
   const lecture = creerLectureVoyages(options);
   const getDeckSession = creerLectureDuTri(options.withOrg === undefined ? {} : { withOrg: options.withOrg });
   return {
     revision: revisionApi(options),
+    reports: signalementsApi(options),
     async listTrips(ctx) {
       return TripSummarySchema.array().parse(await lecture.listTrips(ctx));
     },

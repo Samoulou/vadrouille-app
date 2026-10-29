@@ -3,6 +3,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent } from "react";
 
 import type { RecorderKind } from "@/analytics/track";
+import type { StopReportReason } from "@/contracts/values";
 import * as messages from "@/i18n/messages";
 
 import { JourneePanel } from "./JourneePanel";
@@ -20,6 +21,14 @@ function preloadMoveSheet() {
   loadMoveSheet().catch(() => {});
 }
 
+/** Feuille « Signaler une erreur » (M5c) chargée à la demande, comme « Déplacer ». */
+const loadReportSheet = () => import("./ReportSheet");
+const ReportSheet = lazy(() => loadReportSheet().then((loaded) => ({ default: loaded.ReportSheet })));
+
+function preloadReportSheet() {
+  loadReportSheet().catch(() => {});
+}
+
 /**
  * Contenu du panneau de l'écran 12 « Journée » : la journée ou, avec `?etape=`, la Fiche étape (écran 13,
  * spécification F5, F5-PO-8). Le jour, le programme (verrous) et la fiche viennent du contexte du voyage :
@@ -33,6 +42,9 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
   const shell = useTripShell();
   // Feuille « Déplacer » (F7b) : étape visée, montée au premier usage, ouverte ou fermée sans changer d'adresse.
   const [moving, setMoving] = useState<{ stopId: string; dayIndex: number; open: boolean } | null>(null);
+  // Feuille « Signaler une erreur » (M5c) : étape visée, et dernier signalement enregistré (confirmation de la fiche).
+  const [reporting, setReporting] = useState<{ stopId: string; dayIndex: number; open: boolean } | null>(null);
+  const [reported, setReported] = useState<{ stopId: string; dayIndex: number; reason: StopReportReason } | null>(null);
   const { day, fiche, etape, routes, closedFiche, consumeClosedFiche, reportMissingEtape, focusRequest, consumeFocusRequest } = shell;
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -72,12 +84,13 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
   const onClickCapture = (event: MouseEvent<HTMLDivElement>) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = (event.target as Element).closest<HTMLAnchorElement>(
-      "a[data-part='arret'], a[data-part='evenement'], a[data-part='remplacer']",
+      "a[data-part='arret'], a[data-part='evenement'], a[data-part='remplacer'], a[data-part='signalement-remplacer']",
     );
     const href = link?.getAttribute("href");
     if (!href) return;
-    // « Remplacer » de la fiche (F7-PO-2) : « Retour à la fiche » de l'écran 14 reviendra dans l'historique.
-    if (link?.dataset.part === "remplacer") shell.markReplaceOrigin(href);
+    // « Remplacer » de la fiche (F7-PO-2), ou de la confirmation d'un signalement (M5c) : « Retour à la fiche » de
+    // l'écran 14 reviendra dans l'historique.
+    if (link?.dataset.part === "remplacer" || link?.dataset.part === "signalement-remplacer") shell.markReplaceOrigin(href);
     else shell.markOpenedFromPanel(href);
   };
 
@@ -92,6 +105,15 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
   // Étape de la feuille « Déplacer » : celle de la fiche ouverte quand la feuille a été ouverte.
   const movingStop =
     moving && fiche && fiche.inProgramme && fiche.stop.id === moving.stopId && moving.dayIndex === day.index ? fiche.stop : null;
+  // Étape de la feuille « Signaler une erreur » : celle de la fiche ouverte quand la feuille a été ouverte.
+  const reportingStop =
+    reporting && fiche && fiche.inProgramme && fiche.stop.id === reporting.stopId && reporting.dayIndex === day.index ? fiche.stop : null;
+  // Confirmation (spécification M5 § 5) : « Remplacer cette étape » pour un motif `closed`, étape non verrouillée et voyage débloqué.
+  const reportedHere = fiche && reported && reported.stopId === fiche.stop.id && reported.dayIndex === day.index ? reported : null;
+  const reportConfirmation = reportedHere
+    ? { replaceHref: reportedHere.reason === "closed" && !fiche?.stop.locked && shell.trip.unlocked ? routes.remplacer(day.index, reportedHere.stopId) : null }
+    : null;
+  const focusReportButton = () => contentRef.current?.querySelector<HTMLButtonElement>("[data-part='signaler']")?.focus();
 
   return (
     <div ref={contentRef} onClickCapture={onClickCapture}>
@@ -104,6 +126,18 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
             dayIndex={moving.dayIndex}
             recorderKind={recorderKind}
             onReturnFocus={() => contentRef.current?.querySelector<HTMLButtonElement>("[data-part='deplacer']")?.focus()}
+          />
+        </Suspense>
+      ) : null}
+      {reporting && reportingStop ? (
+        <Suspense fallback={null}>
+          <ReportSheet
+            open={reporting.open}
+            onOpenChange={(open) => setReporting((current) => (current ? { ...current, open } : current))}
+            tripId={shell.trip.id}
+            stop={reportingStop}
+            onReported={(reason) => setReported({ stopId: reportingStop.id, dayIndex: day.index, reason })}
+            onReturnFocus={focusReportButton}
           />
         </Suspense>
       ) : null}
@@ -121,6 +155,16 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
           onToggleLock={onToggleLock}
           onMove={() => setMoving({ stopId: fiche.stop.id, dayIndex: day.index, open: true })}
           onMoveIntent={preloadMoveSheet}
+          {...(shell.reportable
+            ? {
+                onReport: () => {
+                  setReported(null);
+                  setReporting({ stopId: fiche.stop.id, dayIndex: day.index, open: true });
+                },
+                onReportIntent: preloadReportSheet,
+              }
+            : {})}
+          reported={reportConfirmation}
           placesFromGoogle={shell.placesFromGoogle}
         />
       ) : (

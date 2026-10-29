@@ -1,4 +1,7 @@
 // @vitest-environment node
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { ClientModeles, EtapeRequete } from "@/ai/client";
@@ -141,5 +144,33 @@ describe("prompts: aucun prompt journalisé ne contient de donnée Google", () =
     const glissee = { ...entreeProgrammeDepuisBrief(brief), placeId } as Parameters<typeof rediger>[0];
     await expect(rediger(glissee)).rejects.toBeInstanceOf(RangeError);
     expect(journal.requetes).toHaveLength(2);
+  });
+});
+
+/**
+ * M5c (ticket 904 ; spécification M5, critère 15 ; décision 0147 § 12 S1) : un signalement n'entre dans aucun prompt. Aucun
+ * module qui construit ou envoie une requête de modèle (`src/ai`, `src/research`, la génération et la chaîne de P0 de
+ * `src/server`) ne lit la table `feedback`, n'importe le signalement ni ne nomme ses motifs : rien ne peut y faire passer
+ * un motif ou un signalement, de ce voyage ou d'un autre.
+ */
+describe("signalement: jamais dans un prompt", () => {
+  const RACINE = path.resolve(__dirname, "../../..");
+  const DOSSIERS = ["src/ai", "src/research", "src/server/generation", "src/server/p0"];
+  const INTERDITS = [/\bfeedback\b/, /signalement/i, /STOP_REPORT_REASONS|StopReport/, /reportStop/];
+  const fichiers = (dossier: string): string[] =>
+    readdirSync(path.join(RACINE, dossier), { withFileTypes: true }).flatMap((entree) => {
+      const relatif = `${dossier}/${entree.name}`;
+      if (entree.isDirectory()) return fichiers(relatif);
+      return /\.tsx?$/.test(entree.name) && !/\.test\.tsx?$/.test(entree.name) ? [relatif] : [];
+    });
+
+  it("aucun module des prompts ne lit feedback, n'importe le signalement ni ne nomme ses motifs", () => {
+    const sources = DOSSIERS.flatMap(fichiers);
+    expect(sources).toContain("src/ai/entree-revision.ts");
+    const fautifs = sources.filter((fichier) => {
+      const texte = readFileSync(path.join(RACINE, fichier), "utf8");
+      return INTERDITS.some((motif) => motif.test(texte));
+    });
+    expect(fautifs).toEqual([]);
   });
 });

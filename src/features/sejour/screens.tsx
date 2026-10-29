@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { getRevisionFixtures, getRevisionVersion, isPrototypeAdapter, paymentAvailable, shareButtonVisible } from "@/adapters";
+import { getRevisionFixtures, getRevisionVersion, isPrototypeAdapter, paymentAvailable, shareButtonVisible, signalementDisponible } from "@/adapters";
 import { contexteFacultatif } from "@/features/compte/session";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { format } from "@/i18n";
@@ -41,6 +41,8 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
   const shareable = base === "/voyages" && (await shareButtonVisible(data.trip));
   // « Débloquer » depuis le Séjour (spécification E2E-essai, lot 1) : routes `/voyages`, voyage non débloqué, paiement simulé disponible.
   const unlockHref = base === "/voyages" && !data.trip.unlocked && paymentAvailable() ? unlockRoutes(data.trip.id).debloquer() : null;
+  // « Signaler une erreur » (M5c) : routes `/voyages`, adaptateurs `mock` et `api` (le site d'essai n'en a pas).
+  const reportable = base === "/voyages" && signalementDisponible();
   return (
     <TripShell
       trip={data.trip}
@@ -51,6 +53,7 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
       revisionVersion={revisionVersion}
       shareable={shareable}
       unlockHref={unlockHref}
+      reportable={reportable}
     >
       <SejourOriginProvider>{children}</SejourOriginProvider>
     </TripShell>

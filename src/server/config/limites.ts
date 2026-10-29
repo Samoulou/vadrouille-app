@@ -41,6 +41,10 @@ export const RATE_LIMITS: RateLimitConfig = {
   // (`MAX_PHOTOS_PAR_HEURE`, 0128 § 4), compté par adresse IP (le limiteur n'a pas de règle par session ; le site d'essai
   // compte toutes sessions confondues). Lu seulement barrière B9-TL-8 ouverte, client branché et lieu admis.
   "photo-tri": [{ kind: "ip", windowSeconds: 3600, threshold: 40 }],
+  // M5c (décision 0147 § 6.4 point 2 et § 12 S5) : signalement d'une erreur sur une étape (`reportStop`), 10 par minute et
+  // par adresse IP (proposition). Vérifié après le doublon, avant le plafond par voyage et par jour UTC
+  // (`SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR`, `src/server/config/lieux.ts`) : un signalement rejoué n'est jamais refusé.
+  signalement: [{ kind: "ip", windowSeconds: 60, threshold: 10 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */
