@@ -10,6 +10,7 @@ import {
   countToReserve,
   type Day,
   type DayLineItem,
+  type ChecklistItem,
   type DayMap,
   type MapPoint,
   type Proposal,
@@ -332,6 +333,15 @@ function carteDuJour({ programme, positions: table }: ProgrammeServi, jour: Jour
   return DayMapSchema.parse({ tripId: programme.trip.id, dayIndex: jour.index, points });
 }
 
+/**
+ * Lignes « À faire » du site d'essai : ce sont des bons plans de l'IA (forme réduite, `ChecklistReduiteSchema`), donc de
+ * sorte `other` (décision 0147 § 6.2) : le compteur des réservations à faire passe à 0 et n'est plus affiché. La forme
+ * réduite stockée ne change pas ; la sorte est posée à la lecture.
+ */
+function aFaireDuPrototype(programme: ProgrammeEcrit): ChecklistItem[] {
+  return programme.trip.checklist.map((ligne) => ({ ...ligne, kind: "other" }));
+}
+
 /** Résumé d'un voyage du prototype, sans relecture (aucune durée dans `TripSummary`). */
 function resume(programme: ProgrammeEcrit, unlocked: boolean = programme.trip.unlocked): TripSummary {
   const { trip } = programme;
@@ -344,7 +354,7 @@ function resume(programme: ProgrammeEcrit, unlocked: boolean = programme.trip.un
     timeZone: trip.timeZone,
     travellers: trip.travellers,
     unlocked,
-    toReserveCount: countToReserve(trip.checklist),
+    toReserveCount: countToReserve(aFaireDuPrototype(programme)),
     dayCount: trip.days.length,
   });
 }
@@ -456,8 +466,9 @@ function creerAdapter({ lister, lire, relecteur, deblocage = JAMAIS_DEBLOQUE }: 
 
   const voyage = async (servi: ProgrammeServi, parcours: EtatParcours | null): Promise<Trip> => {
     const days = await recomposerJours(servi, joursServis(servi, parcours));
-    if (parcours !== null && !parcours.debloque) return voyageNonDebloque({ ...servi.programme.trip, days }, days);
-    return TripSchema.parse({ ...servi.programme.trip, days });
+    const checklist = aFaireDuPrototype(servi.programme);
+    if (parcours !== null && !parcours.debloque) return voyageNonDebloque({ ...servi.programme.trip, days, checklist }, days);
+    return TripSchema.parse({ ...servi.programme.trip, days, checklist });
   };
 
   /** Propositions d'un voyage d'essai : l'aperçu avant le déblocage, la suite du tri (étapes hors aperçu) après. */

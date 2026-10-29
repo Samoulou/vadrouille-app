@@ -9,6 +9,7 @@
   "revoirProposition": "Revoir la proposition",
   "erreur": "La proposition n'a pas pu être calculée. Ton programme est inchangé.",
   "reessayer": "Réessayer",
+  "nonDebloque": "Débloque ce voyage pour modifier ton programme. Ton programme est inchangé.",
   "aucuneOption": "Aucune option compatible pour ce créneau. Ton programme est inchangé.",
   "recherche": "Recherche d'une proposition.",
   "arreter": "Arrêter",

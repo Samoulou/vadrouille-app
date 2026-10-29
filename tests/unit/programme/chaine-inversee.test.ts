@@ -387,6 +387,7 @@ describe("chaîne inversée : lignes « À faire » (0136 § 3.3 ; 0139 § 3 con
       "Venir tôt",
     ].map((label, rang) => ({
       id: `bon-plan-${rang + 1}`,
+      kind: "other" as const,
       label,
       when: { type: "beforeDeparture" as const },
       done: false,

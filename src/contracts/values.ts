@@ -50,12 +50,62 @@ export const STOP_KINDS = ["activity", "meal", "event"] as const;
 export type StopKind = (typeof STOP_KINDS)[number];
 
 /**
- * Nombre de lignes « À faire » non faites (décision 0021 § 1.1) : seul calcul des « réservations à faire »,
- * pour le résumé de voyage (`TripSummary.toReserveCount`) et, avec F9b, le programme ajusté.
+ * Sortes d'une ligne « À faire » (décision 0147 § 6.2, T8) : réservation à faire (« Réserver : {nom} », comptée),
+ * billet ou engagement déjà pris (`ticket`), bon plan ou autre (`other`). Égale, dans cet ordre, au `CHECK` de
+ * `checklist_items.kind` (`db/schema/business.ts`), égalité testée. Source de `ChecklistItemSchema.kind`.
  */
-export function countToReserve(checklist: readonly { done: boolean }[]): number {
-  return checklist.filter((item) => !item.done).length;
+export const CHECKLIST_KINDS = ["reservation", "ticket", "other"] as const;
+export type ChecklistKind = (typeof CHECKLIST_KINDS)[number];
+
+/**
+ * Nombre de réservations à faire (décision 0021 § 1.1, amendée par 0147 § 6.2) : lignes « À faire » de sorte
+ * `reservation` non faites, et elles seules (ni bons plans, ni engagements). Seul calcul des « réservations à faire »,
+ * pour le résumé de voyage (`TripSummary.toReserveCount`) et le programme ajusté.
+ */
+export function countToReserve(checklist: readonly { done: boolean; kind: ChecklistKind }[]): number {
+  return checklist.filter((item) => item.kind === "reservation" && !item.done).length;
 }
+
+/**
+ * Motifs d'un signalement d'erreur sur une étape (décision 0147 § 1, M5-PO-8), dans l'ordre de la feuille : fermé ou
+ * n'existe plus, horaires faux, mauvais lieu ou mauvaise adresse, prix faux, autre erreur. Liste fermée, sans texte
+ * libre (M5-PO-9) ; égale au `CHECK` de `feedback.reason` posé par la migration M5-D. Source de
+ * `StopReportSchema.reason` et du champ `reason` de l'événement de journal `voyages.stop_reported`.
+ */
+export const STOP_REPORT_REASONS = ["closed", "hours", "wrongPlace", "price", "other"] as const;
+export type StopReportReason = (typeof STOP_REPORT_REASONS)[number];
+
+/**
+ * Sortes d'une version dans la liste « Versions du programme » (décision 0147 § 5.3 point 1) : version écrite par
+ * l'exécution `preview` (`prepared`), révision après le tri (`adjusted`, M1b), voyage complet (`complete`, M1c), puis
+ * les retouches de la personne, lues sur la première opération de `trip_versions.patch` (`[add, lock]` donne `added`).
+ * Source de `TripVersionSummarySchema.kind` ; le libellé est composé par l'écran, jamais stocké.
+ */
+export const TRIP_VERSION_KINDS = [
+  "prepared",
+  "adjusted",
+  "complete",
+  "replaced",
+  "added",
+  "moved",
+  "locked",
+  "unlocked",
+  "reverted",
+] as const;
+export type TripVersionKind = (typeof TRIP_VERSION_KINDS)[number];
+
+/** Versions par page de la liste « Versions du programme » (décision 0147 § 5.3 point 2). */
+export const TRIP_VERSIONS_PAGE_SIZE = 20;
+
+/**
+ * Texte saisi de la recherche d'un lieu à soi (« Lieu à ajouter », décision 0147 § 3 point 3 ; F7-PO-9) : 2 à 80
+ * caractères après retrait des espaces aux extrémités, aucune recherche à la frappe.
+ */
+export const PLACE_SEARCH_QUERY_LENGTH = { min: 2, max: 80 } as const;
+/** Résultats d'une recherche de lieu à soi, au plus (décision 0147 § 3 point 1 : `pageSize: 5`). */
+export const PLACE_SEARCH_MAX_RESULTS = 5;
+/** Longueur maximale d'un nom ou d'une adresse Google affichés dans un résultat de recherche (décision 0147 § 3 point 3). */
+export const GOOGLE_PLACE_LABEL_MAX = 200;
 
 /** Jours de la semaine abrégés, du lundi au dimanche (handover § 9). Source de `WeekdaySchema`. */
 export const WEEKDAYS = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."] as const;
@@ -220,6 +270,9 @@ export const API_ERROR_CODES = [
   // B3d (spécification B3d, point 4 ; décision 0138 T4) : plafond global des e-mails du jour atteint, ou quota du
   // fournisseur ; `retryable` faux (la personne réessaie demain). Ajouté à la fin, sans renommer ni réordonner.
   "email_cap_reached",
+  // M5 (décision 0147 § 8) : retouche refusée sur un voyage non débloqué (M5-PO-1) ; `retryable` faux. Symétrique
+  // d'`already_unlocked`. Ajouté à la fin, sans renommer ni réordonner.
+  "not_unlocked",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 

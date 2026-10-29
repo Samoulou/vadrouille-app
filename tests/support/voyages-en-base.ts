@@ -75,6 +75,8 @@ export type DonneesVoyage = {
   /** `briefs.mobility` d'une ligne `briefs` (version 1) ; absent : aucune ligne `briefs`. */
   readonly mobility?: string | null;
   readonly checklist: readonly {
+    /** Sorte de la ligne (décision 0147 § 6.2) ; absente : `other`. */
+    readonly kind?: "reservation" | "ticket" | "other";
     readonly label: string;
     readonly moment: ChecklistMoment;
     readonly done: boolean;
@@ -210,6 +212,7 @@ export function convertirVoyageSimule(voyage: VoyageSimule): VoyageConverti {
       stays: [{ kind: "lodging", placeId: logementDeTest(trip.id), label: etiquetteLogement(trip), from: trip.start, to: trip.end }],
       mobility: null,
       checklist: trip.checklist.map((item) => ({
+        kind: item.kind,
         label: item.label,
         moment: item.when,
         done: item.done,
@@ -484,8 +487,8 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
     }
     for (const item of donnees.checklist) {
       await q(
-        "INSERT INTO checklist_items (organization_id, trip_id, stop_id, kind, label, moment, booking_url, sponsored, done) VALUES ($1, $2, $3, 'other', $4, $5, $6, $7, $8)",
-        [org.org, tripId, item.stopId ?? null, item.label, JSON.stringify(item.moment), item.bookingUrl ?? null, item.sponsored, item.done],
+        "INSERT INTO checklist_items (organization_id, trip_id, stop_id, kind, label, moment, booking_url, sponsored, done) VALUES ($1, $2, $3, $9, $4, $5, $6, $7, $8)",
+        [org.org, tripId, item.stopId ?? null, item.label, JSON.stringify(item.moment), item.bookingUrl ?? null, item.sponsored, item.done, item.kind ?? "other"],
       );
     }
     const ecrirePropositions = async (runId: string, propositions: readonly LigneProposition[]) => {

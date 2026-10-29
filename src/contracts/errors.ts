@@ -46,6 +46,10 @@ export const ApiErrorSchema = z
     if (error.code === "email_cap_reached" && error.retryable !== false) {
       ctx.addIssue({ code: "custom", message: "email_cap_reached : retryable vaut false", path: ["retryable"] });
     }
+    // M5 (décision 0147 § 8) : le voyage n'est pas débloqué ; réessayer ne change rien.
+    if (error.code === "not_unlocked" && error.retryable !== false) {
+      ctx.addIssue({ code: "custom", message: "not_unlocked : retryable vaut false", path: ["retryable"] });
+    }
     if ((error.code === "active_preview_exists") !== (error.activeTripId !== undefined)) {
       ctx.addIssue({
         code: "custom",

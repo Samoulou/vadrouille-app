@@ -125,8 +125,22 @@ export const MoveDraftSchema = MoveDraftBaseSchema.superRefine(refineDraft);
 export type MoveDraft = z.infer<typeof MoveDraftSchema>;
 
 /**
+ * Champs d'un brouillon d'ajout d'un lieu à soi (F7c ; décision 0147 § 3 et § 11) : jour touché, sans proposition.
+ * L'étape ajoutée (`targetStopId`) porte le nom saisi par la personne (`Stop.name`) et `addedBy: "person"`, jamais un
+ * nom ni une adresse Google ; un trajet estimé ou absent vers elle fait dire « Temps de trajet calculé après l'ajout ».
+ */
+const AddDraftBaseSchema = z.strictObject({
+  /** Brouillon complet du jour touché. */
+  days: z.array(DaySchema).min(1),
+  changes: z.array(ChangeSchema),
+  changedStopIds: z.array(IdSchema),
+  /** Étape ajoutée : reçoit le focus après « Appliquer » (F7-PO-1). */
+  targetStopId: IdSchema,
+});
+
+/**
  * Aperçu d'une révision (`ReplacementPreview` du handover = variante `replace`), union discriminée sur `kind`
- * (0016 § 4.2). F7b ajoute `move` ; F7c ajoutera `add`.
+ * (0016 § 4.2). F7b ajoute `move` ; M5-C (décision 0147 § 14) ajoute `add`, aperçu d'un lieu à soi (`[add, lock]`).
  */
 export const RevisionPreviewSchema = z
   .discriminatedUnion("kind", [
@@ -137,6 +151,11 @@ export const RevisionPreviewSchema = z
     }),
     MoveDraftBaseSchema.extend({
       kind: z.literal("move"),
+      id: IdSchema,
+      baseVersion: z.number().int().nonnegative(),
+    }),
+    AddDraftBaseSchema.extend({
+      kind: z.literal("add"),
       id: IdSchema,
       baseVersion: z.number().int().nonnegative(),
     }),

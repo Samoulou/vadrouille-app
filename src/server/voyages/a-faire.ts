@@ -17,7 +17,7 @@ import { elementAFaire, identifiantLisible } from "./conversion";
 const SQL_COCHER = `UPDATE public.checklist_items
   SET done = $4, done_at = CASE WHEN $4 THEN COALESCE(done_at, now()) ELSE NULL END
   WHERE organization_id = $1 AND trip_id = $2 AND id = $3
-  RETURNING id, label, moment, done, booking_url, sponsored, stop_id`;
+  RETURNING id, kind, label, moment, done, booking_url, sponsored, stop_id`;
 
 /** Erreur d'une ligne écrite qui ne valide plus le contrat : convertie en `internal` par le cadre. */
 class LigneAFaireInvalide extends Error {

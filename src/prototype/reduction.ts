@@ -96,7 +96,13 @@ export function reduireProgramme(
     justifications: ReadonlyMap<string, string>;
   },
 ): ProgrammeReduit {
-  const trip = { ...sans(complet.trip, "days"), days: complet.trip.days.map(jour) } as VoyageReduit;
+  // La forme réduite des lignes « À faire » n'a pas de `kind` (bons plans seulement, `ChecklistReduiteSchema`) : la sorte
+  // (`other`, décision 0147 § 6.2) est reposée à la lecture par l'adaptateur `prototype`.
+  const trip = {
+    ...sans(complet.trip, "days", "checklist"),
+    days: complet.trip.days.map(jour),
+    checklist: complet.trip.checklist.map((ligne) => sans(ligne, "kind")),
+  } as VoyageReduit;
   const proposals = complet.proposals.map((valeur) => {
     const justification = options.justifications.get(valeur.id);
     if (justification === undefined) throw new ReductionRefusee();

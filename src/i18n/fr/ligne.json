@@ -119,7 +119,12 @@
     "estimation": "environ {duree} (estimation)",
     "budget": "Budget du jour : environ {montant} CHF par personne",
     "plus": "+",
-    "moins": "−"
+    "moins": "−",
+    "retire": "retiré",
+    "verrouille": "{label} verrouillé",
+    "verrouRetire": "Verrou retiré : {label}",
+    "aFaireAjoutee": "À faire : {label} ajouté",
+    "aFaireRetiree": "À faire : {label} retiré"
   },
   "infosPratiques": {
     "titre": "Infos pratiques",

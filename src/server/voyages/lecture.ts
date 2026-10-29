@@ -140,7 +140,7 @@ const SQL_EN_COURS = `SELECT EXISTS (SELECT 1 FROM public.generation_runs WHERE 
   AND finished_at IS NULL AND kind IN ('full', 'batch')) AS en_cours`;
 
 /** Ordre : `id` (aucune colonne d'ordre dans `checklist_items` ; question au rôle data, PR de B6a). */
-const SQL_A_FAIRE = `SELECT id, label, moment, done, booking_url, sponsored, stop_id
+const SQL_A_FAIRE = `SELECT id, kind, label, moment, done, booking_url, sponsored, stop_id
   FROM public.checklist_items WHERE organization_id = $1 AND trip_id = $2 ORDER BY id`;
 
 /** Propositions `deck` de la dernière exécution qui en a écrit (B6-PO-9). */
@@ -169,7 +169,7 @@ const SQL_RESUMES = `SELECT t.id, t.destination, t.start_date::text AS start, t.
 
 const SQL_DEBLOQUES = "SELECT DISTINCT trip_id FROM public.entitlements WHERE organization_id = $1 AND kind = 'tripUnlocked'";
 
-const SQL_A_FAIRE_TOUS = "SELECT trip_id, done FROM public.checklist_items WHERE organization_id = $1";
+const SQL_A_FAIRE_TOUS = "SELECT trip_id, kind, done FROM public.checklist_items WHERE organization_id = $1";
 
 // --- Lecture des lignes -----------------------------------------------------------------------------------
 
@@ -539,7 +539,12 @@ export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripA
             timeZone: enTete.timeZone,
             travellers: enTete.travellers,
             unlocked: debloques.has(enTete.id),
-            toReserveCount: countToReserve(aFaire.filter((l) => l.trip_id === enTete.id).map((l) => ({ done: l.done === true }))),
+            toReserveCount: countToReserve(
+              aFaire
+                .filter((l) => l.trip_id === enTete.id)
+                // Seules les réservations comptent (décision 0147 § 6.2) ; une autre sorte n'est jamais comptée.
+                .map((l) => ({ done: l.done === true, kind: l.kind === "reservation" ? ("reservation" as const) : ("other" as const) })),
+            ),
             dayCount: jours,
           },
           contexte,

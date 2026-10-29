@@ -62,10 +62,10 @@ const snapshot = TripSnapshotSchema.parse({
 
 /** Lignes « À faire » : J3 et étape `d` (hors aperçu), étape `a` et avant le départ (gardées). */
 const A_FAIRE = [
-  { id: "l1", label: "[Avant le départ]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: null },
-  { id: "l2", label: "[Pour l'étape a]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: "a" },
-  { id: "l3", label: "[Le jour 3]", moment: { type: "tripDay", day: 3 }, done: false, booking_url: null, sponsored: false, stop_id: null },
-  { id: "l4", label: "[Pour l'étape d]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: "d" },
+  { id: "l1", kind: "other", label: "[Avant le départ]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: null },
+  { id: "l2", kind: "reservation", label: "[Pour l'étape a]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: "a" },
+  { id: "l3", kind: "other", label: "[Le jour 3]", moment: { type: "tripDay", day: 3 }, done: false, booking_url: null, sponsored: false, stop_id: null },
+  { id: "l4", kind: "reservation", label: "[Pour l'étape d]", moment: { type: "beforeDeparture" }, done: false, booking_url: null, sponsored: false, stop_id: "d" },
 ];
 
 /** Texte et paramètres d'une requête de `executeurSql`, parcourue par sa forme (comme `lecture.test.ts`). */

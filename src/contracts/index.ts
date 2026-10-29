@@ -17,6 +17,7 @@ export {
   SegmentSchema,
   SourceSchema,
   StopFactsSchema,
+  StopReportSchema,
   StopSchema,
   SurpriseIdeaSchema,
   TimeSchema,
@@ -43,6 +44,7 @@ export type {
   Source,
   Stop,
   StopFacts,
+  StopReport,
   SurpriseIdea,
   Trip,
   Weekday,
@@ -108,6 +110,27 @@ export type {
   RevisionPreview,
   RevisionResult,
 } from "./revision";
+export {
+  AddPlaceApplySchema,
+  AddPlaceRequestSchema,
+  GooglePlaceLabelSchema,
+  PlaceSearchRequestSchema,
+  PlaceSearchResultSchema,
+  PlaceSearchResultsSchema,
+  RevertPreviewSchema,
+  TripVersionPageSchema,
+  TripVersionSummarySchema,
+} from "./retouches";
+export type {
+  AddPlaceApply,
+  AddPlaceRequest,
+  GooglePlaceLabel,
+  PlaceSearchRequest,
+  PlaceSearchResult,
+  RevertPreview,
+  TripVersionPage,
+  TripVersionSummary,
+} from "./retouches";
 export { TripSummarySchema } from "./trip-summary";
 export type { TripSummary } from "./trip-summary";
 export {

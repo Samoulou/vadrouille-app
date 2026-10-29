@@ -113,9 +113,9 @@ describe("essai: sélection des premières propositions (fonctions pures)", () =
       travellers: { adults: 2, children: 0 },
       days: [j1, jour(2, [etape("b1")])],
       checklist: [
-        { id: "c1", label: "Avant", when: { type: "beforeDeparture" }, done: false, sponsored: false },
-        { id: "c2", label: "Jour 2", when: { type: "tripDay", day: 2 }, done: false, sponsored: false },
-        { id: "c3", label: "Étape b1", when: { type: "beforeDeparture" }, done: false, sponsored: false, stopId: "b1" },
+        { id: "c1", kind: "other", label: "Avant", when: { type: "beforeDeparture" }, done: false, sponsored: false },
+        { id: "c2", kind: "other", label: "Jour 2", when: { type: "tripDay", day: 2 }, done: false, sponsored: false },
+        { id: "c3", kind: "other", label: "Étape b1", when: { type: "beforeDeparture" }, done: false, sponsored: false, stopId: "b1" },
       ],
       unlocked: true,
     });

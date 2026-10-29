@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { texteMaison } from "./texte";
 import { ChangeSchema, TimeSchema } from "./trip";
 
 /**
@@ -34,7 +35,8 @@ export const TripPatchOperationSchema = z.discriminatedUnion("op", [
     kind: z.enum(["activity", "meal"]),
     day: DayIndexSchema,
     time: TimeSchema,
-    name: z.string().trim().min(1).max(ADDED_STOP_NAME_MAX),
+    /** Nom saisi : texte maison (décision 0147 § 12 S4 : une ligne, sans caractère de contrôle, balise ni URL). */
+    name: texteMaison(ADDED_STOP_NAME_MAX),
     placeId: z.string().min(1).optional(),
   }),
   /** Déplacer l'étape vers ce jour et cette heure (le point d'insertion est traduit avant l'écriture). */

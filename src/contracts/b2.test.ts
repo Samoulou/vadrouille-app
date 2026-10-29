@@ -46,6 +46,7 @@ const stop = (id: string, kind: Stop["kind"] = "activity"): Stop => ({
 
 const item = (overrides: Partial<ChecklistItem> = {}): ChecklistItem => ({
   id: "c1",
+  kind: "ticket",
   label: "[Billet]",
   when: { type: "beforeDeparture" },
   done: false,

@@ -307,7 +307,8 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
     timeZone: brief.fuseau,
     travellers: { adults: brief.voyageurs.adultes, children: brief.voyageurs.enfants },
     days,
-    checklist: entree.bonsPlans.map((label, rang) => ({ id: `bon-plan-${rang + 1}`, label, when: { type: "beforeDeparture" }, done: false, sponsored: false })),
+    // Bons plans : sorte `other` (décision 0147 § 6.2), jamais comptés comme réservations à faire.
+    checklist: entree.bonsPlans.map((label, rang) => ({ id: `bon-plan-${rang + 1}`, kind: "other", label, when: { type: "beforeDeparture" }, done: false, sponsored: false })),
     unlocked: true,
   };
   TripSchema.parse(trip);
