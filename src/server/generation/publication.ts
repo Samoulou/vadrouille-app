@@ -42,6 +42,12 @@ export type DonneesPublication = {
    * avec elle. Absentes : l'ancienne chaîne, inchangée.
    */
   readonly ecrireDePlus?: (executeur: ExecuteurPublication) => Promise<void>;
+  /**
+   * Révision de la chaîne inversée (M1b, ticket 868 ; décision 0142) : contrôle fait **sous la garde, dans la transaction**,
+   * avant toute écriture (l'appelant y prend le verrou des versions et relit la version courante). Faux : ni version, ni case,
+   * ni position, ni écriture de plus ; l'exécution finit quand même sur `statut`, `last_version` nul. Absent : on écrit toujours.
+   */
+  readonly ecrireSi?: (executeur: ReturnType<typeof executeurSql>) => Promise<boolean>;
 };
 
 export type ContextePublication = {
@@ -63,7 +69,11 @@ const SQL_CASE = `INSERT INTO public.proposals (organization_id, trip_id, genera
 const SQL_FIN = `UPDATE public.generation_runs SET phase = $4, stop_reason = NULL, last_version = $5, updated_at = $6::timestamptz, finished_at = $6::timestamptz
   WHERE organization_id = $1 AND id = $2 AND step_seq = $3 AND phase = 'preparing' RETURNING id`;
 
-export async function publier(dependances: DependancesResolues, contexte: ContextePublication, donnees: DonneesPublication): Promise<{ readonly version: number; readonly dejaPubliee: boolean }> {
+export async function publier(
+  dependances: DependancesResolues,
+  contexte: ContextePublication,
+  donnees: DonneesPublication,
+): Promise<{ readonly version: number | null; readonly dejaPubliee: boolean }> {
   const { organizationId, generationRunId, tripId } = contexte;
   const rang = contexte.rang ?? RANG_ETAPE.e;
   if (contexte.requestId === null) throw new ArretEtape("invalid_input");
@@ -76,11 +86,18 @@ export async function publier(dependances: DependancesResolues, contexte: Contex
         if (!(await gardeOuverteAuRang(x, organizationId, generationRunId, rang, instant))) {
           const ligne = (await x.query(SQL_PHASE, [organizationId, generationRunId])).rows[0];
           if (ligne !== undefined && (ligne.phase === "ready" || ligne.phase === "incomplete")) {
+            // Révision finie sans version (`ecrireSi` faux, confirmation perdue) : rien de plus, aucune version.
+            if (ligne.last_version === null && donnees.ecrireSi !== undefined) return { version: null, dejaPubliee: true };
             const derniere = Number(ligne.last_version);
             if (!Number.isInteger(derniere) || derniere < 1) throw new ArretEtape("step_expired");
             return { version: derniere, dejaPubliee: true };
           }
           throw new ArretEtape("step_expired");
+        }
+        if (donnees.ecrireSi !== undefined && !(await donnees.ecrireSi(x))) {
+          const fin = await x.query(SQL_FIN, [organizationId, generationRunId, rang, donnees.statut, null, instant.toISOString()]);
+          if (fin.rows.length === 0) throw new ArretEtape("step_expired");
+          return { version: null, dejaPubliee: false };
         }
         const ecrite = await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: donnees.instantane });
         for (const c of donnees.cases) {

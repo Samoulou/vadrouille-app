@@ -78,7 +78,9 @@ export const PlafondsUsageSchema = z.strictObject({
    * Profils de génération (B7-PO-5) : `apercu` (workflow 1), `complet` (workflow 4), `mini` (mini-recherche, B11) et `lot`
    * (recalcul des jours touchés par un tri, workflow 5 `batchRecompute`, décision 0119 § 4.1 : aucune recherche, des requêtes
    * Routes ; plafond d'un recalcul, question 3 de la spécification B10, à Samuel) ; `programme` (aperçu de la chaîne inversée,
-   * workflow `generateProgramme`, décision 0136 § 6 : une requête de modèle, Text Search et fiches, aucune requête Routes).
+   * workflow `generateProgramme`, décision 0136 § 6 : une requête de modèle, Text Search et fiches, aucune requête Routes) ;
+   * `revision` (« Pas pour moi » de la chaîne inversée, exécution `batch` du workflow 5, décision 0142 : une requête `revision`,
+   * vérification de toute la version, aucune requête Routes).
    */
   generations: z.strictObject({
     apercu: ProfilGenerationSchema,
@@ -86,6 +88,7 @@ export const PlafondsUsageSchema = z.strictObject({
     mini: ProfilGenerationSchema,
     lot: ProfilGenerationSchema,
     programme: ProfilGenerationSchema,
+    revision: ProfilGenerationSchema,
   }),
   /** Relectures (0100 § 1.3) : `jour` (un jour, une présentation : `getDay`, `listProposals`, `listPreviewSlots`) et `voyage` (`getTrip`). */
   relecture: z.strictObject({ jour: ProfilRelectureSchema, voyage: ProfilRelectureSchema }),
@@ -163,6 +166,10 @@ export const PLAFONDS_VARIANTE_SIMULEE: PlafondsUsage = chargerPlafondsUsage({
     // programme simulé de Rome compte 30 lieux distincts et un logement), aucune requête Routes à la génération (§ 2.4).
     // Valeurs de test, pas des montants : la barrière ne les lit jamais.
     programme: { coutModelesMicros: 600_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 },
+    // Révision de la chaîne inversée (décision 0142) : une requête `revision` (entrée plus longue que celle du programme : les
+    // textes de la version de base), toute la version revérifiée (Text Search et fiches du profil `programme`), aucune requête
+    // Routes. Valeurs de test, pas des montants : la barrière ne les lit jamais.
+    revision: { coutModelesMicros: 700_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 },
   },
   relecture: {
     jour: { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 },

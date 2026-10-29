@@ -8,12 +8,13 @@ import { parsePaiementParam, unlockRoutes } from "./routes";
 const ID = "Ab_9-Ab_9-Ab_9-Ab_9-Ab";
 
 describe("unlockRoutes", () => {
-  it("R9, R9 avec paiement, R9-sim, R9-retour", () => {
+  it("R9, R9 avec paiement, R9-sim, R9-retour, R9-recu (PR 878)", () => {
     const routes = unlockRoutes("mock_trip_edimbourg");
     expect(routes.debloquer()).toBe("/voyages/mock_trip_edimbourg/debloquer");
     expect(routes.debloquer(ID)).toBe(`/voyages/mock_trip_edimbourg/debloquer?paiement=${ID}`);
     expect(routes.paiementSimule(ID)).toBe(`/voyages/mock_trip_edimbourg/debloquer/paiement-simule/${ID}`);
     expect(routes.confirmation(ID)).toBe(`/voyages/mock_trip_edimbourg/debloquer/confirmation?paiement=${ID}`);
+    expect(routes.recu()).toBe("/voyages/mock_trip_edimbourg/debloquer/recu");
   });
 
   it("identifiants encodés", () => {
