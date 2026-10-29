@@ -24,7 +24,7 @@ import {
   type TripSnapshot,
   type TripSummary,
 } from "@/contracts";
-import { countToReserve } from "@/contracts/values";
+import { CHECKLIST_KINDS, countToReserve } from "@/contracts/values";
 import type { z } from "zod";
 import { retenirApercu, selectionApercu, servisAvantDeblocage } from "@/domain/apercu";
 import { destinationColor } from "@/domain/calculs";
@@ -542,8 +542,13 @@ export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripA
             toReserveCount: countToReserve(
               aFaire
                 .filter((l) => l.trip_id === enTete.id)
-                // Seules les réservations comptent (décision 0147 § 6.2) ; une autre sorte n'est jamais comptée.
-                .map((l) => ({ done: l.done === true, kind: l.kind === "reservation" ? ("reservation" as const) : ("other" as const) })),
+                // Seules les réservations comptent (décision 0147 § 6.2). Une sorte hors de `CHECKLIST_KINDS` (que le `CHECK`
+                // de la base ferme déjà) n'est jamais ramenée à une autre : lecture refusée, `output_invalid` journalisé.
+                .map((l) => {
+                  const kind = CHECKLIST_KINDS.find((sorte) => sorte === l.kind);
+                  if (kind === undefined) throw echec("output_invalid", contexte);
+                  return { done: l.done === true, kind };
+                }),
             ),
             dayCount: jours,
           },

@@ -376,6 +376,8 @@ export interface Trip {
 }
 
 export interface ChecklistItem { id: string; label: string; when: string; done: boolean; bookingUrl?: string; sponsored: boolean }
+// Ajout de M5-C (décision 0147 § 6.2) : `kind: "reservation" | "ticket" | "other"`, obligatoire ; seules les lignes
+// `reservation` non faites sont comptées (« {n} réservations à faire »). Forme à jour : `src/contracts/trip.ts`.
 
 export interface Proposal {
   id: string;
@@ -394,7 +396,13 @@ export type Change =
   | { type: "moved"; label: string; before: string; after: string }
   | { type: "segment"; before: number; after: number; estimated: boolean }
   | { type: "budget"; deltaPerPerson: number }
-  | { type: "unchanged"; label: string; time: string };
+  | { type: "unchanged"; label: string; time: string }
+  // Ajouts de M5-C (décision 0147 § 5.1), à la fin de l'union ; `added` (F7a) et les formes structurées de `moved` et
+  // `segment` (0016 § 4.5) sont dans `src/contracts/trip.ts`, qui fait foi.
+  | { type: "removed"; label: string; before: { day: number; time: string } }   // étape retirée
+  | { type: "locked"; label: string; time: string }                              // verrou posé
+  | { type: "unlocked"; label: string; time: string }                            // verrou retiré
+  | { type: "checklist"; action: "added" | "removed"; label: string };          // ligne « À faire » ajoutée ou retirée
 ```
 
 Règles : les montants arrivent en nombres et sont formatés côté interface (`Intl.NumberFormat("fr-CH")`) ; les heures sont déjà en heure locale de la destination ; aucun texte d'interface n'est stocké dans les données.

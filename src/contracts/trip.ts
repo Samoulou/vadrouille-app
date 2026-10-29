@@ -47,6 +47,8 @@ export const TimeZoneSchema = z.string().min(1).refine(
 
 const MinutesSchema = z.number().int().nonnegative();
 const TextSchema = z.string().min(1);
+/** Identifiant interne (étape, ligne, aperçu) : chaîne non vide ; partagé avec `revision.ts`. */
+export const IdSchema = z.string().min(1);
 
 /**
  * Jour abrégé (« sam. »), calculé depuis `Day.date` par `weekdayOf` (`./values`, seul calcul ; évolution E1 de B2) :
@@ -276,7 +278,7 @@ export type ChecklistUpdate = z.infer<typeof ChecklistUpdateSchema>;
  */
 export const StopReportSchema = z.strictObject({
   tripId: z.string().regex(TRIP_ID_PATTERN),
-  stopId: TextSchema,
+  stopId: IdSchema,
   reason: z.enum(STOP_REPORT_REASONS),
   requestId: z.uuid(),
 });

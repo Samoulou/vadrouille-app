@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { PreferenceReasonSchema } from "./deck";
-import { ChangeSchema, DaySchema, StopSchema, TimeSchema } from "./trip";
+import { ChangeSchema, DaySchema, IdSchema, StopSchema, TimeSchema } from "./trip";
 import { WISH_MAX_LENGTH } from "./values";
 
 /**
@@ -13,7 +13,6 @@ import { WISH_MAX_LENGTH } from "./values";
  * technique 2) : seul l'identifiant interne de l'étape, le code de raison, le souhait saisi et la version.
  */
 
-const IdSchema = z.string().min(1);
 
 /**
  * Demande de remplacement (0016 § 4.1). `wish` : saisie de la personne, espaces retirés aux extrémités,

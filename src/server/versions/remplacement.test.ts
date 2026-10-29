@@ -7,6 +7,7 @@ import type { Relectures } from "@/domain/relectures";
 import type { BaseDeRevision } from "@/server/voyages/lecture";
 
 import {
+  brouillonDuRemplacement,
   choisirRemplacement,
   DemandeApercuSchema,
   DemandeApplicationSchema,
@@ -258,5 +259,62 @@ describe("remplacement : entrées (PR 869)", () => {
     expect(DemandeApercuSchema.safeParse({ ...base, wish: "x".repeat(201) }).success).toBe(false);
     expect(DemandeApplicationSchema.safeParse({ tripId: "t", requestId: ID_A, stopId: "diner", candidateId: "pas-un-uuid", baseVersion: 1 }).success).toBe(false);
     expect(DemandeApplicationSchema.safeParse({ tripId: "t", requestId: ID_A, stopId: "diner", proposalId: ID_B, baseVersion: 1 }).success).toBe(false);
+  });
+});
+
+describe("remplacement : « Ce qui change » de l'aperçu M1g (décision 0147 § 5.2, M5-C)", () => {
+  /**
+   * Programme de l'IA à identifiants `j<jour>-<rang>` réutilisés d'une version à l'autre (0142 § 5.1) : en version 1,
+   * `j1-2` désignait un autre lieu ; en version 2 (base), une révision l'a réattribué au musée.
+   */
+  const jourIa = (j12: StopSnapshot): TripSnapshot["days"][number] => ({
+    index: 1,
+    date: "2027-05-01",
+    travelBudgetMinutes: 90,
+    events: [],
+    items: [
+      { type: "terminus", role: "start", time: "09:00", label: "[Hôtel]" },
+      { type: "segment", segment: { mode: "walk", estimated: false } },
+      { type: "stop", stop: etape("j1-1", "activity", "09:30", { end: "10:30" }) },
+      { type: "segment", segment: { mode: "walk", estimated: false } },
+      { type: "stop", stop: j12 },
+      { type: "segment", segment: { mode: "walk", estimated: false } },
+      { type: "stop", stop: etape("j1-3", "meal", "19:00", { end: "20:30" }) },
+      { type: "segment", segment: { mode: "walk", estimated: false } },
+      { type: "terminus", role: "end", time: "23:00", label: "[Hôtel]" },
+    ],
+  });
+  const V1 = TripSnapshotSchema.parse({ days: [jourIa(etape("j1-2", "activity", "11:00", { end: "12:30", placeId: "test_place_ancien", name: "[Ancien lieu]" }))] });
+  const V2 = TripSnapshotSchema.parse({ days: [jourIa(etape("j1-2", "activity", "11:00", { end: "12:30", placeId: "test_place_musee", name: "[Musée]" }))] });
+  const BASE_IA: BaseDeRevision = {
+    ...BASE,
+    version: 2,
+    snapshot: V2,
+    chaine: [
+      { version: 2, snapshot: V2, createdAtMs: 1 },
+      { version: 1, snapshot: V1, createdAtMs: 0 },
+    ],
+  };
+  const CONTEXTE_IA: ContexteVoyage = { ...CONTEXTE, base: BASE_IA };
+
+  it("changements: un remplacement ne produit aucun removed (aperçu M1g sur api, étape de l'IA à identifiant réutilisé)", () => {
+    const choix = choisirRemplacement({ instantane: V2, baseVersion: 2, stopId: "j1-2", propositions: [proposition(ACTIVITE)], etapesAFaire: new Set() });
+    if (!choix.ok) throw new Error(choix.refus);
+    const resultat = appliquerPatch({
+      moteur: entreeMoteurDeRevision(CONTEXTE_IA, [choix.proposition.candidat], RELECTURES),
+      patch: patchDuRemplacement(DEMANDE, 2, choix),
+      versionCourante: 2,
+      base: V2,
+    });
+    if (!resultat.ok) throw new Error(resultat.code);
+    const cible = identifiantRemplacement(2, ID_B);
+    const draft = brouillonDuRemplacement(CONTEXTE_IA, resultat, RELECTURES, cible, 2);
+    const types = draft.changes.map((change) => change.type);
+    expect(types).not.toContain("removed");
+    expect(draft.changes).toContainEqual({ type: "replaced", time: "11:00", before: "[Musée]", after: "[Candidat b]" });
+    expect(types.filter((type) => type === "replaced")).toHaveLength(1);
+    // Ni l'ancien lieu de `j1-2` (version 1), ni le musée remplacé n'apparaissent comme retirés ou ajoutés.
+    expect(draft.changes).not.toContainEqual(expect.objectContaining({ label: "[Ancien lieu]" }));
+    expect(draft.changes).not.toContainEqual(expect.objectContaining({ type: "added" }));
   });
 });

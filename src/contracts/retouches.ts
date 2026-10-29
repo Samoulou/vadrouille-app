@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { ADDED_STOP_NAME_MAX } from "./patch";
+import { TripIdSchema } from "./billing";
+import { ADDED_STOP_NAME_MAX, AddedStopKindSchema, DayIndexSchema } from "./patch";
 import { texteMaison } from "./texte";
 import { ChangeSchema, TimeSchema } from "./trip";
 import {
@@ -8,7 +9,6 @@ import {
   PLACE_ID_MOTIF,
   PLACE_SEARCH_MAX_RESULTS,
   PLACE_SEARCH_QUERY_LENGTH,
-  TRIP_ID_PATTERN,
   TRIP_VERSION_KINDS,
 } from "./values";
 
@@ -18,9 +18,7 @@ import {
  * cas d'usage ni action ici : M5a, M5b et M5d-1 les branchent.
  */
 
-const TripIdSchema = z.string().regex(TRIP_ID_PATTERN);
 const VersionSchema = z.number().int().positive();
-const DayIndexSchema = z.number().int().positive();
 const NomMaisonSchema = z.string().min(1);
 
 // --- Versions (0147 § 5.3) ---------------------------------------------------------------------------------------
@@ -160,7 +158,7 @@ export const AddPlaceRequestSchema = z.strictObject({
   baseVersion: VersionSchema,
   day: DayIndexSchema,
   time: TimeSchema,
-  kind: z.enum(["activity", "meal"]),
+  kind: AddedStopKindSchema,
   name: texteMaison(ADDED_STOP_NAME_MAX),
   resultId: ResultIdSchema,
 });

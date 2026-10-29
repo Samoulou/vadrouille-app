@@ -14,7 +14,10 @@ import { ChangeSchema, TimeSchema } from "./trip";
 
 /** Identifiant d'étape : type de `Stop.id`. */
 const StopIdSchema = z.string().min(1);
-const DayIndexSchema = z.number().int().positive();
+/** Jour du voyage (1 = J1). */
+export const DayIndexSchema = z.number().int().positive();
+/** Natures d'une étape ajoutée par la personne : jamais `event`. Source d'`add.kind` et d'`AddPlaceRequest.kind`. */
+export const AddedStopKindSchema = z.enum(["activity", "meal"]);
 
 /** Longueur maximale du nom saisi par la personne pour un ajout. */
 export const ADDED_STOP_NAME_MAX = 80;
@@ -32,7 +35,7 @@ export const TripPatchOperationSchema = z.discriminatedUnion("op", [
   z.strictObject({
     op: z.literal("add"),
     stopId: StopIdSchema,
-    kind: z.enum(["activity", "meal"]),
+    kind: AddedStopKindSchema,
     day: DayIndexSchema,
     time: TimeSchema,
     /** Nom saisi : texte maison (décision 0147 § 12 S4 : une ligne, sans caractère de contrôle, balise ni URL). */
