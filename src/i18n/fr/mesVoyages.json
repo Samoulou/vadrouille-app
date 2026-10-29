@@ -19,5 +19,7 @@
     "plusieurs": "{n} réservations à faire",
     "suiteUn": "réservation à faire",
     "suitePlusieurs": "réservations à faire"
-  }
+  },
+  "recu": "Voir le reçu",
+  "recuNom": "Voir le reçu ({destination})"
 }

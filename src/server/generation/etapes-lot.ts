@@ -17,6 +17,7 @@ import type { DependancesGeneration, DependancesResolues } from "./dependances";
 import { resoudre } from "./dependances";
 import { villesDuComplet, villesDuJour } from "./etapes-complet";
 import { dateDansFuseau, eligibles, evenementsDe, lireCandidats, logementVille, SQL_OCCURRENCES, type CandidatLu } from "./etapes";
+import { debutRevision, ecritureRevision, type FinDuLot } from "./etapes-revision";
 import { lireEtatLot, type EtatLot } from "./etat";
 import { forfaitDuLot, type ForfaitDeLEtape } from "./forfait-etape";
 import { cloreLotEnEchec, commencerEtapeLot, gardeOuverteAuRang } from "./garde";
@@ -198,6 +199,14 @@ const forfait = (contexte: ContexteLot, lot: Pick<LotLu, "voyage" | "villes" | "
 const SQL_FIN_LOT = `UPDATE public.generation_runs SET phase = 'ready', stop_reason = NULL, last_version = COALESCE($4, last_version), updated_at = $5::timestamptz, finished_at = $5::timestamptz
   WHERE organization_id = $1 AND id = $2 AND step_seq = $3 AND phase = 'preparing' AND kind = 'batch' RETURNING id`;
 
+/** Fin `ready` de la ligne au rang de l'étape, sous la garde (`step_expired` si la ligne n'est plus à ce rang). */
+const finDuLot =
+  (contexte: ContexteLot): FinDuLot =>
+  async (x, version) => {
+    const fin = await x.query(SQL_FIN_LOT, [contexte.organizationId, contexte.generationRunId, contexte.rang, version, maintenant(contexte).toISOString()]);
+    if (fin.rows.length === 0) throw new ArretEtape("step_expired");
+  };
+
 /** Jour inchangé depuis la version de base (instantané du jour identique) : sinon la modification de la personne l'emporte. */
 const inchange = (base: TripSnapshot, derniere: TripSnapshot, index: number): boolean => {
   const avant = base.days.find((jour) => jour.index === index);
@@ -216,15 +225,10 @@ export function etapeLotDebut(entree: unknown, dependances?: DependancesGenerati
     entree,
     "a",
     async (contexte) => {
-      // Chaîne inversée (décision 0136 § 4.4), en attendant M1b : la ligne `batch` est close en `ready` sur sa version de base,
-      // sans nouvelle version (le tri est enregistré, le programme ne change pas), sans forfait ni appel.
-      if (contexte.dep.chaine === "inversee") {
-        await sql(contexte, async (x) => {
-          const fin = await x.query(SQL_FIN_LOT, [contexte.organizationId, contexte.generationRunId, contexte.rang, contexte.baseVersion, maintenant(contexte).toISOString()]);
-          if (fin.rows.length === 0) throw new ArretEtape("step_expired");
-        });
-        return "finie";
-      }
+      // Chaîne inversée (M1b, ticket 868 ; décisions 0126 et 0136 § 4.4) : la révision de la chaîne inversée remplace le moteur ;
+      // rien à réviser (aucun « Pas pour moi », révision déjà consommée, programme modifié depuis la version de base), la
+      // ligne est close en `ready` sur sa version de base, sans nouvelle version, sans forfait ni appel (`etapes-revision.ts`).
+      if (contexte.dep.chaine === "inversee") return debutRevision(contexte, finDuLot(contexte));
       const lot = await sql(contexte, (x) => lireLot(x, contexte));
       if (lot.jours.length === 0) {
         await sql(contexte, async (x) => {
@@ -340,6 +344,8 @@ export function etapeLotPlanification(entree: unknown, dependances?: Dependances
     entree,
     "e",
     async (contexte) => {
+      // Chaîne inversée (M1b) : la révision (`etapes-revision.ts`) à la place de la planification par le moteur.
+      if (contexte.dep.chaine === "inversee") return ecritureRevision(contexte, finDuLot(contexte));
       const lus = await sql(contexte, async (x) => {
         const lot = await lireLot(x, contexte);
         return { lot, candidats: await lireCandidatsDuLot(x, contexte, lot.voyage), occurrences: (await x.query(SQL_OCCURRENCES, [contexte.organizationId, contexte.tripId])).rows };

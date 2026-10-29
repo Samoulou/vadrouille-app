@@ -58,6 +58,8 @@ const NON_BRANCHE: PaymentAdapter & PaymentSimulator = {
   getCheckoutStatus: refus,
   getEntitlement: async () => ({ unlocked: false }),
   simulateOutcome: refus,
+  getReceipt: refus,
+  listReceipts: refus,
 };
 
 /** Adaptateur `simulated` du processus : celui de la fabrique branchée (construit une fois), sinon le refus. */

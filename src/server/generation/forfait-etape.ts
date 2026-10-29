@@ -31,6 +31,9 @@ export type ForfaitDeLEtape = {
   readonly plafonds: readonly Plafond[];
 };
 
+/** Cible d'une réservation de forfait d'étape : champs communs des contextes des étapes (programme, lot, révision). */
+export type CibleForfait = { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere };
+
 type Parts = Readonly<Partial<Record<EtapeApercu, number>>>;
 
 /** Part entière de `total` pour `etape` : arrondi par défaut, sauf le dernier consommateur qui reçoit le reste. */
@@ -123,7 +126,7 @@ export function partAvecReserve(entier: Forfait, etape: EtapeApercu, reserve: Re
 
 export async function forfaitDeLEtape(
   dependances: DependancesResolues,
-  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
+  contexte: CibleForfait,
   etape: EtapeApercu,
   passage?: ForfaitDuPassage,
   reserve: ReserveTextSearch = { total: 0, ici: 0, besoinC: 0 },
@@ -174,7 +177,7 @@ function forfaitEnMemoire(entier: Forfait, etape: EtapeApercu, generationRunId: 
  */
 export async function forfaitDuLot(
   dependances: DependancesResolues,
-  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
+  contexte: CibleForfait,
   reserveE: number,
 ): Promise<ForfaitDeLEtape> {
   let forfait = await forfaitEntierReserve(dependances, contexte, "lot", (entier) => {
@@ -187,14 +190,22 @@ export async function forfaitDuLot(
   return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
 }
 
+/** Cible du forfait tirée d'un contexte d'étape (un seul exemplaire, revue de la PR 875, mineur 2). */
+export const cibleDuForfait = (contexte: CibleForfait): CibleForfait => ({
+  organizationId: contexte.organizationId,
+  tripId: contexte.tripId,
+  generationRunId: contexte.generationRunId,
+  barriere: contexte.barriere,
+});
+
 /**
  * Forfait **entier** d'un profil réservé sous l'identifiant de l'exécution (idempotent au rejeu), ou calculé en mémoire pour
  * la variante simulée sans `reserverEnSimulee` (0110 § 3) ; `avant` contrôle le forfait du profil avant la réservation.
  */
 async function forfaitEntierReserve(
   dependances: DependancesResolues,
-  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
-  profil: "lot" | "programme",
+  contexte: CibleForfait,
+  profil: "lot" | "programme" | "revision",
   avant: (entier: Forfait) => void = () => undefined,
 ): Promise<Forfait> {
   const regles = dependances.reglesPour(contexte.barriere);
@@ -225,9 +236,23 @@ async function forfaitEntierReserve(
  */
 export async function forfaitDuProgramme(
   dependances: DependancesResolues,
-  contexte: { readonly organizationId: string; readonly tripId: string; readonly generationRunId: string; readonly barriere: EtatBarriere },
+  contexte: CibleForfait,
 ): Promise<ForfaitDeLEtape> {
   const forfait = await forfaitEntierReserve(dependances, contexte, "programme");
+  const registre = creerRegistreForfait(forfait, contexte.generationRunId, dependances.horloge);
+  return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
+}
+
+/**
+ * Forfait de la révision de la chaîne inversée (« Pas pour moi » sur `api`, profil `revision` ; décision 0142) : même règle que
+ * `forfaitDuProgramme` (réservé par l'étape `a` de l'exécution `batch` sous son identifiant, idempotent, retrouvé par `e`,
+ * entier à `e`, aucune réserve Text Search, part Routes nulle : le registre refuse tout appel Routes).
+ */
+export async function forfaitDeLaRevision(
+  dependances: DependancesResolues,
+  contexte: CibleForfait,
+): Promise<ForfaitDeLEtape> {
+  const forfait = await forfaitEntierReserve(dependances, contexte, "revision");
   const registre = creerRegistreForfait(forfait, contexte.generationRunId, dependances.horloge);
   return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
 }

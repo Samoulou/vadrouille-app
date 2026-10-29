@@ -18,6 +18,7 @@ import type {
   Offer,
   PreviewSlot,
   Proposal,
+  Receipt,
   ReplacementOffer,
   ReplacementWrite,
   Result,
@@ -116,6 +117,14 @@ export interface PaymentAdapter {
   getCheckoutStatus(ctx: AdapterContext, checkoutId: string): Promise<Result<CheckoutStatus>>;
   /** Droit « voyage débloqué » acquis par paiement, lu par `getTripReader()` (§ 3). */
   getEntitlement(ctx: AdapterContext, tripId: string): Promise<{ unlocked: boolean }>;
+  /**
+   * Reçu du paiement qui a débloqué le voyage (B4d), pour la personne qui l'a payé seulement ; `not_found` sinon.
+   * Facultatif : seul l'adaptateur `simulated` l'implémente (reçu maison) ; `mock` n'en a pas, `stripe` pas encore
+   * (lien du reçu de Stripe en attente de sa colonne). Sans la méthode, aucun lien de reçu n'est rendu.
+   */
+  getReceipt?(ctx: AdapterContext, tripId: string): Promise<Result<Receipt>>;
+  /** Reçus de la personne, pour « Mes voyages » (B4d) ; même règle que `getReceipt`. */
+  listReceipts?(ctx: AdapterContext): Promise<Result<readonly Receipt[]>>;
 }
 
 /**

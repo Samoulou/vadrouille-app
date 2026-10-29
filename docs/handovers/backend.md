@@ -546,6 +546,13 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `CheckoutStatus.priceVariant` | stocké | Instantané du prix à la création (décision 0020 § 1.3) |
 | `CheckoutStatus.amount` | stocké | `checkouts.amount_cents` |
 | `CheckoutStatus.currency` | stocké | `checkouts.currency` |
+| `Receipt.kind` | calculé | Serveur : `simulated` (reçu maison du prestataire simulé, B4d) ; le reçu de Stripe attend sa colonne (PR 878) |
+| `Receipt.checkoutId` | stocké | `checkouts.id` du paiement qui a accordé le droit (`entitlements.billing_id` → `billing.checkout_id`), en identifiant public |
+| `Receipt.tripId` | stocké | `checkouts.trip_id` |
+| `Receipt.method` | stocké | `checkouts.method` |
+| `Receipt.amount` | stocké | `checkouts.amount_cents` (instantané du prix, B4-PO-9) |
+| `Receipt.currency` | stocké | `checkouts.currency` |
+| `Receipt.paidAt` | stocké | `billing.received_at` de la confirmation qui a accordé le droit |
 | `OfferConfig.amount` | calculé | Serveur, lu dans `src/server/config/offer.ts` (Q2), jamais en base |
 | `OfferConfig.currency` | calculé | Serveur, configuration |
 | `OfferConfig.priceVariant` | calculé | Serveur, configuration |
