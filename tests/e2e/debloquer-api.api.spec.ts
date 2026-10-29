@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test as base, type APIRequestContext, type Page } from "@playwright/test";
 
 import { ADRESSE_DEBLOQUER, ADRESSE_DEBLOQUER_REFUS } from "../support/bout-en-bout-api";
@@ -83,12 +84,35 @@ function adresses(id: string) {
   return {
     r9,
     r11: `/voyages/${id}`,
+    recu: `${r9}/recu`,
     sim: new RegExp(`^${r9}/paiement-simule/${ID_PAIEMENT}$`),
     echec: new RegExp(`^${r9}\\?paiement=${ID_PAIEMENT}$`),
   };
 }
 
 const enTete = (page: Page, name: string) => page.getByRole("heading", { level: 1, name });
+
+/** Axe (WCAG 2.2 AA) sans violation et un seul titre de niveau 1. */
+async function sansViolation(page: Page) {
+  const resultats = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]).analyze();
+  expect(resultats.violations).toEqual([]);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+}
+
+/**
+ * Reçu simulé `R9-recu` (B4d, PR 878) : marqué « simulé » (titre, mention), puis voyage, montant, moyen, date et
+ * identifiant public du paiement ; aucune violation axe.
+ */
+async function verifierRecu(page: Page, recu: string, paiement: string, moyen: "TWINT" | "Carte") {
+  await expectPath(page, recu);
+  await expect(enTete(page, "Reçu simulé")).toBeVisible();
+  await expect(page).toHaveTitle("Édimbourg · Reçu simulé");
+  await expect(main(page)).toContainText("Reçu de démonstration : aucun paiement réel n'a eu lieu et ce document n'a aucune valeur comptable.");
+  const details = main(page).getByRole("region", { name: "Détails du paiement simulé" });
+  await expect(details.getByRole("term")).toHaveText(["Voyage", "Montant", "Moyen de paiement", "Date", "Identifiant du paiement"]);
+  await expect(details.getByRole("definition")).toHaveText([/^Édimbourg, /, /^29\s?CHF$/, moyen, /^\d{1,2}(er)? \S+ \d{4} à \d{2}:\d{2} \(heure de Zurich\)$/, paiement]);
+  await sansViolation(page);
+}
 
 /** Depuis l'écran 9, commence un paiement et attend la page de paiement simulé ; rend l'identifiant public. */
 async function commencer(page: Page, sim: RegExp, moyen: "twint" | "card"): Promise<string> {
@@ -103,12 +127,13 @@ test("debloquer: paiement simulé de bout en bout sur la base", async ({ page, r
   await connecter(page, request, ADRESSE_DEBLOQUER);
   await setClock(page, DATES.avant);
   const id = await voyageADebloquer(page);
-  const { r9, r11, sim } = adresses(id);
+  const { r9, r11, recu, sim } = adresses(id);
 
-  // Sans session : les trois pages redirigent vers l'écran 4, suite « Débloquer » (B3c ; B8, partie pages).
+  // Sans session : les trois pages, et le reçu (PR 878), redirigent vers l'écran 4, suite « Débloquer » (B3c ; B8,
+  // partie pages).
   const anonyme = await browser.newContext();
   const visiteur = await anonyme.newPage();
-  for (const chemin of [r9, `${r9}/paiement-simule/${"A".repeat(22)}`, `${r9}/confirmation?paiement=${"A".repeat(22)}`]) {
+  for (const chemin of [r9, `${r9}/paiement-simule/${"A".repeat(22)}`, `${r9}/confirmation?paiement=${"A".repeat(22)}`, recu]) {
     await visiteur.goto(chemin);
     await expect.poll(() => `${new URL(visiteur.url()).pathname}${new URL(visiteur.url()).search}`).toBe(connexionRoute(r9));
   }
@@ -137,6 +162,11 @@ test("debloquer: paiement simulé de bout en bout sur la base", async ({ page, r
   await page.goto(r9);
   await expect(enTete(page, "Débloquer ton voyage")).toBeVisible();
   await expect(payTwint(page)).toBeEnabled();
+  // Aucun reçu avant le paiement (PR 878) : ni lien, ni page.
+  await expect(main(page).getByRole("link", { name: "Voir le reçu" })).toHaveCount(0);
+  expect((await page.goto(recu))?.status()).toBe(404);
+  await page.goto(r9);
+  await expect(enTete(page, "Débloquer ton voyage")).toBeVisible();
 
   // « Simuler un paiement réussi » : événement signé, webhook simulé, droit ; `R9-retour` mène au Séjour (`R11`).
   await page.goto(`${r9}/paiement-simule/${paiement}`);
@@ -157,6 +187,23 @@ test("debloquer: paiement simulé de bout en bout sur la base", async ({ page, r
   await expect(main(page).getByRole("button")).toHaveCount(0);
   await expect(main(page)).not.toContainText("CHF");
 
+  // Reçu (B4d, PR 878) : « Voir le reçu » sur l'écran 9 débloqué (retour du paiement), page du reçu simulé, puis le
+  // même lien dans « Mes voyages », sous le voyage payé seulement.
+  await expect(main(page).getByRole("link", { name: "Voir le reçu" })).toHaveAttribute("href", recu);
+  await main(page).getByRole("link", { name: "Voir le reçu" }).click();
+  await verifierRecu(page, recu, paiement, "TWINT");
+  await main(page).getByRole("link", { name: "Voir le programme" }).click();
+  await expectPath(page, r11);
+  await page.goto(R17);
+  await expect(page.getByRole("heading", { level: 1, name: "Mes voyages" })).toBeVisible();
+  await expect(page.getByRole("status")).toHaveCount(0);
+  const recus = page.getByRole("main").getByRole("link", { name: /^Voir le reçu/ });
+  await expect(recus).toHaveCount(1);
+  await expect(recus).toHaveAccessibleName("Voir le reçu (Édimbourg)");
+  await expect(recus).toHaveAttribute("href", recu);
+  await recus.click();
+  await verifierRecu(page, recu, paiement, "TWINT");
+
   // Rejouer la page de paiement simulé d'un paiement conclu : la confirmation, puis le Séjour, sans second paiement.
   await page.goto(`${r9}/paiement-simule/${paiement}`);
   await expectPath(page, r11);
@@ -168,11 +215,11 @@ test("debloquer: paiement refusé puis réussi sur la base", async ({ page, requ
   await connecter(page, request, ADRESSE_DEBLOQUER_REFUS);
   await setClock(page, DATES.avant);
   const id = await voyageADebloquer(page);
-  const { r9, r11, sim, echec } = adresses(id);
+  const { r9, r11, recu, sim, echec } = adresses(id);
 
   await page.goto(r9);
   await expect(enTete(page, "Débloquer ton voyage")).toBeVisible();
-  await commencer(page, sim, "card");
+  const refuse = await commencer(page, sim, "card");
   await expect(main(page)).toContainText("Moyen : carte");
   await simulate(page, "Simuler un refus");
   await expectPath(page, echec);
@@ -184,14 +231,23 @@ test("debloquer: paiement refusé puis réussi sur la base", async ({ page, requ
   await page.reload();
   await expect(main(page).getByRole("alert")).toHaveText("Le paiement n'a pas abouti. Aucun montant n'a été débité.");
 
+  // Un refus ne donne aucun reçu (PR 878).
+  expect((await page.goto(recu))?.status()).toBe(404);
+  await page.goto(r9);
+  await expect(enTete(page, "Débloquer ton voyage")).toBeVisible();
+
   // Un second paiement réussit : un seul droit, le voyage est débloqué.
-  await commencer(page, sim, "twint");
+  const reussi = await commencer(page, sim, "twint");
+  expect(reussi).not.toBe(refuse);
   await simulate(page, "Simuler un paiement réussi");
   await expectPath(page, r11);
   await expect(enTete(page, "Édimbourg")).toBeVisible();
   await page.goto(r9);
   await expect(enTete(page, "Ton voyage est débloqué")).toBeVisible();
   await expect(payTwint(page)).toHaveCount(0);
+  // Le reçu est celui du paiement réussi, jamais celui du refus (PR 878).
+  await page.goto(recu);
+  await verifierRecu(page, recu, reussi, "TWINT");
 
   // « Mes voyages » : plus aucun voyage à débloquer dans l'organisation.
   await page.goto(R17);

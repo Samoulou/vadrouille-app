@@ -5,11 +5,13 @@ import {
   CheckoutStartSchema,
   CheckoutStatusSchema,
   OfferSchema,
+  ReceiptSchema,
   fail,
   ok,
   type CheckoutStart,
   type CheckoutStatus,
   type Offer,
+  type Receipt,
   type Result,
 } from "@/contracts";
 import type { AdapterContext } from "@/adapters/types";
@@ -172,6 +174,34 @@ function depart(ligne: LignePaiement, redirectUrl: string): Result<CheckoutStart
   return valide.success ? ok(valide.data) : erreurPrestataire(false);
 }
 
+/**
+ * Reçus maison (B4d) : paiement qui a accordé le droit `tripUnlocked` de chaque voyage (`entitlements.billing_id` →
+ * `billing.checkout_id` → `checkouts`), lu sous RLS dans l'organisation de la transaction et réservé à la personne qui
+ * l'a commencé (`created_by`, comme la lecture d'un paiement, B4-PO-7). Un droit sans ligne `billing` (données de test,
+ * droit accordé hors paiement) n'a pas de reçu. Rien n'est écrit, rien d'autre n'est lu : ni événement, ni moyen
+ * détaillé, ni donnée de la personne.
+ */
+const SQL_RECUS = `SELECT c.id::text AS id, c.trip_id::text AS trip_id, c.method, c.amount_cents, c.currency,
+    floor(extract(epoch FROM b.received_at) * 1000)::bigint AS paye_ms
+  FROM entitlements e
+  JOIN billing b ON b.id = e.billing_id
+  JOIN checkouts c ON c.id = b.checkout_id
+  WHERE e.kind = 'tripUnlocked' AND c.created_by = $1`;
+
+/** Reçu d'une ligne lue, validé par `ReceiptSchema` ; `null` si la ligne ne le respecte pas (jamais inventé). */
+function recuDe(row: Record<string, unknown>): Receipt | null {
+  const valide = ReceiptSchema.safeParse({
+    kind: "simulated",
+    checkoutId: versIdentifiantPublic(String(row.id)),
+    tripId: String(row.trip_id),
+    method: row.method,
+    amount: Number(row.amount_cents),
+    currency: row.currency,
+    paidAt: new Date(Number(row.paye_ms)).toISOString(),
+  });
+  return valide.success ? valide.data : null;
+}
+
 /** Issue de la transaction d'insertion de `createCheckout` : réponse immédiate, ou ligne à compléter. */
 type Insertion = { readonly fin: Result<CheckoutStart> } | { readonly ligne: LignePaiement; readonly reprise: boolean };
 
@@ -302,6 +332,28 @@ export function creerCasPaiement(deps: DependancesPaiement) {
     async getEntitlement(ctx: AdapterContext, tripId: string): Promise<{ unlocked: boolean }> {
       if (!UUID.test(tripId)) return { unlocked: false };
       return enOrganisation(ctx, async (executeur) => ({ unlocked: (await lireDroitVoyage(executeur, tripId)) !== null }));
+    },
+
+    /** Reçu maison du voyage (B4d) : `not_found` sans droit payé par la personne ; panne → `provider_error`. */
+    async getReceipt(ctx: AdapterContext, tripId: string): Promise<Result<Receipt>> {
+      if (!UUID.test(tripId)) return fail("not_found");
+      try {
+        const rows = await enOrganisation(ctx, async (executeur) => (await executeur.query(`${SQL_RECUS} AND e.trip_id = $2`, [ctx.userId, tripId])).rows);
+        const recu = rows.length === 0 ? null : recuDe(rows[0] as Record<string, unknown>);
+        return recu === null ? fail("not_found") : ok(recu);
+      } catch {
+        return ERREUR_PRESTATAIRE;
+      }
+    },
+
+    /** Reçus maison de la personne dans l'organisation (« Mes voyages », B4d), dans l'ordre des voyages. */
+    async listReceipts(ctx: AdapterContext): Promise<Result<readonly Receipt[]>> {
+      try {
+        const rows = await enOrganisation(ctx, async (executeur) => (await executeur.query(`${SQL_RECUS} ORDER BY c.trip_id`, [ctx.userId])).rows);
+        return ok(rows.flatMap((row) => recuDe(row as Record<string, unknown>) ?? []));
+      } catch {
+        return ERREUR_PRESTATAIRE;
+      }
     },
 
     /**

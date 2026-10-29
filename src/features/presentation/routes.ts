@@ -16,6 +16,8 @@ export interface UnlockRoutes {
   paiementSimule(paiementId: string): string;
   /** `R9-retour` : confirmation du paiement. */
   confirmation(paiementId: string): string;
+  /** `R9-recu` : reçu du paiement qui a débloqué le voyage (B4d ; reçu maison du paiement simulé). */
+  recu(): string;
 }
 
 /**
@@ -29,6 +31,7 @@ export function unlockRoutes(tripId: string): UnlockRoutes {
     debloquer: (paiementId) => (paiementId === undefined ? debloquer : `${debloquer}?paiement=${encodeURIComponent(paiementId)}`),
     paiementSimule: (paiementId) => `${debloquer}/paiement-simule/${encodeURIComponent(paiementId)}`,
     confirmation: (paiementId) => `${debloquer}/confirmation?paiement=${encodeURIComponent(paiementId)}`,
+    recu: () => `${debloquer}/recu`,
   };
 }
 

@@ -145,6 +145,17 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // B4d (PR 878) : reçu maison du paiement simulé en base (`PAYMENT_ADAPTER=simulated`, projet `api`). Le serveur
+    // mesuré (adaptateur de paiement `mock`, sans reçu) sert la page introuvable ; la page réelle est éprouvée par
+    // `tests/e2e/debloquer-api.api.spec.ts` (axe compris).
+    id: "R9-recu",
+    path: `${TRIP}/debloquer/recu`,
+    page: "voyages/[id]/debloquer/recu/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     // F8a : écran 1 de la création ; budgets en `journal` en attendant le Tech Lead (F8-Q15).
     id: "R1",
     path: "/voyages/nouveau",

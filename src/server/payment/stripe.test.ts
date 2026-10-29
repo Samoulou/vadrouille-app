@@ -12,7 +12,16 @@ import { DUREE_VIE_PAIEMENT_MS } from "./dependances";
 import { formeSimulee, formeStripe, idEvenementSimule, idSessionSimulee } from "./formes";
 import type { PaiementPrestataire } from "./paiements";
 import { signer } from "./signature";
-import { CLASSES_ERREUR_STRIPE, creerClientSessionsStripe, EXPIRATION_SESSION_S, NOM_PRODUIT_STRIPE, parametresSessionStripe, verifierEvenementStripe } from "./stripe";
+import {
+  CLASSES_ERREUR_STRIPE,
+  creerClientSessionsStripe,
+  EXPIRATION_SESSION_S,
+  fabriqueClientSdk,
+  NOM_PRODUIT_STRIPE,
+  parametresSessionStripe,
+  verifierEvenementStripe,
+  type TransportHttpStripe,
+} from "./stripe";
 
 /**
  * Module `stripe.ts` (spécification B4, B4c ; décision 0140 § 1.2, § 2.3, § 5 point 4 ; critères C5, T3, T4, T5) : sans
@@ -234,6 +243,60 @@ describe("paiement: aucune donnée d'une erreur du SDK Stripe ne sort", () => {
     const { valeur, lignes } = await capturer(async () => verifierEvenementStripe(Buffer.from(corps), `t=1,v1=${SENTINELLE}`, secretWebhookDeTest(), 1000));
     expect(valeur).toBe(false);
     expect(lignes).toEqual([]);
+  });
+});
+
+describe("paiement: 409 d'idempotence sur le client réel du SDK (PR 878, revue de la PR 867, mineur 4)", () => {
+  /**
+   * Transport HTTP de test : le client **réel** du SDK (options de l'application, `maxNetworkRetries: 1`) lui envoie ses
+   * requêtes au lieu du réseau ; chaque appel rend la réponse fixée. Aucun appel réseau, clé de test tirée au hasard.
+   */
+  function transport(statut: number, corps: unknown, entetes: Record<string, string> = {}) {
+    const requetes: { methode: string; chemin: string; cleIdempotence: unknown }[] = [];
+    const client = {
+      getClientName: () => "transport-de-test",
+      makeRequest: async (_hote: string, _port: string, chemin: string, methode: string, enTetes: Record<string, unknown>) => {
+        requetes.push({ methode, chemin, cleIdempotence: enTetes["Idempotency-Key"] });
+        return {
+          getStatusCode: () => statut,
+          getHeaders: () => ({ "request-id": "req_test", ...entetes }),
+          getRawResponse: () => undefined,
+          toStream: () => undefined,
+          toJSON: async () => corps,
+        };
+      },
+    };
+    return { requetes, client: client as unknown as TransportHttpStripe };
+  }
+  const configurationSdk = (t: ReturnType<typeof transport>) => ({ adressesRetour: RETOUR, moyens: ["twint"] as const, fabriqueClient: fabriqueClientSdk(t.client) });
+  const CONFLIT = { error: { type: "invalid_request_error", code: "idempotency_key_in_use", message: "Requête concurrente sous la même clé." } };
+
+  it("409 : relancé une fois sous la même clé d'idempotence, puis `StripeAPIError`, `retryable: true`", async () => {
+    const t = transport(409, CONFLIT);
+    const { valeur, lignes } = await capturer(() => creerClientSessionsStripe(cleDeTest(), configurationSdk(t)).creerSession(PAIEMENT, `checkout:${PAIEMENT.id}`));
+    expect(valeur).toStrictEqual({ ok: false, code: "provider_error", retryable: true });
+    expect(lignes.map((l) => (JSON.parse(l) as { errorClass: string }).errorClass)).toEqual(["StripeAPIError"]);
+    expect(t.requetes).toHaveLength(2);
+    expect(t.requetes.map((r) => [r.methode, r.chemin, r.cleIdempotence])).toEqual([
+      ["POST", "/v1/checkout/sessions", `checkout:${PAIEMENT.id}`],
+      ["POST", "/v1/checkout/sessions", `checkout:${PAIEMENT.id}`],
+    ]);
+  });
+
+  it("409 de `type` `idempotency_error` : même classe (`StripeAPIError`) ; avec `stripe-should-retry: false`, aucune relance", async () => {
+    const t = transport(409, { error: { type: "idempotency_error", message: "x" } }, { "stripe-should-retry": "false" });
+    const { valeur, lignes } = await capturer(() => creerClientSessionsStripe(cleDeTest(), configurationSdk(t)).creerSession(PAIEMENT, `checkout:${PAIEMENT.id}`));
+    expect(valeur).toStrictEqual({ ok: false, code: "provider_error", retryable: true });
+    expect(lignes.map((l) => (JSON.parse(l) as { errorClass: string }).errorClass)).toEqual(["StripeAPIError"]);
+    expect(t.requetes).toHaveLength(1);
+  });
+
+  it("400 de `type` `idempotency_error` (autres paramètres sous la même clé) : `StripeIdempotencyError`, `retryable: false`, sans relance", async () => {
+    const t = transport(400, { error: { type: "idempotency_error", message: "x" } });
+    const { valeur, lignes } = await capturer(() => creerClientSessionsStripe(cleDeTest(), configurationSdk(t)).creerSession(PAIEMENT, `checkout:${PAIEMENT.id}`));
+    expect(valeur).toStrictEqual({ ok: false, code: "provider_error", retryable: false });
+    expect(lignes.map((l) => (JSON.parse(l) as { errorClass: string }).errorClass)).toEqual(["StripeIdempotencyError"]);
+    expect(t.requetes).toHaveLength(1);
   });
 });
 

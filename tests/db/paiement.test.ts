@@ -622,4 +622,58 @@ describe("paiement simulé en base (B4a)", () => {
     expect(await banc.adapter.simulateOutcome(ctx, p.publicId, "succeeded")).toEqual({ ok: false, error: { code: "provider_error", retryable: true } });
     expect(await etat(ctx, p, tripId)).toEqual({ status: "pending", billing: [], droits: [] });
   });
+
+  // B4d (PR 878) : reçu maison lu depuis le paiement qui a accordé le droit, sans rien écrire de plus.
+  it("paiement: reçu simulé du paiement qui a débloqué le voyage, pour la personne qui l'a payé seulement (PR 878)", async () => {
+    const banc = creerBanc();
+    const { ctx, tripId, org } = await organisation(1);
+    const autreOrg = contexte(await createOrg(auth));
+    const membre: AdapterContext = { organizationId: ctx.organizationId, userId: org.members[0] as string, role: "member" };
+    expect(await banc.adapter.getEntitlement(ctx, tripId)).toEqual({ unlocked: false });
+    // Avant tout paiement, puis après un refus : aucun reçu.
+    expect(await banc.adapter.getReceipt?.(ctx, tripId)).toEqual({ ok: false, error: { code: "not_found" } });
+    const refuse = await commencer(banc, ctx, tripId, "card");
+    expect((await banc.adapter.simulateOutcome(ctx, refuse.publicId, "declined")).ok).toBe(true);
+    expect(await banc.adapter.getReceipt?.(ctx, tripId)).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await banc.adapter.listReceipts?.(ctx)).toEqual({ ok: true, value: [] });
+
+    const debut = Date.now();
+    const p = await commencer(banc, ctx, tripId, "twint");
+    expect((await banc.adapter.simulateOutcome(ctx, p.publicId, "succeeded")).ok).toBe(true);
+    const fin = Date.now();
+    const recu = await banc.adapter.getReceipt?.(ctx, tripId);
+    expect(recu).toEqual({
+      ok: true,
+      value: { kind: "simulated", checkoutId: p.publicId, tripId, method: "twint", amount: OFFRE.amount, currency: OFFRE.currency, paidAt: expect.any(String) },
+    });
+    const paye = recu?.ok ? Date.parse(recu.value.paidAt) : Number.NaN;
+    // `billing.received_at` (horloge de la base) : à une seconde près de l'appel.
+    expect(paye).toBeGreaterThanOrEqual(debut - 1000);
+    expect(paye).toBeLessThanOrEqual(fin + 1000);
+    expect(await banc.adapter.listReceipts?.(ctx)).toEqual({ ok: true, value: [recu?.ok ? recu.value : null] });
+
+    // Autre personne de l'organisation (droit visible, paiement non) et autre organisation : aucun reçu.
+    expect(await banc.adapter.getEntitlement(membre, tripId)).toEqual({ unlocked: true });
+    for (const lecteur of [membre, autreOrg]) {
+      expect(await banc.adapter.getReceipt?.(lecteur, tripId)).toEqual({ ok: false, error: { code: "not_found" } });
+      expect(await banc.adapter.listReceipts?.(lecteur)).toEqual({ ok: true, value: [] });
+    }
+    // Identifiant qui n'est pas un uuid : not_found sans lecture.
+    expect(await banc.adapter.getReceipt?.(ctx, "inconnu")).toEqual({ ok: false, error: { code: "not_found" } });
+
+    // Rejouer la réussite ne change ni le reçu ni les lignes ; rien n'est écrit par la lecture du reçu.
+    const lignesAvant = await etat(ctx, p, tripId);
+    expect((await banc.adapter.simulateOutcome(ctx, p.publicId, "succeeded")).ok).toBe(true);
+    expect(await banc.adapter.getReceipt?.(ctx, tripId)).toEqual(recu);
+    expect(await etat(ctx, p, tripId)).toEqual(lignesAvant);
+  });
+
+  it("paiement: un droit sans ligne billing (données de test) n'a pas de reçu (PR 878)", async () => {
+    const banc = creerBanc();
+    const { ctx, tripId, org } = await organisation();
+    await admin.query("INSERT INTO entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [org.org, tripId]);
+    expect(await banc.adapter.getEntitlement(ctx, tripId)).toEqual({ unlocked: true });
+    expect(await banc.adapter.getReceipt?.(ctx, tripId)).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await banc.adapter.listReceipts?.(ctx)).toEqual({ ok: true, value: [] });
+  });
 });
