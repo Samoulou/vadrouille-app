@@ -14,6 +14,7 @@ import type {
 
 import { lisbonne, porto } from "./autres-voyages";
 import { apercu, edimbourg, edimbourgDebloque, propositions, propositionsDebloque } from "./edimbourg";
+import { edimbourgRevision } from "./edimbourg-revision";
 
 /**
  * Double simulé du port de relectures de la lecture des voyages (spécification B6, B6a point 3 ; décision 0086
@@ -79,6 +80,35 @@ function etapes(items: readonly DayLineItem[]): Etape[] {
 }
 
 /**
+ * Segments d'une ligne de jour regroupés par couple de points avec lieu et mode : plusieurs segments de même mode entre
+ * deux mêmes points reçoivent leur somme.
+ */
+function couplesDuJour(items: readonly DayLineItem[], logement: string): Map<string, number> {
+  const parCouple = new Map<string, number>();
+  let dernier = logement;
+  let enAttente: { mode: ModeTrajet; minutes: number }[] = [];
+  const resoudre = (vers: string) => {
+    for (const segment of enAttente) {
+      const cle = cleTrajet(dernier, vers, segment.mode);
+      parCouple.set(cle, (parCouple.get(cle) ?? 0) + segment.minutes);
+    }
+    enAttente = [];
+  };
+  for (const item of items) {
+    // Un segment sans durée (`null`, prototype seulement, décision 0092 § 4) n'a aucune durée à servir : il est
+    // ignoré, jamais compté 0. Les voyages simulés n'en contiennent pas (MVP).
+    if (item.type === "segment" && item.segment.minutes !== null) enAttente.push({ mode: item.segment.mode, minutes: item.segment.minutes });
+    else if (item.type === "stop") {
+      const lieu = lieuConverti(item.stop);
+      resoudre(lieu);
+      dernier = lieu;
+    }
+  }
+  resoudre(logement);
+  return parCouple;
+}
+
+/**
  * Table tirée du jeu simulé (B6a point 7) : pour chaque segment, la durée de son mode entre les points avec lieu qui
  * l'encadrent (logement au début et à la fin) — plusieurs segments de même mode entre deux mêmes points sont mesurés
  * ensemble et reçoivent leur **somme** (J5 d'Édimbourg : 50 + 20 = 70) ; pour chaque proposition qui porte
@@ -111,29 +141,7 @@ export function tableDesRelectures(voyages: readonly VoyageSimule[] = VOYAGES_SI
     for (const day of trip.days) {
       for (const { lieu, stop } of etapes(day.items)) poserPlages(lieu, day.date, stop);
       for (const event of day.events) poserPlages(lieuConverti(event), day.date, event);
-      // Segments regroupés par couple de points avec lieu et mode, dans le jour.
-      const parCouple = new Map<string, number>();
-      let dernier = logement;
-      let enAttente: { mode: ModeTrajet; minutes: number }[] = [];
-      const resoudre = (vers: string) => {
-        for (const segment of enAttente) {
-          const cle = cleTrajet(dernier, vers, segment.mode);
-          parCouple.set(cle, (parCouple.get(cle) ?? 0) + segment.minutes);
-        }
-        enAttente = [];
-      };
-      for (const item of day.items) {
-        // Un segment sans durée (`null`, prototype seulement, décision 0092 § 4) n'a aucune durée à servir : il est
-        // ignoré, jamais compté 0. Les voyages simulés n'en contiennent pas (MVP).
-        if (item.type === "segment" && item.segment.minutes !== null) enAttente.push({ mode: item.segment.mode, minutes: item.segment.minutes });
-        else if (item.type === "stop") {
-          const lieu = lieuConverti(item.stop);
-          resoudre(lieu);
-          dernier = lieu;
-        }
-      }
-      resoudre(logement);
-      for (const [cle, minutes] of parCouple) poserDuree(cle, minutes);
+      for (const [cle, minutes] of couplesDuJour(day.items, logement)) poserDuree(cle, minutes);
     }
     for (const proposal of proposals) {
       const trajet = proposal.travelFromPrevious;
@@ -163,6 +171,19 @@ export function tableDesRelectures(voyages: readonly VoyageSimule[] = VOYAGES_SI
         if (de === undefined || vers === undefined || mode === undefined) continue;
         const reprise = de === occupee.lieu && vers !== option ? cleTrajet(option, vers, mode as ModeTrajet) : vers === occupee.lieu && de !== option ? cleTrajet(de, option, mode as ModeTrajet) : undefined;
         if (reprise !== undefined && !durees.has(reprise)) durees.set(reprise, minutes);
+      }
+    }
+    // Réserve du jeu simulé de révision (M1g, PR 869 ; `src/mocks/edimbourg-revision.ts`) : la proposition d'un brouillon de
+    // remplacement reçoit, vers ses voisins, les durées de ce brouillon (« [Dégustation…] » : 25 min avant, 10 min après),
+    // et des plages connues ; seuls les couples qui touchent son lieu, et jamais un couple déjà fixé.
+    for (const { draft } of trip.id === edimbourg.id ? edimbourgRevision.replacements : []) {
+      const option = lieuConverti(draft.proposal);
+      for (const day of draft.days) {
+        poserPlages(option, day.date, draft.proposal);
+        for (const [cle, minutes] of couplesDuJour(day.items, logement)) {
+          const [de, vers] = cle.split("|");
+          if ((de === option || vers === option) && !durees.has(cle)) durees.set(cle, minutes);
+        }
       }
     }
   }

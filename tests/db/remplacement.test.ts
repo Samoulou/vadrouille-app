@@ -11,7 +11,7 @@ import { BaseDeVersionDepassee, ecrireVersion } from "@/server/versions/ecrire";
 import { creerWithOrg, executeurSql } from "@/server/with-org";
 
 import { createDatabase } from "../../db/index";
-import { convertirVoyagesSimules, ecrireVoyage } from "../support/voyages-en-base";
+import { avecReserveDeRevision, convertirVoyagesSimules, ecrireVoyage } from "../support/voyages-en-base";
 import { closeAll, connect, createOrg, inTx, type DbClient, type Org } from "./helpers";
 
 /**
@@ -190,6 +190,26 @@ describe("remplacer une étape sur api (M1g, PR 869)", () => {
     expect(valeur(await port.applyReplacement(ctxA, { tripId, requestId: randomUUID(), stopId: "j2-dean-village", candidateId: proposee.candidateId, baseVersion: 1 }))).toEqual({ status: "applied", version: 2 });
     const ecrite = TripSnapshotSchema.parse((await versions(a, tripId))[1]?.snapshot).days[1]?.items.flatMap((i) => (i.type === "stop" && i.stop.id === proposal.id ? [i.stop] : []))[0];
     expect(ecrite).toMatchObject({ start: proposal.start, end: proposal.end, facts: { durationMinutes: 45 } });
+  });
+
+  it("PR 869 : « Ce qui change » porte les lignes de trajet et de budget du moteur (réserve du jeu simulé de révision)", async () => {
+    const tripId = await ecrireVoyage(app, a, avecReserveDeRevision(EDIMBOURG, voyageSimule(EDIMBOURG)), undefined, { candidats: true });
+    const proposee = offre(await apercu(tripId, "j2-dean-village", 1));
+    const { draft } = proposee;
+    expect(draft.proposal.name).toBe("[Dégustation dans une épicerie fine de Stockbridge]");
+    // Durées du double (celles du brouillon simulé) : 20 → 25 min avant la dégustation, 15 → 10 min après ; coût + 15.
+    expect(draft.changes).toEqual(
+      expect.arrayContaining([
+        { type: "replaced", time: draft.proposal.start, before: "[Dean Village]", after: draft.proposal.name },
+        { type: "segment", label: draft.proposal.name, before: 20, after: 25, estimated: false },
+        { type: "segment", label: "[Café de Stockbridge]", before: 15, after: 10, estimated: false },
+        { type: "budget", deltaPerPerson: 15 },
+      ]),
+    );
+    const jour = draft.days.find((d) => d.index === 2);
+    const minutes = jour?.items.flatMap((item) => (item.type === "segment" ? [item.segment.minutes] : [])) ?? [];
+    expect(minutes).toEqual(expect.arrayContaining([25, 10]));
+    expect(valeur(await appliquer(tripId, "j2-dean-village", proposee.candidateId, 1))).toEqual({ status: "applied", version: 2 });
   });
 
   it("PR 869 : annulation, version 3 identique à la version 1 (revert), rien n'est supprimé", async () => {

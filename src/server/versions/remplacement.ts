@@ -247,7 +247,8 @@ export function entreeMoteurDeRevision(
     idees: [],
     choix: new Map(),
     configuration,
-    // Classement et âge des sources : lus par `generer` seulement, jamais par `appliquerPatch` ; valeurs de la génération.
+    // Classement et âge des sources : lus par `generer` seulement, jamais par `appliquerPatch` ; valeurs de la génération
+    // (décision 0145 § 5).
     classement: { formule: CONFIGURATION_CLASSEMENT, ageSourceMaxJours: CONFIGURATION_IA.profils.apercu.ageSourceMaxJours },
     relectures,
     porteeR1: { evenementsSansLieu: "admis" },
@@ -326,7 +327,7 @@ const SQL_ENGAGEMENTS = `SELECT kind, label, to_char(date, 'YYYY-MM-DD') AS date
  * Propositions déjà vérifiées du voyage, de même nature, liées à leur candidat (même nature, ancré) : hors cases vides et
  * hors cartes écartées au tri (« Pas pour moi » non annulé) ; le jour de l'étape d'abord, puis les jours les plus proches ;
  * ordre fixe (phase, position, identifiant). Une proposition sans candidat (`candidate_id` nul, chaîne inversée) n'est pas
- * une option (question au Product Owner et au Tech Lead, PR 869).
+ * une option : `candidates` n'est écrit que par la génération (décision 0145 § 3 ; question au Product Owner, PR 869).
  */
 const SQL_PROPOSITIONS = `SELECT p.id, p.day, c.id AS candidate_id, c.name, c.summary, c.category, c.facts, c.sources, c.place_id,
     c.stop_kind, c.to_reserve, c.fit, c.not_for_me_risk, c.must_see, c.slot_fit
@@ -419,7 +420,7 @@ async function refuserPendantUnRecalcul(executeur: ExecuteurAction, org: string,
 /**
  * Brief du moteur : allure, envies, limites et budget repas de la dernière ligne `briefs` ; modes de trajet **de la lecture**
  * (`BaseDeRevision.modes`, ceux des durées affichées). Sans ligne ou sans allure : `balanced` (valeur par défaut du formulaire
- * de création, `src/features/creation/validation.ts`).
+ * de création, `src/features/creation/validation.ts` ; décision 0145 § 5).
  */
 async function briefDe(executeur: ExecuteurAction, org: string, tripId: string, base: BaseDeRevision, travellers: Brief["travellers"]): Promise<Brief> {
   const ligne = (await executeur.query(SQL_BRIEF, [org, tripId])).rows[0];
@@ -623,7 +624,8 @@ export async function appliquerRemplacement(dependances: DependancesRemplacement
     if (ligne !== undefined) return rejeu(ligne, "replace", courante);
     await refuserPendantUnRecalcul(executeur, org, valeur.tripId);
     if (courante !== valeur.baseVersion || courante !== prepare.contexte.base.version) return { status: "conflict", currentVersion: courante };
-    // Une ligne « À faire » posée entre-temps sur l'étape la rend non remplaçable (comme à l'étape 1).
+    // Une ligne « À faire » posée entre-temps sur l'étape la rend non remplaçable (comme à l'étape 1). Une carte écartée au
+    // tri entre l'étape 1 et ici n'est pas revue : elle ne change pas la version (écart admis, décision 0145 § 6).
     if ((await etapesAFaire(executeur, org, valeur.tripId)).has(valeur.stopId)) return { status: "noOption" };
     const patch = patchDuRemplacement(valeur.requestId, courante, prepare.choix);
     const resultat = moteur(dependances, prepare, relectures, patch);
@@ -650,7 +652,7 @@ export async function appliquerRemplacement(dependances: DependancesRemplacement
  * `undoReplacement` : si la version courante est `version` et qu'elle est un remplacement écrit par une personne, une
  * version de plus recopie sa version de base (`revert` appliqué par le moteur, rien n'est supprimé) ; sinon `conflict`, rien
  * n'est écrit. La fenêtre de 5 s est tenue par le toast ; le serveur n'a pas de borne de temps (réponse du Tech Lead à la
- * revue de la PR 869 : la garde par la version courante suffit). Aucun appel du port : rien n'est replanifié.
+ * revue de la PR 869, décision 0145 § 4 : la garde par la version courante suffit). Aucun appel du port : rien n'est replanifié.
  */
 export function annulerRemplacement(dependances: DependancesRemplacement, entree: unknown): Promise<Result<ReplacementWrite>> {
   return executerActionVoyage("undo-replacement", dependances, DemandeAnnulationSchema, entree, async (executeur, ctx, valeur): Promise<ReplacementWrite | null> => {

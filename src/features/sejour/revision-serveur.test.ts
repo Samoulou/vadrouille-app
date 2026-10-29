@@ -11,7 +11,7 @@ import { RevisionPreviewSchema, type Day, type ReplacementOffer, type Replacemen
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { applyProgramme, createMemoryProgramme, createMemoryProgrammeStore, programmeReducer, sendToMemoryStore, type ProgrammeState } from "./programme";
-import { createServerRevision, createServerRevisionStore, jourDApercu, syncServerRevisionVersion, type ServerRevisionCalls } from "./revision-serveur";
+import { createServerRevision, createServerRevisionStore, syncServerRevisionVersion, type ServerRevisionCalls } from "./revision-serveur";
 
 /**
  * Révision enregistrée de l'écran 14 sur `api` (tâche M1g, PR 869) : aperçu repris du brouillon du moteur (serveur),
@@ -99,26 +99,6 @@ function setup(reponses: { offer?: Result<ReplacementOffer>; apply?: Result<Repl
 const REQUETE = { stopId: DINER, reason: "notMyStyle", baseVersion: 1 } as const;
 
 describe("révision enregistrée : fonctions pures (PR 869)", () => {
-  it("PR 869 : jourDApercu retire `commitment` des engagements qui ne bougent pas, et seulement ce champ (comportement fixé, question au Tech Lead)", () => {
-    const brouillon = jourDuBrouillon();
-    const tattoo = (day: Day) => day.items.flatMap((item) => (item.type === "stop" && item.stop.id === "j1-tattoo" ? [item.stop] : []))[0]!;
-    expect(tattoo(brouillon).commitment).toBe("ticket");
-    const apercu = jourDApercu(brouillon);
-    const sansEngagement: Stop = { ...tattoo(brouillon) };
-    delete sansEngagement.commitment;
-    expect(tattoo(apercu)).toEqual(sansEngagement);
-    expect(tattoo(apercu).locked).toBe(true);
-    // Toutes les autres lignes, et le jour lui-même, sont inchangés.
-    expect({ ...apercu, items: apercu.items.filter((i) => !(i.type === "stop" && i.stop.id === "j1-tattoo")) }).toEqual({
-      ...brouillon,
-      items: brouillon.items.filter((i) => !(i.type === "stop" && i.stop.id === "j1-tattoo")),
-    });
-    // Sans lui, le contrat refuse le jour du brouillon (un engagement dans `days`, 0016 § 4.2).
-    const base = { kind: "replace", id: "r", baseVersion: 1, changes: [], changedStopIds: [NOUVELLE.id], targetStopId: NOUVELLE.id, proposal: NOUVELLE, fromReserve: true } as const;
-    expect(RevisionPreviewSchema.safeParse({ ...base, days: [brouillon] }).success).toBe(false);
-    expect(RevisionPreviewSchema.safeParse({ ...base, days: [apercu] }).success).toBe(true);
-  });
-
   it("PR 869 : la version relue ne fait jamais reculer celle des écritures", () => {
     const store = createServerRevisionStore(3);
     syncServerRevisionVersion(store, 2);
@@ -136,13 +116,14 @@ describe("révision enregistrée : aperçu, application et annulation (PR 869)",
     if (!result.ok) throw new Error(result.error);
     const preview = RevisionPreviewSchema.parse(result.preview);
     expect(preview).toMatchObject({ kind: "replace", baseVersion: 1, targetStopId: NOUVELLE.id, changedStopIds: [NOUVELLE.id], fromReserve: true });
-    // Changements du moteur tels quels (trajet compris) ; jour du brouillon sans le champ `commitment` du Tattoo.
+    // Changements du moteur tels quels (trajet compris) ; jour du brouillon tel quel, engagement intact du Tattoo compris.
     expect(preview.changes).toEqual(OFFRE.status === "offer" ? OFFRE.draft.changes : []);
-    expect(preview.days).toEqual([jourDApercu(jourDuBrouillon())]);
+    expect(preview.days).toEqual([jourDuBrouillon()]);
     const segment = preview.days[0]?.items.find((item) => item.type === "segment" && item.segment.minutes === 12);
     expect(segment).toBeDefined();
     const tattoo = preview.days[0]?.items.find((item) => item.type === "stop" && item.stop.id === "j1-tattoo");
     expect(tattoo?.type === "stop" && tattoo.stop.locked).toBe(true);
+    expect(tattoo?.type === "stop" && tattoo.stop.commitment).toBe("ticket");
     expect(shown()).toBe(edimbourg);
     expect(afterWrite).not.toHaveBeenCalled();
   });

@@ -153,6 +153,14 @@ describe("double de relectures : table des quatre voyages simulés (B6a point 7 
     expect([...complete.durees.keys()].filter((cle) => cle.startsWith("mock_place_jardin_botanique|") && cle.includes("old_town_diner_2"))).toEqual([]);
   });
 
+  it("PR 869 : la proposition du brouillon simulé de remplacement reçoit les durées de ce brouillon, sans conflit", () => {
+    // « [Dégustation…] » à la place de « [Dean Village] » (J2) : 25 min à pied depuis le Royal Mile, 10 min vers le déjeuner.
+    expect(complete.durees.get("mock_place_royal_mile|mock_place_epicerie_stockbridge|walk")).toBe(25);
+    expect(complete.durees.get(`mock_place_epicerie_stockbridge|${lieuDeTest("j2-dejeuner")}|walk`)).toBe(10);
+    expect(complete.plages.get("mock_place_epicerie_stockbridge")?.get("2026-08-30")).toEqual([{ debut: 0, fin: 2880 }]);
+    expect(complete.conflits).toEqual([]);
+  });
+
   it("une étape que mock marque toConfirm a des plages inconnues", () => {
     const marquees = VOYAGES_SIMULES.flatMap(({ trip }) =>
       trip.days.flatMap((day) => day.items.flatMap((item) => (item.type === "stop" && item.stop.exceptions.includes("toConfirm") ? [{ lieu: lieuConverti(item.stop), date: day.date }] : []))),

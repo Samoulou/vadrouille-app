@@ -491,25 +491,32 @@ export function TripShell({
     },
     [clearHighlight],
   );
+  // « Annuler » de la révision enregistrée (PR 869) : le toast reste affiché pendant l'appel (pas de clignotement), le
+  // surlignage n'est retiré qu'après un succès, et un second appui pendant l'attente est ignoré.
+  const undoing = useRef(false);
+  const undoButton = useRef<HTMLButtonElement>(null);
   const onUndo = useCallback(async () => {
     const current = toast;
-    setToast(null);
-    clearHighlight();
+    if (current === null || undoing.current) return;
+    undoing.current = true;
     try {
       await actions.undo();
     } catch {
-      // Annulation refusée ou réseau perdu (révision enregistrée, PR 869) : la modification reste, et reste annulable. Le
-      // toast revient avec l'annonce de l'échec (`role="status"` de sa région) et le focus sur « Annuler ».
+      // Annulation refusée ou réseau perdu : la modification reste, et reste annulable. Le toast revient (délai relancé)
+      // avec l'annonce de l'échec (`role="status"` de sa région) et le focus sur « Annuler ».
       toastId.current += 1;
-      setToast({ id: toastId.current, message: messages.revision.annulationEchouee, afterUndo: current?.afterUndo, refocus: true });
+      setToast({ id: toastId.current, message: messages.revision.annulationEchouee, afterUndo: current.afterUndo, refocus: true });
       return;
+    } finally {
+      undoing.current = false;
     }
-    current?.afterUndo?.();
+    setToast((shown) => (shown?.id === current.id ? null : shown));
+    clearHighlight();
+    current.afterUndo?.();
   }, [actions, toast, clearHighlight]);
-  // Focus rendu à « Annuler » du toast revenu après un échec (le bouton cliqué a quitté le DOM avec l'ancien toast).
+  // Focus rendu à « Annuler » du toast revenu après un échec (le toast est remonté, son bouton est neuf).
   useEffect(() => {
-    if (!toast?.refocus) return;
-    document.querySelector<HTMLButtonElement>("[data-undo-toast] button")?.focus();
+    if (toast?.refocus) undoButton.current?.focus();
   }, [toast]);
 
   const [replaceOrigin, setReplaceOrigin] = useState<string | null>(null);
@@ -624,6 +631,7 @@ export function TripShell({
           key={toast.id}
           message={toast.message}
           onUndo={onUndo}
+          undoRef={undoButton}
           onExpire={() => setToast(null)}
           className="pointer-events-auto"
         />

@@ -66,8 +66,9 @@ interface DraftShape {
 
 /**
  * Raffinements d'un brouillon et d'un aperçu (0016 § 4.2) : jours distincts ; `changedStopIds` et `targetStopId`
- * désignent une étape de `days` ; aucune étape n'est un engagement (0015 § 9) ; la proposition d'un remplacement
- * est l'étape visée.
+ * désignent une étape de `days` ; une révision ne crée ni ne touche aucun engagement (0015 § 9) : ni l'étape visée ni
+ * une étape changée n'en porte, une étape intacte du jour garde le sien (décision 0145 § 2) ; la proposition d'un
+ * remplacement est l'étape visée.
  */
 function refineDraft(draft: DraftShape, ctx: z.RefinementCtx): void {
   const indexes = draft.days.map((day) => day.index);
@@ -82,8 +83,9 @@ function refineDraft(draft: DraftShape, ctx: z.RefinementCtx): void {
   if (!ids.has(draft.targetStopId)) {
     ctx.addIssue({ code: "custom", message: "targetStopId : étape absente de days", path: ["targetStopId"] });
   }
-  if (stops.some((stop) => stop.commitment !== undefined)) {
-    ctx.addIssue({ code: "custom", message: "une révision ne crée jamais d'engagement (commitment interdit)", path: ["days"] });
+  const touchees = new Set([draft.targetStopId, ...draft.changedStopIds]);
+  if (stops.some((stop) => touchees.has(stop.id) && stop.commitment !== undefined)) {
+    ctx.addIssue({ code: "custom", message: "une révision ne crée ni ne touche d'engagement (commitment interdit sur l'étape visée et les étapes changées)", path: ["days"] });
   }
   if (draft.proposal && draft.proposal.id !== draft.targetStopId) {
     ctx.addIssue({ code: "custom", message: "remplacement : targetStopId === proposal.id", path: ["targetStopId"] });
@@ -209,15 +211,15 @@ export type ApplyResult = { ok: true; version: number } | { ok: false; error: "c
  *
  * - `offer` : brouillon calculé par le moteur (`appliquerPatch`, opération `replace`) sur la version `version` : jours
  *   touchés recomposés comme une lecture (durées comprises), changements, étape proposée ; `candidateId` est l'identifiant
- *   du candidat (`candidates.id`) que l'application reprend. Brouillon **non raffiné** : un jour touché peut garder un
- *   engagement intact (question au Tech Lead, PR 869) ;
+ *   du candidat (`candidates.id`, décision 0145 § 1) que l'application reprend. Brouillon raffiné comme un aperçu
+ *   (`refineDraft`) : un jour touché garde ses engagements intacts (décision 0145 § 2) ;
  * - `noOption` : aucune proposition compatible, ou le moteur refuse ; `conflict` : la version de base n'est plus la
  *   version courante ; `lockedStop` : l'étape est verrouillée.
  */
 const VersionReponseSchema = z.number().int().nonnegative();
 
 export const ReplacementOfferSchema = z.discriminatedUnion("status", [
-  z.strictObject({ status: z.literal("offer"), version: VersionReponseSchema, candidateId: IdSchema, draft: ReplacementDraftBaseSchema }),
+  z.strictObject({ status: z.literal("offer"), version: VersionReponseSchema, candidateId: IdSchema, draft: ReplacementDraftSchema }),
   z.strictObject({ status: z.literal("noOption") }),
   z.strictObject({ status: z.literal("conflict"), currentVersion: VersionReponseSchema }),
   z.strictObject({ status: z.literal("lockedStop") }),

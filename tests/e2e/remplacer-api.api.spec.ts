@@ -6,7 +6,7 @@ import { ADRESSE_REMPLACER } from "../support/bout-en-bout-api";
 
 import { codeCells, connexionRoute, emailField, firstCell, pasteCode } from "./connexion-helpers";
 import { R17 } from "./mes-voyages-helpers";
-import { applyButton, askProposal, proposalTitle, replaceTitle } from "./revision-helpers";
+import { applyButton, askProposal, changes, proposalTitle, replaceTitle } from "./revision-helpers";
 import { sheet } from "./sejour-helpers";
 
 /**
@@ -26,13 +26,14 @@ const test = base.extend<{ urlMock: string }>({
   },
 });
 
-// Les deux scénarios écrivent dans la même organisation, dans cet ordre.
+// Les trois scénarios écrivent dans la même organisation, dans cet ordre.
 test.describe.configure({ mode: "serial" });
 
 const API_MAILPIT = "http://127.0.0.1:8025/api/v1";
 const UUID = "[0-9a-f-]{36}";
 const ANCIEN = "[Bonne table de l'Old Town]";
 const NOUVEAU = "[Bistrot de Victoria Street]";
+const DEGUSTATION = "[Dégustation dans une épicerie fine de Stockbridge]";
 
 async function identifiantsMailpit(request: APIRequestContext, adresse: string): Promise<string[]> {
   const reponse = await request.get(`${API_MAILPIT}/search`, { params: { query: `to:${adresse}`, limit: "50" } });
@@ -112,7 +113,7 @@ test("PR 869 : remplacer le dîner du J1 sur api, relu sur le serveur, puis annu
     } else await route.continue();
   });
   await toast(page).getByRole("button", { name: "Annuler" }).click();
-  await expect(toast(page)).toContainText("L'annulation n'a pas abouti. Ta modification est toujours là.");
+  await expect(toast(page)).toContainText("L'annulation n'a pas abouti. Ta modification est toujours là. Réessaie avec Annuler.");
   await expect(toast(page).getByRole("button", { name: "Annuler" })).toBeFocused();
   await expect(etape(page, NOUVEAU)).toBeVisible();
   await page.unroute("**/*");
@@ -149,4 +150,27 @@ test("PR 869 : remplacement appliqué puis rechargé sans annuler : le serveur s
   // L'ancienne étape n'est plus au programme : son écran 14 répond introuvable.
   const reponse = await page.goto(`${jour1}/remplacer/j1-diner`);
   expect(reponse?.status()).toBe(404);
+});
+
+test("PR 869 : remplacer Dean Village (J2) : « Ce qui change » montre les trajets et le budget du moteur", async ({ page, request }) => {
+  test.setTimeout(180_000);
+  await connecter(page, request, ADRESSE_REMPLACER);
+  const id = await edimbourg(page);
+  const jour2 = `/voyages/${id}/jour/2`;
+
+  await page.goto(`${jour2}/remplacer/j2-dean-village`);
+  await expect(replaceTitle(page)).toBeFocused();
+  await askProposal(page, "Trop chargé");
+  await expect(proposalTitle(page)).toHaveText(DEGUSTATION);
+  // Lignes du moteur (durées du double, celles du brouillon simulé) : 20 → 25 min et 15 → 10 min, budget + 15.
+  const lignes = changes(page).locator("li");
+  await expect(lignes.filter({ hasText: DEGUSTATION }).filter({ hasText: "20 min" })).toContainText("25 min");
+  await expect(lignes.filter({ hasText: "[Café de Stockbridge]" }).filter({ hasText: "15 min" })).toContainText("10 min");
+  await expect(changes(page).locator("[data-change='budget']")).toContainText("15");
+
+  await applyButton(page).click();
+  await expect(page).toHaveURL((url) => url.pathname === jour2);
+  await expect(toast(page)).toContainText("Modifié.");
+  await page.reload();
+  await expect(etape(page, DEGUSTATION)).toBeVisible();
 });

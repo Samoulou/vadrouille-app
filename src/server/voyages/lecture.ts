@@ -680,7 +680,7 @@ function logementsDesJours(jours: readonly DaySnapshot[], logements: readonly (s
   });
 }
 
-// --- Révision enregistrée (M1g, PR 869) ---------------------------------------------------------------------------
+// --- Révision enregistrée (M1g, PR 869 ; découpage admis par la décision 0145 § 3) ---------------------------------
 
 /**
  * Ce qu'une révision lit comme la lecture (tâche M1g, PR 869 : `src/server/versions/remplacement.ts`) : version courante et

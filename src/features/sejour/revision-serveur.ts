@@ -1,4 +1,4 @@
-import type { ApplyResult, Day, ReplacementOffer, ReplacementWrite, Result, RevisionPreview, RevisionResult, Stop } from "@/contracts";
+import type { ApplyResult, Day, ReplacementOffer, ReplacementWrite, Result, RevisionPreview, RevisionResult } from "@/contracts";
 import { applyReplacement, previewReplacement, undoReplacement } from "@/server/actions/remplacement";
 
 import type { MemoryProgramme, ProgrammeActions } from "./programme";
@@ -20,24 +20,6 @@ import { abortReason, type RevisionActions } from "./revision";
  *
  * Rien n'est écrit dans le navigateur ; un `requestId` par écriture (idempotence côté serveur).
  */
-
-/**
- * Jour montré dans l'aperçu : le jour du brouillon, sans le champ `commitment` des engagements qui ne bougent pas
- * (`RevisionPreviewSchema` : une révision ne crée jamais d'engagement, décision 0016 § 4.2). L'aperçu ne lit de ses jours
- * que le jour visé, et le verrou et les badges des étapes qui ne bougent pas : rien d'affiché ne change. Le jour affiché
- * après « Appliquer » reste le brouillon entier.
- */
-export function jourDApercu(day: Day): Day {
-  return {
-    ...day,
-    items: day.items.map((item) => {
-      if (item.type !== "stop" || item.stop.commitment === undefined) return item;
-      const stop: Stop = { ...item.stop };
-      delete stop.commitment;
-      return { ...item, stop };
-    }),
-  };
-}
 
 /** Aperçu servi, gardé pour « Appliquer » : la demande à rejouer et les jours avant et après. */
 type ApercuEnAttente = {
@@ -137,7 +119,8 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
         kind: "replace",
         id: `remplacement-${store.serial}`,
         baseVersion: offer.version,
-        days: draft.days.map(jourDApercu),
+        // Jours du brouillon tels quels : les engagements intacts y restent (décision 0145 § 2).
+        days: draft.days,
         changes: draft.changes,
         changedStopIds: draft.changedStopIds,
         targetStopId: draft.targetStopId,

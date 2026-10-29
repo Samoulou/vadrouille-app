@@ -13,7 +13,8 @@ import {
   type TripSnapshot,
 } from "@/contracts";
 import { edimbourgCarte } from "@/mocks/edimbourg-carte";
-import { EDIMBOURG_DEBLOQUE_TRIP_ID, EDIMBOURG_TRIP_ID } from "@/mocks/edimbourg";
+import { EDIMBOURG_DEBLOQUE_TRIP_ID, EDIMBOURG_TRIP_ID, propositions as propositionsEdimbourg } from "@/mocks/edimbourg";
+import { edimbourgRevision } from "@/mocks/edimbourg-revision";
 import { lieuConverti, logementDeTest, tableDesRelectures, VOYAGES_SIMULES, type VoyageSimule } from "@/mocks/relectures-voyages";
 
 /**
@@ -226,6 +227,48 @@ export function convertirVoyageSimule(voyage: VoyageSimule): VoyageConverti {
   };
 }
 
+/**
+ * Réserve du jeu simulé de révision (M1g, PR 869 ; `src/mocks/edimbourg-revision.ts`) : pour Édimbourg, chaque proposition
+ * d'un brouillon de remplacement devient une proposition `deck` de plus, au créneau de l'étape remplacée (sur le modèle de
+ * la proposition de cette étape). Avec `candidats`, elle reçoit sa ligne `candidates` comme les autres. Le double de
+ * relectures lui sert les durées de son brouillon (« [Dégustation…] » à la place de « [Dean Village] » : trajets de 20 à
+ * 25 min et de 15 à 10 min). Le budget d'un jour n'est calculé que si chaque ligne a son coût (B5-PO-10) : les lignes
+ * sans coût du jour de ces brouillons reçoivent un coût de test (`COUTS_DE_TEST`, somme égale au budget de `mock`, 95), pour
+ * que le moteur rende aussi la ligne de budget (+ 15). Autre voyage : données inchangées.
+ */
+const COUTS_DE_TEST: Readonly<Record<string, number>> = { "j2-dejeuner": 25, "j2-diner": 45, "j2-concert-orgue": 25 };
+
+function avecCoutsDeTest(snapshot: TripSnapshot, jours: ReadonlySet<number>): TripSnapshot {
+  const coute = <T extends StopSnapshot>(stop: T): T => {
+    const cout = COUTS_DE_TEST[stop.id];
+    return cout === undefined || stop.facts.costPerPerson !== undefined ? stop : { ...stop, facts: { ...stop.facts, costPerPerson: cout } };
+  };
+  return TripSnapshotSchema.parse({
+    days: snapshot.days.map((day) =>
+      jours.has(day.index)
+        ? { ...day, items: day.items.map((item) => (item.type === "stop" ? { ...item, stop: coute(item.stop) } : item)), events: day.events.map(coute) }
+        : day,
+    ),
+  });
+}
+
+export function avecReserveDeRevision(mockId: string, donnees: DonneesVoyage): DonneesVoyage {
+  if (mockId !== EDIMBOURG_TRIP_ID) return donnees;
+  const jours = new Set(edimbourgRevision.replacements.flatMap(({ draft }) => draft.days.map((day) => day.index)));
+  const versions = donnees.versions.map((version) => ({ ...version, snapshot: avecCoutsDeTest(TripSnapshotSchema.parse(version.snapshot), jours) }));
+  const lignes: LigneProposition[] = edimbourgRevision.replacements.flatMap(({ stopId, draft }) => {
+    const modele = propositionsEdimbourg.find((proposal) => proposal.stop.id === stopId);
+    if (modele === undefined) return [];
+    const proposal: Proposal = { ...modele, id: `prop-${draft.proposal.id}`, stop: draft.proposal };
+    return [{ phase: "deck", position: 0, slotType: "proposal", day: modele.day, time: modele.time, kind: modele.kind, content: enregistrementConverti(proposal) }];
+  });
+  const [premier, ...autres] = donnees.runs;
+  if (premier === undefined || premier.kind !== "preview") throw new Error("réserve de révision : exécution preview attendue en premier");
+  const rang = Math.max(0, ...premier.propositions.filter((l) => l.phase === "deck").map((l) => l.position));
+  const ajoutees = lignes.map((ligne, i) => ({ ...ligne, position: rang + i + 1 }));
+  return { ...donnees, versions, runs: [{ ...premier, propositions: [...premier.propositions, ...ajoutees] }, ...autres] };
+}
+
 export function convertirVoyagesSimules(): VoyageConverti[] {
   const convertis = VOYAGES_SIMULES.map(convertirVoyageSimule);
   const erreurs = controlesPrealables(convertis);
@@ -334,9 +377,9 @@ async function simulerSejourSansNuit(admin: ExecuteurTest, stayId: string, toDat
  * Options d'écriture. `candidats` (M1g, PR 869) : chaque proposition `proposal` dont l'étape a un lieu reçoit sa ligne
  * `candidates` (champs maison de la proposition, source de test en `example.org`, notes neutres) et la désigne par
  * `proposals.candidate_id`, comme une proposition déjà vérifiée de la génération. Absente : aucune ligne `candidates` (les
- * autres scénarios ne changent pas).
+ * autres scénarios ne changent pas). `reserveDeRevision` (par `ecrireVoyagesSimules`) : voir `avecReserveDeRevision`.
  */
-export type OptionsEcriture = { readonly candidats?: boolean };
+export type OptionsEcriture = { readonly candidats?: boolean; readonly reserveDeRevision?: boolean };
 
 const FAITS_CANDIDAT = ["durationMinutes", "costPerPerson", "area"] as const;
 
@@ -507,6 +550,9 @@ export async function ecrireVoyage(executeur: ExecuteurTest, org: OrgTest, donne
 /** Écrit les quatre voyages convertis ; rend l'`uuid` de chacun par identifiant de `mock`. */
 export async function ecrireVoyagesSimules(executeur: ExecuteurTest, org: OrgTest, options: OptionsEcriture = {}): Promise<Map<string, string>> {
   const ids = new Map<string, string>();
-  for (const converti of convertirVoyagesSimules()) ids.set(converti.mockId, await ecrireVoyage(executeur, org, converti.donnees, undefined, options));
+  for (const converti of convertirVoyagesSimules()) {
+    const donnees = options.reserveDeRevision === true ? avecReserveDeRevision(converti.mockId, converti.donnees) : converti.donnees;
+    ids.set(converti.mockId, await ecrireVoyage(executeur, org, donnees, undefined, options));
+  }
   return ids;
 }
