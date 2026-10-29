@@ -1,7 +1,8 @@
 -- Amorçage des rôles de la décision 0007 (spécification B1, « Amorçage des rôles »), amendée par la décision 0046
--- (D17 point 2) : 19 rôles, dont les trois du prototype de recherche (P0r2), le rôle de purge du MVP (décision 0060
--- § 3.2, B8c), le propriétaire de la fonction des sommes de consommation (B7c, migration 0010_usage_forfait) et le
--- rôle du plafond global des e-mails (B3d, décision 0138 § 11, migration 0020_plafond_emails).
+-- (D17 point 2) : 20 rôles, dont les trois du prototype de recherche (P0r2), le rôle de purge du MVP (décision 0060
+-- § 3.2, B8c), le propriétaire de la fonction des sommes de consommation (B7c, migration 0010_usage_forfait), le
+-- rôle du plafond global des e-mails (B3d, décision 0138 § 11, migration 0020_plafond_emails) et celui des compteurs
+-- de la ville par autocomplétion (M1f-D, migration 0021_compteurs_autocompletion).
 --
 -- À exécuter UNE FOIS PAR BASE, avant les migrations, par un utilisateur qui peut créer des rôles :
 --   - en CI : le superutilisateur du conteneur postgres:17.11 (job `db`) ;
@@ -30,6 +31,10 @@ DECLARE
     -- Plafond global des e-mails (B3d ; décision 0138 § 11, T1) : sans connexion, pris par vadrouille_app par SET LOCAL
     -- ROLE ; droits sur public.email_daily_counts seulement (migration 0020_plafond_emails).
     ['vadrouille_mail_counter', 'false', '-1'],
+    -- Compteurs de la ville par autocomplétion sur la vraie app (M1f-D ; décision 0129 § 3, modèle de 0138 § 11, T1) :
+    -- sans connexion, pris par vadrouille_app par SET LOCAL ROLE ; droits sur public.autocomplete_daily_counts seulement
+    -- (migration 0021_compteurs_autocompletion).
+    ['vadrouille_autocomplete_counter', 'false', '-1'],
     ['vadrouille_fn_share', 'false', '-1'],
     ['vadrouille_fn_share_views', 'false', '-1'],
     ['vadrouille_fn_checkout', 'false', '-1'],
@@ -75,7 +80,8 @@ $$;
 GRANT vadrouille_owner TO vadrouille_migrator WITH INHERIT TRUE, SET TRUE, ADMIN FALSE;
 
 -- Appartenances sans héritage (décision 0007) : vadrouille_app ne prend ces rôles que par SET LOCAL ROLE.
-GRANT vadrouille_share, vadrouille_webhook, vadrouille_account_admin, vadrouille_limiter, vadrouille_mail_counter
+GRANT vadrouille_share, vadrouille_webhook, vadrouille_account_admin, vadrouille_limiter, vadrouille_mail_counter,
+  vadrouille_autocomplete_counter
   TO vadrouille_app WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
 
 -- Transfert de propriété (décision 0007) : vadrouille_migrator doit pouvoir accorder, le temps d'une migration,
