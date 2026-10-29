@@ -173,6 +173,22 @@ export function webServerOffenders(config: string): string[] {
   });
 }
 
+/** Clé de l'API de Resend (B3d ; décision 0138 § 2.1), nommée par clé d'objet. */
+const [CLE_RESEND = ""] = Object.keys({ RESEND_API_KEY: 0 });
+
+/**
+ * Lignes qui posent la clé Resend (toute mention hors commentaire : sa seule présence, vide comprise, est refusée au
+ * démarrage) ou `EMAIL_TRANSPORT=resend` (spécification B3d, R12 ; décision 0138 § 2.2 et § 13 : la clé n'est posée que
+ * par Samuel, dans Vercel, jamais par un fichier versionné).
+ */
+export function resendOffenders(path: string, content: string): string[] {
+  return content
+    .split("\n")
+    .flatMap((line, index) =>
+      !commentaire(line) && (line.includes(CLE_RESEND) || /\bEMAIL_TRANSPORT"?\s*[:=]\s*["']?\s*resend\b/i.test(line)) ? [`${path}:${index + 1}`] : [],
+    );
+}
+
 const tracked = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
 const configs = tracked.filter((path) => {
   const name = path.split("/").pop() ?? "";
@@ -256,6 +272,28 @@ describe("configuration versionnée : environnement du serveur (décision 0050, 
     const scripts = (JSON.parse(lire("package.json")) as { scripts: Record<string, string> }).scripts;
     expect(scripts.dev).toBe("VADROUILLE_ENV=local next dev");
     for (const [nom, commande] of Object.entries(scripts)) if (nom !== "dev") expect(commande, nom).not.toContain("VADROUILLE_ENV");
+  });
+});
+
+describe("email: aucun envoi réel par le studio (B3d, R12)", () => {
+  it("aucun fichier de configuration versionné ne pose la clé Resend ni EMAIL_TRANSPORT=resend", () => {
+    expect(configs.flatMap((path) => resendOffenders(path, lire(path)))).toEqual([]);
+  });
+
+  it("cas propres : clé ou transport resend posés → échec ; commentaire ou smtp → succès", () => {
+    expect(resendOffenders(".env.example", `${CLE_RESEND}=`)).toHaveLength(1);
+    expect(resendOffenders(PLAYWRIGHT, `        ${CLE_RESEND}: "re_x",`)).toHaveLength(1);
+    expect(resendOffenders(CI_FILE, "      EMAIL_TRANSPORT: resend")).toHaveLength(1);
+    expect(resendOffenders(".env.example", "EMAIL_TRANSPORT= Resend")).toHaveLength(1);
+    expect(resendOffenders("docker-compose.yml", '      EMAIL_TRANSPORT: "resend"')).toHaveLength(1);
+    expect(resendOffenders(".env.example", "# EMAIL_TRANSPORT=resend : posée par Samuel dans Vercel seulement")).toEqual([]);
+    expect(resendOffenders(PLAYWRIGHT, '        EMAIL_TRANSPORT: "smtp",')).toEqual([]);
+  });
+
+  it("le scénario e2e de connexion reste sur Mailpit : playwright.config.ts pose EMAIL_TRANSPORT=smtp seulement", () => {
+    const lignes = lire(PLAYWRIGHT).split("\n").filter((line) => /EMAIL_TRANSPORT/.test(line) && !commentaire(line));
+    expect(lignes.length).toBeGreaterThan(0);
+    for (const line of lignes) expect(line).toMatch(/EMAIL_TRANSPORT"?\s*:\s*"smtp"/);
   });
 });
 

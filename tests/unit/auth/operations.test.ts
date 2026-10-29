@@ -10,6 +10,7 @@ import * as moduleEnvoi from "@/server/auth/envoi";
 import * as moduleErreurs from "@/server/auth/erreurs";
 import * as moduleReprise from "@/server/auth/reprise";
 import { disabledCodeMailer } from "@/server/mail/disabled";
+import { CodeMailerCapError, CodeMailerRefusalError } from "@/server/mail/port";
 import * as moduleSession from "@/server/session";
 import * as moduleWithOrg from "@/server/with-org";
 
@@ -62,7 +63,8 @@ describe("exports", () => {
     // `executeurSql` : export ajouté par B7c (ticket 449, PR 454), conservé à la fusion de main.
     expect(Object.keys(moduleWithOrg).sort()).toEqual(["WithOrgContextError", "creerWithOrg", "executeurSql", "withOrg"]);
     expect(Object.keys(moduleSession).sort()).toEqual(["creerContexteServeur", "getServerRequestContext"]);
-    expect(Object.keys(moduleErreurs).sort()).toEqual(["ERREURS_BIBLIOTHEQUE", "codeEchec"]);
+    // B3d (M2a, point 4) : tableau distinct des erreurs du port d'envoi, d'une ligne.
+    expect(Object.keys(moduleErreurs).sort()).toEqual(["ERREURS_BIBLIOTHEQUE", "ERREURS_ENVOI", "codeEchec", "codeEchecEnvoi"]);
     expect(Object.keys(moduleConfig).sort()).toEqual(["BETTER_AUTH_CONFIG"]);
   });
 });
@@ -85,6 +87,18 @@ describe("erreurs", () => {
     expect(moduleErreurs.codeEchec("TOO_MANY_ATTEMPTS")).toBe("too_many_attempts");
     for (const inconnu of [undefined, "", "USER_NOT_FOUND", "toString", "__proto__", "constructor", "invalid_otp"]) {
       expect(moduleErreurs.codeEchec(inconnu)).toBeUndefined();
+    }
+  });
+});
+
+describe("erreurs du port d'envoi (B3d, point 4)", () => {
+  it("une seule ligne : l'erreur de plafond donne email_cap_reached ; toute autre erreur, rien (provider_error)", () => {
+    expect(moduleErreurs.ERREURS_ENVOI).toHaveLength(1);
+    expect(Object.isFrozen(moduleErreurs.ERREURS_ENVOI)).toBe(true);
+    expect(moduleErreurs.codeEchecEnvoi(new CodeMailerCapError())).toBe("email_cap_reached");
+    const imitation = Object.assign(new Error("Plafond des envois du jour atteint."), { name: "CodeMailerCapError" });
+    for (const autre of [undefined, null, new CodeMailerRefusalError(), new Error("x"), imitation, { name: "CodeMailerCapError" }, "CodeMailerCapError"]) {
+      expect(moduleErreurs.codeEchecEnvoi(autre)).toBeUndefined();
     }
   });
 });

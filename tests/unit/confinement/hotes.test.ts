@@ -28,3 +28,22 @@ describe("confinement: hôtes de main couverts par leurs lignes, et seulement pa
     });
   }
 });
+
+// B3d (M2a ; spécification B3d, point 8, « Non-régression » ; décision 0138 § 9, ligne 10) : l'hôte de Resend et `fetch`
+// ne sont admis que dans l'implémentation Resend ; la même source à côté, dans `src/server/mail/`, est refusée.
+describe("confinement: hôte de Resend et fetch admis dans le seul module d'envoi réel", () => {
+  const fichier = "src/server/mail/resend.ts";
+  const source = lireFichier(fichier);
+
+  it("à sa place : ni hôte ni capacité refusés", () => {
+    const chez = refusDuCas({ id: fichier, chemin: fichier, source, attendu: "admis" }, depot);
+    expect(chez).toEqual([]);
+  });
+
+  it("dans un autre fichier de src/server/mail/ : hôte et fetch refusés", () => {
+    const ailleurs = "src/server/mail/autre-envoi.ts";
+    const deplace = refusDuCas({ id: ailleurs, chemin: ailleurs, source, attendu: "refus", regle: "hote" }, depot);
+    expect(deplace.some((c) => c.regle === "hote")).toBe(true);
+    expect(deplace.some((c) => c.capacite === "identifiant:fetch")).toBe(true);
+  });
+});

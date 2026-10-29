@@ -480,6 +480,18 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
     ecart: "module de capacité réseau de B4a (décision 0097 B4-TL-7), webhook simulé ouvert en `local` et `ci` seulement : verdict Sécurité : approuvé, revue du head d50acfa (PR 582)",
   },
+  // B3d (M2a ; spécification B3d, point 8 ; décision 0138 § 9, ligne 4A). Verdict Sécurité : approuvé par la Sécurité sur le head 68d6e69.
+  {
+    fichier: "src/server/mail/resend.ts",
+    portee: "application",
+    usage:
+      "transport réel de l'envoi du code de connexion (B3d, M2a) : `POST` vers la constante d'API de Resend, `redirect: \"error\"`, " +
+      "`credentials: \"omit\"`, `cache: \"no-store\"`, délai de 10 s au plus, `fetch` global seulement comme valeur par défaut du " +
+      "paramètre injecté ; corps construit depuis la copie contrôlée par `checkEnvelope`. Justification côté serveur : module " +
+      "`server-only`, importé hors des tests par `src/server/auth/index.ts` seulement (test du dépôt, ligne 7b)",
+    capacites: [{ capacite: "identifiant:fetch", formes: ["reference"], nombre: 1 }],
+    ecart: "module de capacité réseau de B3d (décision 0138 § 1.1), cas admis de 0138 § 3 seulement : verdict Sécurité : approuvé par la Sécurité sur le head 68d6e69",
+  },
 ] as const satisfies readonly LigneCapacite[];
 
 /** Lignes de textes (hôtes, fragments, noms secrets), lues dans les données du régime. */

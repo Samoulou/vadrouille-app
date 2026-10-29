@@ -62,6 +62,17 @@ export const LOG_EVENTS = [
   "email.transport_disabled",
   // B3b-envoi (critères E5 et E6) : enveloppe refusée par `checkEnvelope` avant tout appel du transport ; aucune valeur.
   "email.envelope_refused",
+  // B3d (M2a ; spécification B3d, point 6 ; décision 0138 § 4 point 2) : envoi réel accepté par Resend (`usage`), refusé
+  // par le plafond global du jour (`usage`), refusé par Resend ou en échec de transport (`reason`, `LOG_EMAIL_PROVIDER_REASONS`),
+  // refusé avant tout contact de Resend par la barrière de sortie, le cas admis ou la forme de la clé (`reason`,
+  // `LOG_EMAIL_TRANSPORT_REASONS`). Aucune valeur : ni adresse, ni code, ni clé, ni corps, ni identifiant de message.
+  "email.sent",
+  "email.cap_reached",
+  "email.provider_refused",
+  "email.transport_refused",
+  // B3d (revue de la PR 850, mineur 1) : purge des jours échus du plafond global en échec, après le transport ; `errorName`
+  // seulement, comme `rate_limit.purge_failed`. La réservation reste acceptée.
+  "email.purge_failed",
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",
@@ -246,6 +257,11 @@ export type LogFields = {
   readonly googleCode?: string;
   /** Code HTTP d'une réponse de Google autre que 200 (`p0.ville_refusee`) : entier de 100 à 599, jamais le corps. */
   readonly httpStatus?: number;
+  /**
+   * Usage d'un envoi d'e-mail (`email.sent`, `email.cap_reached`, B3d point 6) : `LOG_EMAIL_USAGES`, copie d'`EMAIL_USAGES`
+   * (`src/server/config/email.ts`) ; retiré sur tout autre événement.
+   */
+  readonly usage?: string;
 };
 
 /**
@@ -259,6 +275,7 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     VADROUILLE_ENV: 0,
     VERCEL_ENV: 0,
     VERCEL: 0,
+    VERCEL_TARGET_ENV: 0,
     HOSTNAME: 0,
     AUTH_ADAPTER: 0,
     TRUSTED_IP_HEADER: 0,
@@ -288,6 +305,8 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     P0_REAL_RUNS: 0,
     P0_RUN_TOKEN: 0,
     "P0_*": 0,
+    RESEND_API_KEY: 0,
+    "NEXT_PUBLIC_*RESEND*": 0,
   }),
 );
 
@@ -492,6 +511,29 @@ export const LOG_GOOGLE_CODES: readonly string[] = [
 ];
 const CODES_GOOGLE: ReadonlySet<string> = new Set(LOG_GOOGLE_CODES);
 /**
+ * Raisons de `email.provider_refused` (B3d point 6 ; 0138 § 7) : copie de `RAISONS_ECHEC_RESEND`
+ * (`src/server/mail/reponses-resend.ts`) ; égalité vérifiée par le test de l'implémentation Resend.
+ */
+export const LOG_EMAIL_PROVIDER_REASONS: readonly string[] = [
+  "quota",
+  "rate_limited",
+  "auth",
+  "recipient_refused",
+  "invalid_request",
+  "server_error",
+  "timeout",
+  "network",
+];
+/**
+ * Raisons de `email.transport_refused` (0138 § 4 point 2) : copie de `RAISONS_REFUS_TRANSPORT`
+ * (`src/server/env/cle-resend.ts`, que ce module n'importe pas : `ligne/server-env-imports`) ; égalité vérifiée par le
+ * test du module de la clé.
+ */
+export const LOG_EMAIL_TRANSPORT_REASONS: readonly string[] = ["egress_refused", "not_admitted", "key_invalid"];
+/** Usages d'un envoi (B3d point 3) : copie d'`EMAIL_USAGES` ; égalité vérifiée par le test de l'implémentation Resend. */
+export const LOG_EMAIL_USAGES: readonly string[] = ["connexion", "notification"];
+const USAGES_EMAIL: ReadonlySet<string> = new Set(LOG_EMAIL_USAGES);
+/**
  * Liste de `reason` admise **par événement** (mineur 3 de la revue du head 244b81a) : une raison d'un autre événement est
  * retirée. Un événement absent de la table n'admet aucune `reason`.
  */
@@ -501,6 +543,8 @@ const RAISONS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map(
   ["voyages.fiches_non_relues", RAISONS_FICHES],
   ["voyages.positions_non_ecrites", RAISONS_POSITIONS],
   ["p0.ville_refusee", RAISONS_VILLE],
+  ["email.provider_refused", new Set(LOG_EMAIL_PROVIDER_REASONS)],
+  ["email.transport_refused", new Set(LOG_EMAIL_TRANSPORT_REASONS)],
 ]);
 /**
  * Phases admises dans `phase` (`p0.step_failed`, ticket 493, décision 0090 § 3 point 4) : celles de
@@ -714,12 +758,14 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
 /**
  * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee`
  * seulement (constat du 2026-10-25 ; verdict 0122 § 2.1 point 4 : aucun statut sur la ligne des sites) ; `failureCode`
- * sur `p0.step_failed` (ticket 493) et `p0.read_unavailable` (décision 0137 § 2) seulement.
+ * sur `p0.step_failed` (ticket 493) et `p0.read_unavailable` (décision 0137 § 2) seulement ; `usage` sur `email.sent` et
+ * `email.cap_reached` seulement (B3d point 6).
  */
 const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlySet<string>; readonly controle: (valeur: unknown) => boolean }> = new Map([
   ["googleCode", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
   ["httpStatus", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
   ["failureCode", { evenements: new Set(["p0.step_failed", "p0.read_unavailable"]), controle: (v: unknown) => chaine(v) && CODES_ETAPE.has(v) }],
+  ["usage", { evenements: new Set(["email.sent", "email.cap_reached"]), controle: (v: unknown) => chaine(v) && USAGES_EMAIL.has(v) }],
 ]);
 
 const EVENEMENTS: ReadonlySet<string> = new Set(LOG_EVENTS);

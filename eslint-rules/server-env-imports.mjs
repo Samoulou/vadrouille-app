@@ -67,6 +67,9 @@ export const IMPORTATEURS_ADMIS = new Map([
   // B9c (décision 0081 B9-TL-8) : déclarations de déploiement de la barrière des appels réels, lues à l'appel par la
   // barrière seule ; aucune clé n'y est lue. Verdict Sécurité : attendu.
   ["generation", ["src/server/generation/barriere.ts"]],
+  // B3d (M2a ; décision 0138 § 2.4 et § 9, ligne 7) : clé de l'API de Resend, lue à chaque envoi par `cleResend` après
+  // la barrière de sortie et le cas admis, par l'implémentation Resend du port seulement ; son test injecte la lecture.
+  ["cle-resend", ["src/server/mail/resend.ts"]],
 ]);
 
 /** Module de `src/server/env/` visé par une source, ou `null` (chemin relatif au dépôt de l'importateur). */

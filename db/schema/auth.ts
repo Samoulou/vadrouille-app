@@ -1,7 +1,7 @@
 import "server-only";
 
 import { sql } from "drizzle-orm";
-import { boolean, check, index, integer, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, index, integer, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 import { uniqueKeyName } from "./naming.ts";
 
@@ -128,4 +128,20 @@ export const actionRateLimits = pgTable(
     index("action_rate_limits_expires_at_idx").on(t.expiresAt),
     check("action_rate_limits_count_check", sql`${t.count} >= 0`),
   ],
+);
+
+/**
+ * Plafond global quotidien des envois d'e-mails (spécification B3d, point 3 ; décision 0138 § 11, T1). Exception à
+ * `organization_id` : compteur global, anonyme. Une ligne par jour civil UTC posé par la base, une colonne par usage
+ * (`EMAIL_USAGES` de `src/server/config/email.ts`) ; aucune adresse, aucun hachage, aucun identifiant d'organisation.
+ * RLS, droits et rôle `vadrouille_mail_counter` : `db/migrations/0020_plafond_emails.sql`.
+ */
+export const emailDailyCounts = pgTable(
+  "email_daily_counts",
+  {
+    day: date("day").primaryKey(),
+    connexion: integer("connexion").notNull().default(0),
+    notification: integer("notification").notNull().default(0),
+  },
+  (t) => [check("email_daily_counts_counts_check", sql`${t.connexion} >= 0 AND ${t.notification} >= 0`)],
 );
