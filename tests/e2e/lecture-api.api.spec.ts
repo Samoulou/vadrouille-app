@@ -104,6 +104,12 @@ async function sejourComparable(page: Page): Promise<{ rendu: string; aFaire: st
   return { rendu: sansBudget(rendu), aFaire: [...aFaire].sort() };
 }
 
+/** Lignes « Jour par jour » du Séjour (liens des journées servies), texte normalisé, dans l'ordre de l'écran. */
+async function joursDuSejour(page: Page): Promise<string[]> {
+  const liens = await sheet(page).locator("a[data-part='jour']").allInnerTexts();
+  return liens.map((l) => sansBudget(l.replace(/\s+/g, " ").trim()));
+}
+
 /**
  * Écart fixé du J5 (critère `lecture: l'adaptateur api recompose le voyage simulé`, règle 2 (a)) : les deux trajets en
  * bus qui relient la distillerie au dîner de Leith, séparés par un temps libre, sont mesurés par la même relecture
@@ -183,11 +189,21 @@ test("écrans 11, 12 et 17 avec DATA_ADAPTER=api : même rendu que mock ; autre 
   expect(correspondance.size).toBe(4);
   for (const id of correspondance.values()) expect(id).toMatch(/^[0-9a-f-]{36}$/);
 
-  // Écran 11 : le Séjour de chacun des quatre voyages, même texte que mock.
+  // Écran 11 : le Séjour de chacun des quatre voyages, même texte que mock ; voyage non débloqué d'Édimbourg (`ED`) : J1 et
+  // J2 seulement (attente modifiée de l'erratum M1a-3 de 0136, PR 862 : sous la chaîne inversée, `api` ne sert avant le
+  // déblocage que les journées de l'aperçu, 0136 § 3.5 ; `mock` sert les six).
   for (const [idMock, idApi] of correspondance) {
     const reponse = await ouvrir(page, api, `/voyages/${idApi}`);
     expect(reponse?.headers()["cache-control"]).toMatch(/private.*no-store|no-store.*private/);
     await expect(sheet(page)).toBeVisible();
+    if (idMock === ED) {
+      const joursApi = await joursDuSejour(page);
+      await ouvrir(page, urlMock, `/voyages/${idMock}`);
+      await expect(sheet(page)).toBeVisible();
+      const joursMock = await joursDuSejour(page);
+      expect(joursApi, `Séjour ${idMock} : journées servies`).toEqual(joursMock.slice(0, 2));
+      continue;
+    }
     const renduApi = await sejourComparable(page);
     await ouvrir(page, urlMock, `/voyages/${idMock}`);
     await expect(sheet(page)).toBeVisible();
@@ -195,9 +211,15 @@ test("écrans 11, 12 et 17 avec DATA_ADAPTER=api : même rendu que mock ; autre 
   }
 
   // Écran 12 : chaque Journée d'Édimbourg et de son pendant débloqué. J5 : écart fixé (70 et 70 au lieu de 50 et 20).
+  // `ED` non débloqué : Journées 3 à 6 introuvables sur `api` (erratum M1a-3 de 0136, PR 862).
   for (const idMock of [ED, ED_OK]) {
     for (const day of edimbourg.days) {
       const chemin = (id: string) => `/voyages/${id}/jour/${day.index}`;
+      if (idMock === ED && day.index > 2) {
+        await ouvrir(page, api, chemin(correspondance.get(idMock) as string), 404);
+        await expect(page.getByRole("heading", { level: 1, name: NOT_FOUND_TITLE })).toBeVisible();
+        continue;
+      }
       await ouvrir(page, api, chemin(correspondance.get(idMock) as string));
       await expect(sheet(page)).toBeVisible();
       const renduApi = sansBudget(await texte(page, body));

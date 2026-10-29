@@ -74,6 +74,35 @@ export function selectionApercu<E extends EtapeLue = EtapeLue>(jours: readonly J
   return { etapes, jours: lisibles };
 }
 
+/** Étape retenue pour une case de la chaîne inversée : un `placeId` et une `reason` non vide (décision 0136 § 3.4). */
+export const etapeAncreeEtRedigee = (stop: { readonly placeId?: string; readonly reason?: string }): boolean =>
+  stop.placeId !== undefined && stop.reason !== undefined && stop.reason.trim() !== "";
+
+/** Étape lue par `retenirApercu` : identifiant, lieu, raison et heure de début (étape du voyage ou de l'instantané). */
+export type EtapeRetenue = EtapeLue & { readonly placeId?: string; readonly reason?: string; readonly start: string };
+
+/**
+ * Fabrique du prédicat `retenir` de `selectionApercu` pour la chaîne inversée (décision 0136 § 3.4 et § 3.5), **la même** à
+ * l'écriture des cases (`src/server/generation/cases-programme.ts`, M1a-2) et à la lecture avant le déblocage
+ * (`src/server/voyages/lecture.ts`, M1a-3) : une étape ancrée et rédigée (`etapeAncreeEtRedigee`) dont le créneau (jour, heure
+ * de début) n'est pas déjà pris par une étape retenue (le contrat `PreviewSlotsSchema` interdit deux cases au même créneau).
+ * Le prédicat **garde un état** (les créneaux pris) : une fabrique neuve par sélection, appelée sur les étapes dans l'ordre
+ * de `selectionApercu`. Déplacée de `cases-programme.ts` par M1a-3 (la lecture de `src/server/voyages` n'atteint pas
+ * `src/server/generation`, règle `ligne/creation-imports`), sans changement de comportement.
+ */
+export function retenirApercu<E extends EtapeRetenue>(jours: readonly JourLu<E>[]): (stop: E) => boolean {
+  const jourDeLEtape = new Map<string, number>();
+  for (const jour of jours) for (const ligne of jour.items) if (ligne.type === "stop" && ligne.stop !== undefined) jourDeLEtape.set(ligne.stop.id, jour.index);
+  const pris = new Set<string>();
+  return (stop) => {
+    if (!etapeAncreeEtRedigee(stop)) return false;
+    const creneau = `${jourDeLEtape.get(stop.id) ?? 0}|${stop.start}`;
+    if (pris.has(creneau)) return false;
+    pris.add(creneau);
+    return true;
+  };
+}
+
 /** Partie commune d'une case tirée d'une étape : ce que les deux chemins lisent des mêmes données (0136 § 1.7). */
 export interface EtapeEnCase {
   readonly id: string;
@@ -108,16 +137,22 @@ export function etapeEnCase(jour: Day, rang: number): EtapeEnCase | null {
   };
 }
 
+/** Journée lue par `servisAvantDeblocage` : `Day` recomposé (site d'essai) ou journée de l'instantané (`api`, M1a-3). */
+export type JourServi = Pick<Day, "index"> & {
+  readonly items: readonly ({ readonly type: "stop"; readonly stop: { readonly id: string } } | { readonly type: Exclude<DayLineItem["type"], "stop"> })[];
+  readonly events: readonly { readonly id: string }[];
+};
+
 /**
  * Journées et lignes « À faire » servies avant le déblocage : journées hors de `lisibles` retirées ; lignes « À faire »
  * retirées si elles désignent une journée retirée (`when.type = "tripDay"`) ou une étape absente des journées gardées
  * (`stopId`, étapes et événements).
  */
-export function servisAvantDeblocage(
-  jours: readonly Day[],
+export function servisAvantDeblocage<J extends JourServi = Day>(
+  jours: readonly J[],
   aFaire: readonly ChecklistItem[],
   lisibles: ReadonlySet<number>,
-): { jours: Day[]; aFaire: ChecklistItem[] } {
+): { jours: J[]; aFaire: ChecklistItem[] } {
   const gardes = jours.filter((jour) => lisibles.has(jour.index));
   const indices = new Set(gardes.map((jour) => jour.index));
   const etapes = new Set(

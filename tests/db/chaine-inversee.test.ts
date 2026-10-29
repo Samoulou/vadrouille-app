@@ -76,8 +76,9 @@ import { closeAll, createOrg, inTx, type DbClient, type Org } from "./helpers";
 /**
  * Chaîne inversée sur `api` (M1a-2, ticket 851 ; décision 0136 § 2, § 3 et § 4 ; verdict 0139) sur la base réelle : workflow
  * `generateProgramme` déroulé sans le SDK (étapes `a` puis `e`), variante simulée sur les fixtures de Rome (`rome-1`), aucune
- * clé, aucun appel réel, aucune position écrite. La chaîne est **injectée** (`chaine: "inversee"`) : `CHAINE_APERCU` vaut
- * encore `"ancienne"` dans cette PR (M1a-3 la bascule).
+ * clé, aucun appel réel, aucune position écrite. La chaîne est **injectée** (`chaine: "inversee"`) : un jeu de dépendances
+ * injecté sans chaîne vaut `"ancienne"`, quelle que soit `CHAINE_APERCU` (`"inversee"` depuis M1a-3, 0136 § 4.2). Lecture
+ * (M1a-3, PR 862) : un test par lecteur du tableau de 0136 § 3.5, badge « à confirmer » (§ 3.6) et critère 9.
  */
 
 let base: BaseApercu;
@@ -825,7 +826,7 @@ describe("chaîne inversée : requête programme, prompts et journal", () => {
     const sortieIllisible = journalisee(() => ({ modeles: illisible }));
     expect((await derouler((await lancer(org)).etat, dependances({}, sortieIllisible.fabrique))).fin.arret).toBe("model_output_invalid");
 
-    expect(lignesDuJournal(espion, "generation.programme_written").length).toBeGreaterThanOrEqual(2);
+    expect(lignesDuJournal(espion, "generation.programme_written")).toHaveLength(3);
     expect([...lignesDuJournal(espion, "p0."), ...lignesDuJournal(erreurs, "p0.")]).toEqual([]);
   });
 
@@ -1109,5 +1110,228 @@ describe("chaine-inversee: voyage complet et recalcul clos sans écriture (0136 
       last_version: 1,
     });
     expect(await nombre(org, "trip_versions", tripId)).toBe(1);
+  });
+});
+
+// --- Lecture (M1a-3, PR 862 ; décision 0136 § 3.5, § 3.6, § 4 ; critère 9) ----------------------------------------------
+
+/** Lecture de `api` sous une chaîne nommée, sur la base notée par `textes` si on la passe. */
+function lecteur(chaine: "inversee" | "ancienne" = "inversee", textes?: string[], relectures: SourceRelectures = RELECTURES) {
+  return createApiTripAdapter({ relectures, withOrg: textes === undefined ? withOrg : creerWithOrg(baseEnregistree(textes)), chaine });
+}
+
+const debloquer = (org: Org, tripId: string) =>
+  admin.query("INSERT INTO public.entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [org.org, tripId]);
+
+/** Voyage de Rome écrit par la chaîne inversée (version 1, cinq journées, huit cases sur J1 et J2). */
+async function voyageEcrit(org: Org, fabrique?: () => FabriqueGeneration) {
+  const lance = await lancer(org);
+  expect((await derouler(lance.etat, dependances({}, fabrique))).fin.arret).toBeUndefined();
+  return lance;
+}
+
+/** Journées de l'aperçu attendues : J1 et celles des cases écrites (0136 § 3.5), lues dans `proposals`. */
+async function journeesDesCases(org: Org, tripId: string): Promise<number[]> {
+  const cases = await lire<{ day: number }>(org, "SELECT DISTINCT day FROM public.proposals WHERE trip_id = $1 AND phase = 'preview'", [tripId]);
+  return [...new Set([1, ...cases.map((c) => c.day)])].sort((a, b) => a - b);
+}
+
+/** Positions sentinelles (aucune réponse Google) pour chaque lieu de la version 1, comme le cache `place_coordinates`. */
+async function positionsDe(org: Org, snapshot: TripSnapshot) {
+  const lieux = [...new Set(snapshot.days.flatMap((j) => j.items.flatMap((l) => (l.type === "stop" && l.stop.placeId !== undefined ? [l.stop.placeId] : []))))];
+  for (const [rang, placeId] of lieux.entries()) {
+    await admin.query(
+      "INSERT INTO public.place_coordinates (organization_id, place_id, lat, lng, fetched_at, expires_at) VALUES ($1, $2, $3, 12.5, now(), now() + interval '29 days')",
+      [org.org, placeId, 41.8 + rang / 1000],
+    );
+  }
+  return lieux;
+}
+
+describe("chaîne inversée : lecture avant et après le déblocage (0136 § 3.5)", () => {
+  it("chaine-inversee: getTrip non débloqué : journées et lignes « À faire » de l'aperçu seulement ; débloqué : tout", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    const apercu = await journeesDesCases(org, tripId);
+    expect(apercu).toEqual([1, 2]);
+    // Une ligne « À faire » d'une journée hors aperçu (J4) et une ligne d'une étape de J5 : retirées avant le déblocage.
+    const j5 = (await version1(org, tripId)).days.find((j) => j.index === 5)!;
+    const etapeJ5 = j5.items.flatMap((l) => (l.type === "stop" ? [l.stop.id] : []))[0]!;
+    await admin.query(
+      `INSERT INTO public.checklist_items (id, organization_id, trip_id, kind, label, moment, sponsored, stop_id) VALUES
+       ('ffffffff-0000-4000-8000-000000000001', $1, $2, 'other', '[Le jour 4]', '{"type":"tripDay","day":4}'::jsonb, false, NULL),
+       ('ffffffff-0000-4000-8000-000000000002', $1, $2, 'other', '[Étape du jour 5]', '{"type":"beforeDeparture"}'::jsonb, false, $3)`,
+      [org.org, tripId, etapeJ5],
+    );
+    const toutes = await lire<{ id: string }>(org, "SELECT id FROM public.checklist_items WHERE trip_id = $1 ORDER BY id", [tripId]);
+
+    const avant = await lecteur().getTrip(contexteDe(org), tripId);
+    expect(avant?.unlocked).toBe(false);
+    expect(avant?.days.map((d) => d.index)).toEqual(apercu);
+    expect(avant?.checklist.map((l) => l.id)).toEqual(toutes.map((l) => l.id).filter((id) => !id.startsWith("ffffffff")));
+    expect(JSON.stringify(avant)).not.toContain(etapeJ5);
+
+    await debloquer(org, tripId);
+    const apres = await lecteur().getTrip(contexteDe(org), tripId);
+    expect(apres?.unlocked).toBe(true);
+    expect(apres?.days.map((d) => d.index)).toEqual([1, 2, 3, 4, 5]);
+    expect(apres?.checklist.map((l) => l.id)).toEqual(toutes.map((l) => l.id));
+  });
+
+  it("chaine-inversee: getDay hors aperçu : null avant le déblocage, servi après", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    let relues = 0;
+    const comptee: SourceRelectures = { pour: async (voyage, demande) => ((relues += 1), RELECTURES.pour(voyage, demande)) };
+    for (const index of [3, 4, 5]) expect(await lecteur("inversee", undefined, comptee).getDay(contexteDe(org), tripId, index)).toBeNull();
+    // Journée non servie : aucune relecture demandée.
+    expect(relues).toBe(0);
+    expect((await lecteur().getDay(contexteDe(org), tripId, 2))?.index).toBe(2);
+    await debloquer(org, tripId);
+    for (const index of [3, 4, 5]) expect((await lecteur().getDay(contexteDe(org), tripId, index))?.index).toBe(index);
+  });
+
+  it("chaine-inversee: getDayMap hors aperçu : null, aucune position lue", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    await positionsDe(org, await version1(org, tripId));
+    const textes: string[] = [];
+    expect(await lecteur("inversee", textes).getDayMap(contexteDe(org), tripId, 4)).toBeNull();
+    expect(textes.some((t) => /public\.trip_versions/.test(t))).toBe(true);
+    expect(textes.filter((t) => /place_coordinates/.test(t))).toEqual([]);
+    // Journée de l'aperçu : la carte est lue ; après le déblocage, la journée 4 aussi.
+    expect((await lecteur().getDayMap(contexteDe(org), tripId, 1))?.dayIndex).toBe(1);
+    await debloquer(org, tripId);
+    expect((await lecteur().getDayMap(contexteDe(org), tripId, 4))?.dayIndex).toBe(4);
+  });
+
+  it("chaine-inversee: getTripMap non débloqué : cartes et lieux des journées de l'aperçu seulement", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    const snapshot = await version1(org, tripId);
+    await positionsDe(org, snapshot);
+    const apercu = await journeesDesCases(org, tripId);
+    const etapesDe = (jours: readonly number[]) =>
+      new Set(snapshot.days.filter((j) => jours.includes(j.index)).flatMap((j) => j.items.flatMap((l) => (l.type === "stop" ? [l.stop.id] : []))));
+    const avant = await lecteur().getTripMap(contexteDe(org), tripId);
+    expect(avant.map((c) => c.dayIndex)).toEqual(apercu);
+    const servies = etapesDe(apercu);
+    for (const carte of avant) for (const point of carte.points) if (point.ref.type === "stop") expect(servies.has(point.ref.stopId)).toBe(true);
+    await debloquer(org, tripId);
+    expect((await lecteur().getTripMap(contexteDe(org), tripId)).map((c) => c.dayIndex)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("chaine-inversee: listTrips non débloqué : résumé strict, aucune journée ni lieu hors aperçu", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    const resumes = await lecteur().listTrips(contexteDe(org));
+    expect(resumes).toHaveLength(1);
+    expect(resumes[0]).toMatchObject({ id: tripId, unlocked: false, dayCount: 5 });
+    // Résumé strict (`TripSummarySchema`) : ni journée, ni étape, ni lieu.
+    expect(Object.keys(resumes[0]!).sort()).toEqual(
+      ["dayCount", "destination", "destinationColor", "end", "id", "start", "timeZone", "toReserveCount", "travellers", "unlocked"].sort(),
+    );
+    expect(JSON.stringify(resumes)).not.toMatch(/SENTINELLE|placeId|"days"|"items"/);
+  });
+
+  it("chaine-inversee: chaque case de l'aperçu désigne une journée servie", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    const voyages = lecteur();
+    const cases = await voyages.listPreviewSlots(contexteDe(org), tripId);
+    expect(cases).toHaveLength(8);
+    const servies = new Set((await voyages.getTrip(contexteDe(org), tripId))?.days.map((d) => d.index));
+    for (const c of cases) {
+      expect(c.type).toBe("proposal");
+      if (c.type === "proposal") {
+        expect(servies.has(c.proposal.day)).toBe(true);
+        expect(c.proposal.stop.placeId).toMatch(/\S/);
+      }
+    }
+  });
+
+  it("chaine-inversee: listProposals vide avant et après le déblocage", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    expect(await lecteur().listProposals(contexteDe(org), tripId)).toEqual([]);
+    await debloquer(org, tripId);
+    expect(await lecteur().listProposals(contexteDe(org), tripId)).toEqual([]);
+  });
+
+  it("ancienne chaîne : la lecture d'un voyage écrit par la chaîne inversée n'est pas filtrée (filtre propre à la chaîne inversée)", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    expect((await lecteur("ancienne").getTrip(contexteDe(org), tripId))?.days.map((d) => d.index)).toEqual([1, 2, 3, 4, 5]);
+    expect((await lecteur("ancienne").getDay(contexteDe(org), tripId, 4))?.index).toBe(4);
+  });
+});
+
+describe("chaîne inversée : badge « à confirmer » et temps de trajet (0136 § 3.6 ; critère 9)", () => {
+  it("chaine-inversee: une étape sans placeId est badgée à la lecture, rien n'est écrit", async () => {
+    const org = await createOrg(auth);
+    const { fabrique } = journalisee((d) => ({
+      places: {
+        ...d.places,
+        textSearch: async (requete) => (requete.texte.includes("Colisée") && !requete.texte.includes("Rione Monti") ? { placeIds: [] } : d.places.textSearch(requete)),
+      },
+    }));
+    const { tripId } = await voyageEcrit(org, fabrique);
+    await debloquer(org, tripId);
+    const ecrit = JSON.stringify(await version1(org, tripId));
+    expect(ecrit).not.toContain("toConfirm");
+
+    const trip = await lecteur().getTrip(contexteDe(org), tripId);
+    const etapes = (trip?.days ?? []).flatMap((j) => j.items.flatMap((l) => (l.type === "stop" ? [l.stop] : [])));
+    const colisee = etapes.filter((s) => s.name === "Colisée");
+    expect(colisee.length).toBeGreaterThan(0);
+    for (const stop of colisee) {
+      expect(stop.placeId).toBeUndefined();
+      expect(stop.exceptions).toContain("toConfirm");
+    }
+    // Sous l'ancienne chaîne, l'étape sans lieu n'est pas badgée (critère 14) ; les étapes ancrées gardent, sous les deux
+    // chaînes, les badges de la règle existante (`exceptionsLues`, relectures du double) : la chaîne inversée n'en ajoute aucun.
+    const ancienne = await lecteur("ancienne").getTrip(contexteDe(org), tripId);
+    const etapesAnciennes = new Map((ancienne?.days ?? []).flatMap((j) => j.items.flatMap((l) => (l.type === "stop" ? [[l.stop.id, l.stop.exceptions] as const] : []))));
+    for (const stop of colisee) expect(etapesAnciennes.get(stop.id)).not.toContain("toConfirm");
+    for (const stop of etapes.filter((s) => s.placeId !== undefined)) expect(stop.exceptions).toEqual(etapesAnciennes.get(stop.id));
+    // Rien n'est écrit : la version 1 est inchangée, aucune nouvelle version.
+    expect(JSON.stringify(await version1(org, tripId))).toBe(ecrit);
+    expect(await nombre(org, "trip_versions", tripId)).toBe(1);
+  });
+
+  it("chaine-inversee: aucun temps de trajet écrit ; Séjour et Journée 1 lus sur le relecteur simulé de Rome, sans travel_unknown", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    // Aucune durée dans l'instantané (B2, rejoué : `TripSnapshotSchema` les refuse) ni dans les cases.
+    const versions = await lire<{ snapshot: unknown }>(org, "SELECT snapshot FROM public.trip_versions WHERE trip_id = $1", [tripId]);
+    for (const v of versions) {
+      expect(TripSnapshotSchema.safeParse(v.snapshot).success).toBe(true);
+      expect(JSON.stringify(v.snapshot)).not.toMatch(/"minutes"|"travelMinutes"/);
+    }
+    const cases = await lire<{ content: unknown }>(org, "SELECT content FROM public.proposals WHERE trip_id = $1", [tripId]);
+    expect(cases).toHaveLength(8);
+    for (const c of cases) expect(JSON.stringify(c.content)).not.toMatch(/"minutes"|"travelMinutes"/);
+    // Aucune autre colonne du schéma principal ne porte de durée de trajet.
+    const colonnes = (
+      await admin.query(
+        "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND (column_name ILIKE '%minute%' OR column_name ILIKE '%trajet%' OR column_name ILIKE '%travel_time%')",
+      )
+    ).rows as { table_name: string; column_name: string }[];
+    expect(colonnes).toEqual([]);
+
+    // Lecture par la source de l'app en `ci` (relecteur simulé, jeu de Rome choisi par la ville du séjour, logement `area`).
+    const { avecVoyagesGeneresSimules } = await import("@/server/composition/lecture");
+    const repli: SourceRelectures = { pour: async () => ({ ok: false, refus: "unavailable" }) };
+    const voyages = lecteur("inversee", undefined, avecVoyagesGeneresSimules(repli, { VADROUILLE_ENV: "ci" }));
+    const sejour = await voyages.getTrip(contexteDe(org), tripId);
+    expect(sejour?.days.map((d) => d.index)).toEqual([1, 2]);
+    for (const jour of sejour?.days ?? []) {
+      expect(jour.travelMinutes).toBeGreaterThan(0);
+      for (const l of jour.items) if (l.type === "segment") expect(Number.isInteger(l.segment.minutes)).toBe(true);
+    }
+    const j1 = await voyages.getDay(contexteDe(org), tripId, 1);
+    const repas = (j1?.items ?? []).flatMap((l) => (l.type === "stop" && l.stop.kind === "meal" ? [l.stop.start] : []));
+    expect(repas.some((debut) => debut < "15:00")).toBe(true);
+    expect(repas.some((debut) => debut >= "18:00")).toBe(true);
   });
 });
