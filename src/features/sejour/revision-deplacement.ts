@@ -11,7 +11,7 @@ import { syncServerRevisionVersion, type ServerRevisionOptions } from "./revisio
  *
  * - Points d'insertion (`getMoveOptions` ; un refus ou une panne **lève** : la feuille l'affiche comme une erreur, pas comme
  *   des jours « complets »), aperçu (`previewMove` : « Ce qui change » et jours touchés calculés par le moteur avec les
- *   durées relues, décision 0153, PR #959), « Appliquer » (`applyMove`, une version de plus) ; « Annuler » du toast est
+ *   durées relues, décision 0153, PR 959), « Appliquer » (`applyMove`, une version de plus) ; « Annuler » du toast est
  *   un retour à la version de base (`applyRevert`, M5b). Un point refusé par le moteur ou qui n'existe plus rend « aucune
  *   option » ; une version dépassée, « conflit ».
  */
