@@ -8,13 +8,19 @@ import "server-only";
  * Q86 (Tech Lead, Sécurité). Compartiment commun (`no-trusted-ip`) : seuils d'une seule adresse IP de l'action.
  */
 
-/** Espèce d'une règle : par clé d'adresse IP (ou compartiment commun), ou par adresse e-mail canonique. */
-export type RateLimitKind = "ip" | "email";
+/**
+ * Espèce d'une règle : par clé d'adresse IP (ou compartiment commun), par adresse e-mail canonique, ou par voyage
+ * (`trip`, décision 0147 § 6.4 point 1 : identifiant `uuid` du voyage, contrôlé dans l'organisation avant le limiteur).
+ */
+export type RateLimitKind = "ip" | "email" | "trip";
 
 /** Une règle : au plus `threshold` appels admis par fenêtre fixe de `windowSeconds` secondes (horloge de la base). */
 export type RateLimitRule = { readonly kind: RateLimitKind; readonly windowSeconds: number; readonly threshold: number };
 
-/** Règles par nom d'action (`^[a-z][a-z0-9-]{0,47}$`), dans l'ordre fixe d'évaluation : adresse IP, puis e-mail. */
+/**
+ * Règles par nom d'action (`^[a-z][a-z0-9-]{0,47}$`), dans l'ordre fixe d'évaluation : adresse IP, puis e-mail, puis voyage
+ * (0147 § 6.4 point 1), chaque espèce dans l'ordre de la configuration.
+ */
 export type RateLimitConfig = Readonly<Record<string, readonly RateLimitRule[]>>;
 
 export const RATE_LIMITS: RateLimitConfig = {
@@ -50,6 +56,13 @@ export const RATE_LIMITS: RateLimitConfig = {
   // d'un ajout, à `listTripVersions`, `previewRevert`, `applyRevert` (et au déplacement quand il viendra sur `api`).
   // Vérifié après le contrôle du voyage dans l'organisation et du déblocage, avant toute relecture ou écriture.
   retouche: [{ kind: "ip", windowSeconds: 3600, threshold: 60 }],
+  // M5d-1 (décision 0147 § 6.4 point 1 et § 12 S5) : recherche d'un lieu à soi (`searchPlaces`), 5 par minute et par adresse
+  // IP, puis 20 par voyage et par 24 heures (fenêtre fixe partie de la première recherche, écart assumé avec « par jour »).
+  // Propositions. Vérifié après le contrôle du voyage dans l'organisation et du déblocage, avant le compteur global du jour.
+  "lieu-recherche": [
+    { kind: "ip", windowSeconds: 60, threshold: 5 },
+    { kind: "trip", windowSeconds: 86_400, threshold: 20 },
+  ],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

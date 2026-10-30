@@ -3,7 +3,15 @@ import "server-only";
 import { createHmac } from "node:crypto";
 
 import type { Result } from "@/contracts";
-import { RATE_LIMIT_PURGE_BATCH, RATE_LIMIT_ROWS_ALERT, RATE_LIMIT_ROWS_ALERT_INTERVAL_MS, RATE_LIMITS, type RateLimitConfig } from "@/server/config/limites";
+import {
+  RATE_LIMIT_PURGE_BATCH,
+  RATE_LIMIT_ROWS_ALERT,
+  RATE_LIMIT_ROWS_ALERT_INTERVAL_MS,
+  RATE_LIMITS,
+  type RateLimitConfig,
+  type RateLimitKind,
+  type RateLimitRule,
+} from "@/server/config/limites";
 import { type CanonicalEmail, isCanonicalEmail, rateLimitEmailKey } from "@/server/email";
 import { parseServerEnv, rateLimitSettings, ServerEnvError, serverEnv, type TrustedIpHeader } from "@/server/env";
 import { type HeadersLike, trustedIpKey } from "@/server/ip";
@@ -19,7 +27,11 @@ import { createDatabase } from "../../db/index.ts";
  * - Clé : HMAC-SHA-256 (octets décodés de `RATE_LIMIT_HMAC_SECRET`) du message `rl/v1/<action>/<fenêtre>s/<espèce>`,
  *   en hexadécimal minuscule ; aucune adresse IP ni e-mail en clair, ni en base ni au-delà de l'appel.
  * - Fenêtre fixe à l'horloge de la base (`now()`) : un `INSERT … ON CONFLICT` par clé, dans l'ordre fixe des règles
- *   (adresse IP, puis e-mail) ; l'incrément s'arrête à la première clé au-dessus de son seuil (0051 point 6.2.2).
+ *   (adresse IP, puis e-mail, puis voyage ; décision 0147 § 6.4 point 1) ; l'incrément s'arrête à la première clé au-dessus
+ *   de son seuil (0051 point 6.2.2).
+ * - Espèce `trip` (M5d-1, décision 0147 § 6.4 point 1) : identifiant `uuid` du voyage, exigé dès que l'action a une règle
+ *   `trip` (sinon refus fermé, `rate_limit.failed`, `errorName: "MissingTripId"`), contrôlé dans l'organisation par
+ *   l'appelant **avant** le limiteur ; message `rl/v1/<action>/<fenêtre>s/trip/<tripId>`, clé HMAC comme les autres.
  * - Purge à l'écriture, dans une transaction distincte ouverte après la validation de l'incrément, par lot de 100,
  *   les plus anciennes `expires_at` d'abord ; un échec de la purge ne change ni l'incrément ni la décision.
  * - Échec fermé : variable du limiteur absente ou invalide, erreur de base, adresse non canonique → `rate_limited`
@@ -43,6 +55,11 @@ export type RateLimitRequest = {
   readonly headers: HeadersLike;
   /** Adresse canonique (`parseEmailAddress`), exigée si l'action a une règle par e-mail. */
   readonly email?: CanonicalEmail;
+  /**
+   * Identifiant `uuid` du voyage, exigé si l'action a une règle par voyage (0147 § 6.4 point 1) ; contrôlé dans
+   * l'organisation par l'appelant avant le limiteur. Écrit en minuscules dans le message.
+   */
+  readonly tripId?: string;
 };
 
 export type RateLimiterOptions = {
@@ -58,13 +75,36 @@ export type RateLimiterOptions = {
   readonly beforePurge?: () => void | Promise<void>;
 };
 
-export type RateLimiter = { check(request: RateLimitRequest): Promise<Result<void>> };
+/**
+ * Verdict détaillé (M5d-1, décision 0147 § 12 S1 point 5 : `limite` et `limite_voyage` distingués au journal) : admis, ou
+ * refusé avec l'espèce de la règle au-delà de son seuil ; sans `kind` pour un refus fermé (configuration, environnement,
+ * base, entrée). Aucune valeur personnelle.
+ */
+export type RateLimitVerdict = { readonly ok: true } | { readonly ok: false; readonly kind?: RateLimitKind };
+
+export type RateLimiter = {
+  check(request: RateLimitRequest): Promise<Result<void>>;
+  /** Même contrôle, mêmes écritures que `check` ; rend l'espèce de la règle qui refuse. */
+  verdict(request: RateLimitRequest): Promise<RateLimitVerdict>;
+};
 
 const ACTION = /^[a-z][a-z0-9-]{0,47}$/;
+/** Identifiant de voyage admis dans une espèce `trip` : `uuid` (36 caractères, tirets aux places fixes). */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REFUS: Result<void> = Object.freeze({ ok: false, error: Object.freeze({ code: "rate_limited", retryable: true }) }) as Result<void>;
 const ADMIS: Result<void> = Object.freeze({ ok: true, value: undefined });
+const REFUS_FERME: RateLimitVerdict = Object.freeze({ ok: false });
+const VERDICT_ADMIS: RateLimitVerdict = Object.freeze({ ok: true });
 
-/** Message à préfixe de domaine (B3-TL-6 point 1) ; l'espèce est `ip/<clé>`, `email/<clé>` ou `no-trusted-ip`. */
+/** Rang fixe d'évaluation des espèces (0147 § 6.4 point 1) : adresse IP, puis e-mail, puis voyage. */
+const RANG_ESPECE: Readonly<Record<RateLimitKind, number>> = Object.freeze({ ip: 0, email: 1, trip: 2 });
+
+/** Règles dans l'ordre fixe d'évaluation : par espèce, puis dans l'ordre de la configuration (tri stable). */
+export function reglesOrdonnees(regles: readonly RateLimitRule[]): RateLimitRule[] {
+  return [...regles].sort((a, b) => RANG_ESPECE[a.kind] - RANG_ESPECE[b.kind]);
+}
+
+/** Message à préfixe de domaine (B3-TL-6 point 1) ; l'espèce est `ip/<clé>`, `email/<clé>`, `trip/<uuid>` ou `no-trusted-ip`. */
 export function rateLimitMessage(action: string, windowSeconds: number, species: string): string {
   return `rl/v1/${action}/${windowSeconds}s/${species}`;
 }
@@ -143,21 +183,29 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
     }
   }
 
-  async function check(request: RateLimitRequest): Promise<Result<void>> {
+  async function verdict(request: RateLimitRequest): Promise<RateLimitVerdict> {
     const { action } = request;
-    const regles = ACTION.test(action) && Object.hasOwn(config, action) ? config[action] : undefined;
-    if (regles === undefined || regles.length === 0) {
+    const configurees = ACTION.test(action) && Object.hasOwn(config, action) ? config[action] : undefined;
+    if (configurees === undefined || configurees.length === 0) {
       logEvent("rate_limit.failed", { errorName: "UnknownAction" }, "error");
-      return REFUS;
+      return REFUS_FERME;
     }
+    const regles = reglesOrdonnees(configurees);
     const env = reglages(action);
-    if (env === null) return REFUS;
+    if (env === null) return REFUS_FERME;
     // Défense en profondeur (0051 point 4.5) : le limiteur ne normalise rien, il refuse une adresse non canonique.
     const avecEmail = regles.some((regle) => regle.kind === "email");
     const cleEmail = request.email !== undefined && isCanonicalEmail(request.email) ? rateLimitEmailKey(request.email) : null;
     if (avecEmail && cleEmail === null) {
       logEvent("rate_limit.failed", { action, errorName: "NonCanonicalEmail" }, "error");
-      return REFUS;
+      return REFUS_FERME;
+    }
+    // Espèce `trip` (0147 § 6.4 point 1) : identifiant `uuid` exigé, sinon refus fermé.
+    const avecVoyage = regles.some((regle) => regle.kind === "trip");
+    const voyage = typeof request.tripId === "string" && UUID.test(request.tripId) ? request.tripId.toLowerCase() : null;
+    if (avecVoyage && voyage === null) {
+      logEvent("rate_limit.failed", { action, errorName: "MissingTripId" }, "error");
+      return REFUS_FERME;
     }
 
     const ip = trustedIpKey(request.headers, env.trustedIpHeader);
@@ -165,11 +213,11 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
     const secret = env.secret;
     const cles = regles.map((regle) => {
       const espece =
-        regle.kind === "ip" ? (ip === null ? "no-trusted-ip" : `ip/${ip}`) : `email/${cleEmail}`;
+        regle.kind === "ip" ? (ip === null ? "no-trusted-ip" : `ip/${ip}`) : regle.kind === "email" ? `email/${cleEmail}` : `trip/${voyage}`;
       return { cle: rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, espece)), regle };
     });
 
-    let refuse = false;
+    let refusee: RateLimitKind | undefined;
     let client: RateLimitClient | undefined;
     try {
       client = await (pool ??= poolParDefaut()).connect();
@@ -180,7 +228,7 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
         const compte = Number(ligne?.count);
         // Au-delà du seuil (ou compteur illisible) : refus, et les clés suivantes ne sont ni lues ni incrémentées.
         if (!Number.isSafeInteger(compte) || compte > regle.threshold) {
-          refuse = true;
+          refusee = regle.kind;
           break;
         }
       }
@@ -192,13 +240,17 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
         client.release(error instanceof Error ? error : true);
       }
       logEvent("rate_limit.failed", { action, errorName: errorNameOf(error) }, "error");
-      return REFUS;
+      return REFUS_FERME;
     }
     await purger();
-    return refuse ? REFUS : ADMIS;
+    return refusee === undefined ? VERDICT_ADMIS : Object.freeze({ ok: false, kind: refusee });
   }
 
-  return { check };
+  async function check(request: RateLimitRequest): Promise<Result<void>> {
+    return (await verdict(request)).ok ? ADMIS : REFUS;
+  }
+
+  return { check, verdict };
 }
 
 let limiteurParDefaut: RateLimiter | undefined;
@@ -206,4 +258,9 @@ let limiteurParDefaut: RateLimiter | undefined;
 /** Limiteur du serveur (configuration de `src/server/config/limites.ts`, `serverEnv()`, pool de `vadrouille_app`). */
 export function checkRateLimit(request: RateLimitRequest): Promise<Result<void>> {
   return (limiteurParDefaut ??= createRateLimiter()).check(request);
+}
+
+/** Même limiteur, verdict détaillé (espèce de la règle qui refuse ; M5d-1, `lieu.recherche`). */
+export function verdictRateLimit(request: RateLimitRequest): Promise<RateLimitVerdict> {
+  return (limiteurParDefaut ??= createRateLimiter()).verdict(request);
 }

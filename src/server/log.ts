@@ -156,6 +156,12 @@ export const LOG_EVENTS = [
   // `STOP_REPORT_REASONS`, `CHAMPS_ADMIS_PAR_EVENEMENT`) : ni texte, ni `placeId`, ni identifiant de voyage, d'étape,
   // d'organisation ou de personne. L'enregistrement est en base ; le journal ne sert qu'à compter.
   "voyages.stop_reported",
+  // M5d-1 (décision 0147 § 12 S1 point 5) : une fois par action de recherche d'un lieu à soi (`searchPlaces` de `api`),
+  // aboutie ou refusée, par le terminal `src/server/composition/lieux-api.ts` seul. **Compteurs et codes fermés seulement**
+  // (`CHAMPS_ADMIS_PAR_EVENEMENT`) : `places` (résultats rendus, 0 à 5), `reason` (`LOG_LIEU_REASONS`), `googleCode` et
+  // `httpStatus` (sur `google_erreur`), `errorName`. Jamais la requête saisie, la ville, un `placeId`, un nom ou une adresse
+  // Google, `tripId`, `organizationId`, une adresse IP ni une clé. Niveau `info`, `warn` pour une panne.
+  "lieu.recherche",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -540,6 +546,28 @@ export const LOG_VILLE_API_REASONS = [
 export type LogVilleApiReason = (typeof LOG_VILLE_API_REASONS)[number];
 const RAISONS_VILLE_API: ReadonlySet<string> = new Set<string>(LOG_VILLE_API_REASONS);
 /**
+ * Issues de `lieu.recherche` (recherche d'un lieu à soi, décision 0147 § 12 S1 point 5) : aboutie (`ok`, `aucun_resultat`),
+ * entrée refusée par le cœur, voyage non débloqué, seuils non validés, barrière fermée, client Places non construit, refus
+ * du limiteur par adresse IP (`limite`) ou par voyage (`limite_voyage`), compteur global du jour (`limite_jour`), compteur
+ * indisponible, erreur de Google, exception attrapée par l'action serveur.
+ */
+export const LOG_LIEU_REASONS = [
+  "ok",
+  "aucun_resultat",
+  "entree_invalide",
+  "non_debloque",
+  "seuils_non_valides",
+  "barriere",
+  "client",
+  "limite",
+  "limite_voyage",
+  "limite_jour",
+  "compteur_indisponible",
+  "google_erreur",
+  "exception",
+] as const;
+export type LogLieuReason = (typeof LOG_LIEU_REASONS)[number];
+/**
  * Codes admis dans `googleCode` : copie de `CODES_ERREUR_GOOGLE` (`src/grounding/enveloppe-google.ts`, que ce module
  * n'importe pas) et `place_not_found` (`ErreurAncrage` d'une fiche introuvable) ; égalité vérifiée par le test du journal.
  */
@@ -601,6 +629,7 @@ const RAISONS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map(
   ["email.transport_refused", new Set(LOG_EMAIL_TRANSPORT_REASONS)],
   // M5c (0147 § 12 S1 point 4) : liste fermée importée de sa définition unique, aucune copie.
   ["voyages.stop_reported", new Set<string>(STOP_REPORT_REASONS)],
+  ["lieu.recherche", new Set<string>(LOG_LIEU_REASONS)],
 ]);
 /**
  * Phases admises dans `phase` (`p0.step_failed`, ticket 493, décision 0090 § 3 point 4) : celles de
@@ -830,16 +859,16 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
 ]);
 
 /**
- * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee` et
- * `ville.refusee` seulement (constat du 2026-10-25 ; décision 0141 § 6.3 point 4 ; verdict 0122 § 2.1 point 4 : aucun
- * statut sur la ligne des sites) ; `failureCode`
+ * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee`,
+ * `ville.refusee` et `lieu.recherche` seulement (constat du 2026-10-25 ; décisions 0141 § 6.3 point 4 et 0147 § 12 S1
+ * point 5 ; verdict 0122 § 2.1 point 4 : aucun statut sur la ligne des sites) ; `failureCode`
  * sur `p0.step_failed` (ticket 493) et `p0.read_unavailable` (décision 0137 § 2) seulement ; `usage` sur `email.sent` et
  * `email.cap_reached` seulement (B3d point 6) ; `errorClass` sur `payment.provider_failed` seulement (B4c, décision 0140
  * § 1.2 ; revue de la PR 848, mineur : règle dans cette table, valeur de `LOG_PROVIDER_ERROR_CLASSES`).
  */
 const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlySet<string>; readonly controle: (valeur: unknown) => boolean }> = new Map([
-  ["googleCode", { evenements: new Set(["p0.ville_refusee", "ville.refusee"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
-  ["httpStatus", { evenements: new Set(["p0.ville_refusee", "ville.refusee"]), controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
+  ["googleCode", { evenements: new Set(["p0.ville_refusee", "ville.refusee", "lieu.recherche"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
+  ["httpStatus", { evenements: new Set(["p0.ville_refusee", "ville.refusee", "lieu.recherche"]), controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
   ["failureCode", { evenements: new Set(["p0.step_failed", "p0.read_unavailable"]), controle: (v: unknown) => chaine(v) && CODES_ETAPE.has(v) }],
   ["usage", { evenements: new Set(["email.sent", "email.cap_reached"]), controle: (v: unknown) => chaine(v) && USAGES_EMAIL.has(v) }],
   ["errorClass", { evenements: new Set(["payment.provider_failed"]), controle: (v: unknown) => chaine(v) && CLASSES_ERREUR_PRESTATAIRE.has(v) }],
@@ -856,6 +885,8 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   ["ville.purge_failed", new Set(["errorName"])],
   // Décision 0147 § 12 S1 point 4 : motif seul ; `tripId`, `organizationId`, `placeId`, `stopId` ou un texte sont retirés.
   ["voyages.stop_reported", new Set(["reason"])],
+  // Décision 0147 § 12 S1 point 5 : compteur et codes fermés ; requête, ville, `placeId`, textes Google et identifiants retirés.
+  ["lieu.recherche", new Set(["places", "reason", "googleCode", "httpStatus", "errorName"])],
   [
     "generation.programme_written",
     new Set([
