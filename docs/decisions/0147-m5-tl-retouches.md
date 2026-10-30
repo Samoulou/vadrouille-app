@@ -2,7 +2,7 @@
 
 Statut : **acceptée**. Décision du **Tech Lead** (architecture, contrats, bibliothèques, tests : « Qui décide quoi » de `docs/CONTEXT.md`), **proposée avec la Sécurité** pour S1 à S5 (§ 12) **et confirmée par sa revue** (revue consolidée du head `c4845be` de la PR #893 : Sécurité « approuvé », S1 à S5 confirmés ; forme de 0114), **validée par le CEO**. Définitive dès sa fusion, **sans fenêtre de veto** (décision 0093). À lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment par une nouvelle décision. Un refus ultérieur de la Sécurité sur un point du § 12 ne rouvre pas la décision d'office : il l'amende par une décision de la Sécurité (ou un erratum signé d'elle) qui remplace ce seul point.
 
-Date : 2026-10-29 (correction 1 le même jour : revue consolidée du head `c4845be`, 2 bloquants et 13 mineurs) · Décideur : Tech Lead ; S1 à S5 proposés avec la Sécurité et confirmés par sa revue · Validation : CEO · Ticket : #891 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 5, ligne M5-TL (l. 165) · Spécification : `specs/M5-retouches.md` (§ 10 T1 à T11, § 11 S1 à S5, § 13 M5-PO-1 à M5-PO-16, fusionnée par #881) · `main` relu : `93ee49a` · Décisions lues : 0011, 0016 § 4.2 et § 11, 0027, 0037 B2-TL-3 et B2-TL-4, 0045 § 5, 0093, 0114, 0129, 0136 (§ 3, § 12), 0141 (§ 2 à § 6), 0142, 0145 (PR #877, ouverte : modèle de forme).
+Date : 2026-10-29 (correction 1 le même jour : revue consolidée du head `c4845be`, 2 bloquants et 13 mineurs ; **addendum du 2026-10-30** sur les relectures de l'ajout d'un lieu à soi, ticket #950, en fin de document) · Décideur : Tech Lead ; S1 à S5 proposés avec la Sécurité et confirmés par sa revue · Validation : CEO · Ticket : #891 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 5, ligne M5-TL (l. 165) · Spécification : `specs/M5-retouches.md` (§ 10 T1 à T11, § 11 S1 à S5, § 13 M5-PO-1 à M5-PO-16, fusionnée par #881) · `main` relu : `93ee49a` · Décisions lues : 0011, 0016 § 4.2 et § 11, 0027, 0037 B2-TL-3 et B2-TL-4, 0045 § 5, 0093, 0114, 0129, 0136 (§ 3, § 12), 0141 (§ 2 à § 6), 0142, 0145 (PR #877, ouverte : modèle de forme).
 
 Numérotation (relue le 2026-10-29) : `main` porte 0001 à 0143 ; 0144 (branche `claude/886-b4d-tl`), 0145 (`claude/869-m1g-remplacer-etape-api`, PR #877) et 0146 (`claude/880-m1f-ville-api`) sont portées par des branches ouvertes ; 0147 est libre.
 
@@ -60,6 +60,8 @@ L'aperçu et l'application d'un ajout relisent le jour **par le port de relectur
 3. **Échec de la relecture** (refus du port, forfait atteint, panne) : `provider_error` (ou `cost_cap_reached` si le forfait l'indique), rien n'est écrit, et l'écran affiche le texte « La recherche n'est pas disponible pour le moment. Réessaie plus tard. » (spécification § 9). La phrase « Temps de trajet calculé après l'ajout » reste pour un aperçu dont une durée est **estimée ou inconnue** pour un trajet qui touche le lieu ajouté (`Segment.estimated`, ou segment absent) : l'aperçu est montré, la durée vient de la lecture suivante.
 
 La préférence du Product Owner (« pas d'appel tant que Q637 n'est pas tranchée ») est donc écartée, pour le motif technique du point 1 ; question de confirmation au Product Owner (§ 15).
+
+Ce que le serveur relit exactement, l'ordre, la règle `no_option` et ce qui n'est pas recalculé : **addendum du 2026-10-30** (fin de document), écrit d'après le code fusionné de M5d-1 (#943).
 
 ## 5. T5 — Versions : extension de `Change` par une PR de contrat d'abord, diff d'un `revert` entre deux instantanés
 
@@ -227,8 +229,8 @@ Une tâche = une branche `claude/<id>-<slug>` = une PR. Toutes citent `specs/M5-
 | **M5a** | Verrou sur `api` (§ 8, § 9, § 11) : verrou seul sans replanification, `FORMES_PATCH_PERSONNE`, règle `retouche` du limiteur et `VERSIONS_MAX_PAR_VOYAGE` (§ 6.4 point 4, § 5.3 point 7), actions `lockStop` et `unlockStop`, refus `not_unlocked` et engagement, R3 rejoué, fiche branchée, mention « Déjà réservé » | backend avec frontend | M5-C, M5e (signature d'`ecrireVersion`), M1b (fait) | `src/domain/patch.ts`, `src/server/versions/retouches.ts`, `src/server/config/{limites,retouches}.ts`, `src/server/actions/retouches.ts`, `src/adapters/`, `src/features/sejour/StopSheet.tsx` |
 | **M5b** | Versions (§ 5.3) : `listTripVersions`, `previewRevert`, `applyRevert`, écran `/voyages/[id]/versions`, lien du Séjour, toast | backend puis frontend (UX/UI pour le rendu) | M5-C, M5a (verrous écrits, pour le critère 8) | `src/server/versions/`, `src/server/actions/retouches.ts`, `src/app/voyages/[id]/(programme)/versions/`, `src/features/sejour/`, `tests/e2e/routes.ts` |
 | **M5c** | Signaler une erreur (§ 1, § 2, § 12 S1) : `reportStop`, `voyages.stop_reported`, feuille, confirmation, lien « Remplacer » | backend avec frontend (UX/UI) | M5-C, M5-D | `src/server/voyages/signalement.ts` (nouveau), `src/server/actions/retouches.ts`, `src/server/log.ts`, `src/features/sejour/StopSheet.tsx`, feuille nouvelle |
-| **M5d-1** | Lieu à soi, serveur (§ 3, § 4, § 6.4, § 11, § 12 S1 à S4) : client Text Search et double, cœur et terminal, compteurs `lieux`, limiteur `trip`, `lieu.recherche`, aperçu et application `[add, lock]`, règle des prompts (S4), lignes du § 13, adaptateurs `mock` et `api` | backend (relecture Sécurité) | M5-C, M5-D, M5a, **M1f fusionnée** (#885 : cœur et compteurs) | `src/grounding/`, `src/server/lieux/`, `src/server/composition/lieux-api.ts`, `src/server/config/{lieux,limites}.ts`, `src/server/rate-limit.ts`, `src/server/villes/compteurs.ts`, `src/ai/entree-revision.ts` (filtre), `src/adapters/`, `eslint-rules/`, `tests/unit/confinement/` |
-| **M5d-2** | Lieu à soi, écran : « Ajouter un lieu » (F7c, **jamais livré**, Contexte point 6) sur `mock` et `api`, nom vide, moment et heure proposée, aperçu, toast, « Ajouté par toi. », inscription des routes, sentinelles e2e | frontend (UX/UI pour le rendu) | M5d-1 | `src/app/voyages/[id]/(programme)/jour/[n]/ajouter/`, `src/features/sejour/`, `src/i18n/fr/sejour.json`, `tests/e2e/` |
+| **M5d-1** | Lieu à soi, serveur (§ 3, § 4, § 6.4, § 11, § 12 S1 à S4) : client Text Search et double, cœur et terminal, compteurs `lieux`, limiteur `trip`, `lieu.recherche`, aperçu et application `[add, lock]` (une relecture de la journée par geste, addendum A.1 à A.5), règle des prompts (S4) **et réinjection des lieux à soi dans la révision M1b avant R3** (`lieuxASoiReinjectes`, addendum A.6), lignes du § 13 (plus l'entrée `src/server/actions/lieux.ts`, admise par la Sécurité), adaptateurs `mock` et `api`. **Fusionnée** (#943, `7252a30`) ; relectures décrites par l'addendum du 2026-10-30 | backend (relecture Sécurité) | M5-C, M5-D, M5a, **M1f fusionnée** (#885 : cœur et compteurs) | `src/grounding/`, `src/server/lieux/`, `src/server/composition/lieux-api.ts`, `src/server/actions/lieux.ts`, `src/server/config/{lieux,limites}.ts`, `src/server/rate-limit.ts`, `src/server/villes/compteurs.ts`, `src/ai/entree-revision.ts` et `src/server/programme/revision.ts` (filtre), `src/server/generation/etapes-revision.ts` (réinjection), `src/adapters/`, `eslint-rules/`, `tests/unit/confinement/`, `tests/db/lieu-a-soi.test.ts` |
+| **M5d-2** | Lieu à soi, écran : « Ajouter un lieu » (F7c, **jamais livré**, Contexte point 6) sur `mock` et `api`, nom vide, moment et heure proposée, aperçu, toast, « Ajouté par toi. », inscription des routes, sentinelles e2e ; points reportés par l'addendum du 2026-10-30 (A.7) | frontend (UX/UI pour le rendu) | M5d-1 (fait, #943) ; réponses du Product Owner et de l'UX/UI sur le message des refus (addendum A.7) | `src/app/voyages/[id]/(programme)/jour/[n]/ajouter/`, `src/features/sejour/`, `src/i18n/fr/sejour.json`, `tests/e2e/` |
 
 **Ordre** (le CEO le place dans les cycles) : M5-C et M5-D en parallèle (fichiers distincts ; M5-D occupe le fil `db/migrations` de son cycle) ; puis M5e (dès M1g fusionnée) ; puis M5a ; puis M5b et M5c (M5c peut partir dès M5-C et M5-D, mais pas dans le même cycle que M5a, qui touche aussi `StopSheet.tsx`) ; puis M5d-1, puis M5d-2. **M5e dépend de T8 et T9** : elles sont tranchées ici (§ 6.2, § 7.1), et leur forme de contrat passe par M5-C ; le plan (l. 170, « M5e : M1a ») est à aligner par le CEO (Q684) sur « M5-C, M1g ».
 
@@ -266,3 +268,134 @@ Une tâche = une branche `claude/<id>-<slug>` = une PR. Toutes citent `specs/M5-
 - À la fusion de M1g (#877) et de M1f (#885), dont M5e et M5d-1 reprennent les formes : les numéros de ligne cités de ces PR (`remplacement.ts`, `lecture.ts`, `ecrire.ts`, `villes/compteurs.ts`) sont revérifiés à ce moment (mineur 10).
 - À M4 (ville du jour d'un voyage à plusieurs villes, § 3 point 2) et à M8b (`addedBy: "discovered"`).
 - Si la taille de `trip_versions` devient mesurable sur un voyage réel (§ 5.3 point 7).
+
+## Addendum du 2026-10-30 : relectures de l'ajout
+
+Statut : **acceptée**. Décision du **Tech Lead** (architecture et tests). Ticket : #950. Répond à Q758 et au mineur 6 de la revue consolidée du head `655674f` de la PR #943. Définitive dès sa fusion, sans fenêtre de veto (décision 0093). À lister dans la prochaine note de version (rubrique « Décisions prises par le studio »). Code relu : `main` `7252a30` (M5d-1, PR #943). Fichiers : `src/server/lieux/ajout.ts`, `src/server/actions/lieux.ts`, `src/server/generation/etapes-revision.ts`, `src/domain/patch.ts`, `src/domain/validation.ts`, `src/domain/recomposition.ts`, `src/server/relecture/source.ts`, `src/adapters/mock-lieux.ts`. Tests : `tests/db/lieu-a-soi.test.ts`, `tests/unit/programme/revision.test.ts`.
+
+Cet addendum **décrit le code fusionné** et fixe la règle des relectures de l'ajout qu'il implémente. Il ne change aucun code. Aucun argent, aucun compte, aucun test touché. Les écarts entre le code et cette décision (ou la spécification) sont listés au point A.8 : ils ne sont **pas tranchés** ici. Les points qui reviennent au Product Owner ou à l'UX/UI, dont le message des refus à l'écran, sont laissés à M5d-2 (A.7).
+
+### A.1 Ce que le serveur relit, et dans quel ordre
+
+Aperçu : `previewAddPlace` → `proposerAjout`. Application : `applyAddPlace` → `appliquerAjout` (`src/server/lieux/ajout.ts`).
+
+1. **Transaction 1, en lecture seule** (`SET TRANSACTION READ ONLY`, dans le cadre `executerActionVoyage`). Les contrôles se suivent dans cet ordre :
+   - session, entrée stricte, voyage de l'organisation (`not_found`) ;
+   - déblocage (`not_unlocked`, `retryable` faux) ;
+   - débit `retouche` (`rate_limited`) ;
+   - pour l'application seulement, rejeu par `requestId` (`SQL_PAR_DEMANDE`, `rejeuDe`), **avant toute relecture** ;
+   - borne `VERSIONS_MAX_PAR_VOYAGE` (`validation_failed`, `field: "baseVersion"`) ;
+   - version de base (`version_conflict`) ;
+   - jour du voyage (`not_found`) ;
+   - pour l'aperçu seulement, lecture des lignes « À faire ».
+2. **Un seul appel au port de relectures de la lecture**, hors transaction et sans verrou : `relireRevision`, source B8b, portée `jour`, profil de forfait `relecture`. La demande (`demandeDeRelectures`) porte sur **deux versions du même jour**, mesurées toutes les deux :
+   - le **jour de base** ;
+   - un **jour provisoire** (`jourProvisoire`) : le jour de base avec l'étape ajoutée posée à son heure, avant la première étape qui commence après elle, sinon avant le terminus de fin.
+
+   La demande contient :
+   - les **fiches** (validité, plages horaires à la date du jour) de chaque étape et de chaque événement des deux jours, **donc la fiche du lieu ajouté** ;
+   - les **trajets entre deux points consécutifs** de chaque jour : logement de départ, étapes à `placeId`, logement d'arrivée. Aucun trajet ne traverse un changement de ville (0148 § 1 point 3). Ils sont demandés avec les modes admis du voyage et avec le mode stocké de chaque segment.
+
+   Pour le lieu ajouté, cela donne les trajets **précédent → lieu ajouté** et **lieu ajouté → suivant** du jour provisoire. Le double de test (`tests/db/lieu-a-soi.test.ts`) et le vrai port reçoivent la même demande. Le double ne répond, pour le lieu ajouté, qu'à ce qui est demandé (fiche `valide`, trajets de 10 minutes). Le vrai port n'interroge Places et Routes que sur la demande.
+3. **Moteur** : `appliquerPatch` sur `[add, lock]`, avec ces relectures (`entreeMoteurDeRevision` : aucun candidat, `porteeR1.evenementsSansLieu: "admis"`).
+4. **Application seulement : transaction 2**, sous le verrou du tri (`SQL_VERROU_TRI`), puis sous celui des versions. Les contrôles reprennent dans cet ordre :
+   - droit relu (`not_unlocked`) ;
+   - rejeu relu ;
+   - recalcul en cours (`refuserPendantUnRecalcul` : `generation_in_progress`) ;
+   - borne ;
+   - version courante égale à la base lue en transaction 1 (sinon `version_conflict`) ;
+   - moteur rejoué **avec les relectures de l'étape 2**, sans second appel ;
+   - écriture par `ecrireVersion`, avec `instantanePrecedent` = la base.
+
+**Conséquences** :
+- un geste = un appel. Un aperçu suivi d'une application font donc deux relectures de la journée, soit deux réservations du forfait `relecture`, comme M1g ;
+- un rejeu ne fait aucun appel ;
+- l'aperçu ne contrôle pas le recalcul en cours, seule l'application le fait ;
+- l'aperçu a un identifiant aléatoire : son `targetStopId` (`ajout-<identifiant de l'aperçu>`) n'est pas l'identifiant de l'étape écrite (`ajout-<requestId>`).
+
+### A.2 Ce que le moteur rejoue sur la version avec l'ajout
+
+Le ticket parle de « R1 à R3 ». Le code en fait plus : `validerProgramme` rejoue, **sur les jours touchés**, R1, R2 et R4 à R9 jour par jour, et R3 contre la base. R10 ne joue pas, aucune version n'étant fournie au validateur. R9 ne porte que sur un jour recomposé, donc pas sur un instantané. Un refus `no_option` ne tombe que pour une entrée **bloquante** (`estBloquante` : toutes, sauf R5 entre deux étapes verrouillées) **absente du rapport de la base**, comparé par la clé `règle|étape|jour` (`cleRapport`, `src/domain/patch.ts`).
+
+Pour le lieu ajouté, compté dans `ajouts` grâce à la marque `addedBy: "person"` :
+- **R1** : la portée `ajouts: "lieu"` (`PORTEE_R1_PAR_DEFAUT`, `src/domain/validation.ts`, valeur **provisoire**, Q332 à Samuel) exige un `placeId` relu `valide`, sans source. Un lieu `inconnu`, `introuvable` ou `ferme_definitivement` donne `no_option`.
+- **R3** : les étapes verrouillées de la base restent à leur heure. Elles sont fixes dans la replanification, donc tenues.
+- **R4** (heures d'ouverture) : ne s'applique pas au lieu ajouté, qui est verrouillé. Ses plages arrivent par la lecture.
+- **R5** : entre deux étapes consécutives à `placeId`, il faut un trajet de durée connue (le plus rapide des modes admis) et assez de temps. La règle est bloquante, sauf si les deux étapes sont verrouillées. Avec une voisine mobile, les trajets **précédent → ajouté** et **ajouté → suivant** doivent donc être connus et tenir.
+- **R7** : un repas ou une soirée ajoutés sont admis, grâce à `ajouts`.
+- **R8** : une entrée R8 nouvelle pour le jour donne `no_option`, quelle qu'en soit la cause : rythme (plus d'activités que le rythme plus une soirée), temps libre minimal d'un jour complet ou trou. Si la base avait déjà une entrée R8 pour ce jour, une seconde cause ne refuse pas, faute de sous-cause dans la clé (limite connue, écart 1 de B5c).
+
+### A.3 Replanification, trajets demandés et règle `no_option`
+
+La replanification (`replanifierHoraires`) ne porte que sur le jour touché. Les étapes fixes restent à leur heure : étapes verrouillées, engagements et lieu ajouté (`fixe: true`). Les étapes mobiles sont posées dans l'ordre de leur heure et décalées au besoin. **L'ajout est refusé par `no_option`, sans rien écrire**, dans quatre cas :
+
+1. **Heure hors de la journée** : la fin de l'étape ajoutée dépasse la journée (`heureSure`, par exemple à 23:50), ou une étape repoussée dépasse la dernière heure.
+2. **Trajet non relu vers une étape mobile** (`src/domain/patch.ts`, l. 308). Cas type : une étape mobile chevauche le bloc ajouté. Elle est repoussée après lui. Les trajets **lieu ajouté → elle** et **elle → suivante** ne figurent pas dans la demande, car le jour provisoire la plaçait avant le lieu ajouté. Ces trajets sont inconnus, d'où `no_option`. **Il n'y a pas de seconde relecture** : c'est la règle, acceptée par le Tech Lead dans la revue de #943 et fixée ici. Test : « étape mobile repoussée après le lieu ajouté », ajout à 13:35 au J2 du voyage d'Édimbourg, dans `tests/db/lieu-a-soi.test.ts`.
+3. **Étape fixe qui chevauche la précédente** (même fichier, l. 281). L'exception est un chevauchement entre deux étapes verrouillées, qui est admis (B5-PO-6) ; voir l'écart 4 de A.8.
+4. **Entrée bloquante nouvelle** (A.2).
+
+**Règle des doubles** (pour M5d-2 et toute suite) : un double de relectures ne répond qu'à ce que la demande contient. Un test qui passerait grâce à un double plus large que la demande ne prouverait rien. La correction 2 de #943 a montré qu'un double trop étroit (fiche du lieu ajouté non servie) faisait tomber R1 à tort.
+
+Le code `no_option` **ne dit pas sa cause**. Le même code couvre « pas de place », lieu non relu ou fermé (R1), trajet non relu, rythme ou temps libre (R8). Le test « étape mobile repoussée » n'affirme que le code (mineur 1 de la revue du head `24771c2`).
+
+### A.4 Échec de la relecture
+
+`relireRevision` lève une erreur quand le port refuse. Un refus `quota_reached` donne `cost_cap_reached`. Un refus `unavailable` ou une exception donnent `provider_error`. Rien n'est écrit (0147 § 4 point 3, tenu). Un échec de Routes est un refus du vrai port, donc `provider_error`. Un échec des **fiches**, en revanche, n'est pas un refus du vrai port (`src/server/relecture/source.ts`, B8-PO-9) : les lieux reviennent `inconnu`. R1 refuse alors le lieu ajouté, et l'ajout rend `no_option` au lieu de `provider_error` (A.8, écart 3).
+
+### A.5 Segments de l'aperçu et « Temps de trajet calculé après l'ajout »
+
+L'aperçu est recomposé comme une lecture (`recomposerJourDeRevision`), avec les relectures de A.1. Le serveur ne rend **aucun indicateur dédié** : l'écran lit les segments. Grâce à R5, un aperçu accepté a des durées connues entre le lieu ajouté et une étape voisine à `placeId`, sauf dans trois cas :
+- **la voisine est verrouillée** : R5 n'est pas bloquante entre deux verrous ;
+- **la voisine est un logement** (départ ou arrivée) : R5 ne contrôle pas ce trajet, et un trajet sans durée connue vers une étape fixe n'est pas écrit, donc pas de segment ;
+- **la durée est estimée** (`Segment.estimated`).
+
+Ce sont les cas où l'écran affiche « Temps de trajet calculé après l'ajout » (0147 § 4 point 3, inchangé ; rendu à M5d-2).
+
+### A.6 Lieu à soi dans la révision M1b : réinjection avant R3, et ce qui n'est pas recalculé
+
+`ecritureRevision` (`src/server/generation/etapes-revision.ts`) enchaîne quatre étapes :
+1. sortie du modèle, qui ne voit jamais le lieu à soi (S4) ;
+2. `lieuxASoiReinjectes(base, sortie)` ;
+3. `verrousReportes(base, version réinjectée)` : R3 seule, qui donne `null` si une étape verrouillée change, et rien n'est alors écrit ;
+4. publication.
+
+La réinjection remet chaque étape `addedBy: "person"` de la base **telle quelle** (identifiant, nom, jour, heures, `placeId`, verrou), dans le même jour, à son heure. Les lignes de la révision qui la chevauchent sont retirées : étapes non verrouillées dans la base, temps libres et repas ouverts. Deux segments devenus voisins sont fusionnés. Un jour absent de la révision, ou un lieu déjà présent, reste tel quel.
+
+**Ce qui n'est pas recalculé** (Q765, mineur 3 de la revue du head `655674f`) :
+- la révision ne fait **aucune relecture** ni aucun appel Routes ;
+- les trajets du lieu réinjecté ne sont pas recomposés : les segments restent ceux de la sortie du modèle, avec des durées affichées peut-être fausses ;
+- les étapes de l'IA retirées par la réinjection ne laissent **aucune trace** : ni `Change`, ni journal (Trevi dans le test unitaire) ;
+- un temps libre retiré n'est pas réécrit : un trou est possible, contre le principe « aucun trou » ;
+- R1, R2 et R4 à R9 **ne sont pas rejoués** sur la version réinjectée : seule R3 l'est.
+
+La liste « À faire » suit la version (`lignesApresVersion`) : une étape `toReserve` retirée par la réinjection perd sa ligne non faite, et sa ligne faite est déliée. Les positions écrites au cache sont celles de la version publiée. Le voyage complet (M1c) ne touche pas le lieu à soi : d'après le code, il ne remplace qu'un jour sans étape, et l'ajout est refusé (`generation_in_progress`) tant qu'une exécution `full` ou `batch` est ouverte.
+
+### A.7 Reporté à M5d-2 et aux rôles concernés
+
+- **Product Owner et UX/UI : message des refus à l'écran.** La spécification (§ 6, § 9, M5-PO-12) n'a qu'un texte pour tout `no_option` : « Pas de place ce jour-là, choisis un autre jour. » Or `no_option` couvre aussi un lieu non relu ou fermé (R1) et l'échec des fiches (A.3, A.4). Il leur revient de dire s'il faut distinguer ces causes, et avec quels textes. Si oui, la forme de contrat qui exposera la cause revient au Tech Lead, après leur réponse. **Rien n'est décidé ici.**
+- **Product Owner (Q765)** : recomposition des trajets du lieu réinjecté par M1b, et trace des étapes retirées (A.6).
+- **Product Owner (Q762)** : persistance de l'ajout sur `mock`.
+- **M5d-2, tests** :
+  - nommer la cause du refus dans le test « étape mobile repoussée » (A.3) ;
+  - appliquer la règle des doubles (A.3) ;
+  - ne pas relire `changes` après un rejeu : un rejeu de l'application rend `touchedDays: [jour]` et le seul changement `added`, pas les changements (étapes décalées, lignes `checklist`) de la première réponse ;
+  - ne pas tenir `mock` pour un modèle d'`api` : `mock` n'accepte qu'un ajout contenu dans un temps libre ou posé à la place d'un repas pas encore choisi (`src/adapters/mock-lieux.ts`), alors qu'`api` replanifie les étapes mobiles du jour.
+- **Backend, avant M5d-2** : factorisation avec M1f (mineur 4 de la revue du head `2043e3a`), inchangé.
+
+### A.8 Écarts constatés entre le code et la décision ou la spécification (non tranchés)
+
+1. **Fiche du lieu ajouté relue.** 0147 § 3 point 4 dit le `placeId` « jamais revérifié auprès de Google (aucune fiche) », et S2 dit « aucune fiche après le choix ». Or le port de relectures lit la fiche du lieu ajouté, à l'aperçu comme à l'application (A.1). C'est la relecture que la lecture (B8b) fait déjà de chaque étape à l'affichage, sous le forfait `relecture`. Rien n'est stocké en dehors des positions du cache `place_coordinates` (30 jours au plus, décisions 0027 et 0011). Question à la Sécurité (S2).
+2. **Lieu introuvable ou fermé.** 0147 § 3 point 4 prévoyait que l'étape soit écrite, puis « relu[e] ensuite par la lecture (B8b), qui le badge s'il est introuvable ». Le code **refuse l'ajout** (R1, `no_option`). Ce point dépend de Q332 (Samuel : portée de R1 pour un lieu ajouté, valeur provisoire `lieu`) et du message à l'écran (A.7).
+3. **Échec des fiches.** 0147 § 4 point 3 prévoit `provider_error`. Le code rend `no_option` (A.4). À revoir avec l'écart 2.
+4. **Chevauchement d'une étape verrouillée.** Le critère 22 de la spécification (M5-PO-12) attend `no_option` quand le lieu ajouté chevaucherait une étape verrouillée. 0147 § 11 dit que le moteur applique déjà `[add, lock]`. Un essai local du moteur, non commité, sur le jeu de `src/domain/patch.test.ts` (étape verrouillée de 09:45 à 11:15 au J2) donne ceci :
+   - un `[add, lock]` posé à la même heure est **accepté** : deux étapes verrouillées se chevauchent. Le contrôle des étapes fixes admet un conflit entre deux verrous (`src/domain/patch.ts`, l. 281, B5-PO-6), et R5 ne bloque pas entre deux verrous ;
+   - un `[add]` seul est refusé (`no_option`).
+
+   Le lieu ajouté est verrouillé par son propre patch, ce qui le fait passer par cette exception. Le critère 22 ne peut donc pas être tenu sur `api` sans un changement du moteur ou du cas d'usage. **Proposition du Tech Lead**, non appliquée par cet addendum (docs seulement) : pour le contrôle de chevauchement et pour R5, traiter le lieu ajouté par le patch comme non verrouillé. La décision et sa mise en œuvre reviennent à une tâche backend, que le CEO ouvre avant M5d-2. Sinon, le Product Owner lève ou amende le critère 22.
+
+### A.9 Questions nouvelles (à reporter par le CEO dans `QUESTIONS.md`)
+
+- **Sécurité** : la fiche du lieu ajouté, relue par le port de la lecture à l'aperçu et à l'application (A.8, écart 1), est-elle admise au regard de S2 ? Bloque : rien dans le code fusionné ; l'ouverture réelle de M5d (M1h).
+- **Product Owner et UX/UI** : faut-il un texte distinct de « Pas de place ce jour-là » pour un lieu introuvable ou fermé (R1) et pour une relecture des fiches en échec (A.7, A.8, écarts 2 et 3) ? Bloque : les textes des refus de M5d-2.
+- **Product Owner** (avec Q332 de Samuel, rappelée) : un lieu ajouté que la relecture ne trouve pas, ou trouve fermé, doit-il être refusé (code actuel) ou écrit avec un badge (0147 § 3 point 4) ? Bloque : M5d-2, critères de refus.
+- **CEO** : ouvrir une tâche backend pour l'écart 4 de A.8 (`[add, lock]` qui chevauche une étape verrouillée), avant M5d-2. Bloque : le critère 22 de M5d-2 sur `api`.
