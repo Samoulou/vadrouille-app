@@ -11,7 +11,8 @@ compte 4 versions : la version 1 date d'avant le déblocage, et la version 4 est
 1. `TRIP_VERSIONS_PAGE_SIZE` vaut 3 au lieu de 20 (`src/contracts/values.ts`), pour faire paraître « Voir les versions plus
    anciennes » ;
 2. la borne du nombre de versions de `mock` vaut 5 au lieu de `VERSIONS_MAX_PAR_VOYAGE` (`src/adapters/index.ts`), pour
-   obtenir le refus de la borne au second retour ;
+   obtenir le refus de la borne au second retour. La capture 9 a été reprise seule, avec les forçages 1 et 2, après la
+   correction des bloquants tardifs ;
 3. l'aperçu vers la version 2 rend `currentHasLockedStop` faux (`src/adapters/mock-versions.ts`), pour l'aperçu sans la
    phrase des étapes verrouillées : le jeu simulé a toujours une étape verrouillée, un engagement.
 
@@ -29,7 +30,7 @@ bloquées pendant la capture.
 | `m5b-6-apercu-sans-phrase-390.png` | Aperçu sans la phrase des étapes verrouillées : « Rien ne change dans ton programme. » (forçage 3) |
 | `m5b-7-liste-hors-ligne-390.png` | Liste hors ligne : bandeau `offline`, « Revenir à cette version » en `aria-disabled` (correction 1, mineur 5) |
 | `m5b-8-toast-retabli-390.png` | Après « Appliquer » : retour au Séjour, toast « Programme rétabli. » avec « Annuler » |
-| `m5b-9-bandeau-erreur-390.png` | Bandeau d'erreur : refus de la borne, « Tu as fait beaucoup de retouches sur ce voyage : le retour à une version n'est plus possible. » (forçage 2) |
+| `m5b-9-bandeau-erreur-390.png` | Bandeau d'erreur après un premier retour (version 5, « Version actuelle ») : « Appliquer » vers « Verrou retiré », version 4, refusé par la borne. Retour à la liste sans « Appliquer » : « Tu as fait beaucoup de retouches sur ce voyage : le retour à une version n'est plus possible. » (forçage 2 ; reprise après les bloquants tardifs du head `5cca917`) |
 
 **Références visuelles de la CI** : inchangées. Aucune référence de `tests/visual/` ne montre le Séjour d'un voyage
 débloqué sous `/voyages` : elles sont prises sous `/dev/voyages`, où `routes.versions()` vaut `null`, ou sur une Journée.
