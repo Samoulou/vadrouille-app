@@ -33,11 +33,14 @@ const sortie = (start: string, end?: string): EngagementLu => ({ kind: "booking"
 
 describe("configuration: changementDeVille (moteur.json, M4b)", () => {
   it("valeurs posées par M4b : départ 10:00 au plus tôt, créneau sans durée 180, durée 20 à 600, 1/2/2 activités, seuil 30", () => {
+    // Section complétée par M4-suite-back (M4-suite § 2 : arrondi, marges, long changement de ville ; critère 1).
     expect(C.changementDeVille).toEqual({
       activitesParRythme: { relaxed: 1, balanced: 2, intense: 2 },
-      departEstime: { heureParDefaut: "10:00", limite: "18:00" },
+      departEstime: { heureParDefaut: "10:00", limite: "18:00", arrondiMinutes: 15 },
       creneauSansDureeMinutes: 180,
       dureeEstimeeMinutes: { min: 20, max: 600 },
+      margesMinutes: { avantDepart: { ticket: 45, flight: 120, estimated: 30 }, apresArrivee: { ticket: 30, flight: 60, estimated: 30 } },
+      long: { seuilMinutes: 240, activitesMax: 1 },
     });
     expect(C.seuilTempsLibreMinutes).toBe(30);
   });
@@ -53,21 +56,23 @@ describe("configuration: changementDeVille (moteur.json, M4b)", () => {
 
   it("le départ par défaut est dans la fenêtre du jour, la limite plus le créneau sans durée aussi", () => {
     const avec = (departEstime: unknown) => ConfigurationMoteurSchema.safeParse({ ...C, changementDeVille: { ...C.changementDeVille, departEstime } }).success;
-    expect(avec({ heureParDefaut: "08:00", limite: "18:00" })).toBe(false);
-    expect(avec({ heureParDefaut: "10:00", limite: "21:00" })).toBe(false);
-    expect(avec({ heureParDefaut: "10:00", limite: "18:00" })).toBe(true);
+    // `arrondiMinutes` (M4-suite § 2) ajouté à chaque entrée : la clé est désormais exigée.
+    expect(avec({ heureParDefaut: "08:00", limite: "18:00", arrondiMinutes: 15 })).toBe(false);
+    expect(avec({ heureParDefaut: "10:00", limite: "21:00", arrondiMinutes: 15 })).toBe(false);
+    expect(avec({ heureParDefaut: "10:00", limite: "18:00", arrondiMinutes: 15 })).toBe(true);
   });
 });
 
 describe("changement de ville: départ (0148 § 5.2 ; spécification M4 § 3.3)", () => {
+  // M4-suite § 9.1 point 2 (liste fermée validée par 0151 § 3 point 4) : 11:30 devient 12:00 (marge de 30 minutes, § 3.1).
   it("changement de ville: départ estimé, sortie du matin et dîner du soir", () => {
     const engagements = [sortie("09:30", "11:30"), sortie("19:30", "21:00")];
-    expect(departEstime(engagements, JOUR, C)).toBe("11:30");
+    expect(departEstime(engagements, JOUR, C)).toBe("12:00");
   });
 
   it("changement de ville: départ estimé, sortie sans fin", () => {
-    // Sortie à 10:00 sans fin, hors des fenêtres de repas : durée d'une activité (90 minutes).
-    expect(departEstime([sortie("10:00")], JOUR, C)).toBe("11:30");
+    // Sortie à 10:00 sans fin, hors des fenêtres de repas : durée d'une activité (90 minutes), puis 30 minutes de marge.
+    expect(departEstime([sortie("10:00")], JOUR, C)).toBe("12:00");
   });
 
   it("sans engagement ce jour-là : 10:00 ; jamais sous 10:00 ; une fin au-delà de 18:00 est ignorée", () => {
@@ -122,7 +127,8 @@ describe("changement de ville: départ (0148 § 5.2 ; spécification M4 § 3.3)"
 describe("changement de ville: créneau occupé et durée estimée (0148 § 2 et § 5.3)", () => {
   it("billet avec fin, billet sans fin, estimé avec et sans durée", () => {
     expect(creneauOccupe({ source: "entered", start: "10:00", end: "12:30" }, C)).toEqual({ debut: 600, fin: 750 });
-    expect(creneauOccupe({ source: "entered", start: "10:00" }, C)).toEqual({ debut: 600, fin: 600 });
+    // M4-suite § 9.1 point 3 : billet sans heure de fin, créneau de planification de 180 minutes, non affiché (§ 3.2).
+    expect(creneauOccupe({ source: "entered", start: "10:00" }, C)).toEqual({ debut: 600, fin: 600 + 180 });
     expect(creneauOccupe({ source: "estimated", start: "11:30", estimatedMinutes: 120 }, C)).toEqual({ debut: 690, fin: 810 });
     expect(creneauOccupe({ source: "estimated", start: "11:30" }, C)).toEqual({ debut: 690, fin: 690 + 180 });
   });
