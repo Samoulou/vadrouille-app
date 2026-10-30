@@ -124,9 +124,12 @@ export function lignePaiement(row: Record<string, unknown>): LignePaiement {
 const ERREUR_PRESTATAIRE: Result<never> = { ok: false, error: { code: "provider_error", retryable: true } };
 const erreurPrestataire = (retryable: boolean): Result<never> => ({ ok: false, error: { code: "provider_error", retryable } });
 
+/** Lecture du droit `tripUnlocked` d'un voyage (organisation de la transaction, par la RLS) ; partagée (M5a, `lockStop`). */
+export const SQL_DROIT_VOYAGE = "SELECT id::text AS id FROM entitlements WHERE trip_id = $1 AND kind = 'tripUnlocked'";
+
 /** Droit `tripUnlocked` du voyage dans l'organisation de la transaction : son identifiant, ou `null`. */
 export async function lireDroitVoyage(executeur: Executeur, tripId: string): Promise<string | null> {
-  const { rows } = await executeur.query("SELECT id::text AS id FROM entitlements WHERE trip_id = $1 AND kind = 'tripUnlocked'", [tripId]);
+  const { rows } = await executeur.query(SQL_DROIT_VOYAGE, [tripId]);
   return rows.length === 0 ? null : String(rows[0]?.id);
 }
 

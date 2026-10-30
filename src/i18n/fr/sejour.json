@@ -6,6 +6,7 @@
   },
   "region": "Programme",
   "retour": "Retour",
+  "echecEnregistrement": "Impossible d'enregistrer. Réessaie.",
   "journee": {
     "trajet": "{duree} de trajet",
     "trajetBudget": "{duree} de trajet · environ {montant} CHF par personne",
@@ -44,6 +45,8 @@
     "signaler": "Signaler une erreur",
     "toastVerrouillee": "Étape verrouillée.",
     "toastDeverrouillee": "Verrou retiré.",
+    "dejaReserve": "Déjà réservé : cette étape ne bouge pas.",
+    "verrouConflit": "Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.",
     "absente": "Cette étape n'est plus dans ce jour."
   },
   "signaler": {
@@ -77,7 +80,6 @@
         "plusieurs": "{n} réservations à faire"
       },
       "reserver": "Réserver : {nom}",
-      "echec": "Impossible d'enregistrer. Réessaie.",
       "horsLigne": "Tu es hors ligne. Cocher une ligne demande une connexion."
     },
     "pendant": {

@@ -311,13 +311,15 @@ export function brouillonDuRemplacement(
 }
 
 // --- Requêtes (constantes ; paramètres liés) ------------------------------------------------------------------
+// Les lectures exportées (version courante, version, contexte du voyage, recalcul en cours, demande déjà écrite) servent
+// aussi aux retouches de la personne (`./retouches.ts`, M5a) : mêmes requêtes, mêmes erreurs.
 
 const SQL_COURANTE = "SELECT current_version FROM public.trips WHERE organization_id = $1 AND id = $2";
 const SQL_VOYAGE = "SELECT destination, travellers_adults AS adults, travellers_children AS children FROM public.trips WHERE organization_id = $1 AND id = $2";
 const SQL_INSTANTANE = "SELECT snapshot, patch, author_kind FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2 AND version = $3";
-const SQL_PAR_DEMANDE = "SELECT version, patch, author_kind FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2 AND request_id = $3";
+export const SQL_PAR_DEMANDE = "SELECT version, patch, author_kind FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2 AND request_id = $3";
 /** Un recalcul ou un voyage complet en cours (même règle que la lecture, `SQL_EN_COURS`) : aucune version n'est écrite. */
-const SQL_EN_COURS = `SELECT EXISTS (SELECT 1 FROM public.generation_runs WHERE organization_id = $1 AND trip_id = $2
+export const SQL_EN_COURS = `SELECT EXISTS (SELECT 1 FROM public.generation_runs WHERE organization_id = $1 AND trip_id = $2
   AND finished_at IS NULL AND kind IN ('full', 'batch')) AS en_cours`;
 const SQL_BRIEF = `SELECT pace, wishes, limit_categories, meal_budget FROM public.briefs
   WHERE organization_id = $1 AND trip_id = $2 ORDER BY version DESC LIMIT 1`;
@@ -347,12 +349,12 @@ const textes = (valeur: unknown): string[] => (Array.isArray(valeur) ? valeur.fi
 
 type Session = Pick<AdapterContext, "organizationId" | "userId">;
 
-async function versionCourante(executeur: ExecuteurAction, org: string, tripId: string): Promise<number | null> {
+export async function versionCourante(executeur: ExecuteurAction, org: string, tripId: string): Promise<number | null> {
   const ligne = (await executeur.query(SQL_COURANTE, [org, tripId])).rows[0];
   return ligne === undefined || ligne.current_version === null ? null : (entier(ligne.current_version) ?? null);
 }
 
-async function lireVersion(executeur: ExecuteurAction, org: string, tripId: string, version: number) {
+export async function lireVersion(executeur: ExecuteurAction, org: string, tripId: string, version: number) {
   const ligne = (await executeur.query(SQL_INSTANTANE, [org, tripId, version])).rows[0];
   const instantane = TripSnapshotSchema.safeParse(ligne?.snapshot);
   if (ligne === undefined || !instantane.success) throw new RemplacementIncoherent();
@@ -411,7 +413,7 @@ async function propositionsDe(executeur: ExecuteurAction, org: string, tripId: s
   });
 }
 
-async function refuserPendantUnRecalcul(executeur: ExecuteurAction, org: string, tripId: string): Promise<void> {
+export async function refuserPendantUnRecalcul(executeur: ExecuteurAction, org: string, tripId: string): Promise<void> {
   if ((await executeur.query(SQL_EN_COURS, [org, tripId])).rows[0]?.en_cours === true) throw new RefusAction("generation_in_progress");
 }
 
@@ -462,7 +464,7 @@ async function engagementsDe(executeur: ExecuteurAction, org: string, tripId: st
   });
 }
 
-async function contexteVoyage(executeur: ExecuteurAction, ctx: AdapterContext, tripId: string): Promise<ContexteVoyage | null> {
+export async function contexteVoyage(executeur: ExecuteurAction, ctx: AdapterContext, tripId: string): Promise<ContexteVoyage | null> {
   const base = await lireBaseDeRevision(executeur, ctx, tripId);
   if (base === null) return null;
   const org = ctx.organizationId;

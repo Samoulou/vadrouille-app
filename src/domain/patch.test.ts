@@ -542,15 +542,112 @@ describe("patch: entrée bloquante nouvelle (validation des jours touchés)", ()
     jour.items = jour.items.map((item) => (item.type === "stop" && item.stop.id === ancienne.id ? { ...item, stop: { ...item.stop, placeId: place("ferme") } } : item));
     const gelee = structuredClone(fermee);
 
-    const { instantane, resultat, rapport } = reussi(appliquerPatch(entree(fermee, patch(2, [{ op: "lock", stopId: autre.id }]))));
+    // Patch `[add, lock]` (lieu à soi verrouillé, décision 0147 § 11) : il replanifie et valide le J2. Un `lock` seul ne
+    // revalide plus rien depuis la décision 0147 § 9 (M5a) : il ne peut plus servir à éprouver l'écart 1.
+    const { instantane, resultat, rapport } = reussi(
+      appliquerPatch(
+        entree(fermee, patch(2, [
+          { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time: "21:00", name: "Mon lieu à moi", placeId: place("proche") },
+          { op: "lock", stopId: "ajout-1" },
+        ])),
+      ),
+    );
     expect(resultat.touchedDays).toEqual([2]);
-    expect(etape(instantane, (stop) => stop.id === autre.id).locked).toBe(true);
+    expect(etape(instantane, (stop) => stop.id === "ajout-1").locked).toBe(true);
+    expect(etape(instantane, (stop) => stop.id === autre.id).locked).toBe(false);
     // L'entrée bloquante R1 du lieu fermé est toujours dans le rapport du jour touché : elle n'a pas été créée par ce
     // patch, qui n'est donc pas refusé (écart 1).
     const bloquantes = rapport.filter((e) => estBloquante(e, instantane.days));
     expect(bloquantes.length).toBeGreaterThan(0);
     expect(bloquantes).toContainEqual(expect.objectContaining({ regle: "R1", etape: ancienne.id }));
     expect(fermee).toEqual(gelee);
+  });
+});
+
+/**
+ * Verrou seul (décision 0147 § 9, M5a) : un patch fait seulement de `lock` et d'`unlock` ne replanifie ni ne revalide ;
+ * aucune interface de relectures n'est appelée (sur `api` : aucun appel Google ni Routes pour verrouiller).
+ */
+describe("verrou: verrou seul, aucune replanification ni relecture", () => {
+  /** Relectures qui ne connaissent rien : sans § 9, la replanification d'un jour touché rendait `no_option`. */
+  function muettes(appels: { nombre: number }): Relectures {
+    return {
+      validite() {
+        appels.nombre += 1;
+        return INCONNU;
+      },
+      plages() {
+        appels.nombre += 1;
+        return INCONNU;
+      },
+      duree() {
+        appels.nombre += 1;
+        return INCONNU;
+      },
+    };
+  }
+
+  it("verrou: verrou seul, aucune replanification ni relecture (instantané égal à la base hors locked, aucun appel du port)", () => {
+    const base = version2();
+    const gelee = structuredClone(base);
+    const activite = activiteDuJour(base, 2);
+    const ticket = billet(base);
+    for (const operations of [
+      [{ op: "lock", stopId: activite.id }],
+      [{ op: "unlock", stopId: ticket.id }],
+      [{ op: "lock", stopId: activite.id }, { op: "unlock", stopId: ticket.id }],
+    ] satisfies TripPatchOperation[][]) {
+      const appels = { nombre: 0 };
+      const { instantane, resultat, rapport } = reussi(appliquerPatch({ ...entree(base, patch(2, operations)), moteur: { ...moteur(), relectures: muettes(appels) } }));
+      expect(appels.nombre, JSON.stringify(operations)).toBe(0);
+      const attendu = structuredClone(base);
+      for (const operation of operations) {
+        for (const jour of attendu.days) {
+          jour.items = jour.items.map((item) => (item.type === "stop" && item.stop.id === operation.stopId ? { ...item, stop: { ...item.stop, locked: operation.op === "lock" } } : item));
+        }
+      }
+      expect(instantane).toEqual(attendu);
+      expect(rapport).toEqual([]);
+      expect(PatchResultSchema.parse(resultat)).toEqual(resultat);
+      // Aucun trajet ni budget ne change : seulement `locked`, `unlocked` et `unchanged`.
+      expect(resultat.changes.every((change) => ["locked", "unlocked", "unchanged"].includes(change.type))).toBe(true);
+    }
+    expect(base).toEqual(gelee);
+  });
+
+  it("verrou: les refus du moteur restent (étape inconnue, verrou sans effet), sans relecture", () => {
+    const base = version2();
+    const appels = { nombre: 0 };
+    const avec = (operations: TripPatchOperation[]) => appliquerPatch({ ...entree(base, patch(2, operations)), moteur: { ...moteur(), relectures: muettes(appels) } });
+    expect(avec([{ op: "lock", stopId: "absente" }])).toEqual({ ok: false, code: "unknown_stop" });
+    expect(avec([{ op: "lock", stopId: billet(base).id }])).toEqual({ ok: false, code: "no_effect" });
+    expect(avec([{ op: "unlock", stopId: activiteDuJour(base, 2).id }])).toEqual({ ok: false, code: "no_effect" });
+    expect(appels.nombre).toBe(0);
+  });
+
+  it("verrou: [add, lock] garde la replanification et la validation de l'ajout (relectures appelées)", () => {
+    const base = version2();
+    const appels = { nombre: 0 };
+    const { instantane } = reussi(
+      appliquerPatch({
+        ...entree(base, patch(2, [
+          { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time: "21:00", name: "Mon lieu à moi", placeId: place("proche") },
+          { op: "lock", stopId: "ajout-1" },
+        ])),
+        moteur: { ...moteur(), relectures: relectures(appels) },
+      }),
+    );
+    expect(appels.nombre).toBeGreaterThan(0);
+    expect(etape(instantane, (stop) => stop.id === "ajout-1")).toMatchObject({ addedBy: "person", locked: true });
+    // Sans relecture, l'ajout n'est pas replanifiable : le verrou ne l'en dispense pas.
+    const sans = appliquerPatch({
+      ...entree(base, patch(2, [
+        { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time: "21:00", name: "Mon lieu à moi", placeId: place("proche") },
+        { op: "lock", stopId: "ajout-1" },
+      ])),
+      moteur: { ...moteur(), relectures: muettes({ nombre: 0 }) },
+    });
+    expect(sans).toEqual({ ok: false, code: "no_option" });
   });
 });
 

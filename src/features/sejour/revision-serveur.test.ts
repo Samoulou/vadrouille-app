@@ -9,11 +9,15 @@ vi.mock("@/server/actions/remplacement", () => ({
 vi.mock("@/server/actions/sejour", () => ({
   toggleChecklistItem: vi.fn(),
 }));
+vi.mock("@/server/actions/retouches", () => ({
+  lockStop: vi.fn(),
+  unlockStop: vi.fn(),
+}));
 
-import { RevisionPreviewSchema, type ChecklistItem, type Day, type ReplacementOffer, type ReplacementWrite, type Result, type Stop } from "@/contracts";
+import { RevisionPreviewSchema, type ChecklistItem, type Day, type PatchResult, type ReplacementOffer, type ReplacementWrite, type Result, type Stop } from "@/contracts";
 import { edimbourg } from "@/mocks/edimbourg";
 
-import { applyProgramme, createMemoryProgramme, createMemoryProgrammeStore, programmeReducer, sendToMemoryStore, type ProgrammeState } from "./programme";
+import { applyProgramme, createMemoryProgramme, createMemoryProgrammeStore, programmeReducer, sendToMemoryStore, VerrouNonEnregistre, type ProgrammeState } from "./programme";
 import { createServerRevision, createServerRevisionStore, syncServerRevisionVersion, type ServerRevisionCalls } from "./revision-serveur";
 
 /**
@@ -22,6 +26,8 @@ import { createServerRevision, createServerRevisionStore, syncServerRevisionVers
  */
 
 const DINER = "j1-diner";
+/** `VERSIONS_MAX_PAR_VOYAGE` (`src/server/config/retouches.ts`, serveur seulement) : la borne est tenue par le serveur. */
+const VERSIONS_MAX = 200;
 const NOUVELLE: Stop = {
   id: "remplacement-v2-abcdef12",
   kind: "meal",
@@ -72,8 +78,23 @@ const OFFRE: ReplacementOffer = {
 };
 
 function setup(
-  reponses: { offer?: Result<ReplacementOffer>; apply?: Result<ReplacementWrite>; undo?: Result<ReplacementWrite>; toggle?: (input: unknown) => Promise<Result<ChecklistItem>> } = {},
+  reponses: {
+    offer?: Result<ReplacementOffer>;
+    apply?: Result<ReplacementWrite>;
+    undo?: Result<ReplacementWrite>;
+    toggle?: (input: unknown) => Promise<Result<ChecklistItem>>;
+    verrou?: (input: unknown) => Promise<Result<PatchResult>>;
+  } = {},
 ) {
+  // Verrou enregistré (M5a) : version suivante de la base reçue, aucun changement détaillé.
+  let derniereVersion = 1;
+  const verrou =
+    reponses.verrou ??
+    (async (input: unknown) => {
+      const { baseVersion } = input as { baseVersion: number };
+      derniereVersion = baseVersion + 1;
+      return ok<PatchResult>({ version: derniereVersion, touchedDays: [1], changes: [] });
+    });
   const calls = {
     previewReplacement: vi.fn<ServerRevisionCalls["previewReplacement"]>(async () => reponses.offer ?? ok(OFFRE)),
     applyReplacement: vi.fn<ServerRevisionCalls["applyReplacement"]>(async () => reponses.apply ?? ok({ status: "applied", version: 2 })),
@@ -86,6 +107,8 @@ function setup(
           return ok({ ...item, done });
         }),
     ),
+    lockStop: vi.fn<ServerRevisionCalls["lockStop"]>(verrou),
+    unlockStop: vi.fn<ServerRevisionCalls["unlockStop"]>(verrou),
   };
   let screen: ProgrammeState = createMemoryProgrammeStore().state;
   const memoryStore = createMemoryProgrammeStore();
@@ -179,7 +202,7 @@ describe("révision enregistrée : aperçu, application et annulation (PR 869)",
     expect(calls.undoReplacement).toHaveBeenCalledTimes(1);
   });
 
-  it("PR 869 : un verrou posé après le remplacement le rend définitif (« Annuler » annule le verrou, en mémoire)", async () => {
+  it("PR 869 : un verrou posé après le remplacement le rend définitif (« Annuler » annule le verrou : geste inverse enregistré, M5a)", async () => {
     const { actions, calls, shown } = setup();
     const result = await actions.previewReplacement(REQUETE, { signal: signal() });
     if (!result.ok) throw new Error(result.error);
@@ -187,6 +210,8 @@ describe("révision enregistrée : aperçu, application et annulation (PR 869)",
     await actions.setStopLocked("j1-chateau", true);
     await actions.undo();
     expect(calls.undoReplacement).not.toHaveBeenCalled();
+    expect(calls.lockStop).toHaveBeenCalledWith({ tripId: edimbourg.id, requestId: "00000000-0000-4000-8000-000000000002", stopId: "j1-chateau", baseVersion: 2 });
+    expect(calls.unlockStop).toHaveBeenCalledWith({ tripId: edimbourg.id, requestId: "00000000-0000-4000-8000-000000000003", stopId: "j1-chateau", baseVersion: 3 });
     const chateau = shown().days[0]?.items.find((item) => item.type === "stop" && item.stop.id === "j1-chateau");
     expect(chateau?.type === "stop" && chateau.stop.locked).toBe(false);
   });
@@ -279,5 +304,67 @@ describe("liste « À faire » enregistrée (M5e, spécification M5 § 7.3)", ()
       await expect(actions.setChecklistItemDone(CHATEAU, true)).rejects.toThrow();
       expect(fait(shown)).toBe(false);
     }
+  });
+});
+
+describe("verrou enregistré sur api (M5a, ticket 919)", () => {
+  const chateau = (shown: ReturnType<ReturnType<typeof setup>["shown"]>) => {
+    const item = shown.days[0]?.items.find((i) => i.type === "stop" && i.stop.id === "j1-chateau");
+    return item?.type === "stop" ? item.stop : undefined;
+  };
+
+  it("verrou: verrouiller écrit une version : lockStop sur la version courante, l'état s'affiche après l'écriture, puis relecture", async () => {
+    const { actions, calls, store, afterWrite, shown } = setup();
+    await actions.setStopLocked("j1-chateau", true);
+    expect(calls.lockStop).toHaveBeenCalledWith({ tripId: edimbourg.id, requestId: "00000000-0000-4000-8000-000000000001", stopId: "j1-chateau", baseVersion: 1 });
+    expect(store.version).toBe(2);
+    expect(chateau(shown())?.locked).toBe(true);
+    expect(afterWrite).toHaveBeenCalledTimes(1);
+    await actions.setStopLocked("j1-chateau", false);
+    expect(calls.unlockStop).toHaveBeenCalledWith({ tripId: edimbourg.id, requestId: "00000000-0000-4000-8000-000000000002", stopId: "j1-chateau", baseVersion: 2 });
+    expect(chateau(shown())?.locked).toBe(false);
+  });
+
+  it("verrou: conflit de version : VerrouNonEnregistre(conflict), rien n'est affiché, la version relue sert de base, relecture demandée", async () => {
+    const { actions, store, afterWrite, shown } = setup({ verrou: async () => ({ ok: false, error: { code: "version_conflict", retryable: true, currentVersion: 4 } }) });
+    await expect(actions.setStopLocked("j1-chateau", true)).rejects.toEqual(new VerrouNonEnregistre("conflict"));
+    expect(chateau(shown())?.locked).toBe(false);
+    expect(store.version).toBe(4);
+    expect(afterWrite).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["not_unlocked", async (): Promise<Result<PatchResult>> => ({ ok: false, error: { code: "not_unlocked", retryable: false } })],
+    ["panne", async (): Promise<Result<PatchResult>> => Promise.reject(new Error("réseau"))],
+  ])("verrou: refus (%s) : VerrouNonEnregistre(error), rien n'est affiché ni relu", async (_cas, verrou) => {
+    const { actions, store, afterWrite, shown } = setup({ verrou });
+    await expect(actions.setStopLocked("j1-chateau", true)).rejects.toEqual(new VerrouNonEnregistre("error"));
+    expect(chateau(shown())?.locked).toBe(false);
+    expect(store.version).toBe(1);
+    expect(afterWrite).not.toHaveBeenCalled();
+  });
+
+  it(`verrou: « Annuler » au plafond de ${VERSIONS_MAX} versions : le geste inverse refusé (validation_failed) lève, l'étape reste verrouillée, l'annulation reste possible`, async () => {
+    // Le verrou écrit la dernière version admise ; le geste inverse de « Annuler » tombe sur la borne (0147 § 5.3 point 7).
+    let plafond = false;
+    const { actions, calls, store, shown } = setup({
+      verrou: async (input) => {
+        const { baseVersion } = input as { baseVersion: number };
+        if (plafond) return { ok: false, error: { code: "validation_failed", field: "baseVersion" } };
+        plafond = true;
+        return ok<PatchResult>({ version: baseVersion + 1, touchedDays: [1], changes: [] });
+      },
+    });
+    syncServerRevisionVersion(store, VERSIONS_MAX - 1);
+    await actions.setStopLocked("j1-chateau", true);
+    expect(store.version).toBe(VERSIONS_MAX);
+    await expect(actions.undo()).rejects.toEqual(new VerrouNonEnregistre("error"));
+    expect(calls.unlockStop).toHaveBeenCalledWith(expect.objectContaining({ stopId: "j1-chateau", baseVersion: VERSIONS_MAX }));
+    expect(chateau(shown())?.locked).toBe(true);
+    expect(store.version).toBe(VERSIONS_MAX);
+    // L'annulation n'est pas oubliée : un second « Annuler » redemande le même geste inverse.
+    await expect(actions.undo()).rejects.toEqual(new VerrouNonEnregistre("error"));
+    expect(calls.unlockStop).toHaveBeenCalledTimes(2);
+    expect(calls.undoReplacement).not.toHaveBeenCalled();
   });
 });
