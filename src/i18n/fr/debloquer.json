@@ -6,20 +6,6 @@
     "recu": "{destination} · Reçu simulé"
   },
   "retour": "Retour",
-  "plaque": {
-    "ligne": "{debut} – {fin} · {voyageurs}",
-    "date": "{jour} {date}",
-    "adultes": {
-      "un": "1 adulte",
-      "plusieurs": "{n} adultes"
-    },
-    "enfants": {
-      "un": "1 enfant",
-      "plusieurs": "{n} enfants"
-    },
-    "separateur": ", ",
-    "dateAnnee": "{jour} {date}.{annee}"
-  },
   "offre": {
     "titre": "Débloquer ton voyage",
     "titreDebloque": "Ton voyage est débloqué",
