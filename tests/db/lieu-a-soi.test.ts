@@ -117,17 +117,25 @@ beforeAll(async () => {
   b = await createOrg(auth);
   double = creerRelecturesVoyages();
   const estLeLieu = (point: Point) => "lieu" in point && point.lieu === LIEU;
-  // Le double ne connaît que les lieux du jeu : trajets **demandés** vers et depuis le lieu ajouté, 10 minutes ; tout le
-  // reste, le double (un trajet non demandé reste inconnu, comme avec le vrai port).
+  // Le double ne connaît que les lieux du jeu. Pour le lieu ajouté, il répond comme le vrai port, à ce qui est **demandé**
+  // seulement : sa fiche (`validite`, valide s'il est dans `demande.lieux`, sinon inconnue ; R1 exige un lieu ajouté relu
+  // et valide, `PORTEE_R1_PAR_DEFAUT`), et les trajets demandés vers et depuis lui, 10 minutes ; tout le reste, le double
+  // (un trajet ou une fiche non demandés restent inconnus). Correction 2 de la PR 943 : sans la fiche, R1 refusait tout
+  // ajout (`no_option`) ; la demande de `src/server/lieux/ajout.ts` couvrait déjà la fiche et les trajets du cas nominal.
   relectures = {
     async pour(voyage, demande) {
       const issue = await double.pour(voyage, demande);
       if (!issue.ok) return issue;
       const base = issue.relectures;
+      const ficheDemandee = demande.lieux.some((lieu) => lieu.placeId === LIEU);
       return {
         ok: true as const,
         relectures: {
-          validite: (placeId) => base.validite(placeId),
+          validite(placeId) {
+            const lue = base.validite(placeId);
+            if (lue !== INCONNU || placeId !== LIEU) return lue;
+            return ficheDemandee ? "valide" : INCONNU;
+          },
           plages: (placeId, date) => base.plages(placeId, date),
           duree(depuis, vers, mode) {
             const lue = base.duree(depuis, vers, mode);
@@ -183,10 +191,11 @@ describe("lieu à soi sur api (M5d-1, ticket 939)", () => {
       stop: { id: stopId, kind: "activity", placeId: LIEU, name: NOM, start: "16:00", end: expect.any(String), facts: {}, exceptions: [], locked: true, addedBy: "person" },
     });
 
-    // Rejeu : même réponse, aucune nouvelle version ; autre geste sous le même requestId : conflit.
+    // Rejeu : même réponse, sans relecture (le rejeu est cherché avant le port, `rejeuDe`), aucune nouvelle version ; autre
+    // geste sous le même requestId : conflit.
     const appels = double.appels();
     expect(valeur(await appliquer(tripId, 1, requestId))).toEqual({ version: 2, touchedDays: [2], changes: [{ type: "added", time: "16:00", label: NOM }] });
-    expect(double.appels()).toBe(appels + 1);
+    expect(double.appels()).toBe(appels);
     expect(erreur(await appliquer(tripId, 1, requestId, { time: "17:00" }))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 2 });
     expect(await versions(a, tripId)).toHaveLength(2);
 
@@ -283,11 +292,14 @@ describe("lieu à soi sur api (M5d-1, ticket 939)", () => {
 
   it("R3 : une étape verrouillée survit à l'ajout (nom, jour, heures, placeId, verrou)", async () => {
     const tripId = await nouveauVoyage();
-    valeur(await basculerVerrou({ contexte: async () => contexte(a), withOrg, limiteur: async () => ok(undefined) }, "lock", { tripId, requestId: randomUUID(), stopId: "j2-jardin-botanique", baseVersion: 1 }));
-    const avant = etape(instantane((await versions(a, tripId))[1]), "j2-jardin-botanique");
+    // Le dîner du J2, voisin suivant du lieu ajouté (trajet demandé). Pas le jardin botanique : verrouillé à son heure
+    // écrite, il ferait passer le déjeuner, mobile et décalé par la replanification, après lui ; le trajet du jardin vers
+    // le déjeuner n'est pas demandé, d'où `no_option` (étape mobile repoussée, cas toléré ; correction 2 de la PR 943).
+    valeur(await basculerVerrou({ contexte: async () => contexte(a), withOrg, limiteur: async () => ok(undefined) }, "lock", { tripId, requestId: randomUUID(), stopId: "j2-diner", baseVersion: 1 }));
+    const avant = etape(instantane((await versions(a, tripId))[1]), "j2-diner");
     expect(avant?.stop.locked).toBe(true);
     expect(valeur(await appliquer(tripId, 2)).version).toBe(3);
-    const apres = etape(instantane((await versions(a, tripId))[2]), "j2-jardin-botanique");
+    const apres = etape(instantane((await versions(a, tripId))[2]), "j2-diner");
     expect(apres).toEqual(avant);
   });
 });
@@ -427,6 +439,9 @@ describe("lieu à soi et révision après le tri (M1b)", () => {
     const avecAjout = lieuxASoiReinjectes({ days: v1!.days.map((jour) => (jour.index === 2 ? { ...jour, items: [{ type: "stop", stop: ajoutee }] } : { ...jour, items: [] })) }, v1!);
     expect(etape(avecAjout, stopId)?.stop).toEqual(ajoutee);
     expect(etapes(avecAjout).filter((e) => e.stop.id !== stopId)).toEqual(etapes(v1!));
+    // INSERT direct dans `trip_versions` (auteur `engine`), et non `ecrireVersion` ni `appliquerAjout` : seul l'instantané
+    // de la base de la révision compte pour S4 (étape `addedBy: "person"` gardée par M1b) ; le chemin d'écriture d'un ajout
+    // est éprouvé par le premier describe (auteur `user`, patch `[add, lock]`). Suffisant pour S4 (revue de la PR 943).
     await inTx(jetable.app, { org: org.org, user: org.owner }, async (c) => {
       await c.query(
         "INSERT INTO trip_versions (organization_id, trip_id, version, parent_version, request_id, snapshot, author_kind) VALUES ($1, $2, 2, 1, $3, $4, 'engine')",

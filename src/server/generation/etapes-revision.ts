@@ -151,15 +151,21 @@ function intervalle(ligne: DayLineItemSnapshot): readonly [number, number] | nul
  * Lieux à soi réinjectés (fonction pure ; M5d-1, décision 0147 § 12 S4) : chaque étape `addedBy: "person"` de la version de
  * base est remise, **telle quelle** (identifiant, nom, jour, heures, `placeId`, verrou), dans le même jour de la version
  * révisée, à son heure (avant la première étape qui commence après elle, sinon avant le terminus de fin). Les lignes de la
- * révision qui la chevauchent sont retirées : étapes non verrouillées, temps libres et repas ouverts ; une étape verrouillée
- * de la base n'est jamais retirée (la base les tenait déjà sans chevauchement). Deux trajets devenus voisins n'en font
- * qu'un. Un jour absent de la révision, ou un lieu déjà présent (même identifiant), est laissé tel quel.
+ * révision qui la chevauchent sont retirées : étapes, temps libres et repas ouverts ; une étape **verrouillée dans la base**
+ * (verrou lu dans `base`, l'assemblage rendant les lignes de la révision déverrouillées) n'est jamais retirée (la base les
+ * tenait déjà sans chevauchement ; R3 les compare ensuite). Deux trajets devenus voisins n'en font qu'un ; les trajets du
+ * lieu réinjecté ne sont pas recomposés (durées affichées possiblement périmées) et une étape retirée ne laisse aucune trace
+ * (consigné dans la PR 943, à traiter à M5d-2). Un jour absent de la révision, ou un lieu déjà présent (même identifiant),
+ * est laissé tel quel.
  */
 export function lieuxASoiReinjectes(base: TripSnapshot, revisee: TripSnapshot): TripSnapshot {
   const parJour = new Map<number, StopSnapshot[]>();
+  const verrouilleesDansLaBase = new Set<string>();
   for (const jour of base.days) {
     for (const ligne of jour.items) {
-      if (ligne.type === "stop" && ligne.stop.addedBy === "person") parJour.set(jour.index, [...(parJour.get(jour.index) ?? []), ligne.stop]);
+      if (ligne.type !== "stop") continue;
+      if (ligne.stop.locked) verrouilleesDansLaBase.add(ligne.stop.id);
+      if (ligne.stop.addedBy === "person") parJour.set(jour.index, [...(parJour.get(jour.index) ?? []), ligne.stop]);
     }
   }
   if (parJour.size === 0) return revisee;
@@ -170,7 +176,7 @@ export function lieuxASoiReinjectes(base: TripSnapshot, revisee: TripSnapshot): 
       const aPoser = (parJour.get(jour.index) ?? []).filter((stop) => !presents.has(stop.id));
       if (aPoser.length === 0) return jour;
       const chevauche = (ligne: DayLineItemSnapshot) => {
-        if (ligne.type === "stop" && ligne.stop.locked) return false;
+        if (ligne.type === "stop" && verrouilleesDansLaBase.has(ligne.stop.id)) return false;
         const lu = intervalle(ligne);
         if (lu === null) return false;
         return aPoser.some((stop) => {
@@ -250,7 +256,10 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
   // Lieux à soi de la base réinjectés (voir l'en-tête), puis R3 : une version qui changerait une étape verrouillée n'est pas écrite.
   const revisee = lieuxASoiReinjectes(base, instantane);
   const tenue = verrousReportes(base, revisee);
-  const publies = new Set(instantane.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));
+  // Positions écrites : celles des lieux de la version **publiée** (lieux à soi compris ; seules les fiches lues par cette
+  // révision ont une position en mémoire, `PositionsDeLEtape`), jamais d'une étape retirée par la réinjection.
+  const publiee = tenue ?? revisee;
+  const publies = new Set(publiee.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));
   const ecrirePositions = contexte.dep.ecriturePositions(fabrique)
     ? (executeur: ExecuteurPublication) => verifies.positions.ecrire(executeur, publies, obtenuesA, contexte.dep.portPositions)
     : undefined;
@@ -262,7 +271,7 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
     contexte.dep,
     { organizationId, generationRunId, tripId, requestId: contexte.requestId, echeance: contexte.echeance, rang: contexte.rang },
     {
-      instantane: tenue ?? revisee,
+      instantane: publiee,
       // Version remplacée : la version de base, seule version courante admise par `ecrireSi` (relue sous le verrou).
       instantanePrecedent: base,
       cases: [],
