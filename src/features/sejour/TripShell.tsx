@@ -100,6 +100,11 @@ export interface AppliedChange {
   originStopId?: Stop["id"];
   /** Appelé une fois l'annulation résolue (mesure `replace_undone`). */
   onUndone?: () => void;
+  /**
+   * Annulation propre à cette modification (ajout d'un lieu à soi enregistré sur `api`, M5d-2 : un retour vers la version
+   * d'avant) ; sinon `actions.undo()`. Lève en cas d'échec : le toast revient avec l'annonce de l'échec.
+   */
+  undo?: () => Promise<void>;
 }
 
 export interface TripShellValue {
@@ -179,6 +184,17 @@ export interface TripShellValue {
   recordRevert: (version: number) => void;
   /** L'écran des versions signale son montage (`true`) et son démontage (`false`) : « Retour » mène alors au Séjour. */
   markVersionsOpen: (open: boolean) => void;
+  /**
+   * « Ajouter un lieu » (M5d-2 ; spécification M5 § 6) : voyage débloqué (M5-PO-1), adaptateurs `mock` et `api`, routes
+   * `/voyages` (même condition serveur que les versions, `versionable`) ; sinon faux (ni bouton, ni formulaire).
+   */
+  addPlaceAvailable: boolean;
+  /**
+   * Ajout d'un lieu à soi appliqué (M5d-2) : les jours de l'aperçu s'affichent aussitôt. Sur `api` (`version` non nulle),
+   * la version écrite devient la base des gestes suivants (la modification précédente devient définitive), puis le voyage
+   * est relu ; sans révision enregistrée (`mock`), l'ajout reste en mémoire, annulable par `actions.undo()` (Q762).
+   */
+  showAddedPlace: (days: readonly Day[], version: number | null) => void;
 }
 
 const TripShellContext = createContext<TripShellValue | null>(null);
@@ -490,6 +506,20 @@ export function TripShell({
   // Écran des versions monté (il le signale) : « Retour » sur la carte mène au Séjour, comme depuis une Journée.
   const [onVersions, setOnVersions] = useState(false);
   const markVersionsOpen = useCallback((open: boolean) => setOnVersions(open), []);
+  // « Ajouter un lieu » (M5d-2) : même condition serveur que les versions, voyage débloqué seulement (M5-PO-1).
+  const addPlaceAvailable = versionable && sourceTrip.unlocked;
+  const showAddedPlace = useCallback(
+    (days: readonly Day[], version: number | null) => {
+      if (serverStore !== null && version !== null) {
+        recordServerRevert(serverStore, version);
+        send({ type: "applyRevision", days });
+        afterWrite();
+        return;
+      }
+      send({ type: "applyRevision", days });
+    },
+    [serverStore, send, afterWrite],
+  );
   const recordRevert = useCallback(
     (version: number) => {
       // Le retour rend définitive toute modification précédente (une seule modification annulable à la fois).
@@ -555,6 +585,7 @@ export function TripShell({
       setToast({
         id,
         message: change.message,
+        undo: change.undo,
         afterUndo: () => {
           setUndone({ id });
           // Étape d'origine si elle est dans le jour affiché, sinon titre du jour (F7-PO-1).
@@ -630,6 +661,8 @@ export function TripShell({
       notifyReverted,
       recordRevert,
       markVersionsOpen,
+      addPlaceAvailable,
+      showAddedPlace,
     }),
     [
       routes,
@@ -662,6 +695,8 @@ export function TripShell({
       notifyReverted,
       recordRevert,
       markVersionsOpen,
+      addPlaceAvailable,
+      showAddedPlace,
     ],
   );
 

@@ -206,6 +206,7 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
           routes={routes}
           placesFromGoogle={shell.placesFromGoogle}
           highlightedStopIds={shell.highlight?.dayIndex === day.index ? shell.highlight.stopIds : NO_HIGHLIGHT}
+          addPlaceHref={shell.addPlaceAvailable ? routes.ajouter(day.index) : null}
         />
       )}
     </div>
