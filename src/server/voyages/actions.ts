@@ -59,7 +59,11 @@ export type NomAction =
   // M5b (ticket 934) : versions du programme et retour à une version sur `api` (`src/server/versions/historique.ts`).
   | "list-versions"
   | "preview-revert"
-  | "apply-revert";
+  | "apply-revert"
+  // Ticket 947 : déplacer une étape sur `api` (`src/server/versions/deplacement.ts`).
+  | "move-options"
+  | "preview-move"
+  | "apply-move";
 
 type EntreeVoyage = { readonly tripId: string };
 

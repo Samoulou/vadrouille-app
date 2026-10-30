@@ -15,6 +15,8 @@ import type {
   InferredBrief,
   LodgingRequest,
   LodgingSuggestion,
+  MoveDraft,
+  MoveOptions,
   Offer,
   PatchResult,
   PreviewSlot,
@@ -154,6 +156,17 @@ export interface RevisionAdapter {
    */
   lockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
   unlockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+  /**
+   * Déplacer une étape (ticket 947 ; feuille « Déplacer » de F7b ; décision 0147 § 8 et § 11), sans aucun appel du port de
+   * relectures ni de Google : `getMoveOptions` (`{ tripId, stopId }` → `MoveOptions`), `previewMove` (`{ tripId, stopId,
+   * pointId, baseVersion }` → `MoveDraft`, trajets sans durée) et `applyMove` (`{ tripId, requestId, stopId, pointId,
+   * baseVersion }` → `PatchResult`, version nouvelle, patch `[move]`, débit `retouche`). Voyage débloqué seulement
+   * (`not_unlocked`) ; jamais une étape verrouillée, un engagement ni un événement (`validation_failed`, `stopId`) ; point
+   * absent de la version courante : `no_option`.
+   */
+  getMoveOptions(ctx: AdapterContext | null, input: unknown): Promise<Result<MoveOptions>>;
+  previewMove(ctx: AdapterContext | null, input: unknown): Promise<Result<MoveDraft>>;
+  applyMove(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
 }
 
 /**

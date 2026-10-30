@@ -1,6 +1,18 @@
-import type { ApplyResult, ChecklistItem, Day, PatchResult, ReplacementOffer, ReplacementWrite, Result, RevisionPreview, RevisionResult } from "@/contracts";
+import type {
+  ApplyResult,
+  ChecklistItem,
+  Day,
+  MoveDraft,
+  MoveOptions,
+  PatchResult,
+  ReplacementOffer,
+  ReplacementWrite,
+  Result,
+  RevisionPreview,
+  RevisionResult,
+} from "@/contracts";
 import { applyReplacement, previewReplacement, undoReplacement } from "@/server/actions/remplacement";
-import { lockStop, unlockStop } from "@/server/actions/retouches";
+import { applyMove, applyRevert, getMoveOptions, lockStop, previewMove, unlockStop } from "@/server/actions/retouches";
 import { toggleChecklistItem } from "@/server/actions/sejour";
 
 import { VerrouNonEnregistre, type MemoryProgramme, type ProgrammeActions } from "./programme";
@@ -10,8 +22,12 @@ import { abortReason, type RevisionActions } from "./revision";
  * Révision enregistrée de l'écran 14 sur l'adaptateur `api` (tâche M1g, ticket 869) : implémentation serveur de
  * `RevisionActions` et de `ProgrammeActions.undo`, choisie par `TripShell` quand la mise en page lui passe la version
  * courante du voyage (`revisionVersion` non nul, adaptateur `api`). N'importe de `src/server` que
- * `@/server/actions/remplacement`, `@/server/actions/retouches` et `@/server/actions/sejour`. Le déplacement reste
- * l'implémentation en mémoire.
+ * `@/server/actions/remplacement`, `@/server/actions/retouches` et `@/server/actions/sejour`.
+ *
+ * - Déplacement (ticket 947, feuille « Déplacer ») : points d'insertion (`getMoveOptions`, lus une fois à l'ouverture),
+ *   aperçu (`previewMove` : « Ce qui change », jours touchés **sans durée de trajet**, aucune relecture), « Appliquer »
+ *   (`applyMove`, une version de plus) ; « Annuler » du toast est un retour à la version de base (`applyRevert`, M5b). Un
+ *   point qui n'existe plus rend « aucune option » ; une version dépassée, « conflit ».
  *
  * - Verrou de la fiche (M5a, spécification M5 § 3) : `lockStop` ou `unlockStop` écrit une version (aucun appel Google ni
  *   Routes) ; l'état s'affiche une fois la version écrite, puis la mise en page relit le voyage : après un rechargement, le
@@ -33,14 +49,13 @@ import { abortReason, type RevisionActions } from "./revision";
  * Rien n'est écrit dans le navigateur ; un `requestId` par écriture (idempotence côté serveur).
  */
 
-/** Aperçu servi, gardé pour « Appliquer » : la demande à rejouer et les jours avant et après. */
+/** Aperçu servi, gardé pour « Appliquer » : la demande à rejouer (remplacement ou déplacement) et les jours avant et après. */
 type ApercuEnAttente = {
   readonly stopId: string;
-  readonly candidateId: string;
   readonly baseVersion: number;
   readonly avant: readonly Day[];
   readonly apres: readonly Day[];
-};
+} & ({ readonly kind: "replace"; readonly candidateId: string } | { readonly kind: "move"; readonly pointId: string });
 
 /**
  * État tenu pour la vie de l'écran (comme `MemoryProgrammeStore`) : recréer les actions (voyage relu) ne perd ni la
@@ -54,10 +69,12 @@ export interface ServerRevisionStore {
   last: { readonly version: number; readonly avant: readonly Day[] } | null;
   /** Dernière modification annulable, si c'est un verrou enregistré (M5a) : « Annuler » écrit le geste inverse. */
   lastLock: { readonly stopId: string; readonly locked: boolean } | null;
+  /** Dernière modification annulable, si c'est un déplacement enregistré (ticket 947) : « Annuler » revient à sa base. */
+  lastMove: { readonly version: number; readonly baseVersion: number; readonly avant: readonly Day[] } | null;
 }
 
 export function createServerRevisionStore(version: number): ServerRevisionStore {
-  return { version, serial: 0, pending: new Map(), last: null, lastLock: null };
+  return { version, serial: 0, pending: new Map(), last: null, lastLock: null, lastMove: null };
 }
 
 /** Version relue par la mise en page : elle ne fait jamais reculer celle que les écritures ont rendue. */
@@ -73,6 +90,7 @@ export function recordServerRevert(store: ServerRevisionStore, version: number):
   syncServerRevisionVersion(store, version);
   store.last = null;
   store.lastLock = null;
+  store.lastMove = null;
 }
 
 /** Actions serveur injectées (tests) ; celles de `@/server/actions/remplacement` par défaut. */
@@ -83,9 +101,24 @@ export type ServerRevisionCalls = {
   toggleChecklistItem(input: unknown): Promise<Result<ChecklistItem>>;
   lockStop(input: unknown): Promise<Result<PatchResult>>;
   unlockStop(input: unknown): Promise<Result<PatchResult>>;
+  getMoveOptions(input: unknown): Promise<Result<MoveOptions>>;
+  previewMove(input: unknown): Promise<Result<MoveDraft>>;
+  applyMove(input: unknown): Promise<Result<PatchResult>>;
+  applyRevert(input: unknown): Promise<Result<PatchResult>>;
 };
 
-const APPELS: ServerRevisionCalls = { previewReplacement, applyReplacement, undoReplacement, toggleChecklistItem, lockStop, unlockStop };
+const APPELS: ServerRevisionCalls = {
+  previewReplacement,
+  applyReplacement,
+  undoReplacement,
+  toggleChecklistItem,
+  lockStop,
+  unlockStop,
+  getMoveOptions,
+  previewMove,
+  applyMove,
+  applyRevert,
+};
 
 export interface ServerRevisionOptions {
   tripId: string;
@@ -131,11 +164,43 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
     options.afterWrite();
   }
 
+  /** « Appliquer » d'un déplacement : une version de plus ; les jours de l'aperçu s'affichent, puis la relecture. */
+  async function appliquerDeplacement(previewId: string, pending: ApercuEnAttente & { kind: "move" }): Promise<ApplyResult> {
+    let result: Result<PatchResult> | null;
+    try {
+      result = await calls.applyMove({ tripId, requestId: newRequestId(), stopId: pending.stopId, pointId: pending.pointId, baseVersion: pending.baseVersion });
+    } catch {
+      result = null;
+    }
+    if (result === null) return { ok: false, error: "error" };
+    if (!result.ok) {
+      if (result.error.code === "version_conflict") {
+        store.pending.delete(previewId);
+        if (result.error.currentVersion !== undefined) syncServerRevisionVersion(store, result.error.currentVersion);
+        return { ok: false, error: "conflict" };
+      }
+      if (result.error.code === "validation_failed" && result.error.field === "stopId") {
+        store.pending.delete(previewId);
+        return { ok: false, error: "lockedStop" };
+      }
+      return { ok: false, error: "error" };
+    }
+    store.pending.delete(previewId);
+    store.version = result.value.version;
+    store.last = null;
+    store.lastLock = null;
+    store.lastMove = { version: result.value.version, baseVersion: pending.baseVersion, avant: pending.avant };
+    options.showDays(pending.apres);
+    options.afterWrite();
+    return { ok: true, version: result.value.version };
+  }
+
   return {
     async setStopLocked(stopId, locked) {
       await ecrireVerrou(stopId, locked);
       // Une nouvelle modification rend le remplacement définitif (une seule modification annulable à la fois).
       store.last = null;
+      store.lastMove = null;
       store.lastLock = { stopId, locked };
     },
     async undo() {
@@ -144,6 +209,22 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
         // Geste inverse, enregistré comme une version de plus ; un refus lève, l'annulation reste possible.
         await ecrireVerrou(lastLock.stopId, !lastLock.locked);
         store.lastLock = null;
+        return;
+      }
+      const lastMove = store.lastMove;
+      if (lastMove !== null) {
+        // Retour à la version d'avant le déplacement (M5b) ; un refus ou une panne lève, l'annulation reste possible.
+        let result: Result<PatchResult> | null;
+        try {
+          result = await calls.applyRevert({ tripId, requestId: newRequestId(), baseVersion: lastMove.version, toVersion: lastMove.baseVersion });
+        } catch {
+          result = null;
+        }
+        if (result === null || !result.ok) throw new Error("annulation refusée");
+        store.lastMove = null;
+        store.version = result.value.version;
+        options.showDays(lastMove.avant);
+        options.afterWrite();
         return;
       }
       const last = store.last;
@@ -201,14 +282,40 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
       };
       // Un seul aperçu en attente : un aperçu plus récent remplace le précédent (l'écran n'applique que le dernier).
       store.pending.clear();
-      store.pending.set(preview.id, { stopId: request.stopId, candidateId: offer.candidateId, baseVersion: offer.version, avant, apres: draft.days });
+      store.pending.set(preview.id, { kind: "replace", stopId: request.stopId, candidateId: offer.candidateId, baseVersion: offer.version, avant, apres: draft.days });
       return { ok: true, preview } satisfies RevisionResult;
     },
-    getMoveOptions: (stopId) => memory.getMoveOptions(stopId),
-    previewMove: (request, signal) => memory.previewMove(request, signal),
+    async getMoveOptions(stopId) {
+      const result = await calls.getMoveOptions({ tripId, stopId });
+      // Refus ou panne : aucun point, tous les jours « complets » (rien n'est écrit).
+      return result.ok ? result.value : { stopId, days: [] };
+    },
+    async previewMove(request, { signal }) {
+      if (signal.aborted) throw abortReason(signal);
+      const result = await calls.previewMove({ tripId, ...request });
+      if (signal.aborted) throw abortReason(signal);
+      if (!result.ok) {
+        const { error } = result;
+        if (error.code === "version_conflict") {
+          if (error.currentVersion !== undefined) syncServerRevisionVersion(store, error.currentVersion);
+          return { ok: false, error: "conflict" };
+        }
+        return { ok: false, error: error.code === "no_option" ? "noOption" : "error" };
+      }
+      const draft = result.value;
+      const jours = new Set(draft.days.map((day) => day.index));
+      const avant = options.currentDays().filter((day) => jours.has(day.index));
+      if (avant.length !== jours.size) return { ok: false, error: "conflict" };
+      store.serial += 1;
+      const preview: RevisionPreview = { kind: "move", id: `deplacement-${store.serial}`, baseVersion: request.baseVersion, ...draft };
+      store.pending.clear();
+      store.pending.set(preview.id, { kind: "move", stopId: request.stopId, pointId: request.pointId, baseVersion: request.baseVersion, avant, apres: draft.days });
+      return { ok: true, preview } satisfies RevisionResult;
+    },
     async apply(previewId): Promise<ApplyResult> {
       const pending = store.pending.get(previewId);
       if (!pending) return { ok: false, error: "error" };
+      if (pending.kind === "move") return appliquerDeplacement(previewId, pending);
       const result = await calls.applyReplacement({
         tripId,
         requestId: newRequestId(),
@@ -227,6 +334,7 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
       store.version = write.version;
       store.last = { version: write.version, avant: pending.avant };
       store.lastLock = null;
+      store.lastMove = null;
       options.showDays(pending.apres);
       options.afterWrite();
       return { ok: true, version: write.version };

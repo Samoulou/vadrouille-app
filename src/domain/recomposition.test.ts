@@ -213,6 +213,23 @@ describe("recomposition: jour (B6-PO-4 à B6-PO-8)", () => {
     expect(stops.map((s) => s.verifiedAt)).toEqual(["2026-10-02", undefined]);
   });
 
+  it("aperçu d'un déplacement (ticket 947, sansDurees) : trajets sans durée (null), estimated stocké, travelMinutes 0, budget ; sans l'option, travel_unknown", () => {
+    const resultat = recomposerJour(j, { nombreDeNuits: 2, generating: false, modes: ["walk", "transit"], verification: sansDate, sansDurees: true });
+    expect(resultat.ok).toBe(true);
+    if (!resultat.ok) return;
+    expect(resultat.valeur.items.flatMap((item) => (item.type === "segment" ? [item.segment] : []))).toEqual([
+      { mode: "walk", minutes: null, estimated: false },
+      { mode: "transit", minutes: null, estimated: true },
+      { mode: "walk", minutes: null, estimated: false },
+    ]);
+    expect(resultat.valeur.travelMinutes).toBe(0);
+    expect(resultat.valeur.budgetPerPerson).toBe(20);
+    // Une relecture fournie l'emporte (l'option ne sert qu'en son absence) ; un jour en préparation n'en profite pas.
+    const relu = recomposerJour(j, { nombreDeNuits: 2, generating: false, relectures: r, modes: ["walk", "transit"], verification: sansDate, sansDurees: true });
+    expect(relu.ok && relu.valeur.travelMinutes).toBe(25);
+    expect(recomposerJour(j, { nombreDeNuits: 2, generating: true, modes: [], verification: sansDate, sansDurees: true })).toEqual({ ok: false, raison: "travel_unknown" });
+  });
+
   it("jour en préparation : ni mesure, ni budget, ni toConfirm ; un segment y est travel_unknown", () => {
     const sansSegment = jour(1, [term("start", "09:00"), etape("a", "10:00", "11:00", A), term("end", "18:00")]);
     const resultat = recomposerJour(sansSegment, { nombreDeNuits: 2, generating: true, modes: [], verification: sansDate });

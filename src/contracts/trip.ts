@@ -146,7 +146,10 @@ export type Stop = z.infer<typeof StopSchema>;
 
 export const SegmentSchema = z.strictObject({
   mode: z.enum(["walk", "transit", "car"]),
-  /** `null` : temps indisponible (prototype seulement, décision 0092 § 4) ; le MVP ne produit jamais `null`. */
+  /**
+   * `null` : temps indisponible (prototype, décision 0092 § 4 ; et, sur le MVP, seulement dans l'aperçu d'un déplacement,
+   * ticket 947, qui ne relit aucun trajet). Une lecture du MVP ne produit jamais `null`.
+   */
   minutes: MinutesSchema.nullable(),
   /** Affiche « (estimation) ». */
   estimated: z.boolean(),

@@ -186,6 +186,21 @@ export function tableDesRelectures(voyages: readonly VoyageSimule[] = VOYAGES_SI
         }
       }
     }
+    // Réserve du déplacement sur `api` (ticket 947 ; `src/domain/deplacement.ts`) : le serveur ne relit aucun trajet pour
+    // déplacer ; la ligne écrite garde les modes des trajets voisins, que la lecture suivante relit. Le double sert donc,
+    // pour les jours des brouillons de déplacement du jeu simulé de révision, la durée de chaque couple du brouillon, pour
+    // chacun des modes, si ce couple n'en a pas déjà une (valeur de test : jamais une durée relue).
+    for (const { drafts } of trip.id === edimbourg.id ? edimbourgRevision.moves : []) {
+      for (const { draft } of drafts) {
+        for (const day of draft.days) {
+          for (const [cle, minutes] of couplesDuJour(day.items, logement)) {
+            const [de, vers] = cle.split("|");
+            if (de === undefined || vers === undefined) continue;
+            for (const mode of ["walk", "transit", "car"] as const) if (!durees.has(cleTrajet(de, vers, mode))) durees.set(cleTrajet(de, vers, mode), minutes);
+          }
+        }
+      }
+    }
   }
   return { plages, durees, conflits, ecartsPropositions };
 }

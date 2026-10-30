@@ -12,9 +12,13 @@ vi.mock("@/server/actions/sejour", () => ({
 vi.mock("@/server/actions/retouches", () => ({
   lockStop: vi.fn(),
   unlockStop: vi.fn(),
+  getMoveOptions: vi.fn(),
+  previewMove: vi.fn(),
+  applyMove: vi.fn(),
+  applyRevert: vi.fn(),
 }));
 
-import { RevisionPreviewSchema, type ChecklistItem, type Day, type PatchResult, type ReplacementOffer, type ReplacementWrite, type Result, type Stop } from "@/contracts";
+import { RevisionPreviewSchema, type ChecklistItem, type Day, type MoveDraft, type MoveOptions, type PatchResult, type ReplacementOffer, type ReplacementWrite, type Result, type Stop } from "@/contracts";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { applyProgramme, createMemoryProgramme, createMemoryProgrammeStore, programmeReducer, sendToMemoryStore, VerrouNonEnregistre, type ProgrammeState } from "./programme";
@@ -77,6 +81,25 @@ const OFFRE: ReplacementOffer = {
   },
 };
 
+const JARDIN = "j2-jardin-botanique";
+const OPTIONS: MoveOptions = { stopId: JARDIN, days: [{ index: 4, points: [{ id: "deplacer-j4-1545", time: "15:45" }] }] };
+
+/** Jours du brouillon du serveur : le jardin passe du J2 au J4, trajets sans durée (aucune relecture, ticket 947). */
+function joursDuDeplacement(): Day[] {
+  const sansDuree = (day: Day): Day => ({ ...day, items: day.items.map((item) => (item.type === "segment" ? { ...item, segment: { ...item.segment, minutes: null } } : item)) });
+  const jardin = jour(2).items.flatMap((item) => (item.type === "stop" && item.stop.id === JARDIN ? [item.stop] : []))[0]!;
+  const j2 = { ...jour(2), items: jour(2).items.filter((item) => !(item.type === "stop" && item.stop.id === JARDIN)) };
+  const j4 = { ...jour(4), items: [...jour(4).items.slice(0, -1), { type: "stop" as const, stop: { ...jardin, start: "15:45", end: "17:20" } }, ...jour(4).items.slice(-1)] };
+  return [sansDuree(j2), sansDuree(j4)];
+}
+
+const APERCU_DEPLACEMENT: MoveDraft = {
+  days: joursDuDeplacement(),
+  changes: [{ type: "moved", label: "[Jardin botanique royal]", before: { day: 2, time: "13:25" }, after: { day: 4, time: "15:45" } }],
+  changedStopIds: [JARDIN],
+  targetStopId: JARDIN,
+};
+
 function setup(
   reponses: {
     offer?: Result<ReplacementOffer>;
@@ -84,6 +107,10 @@ function setup(
     undo?: Result<ReplacementWrite>;
     toggle?: (input: unknown) => Promise<Result<ChecklistItem>>;
     verrou?: (input: unknown) => Promise<Result<PatchResult>>;
+    options?: Result<MoveOptions>;
+    apercuDeplacement?: Result<MoveDraft>;
+    deplacement?: Result<PatchResult>;
+    retour?: Result<PatchResult>;
   } = {},
 ) {
   // Verrou enregistré (M5a) : version suivante de la base reçue, aucun changement détaillé.
@@ -109,6 +136,10 @@ function setup(
     ),
     lockStop: vi.fn<ServerRevisionCalls["lockStop"]>(verrou),
     unlockStop: vi.fn<ServerRevisionCalls["unlockStop"]>(verrou),
+    getMoveOptions: vi.fn<ServerRevisionCalls["getMoveOptions"]>(async () => reponses.options ?? ok(OPTIONS)),
+    previewMove: vi.fn<ServerRevisionCalls["previewMove"]>(async () => reponses.apercuDeplacement ?? ok(APERCU_DEPLACEMENT)),
+    applyMove: vi.fn<ServerRevisionCalls["applyMove"]>(async () => reponses.deplacement ?? ok({ version: 2, touchedDays: [2, 4], changes: [] })),
+    applyRevert: vi.fn<ServerRevisionCalls["applyRevert"]>(async () => reponses.retour ?? ok({ version: 3, touchedDays: [2, 4], changes: [] })),
   };
   let screen: ProgrammeState = createMemoryProgrammeStore().state;
   const memoryStore = createMemoryProgrammeStore();
@@ -366,5 +397,84 @@ describe("verrou enregistré sur api (M5a, ticket 919)", () => {
     await expect(actions.undo()).rejects.toEqual(new VerrouNonEnregistre("error"));
     expect(calls.unlockStop).toHaveBeenCalledTimes(2);
     expect(calls.undoReplacement).not.toHaveBeenCalled();
+  });
+});
+
+describe("déplacement enregistré sur api (ticket 947)", () => {
+  const DEMANDE = { stopId: JARDIN, pointId: "deplacer-j4-1545", baseVersion: 1 } as const;
+
+  it("deplacer: points lus par getMoveOptions ; refus ou panne : aucun point (tous les jours « complets »)", async () => {
+    const { actions, calls } = setup();
+    expect(await actions.getMoveOptions(JARDIN)).toEqual(OPTIONS);
+    expect(calls.getMoveOptions).toHaveBeenCalledWith({ tripId: edimbourg.id, stopId: JARDIN });
+    const refuse = setup({ options: { ok: false, error: { code: "not_unlocked", retryable: false } } });
+    expect(await refuse.actions.getMoveOptions(JARDIN)).toEqual({ stopId: JARDIN, days: [] });
+  });
+
+  it("deplacer: aperçu repris du serveur (trajets sans durée), valide RevisionPreviewSchema, rien n'est affiché ni écrit", async () => {
+    const { actions, calls, afterWrite, shown } = setup();
+    const result = await actions.previewMove(DEMANDE, { signal: signal() });
+    expect(calls.previewMove).toHaveBeenCalledWith({ tripId: edimbourg.id, ...DEMANDE });
+    if (!result.ok) throw new Error(result.error);
+    const preview = RevisionPreviewSchema.parse(result.preview);
+    expect(preview).toMatchObject({ kind: "move", baseVersion: 1, targetStopId: JARDIN, changedStopIds: [JARDIN] });
+    expect(preview.days.flatMap((day) => day.items).filter((item) => item.type === "segment").every((item) => item.type === "segment" && item.segment.minutes === null)).toBe(true);
+    expect(shown()).toBe(edimbourg);
+    expect(afterWrite).not.toHaveBeenCalled();
+    expect(calls.applyMove).not.toHaveBeenCalled();
+  });
+
+  it("deplacer: refus de l'aperçu : no_option → noOption, version_conflict → conflict (version relue), autre → error", async () => {
+    const aucun = setup({ apercuDeplacement: { ok: false, error: { code: "no_option" } } });
+    expect(await aucun.actions.previewMove(DEMANDE, { signal: signal() })).toEqual({ ok: false, error: "noOption" });
+    const conflit = setup({ apercuDeplacement: { ok: false, error: { code: "version_conflict", retryable: true, currentVersion: 4 } } });
+    expect(await conflit.actions.previewMove(DEMANDE, { signal: signal() })).toEqual({ ok: false, error: "conflict" });
+    expect(conflit.store.version).toBe(4);
+    const autre = setup({ apercuDeplacement: { ok: false, error: { code: "validation_failed", field: "stopId" } } });
+    expect(await autre.actions.previewMove(DEMANDE, { signal: signal() })).toEqual({ ok: false, error: "error" });
+  });
+
+  it("deplacer: « Appliquer » écrit (applyMove, point rejoué tel quel), affiche le brouillon, relecture ; « Annuler » revient à la base (applyRevert)", async () => {
+    const { actions, calls, store, afterWrite, shown } = setup();
+    const result = await actions.previewMove(DEMANDE, { signal: signal() });
+    if (!result.ok) throw new Error(result.error);
+    expect(await actions.apply(result.preview.id)).toEqual({ ok: true, version: 2 });
+    expect(calls.applyMove).toHaveBeenCalledWith({ tripId: edimbourg.id, requestId: "00000000-0000-4000-8000-000000000001", ...DEMANDE });
+    expect(calls.applyReplacement).not.toHaveBeenCalled();
+    expect(store.version).toBe(2);
+    expect(afterWrite).toHaveBeenCalledTimes(1);
+    expect(shown().days.find((day) => day.index === 4)?.items.some((item) => item.type === "stop" && item.stop.id === JARDIN)).toBe(true);
+
+    await actions.undo();
+    expect(calls.applyRevert).toHaveBeenCalledWith({ tripId: edimbourg.id, requestId: "00000000-0000-4000-8000-000000000002", baseVersion: 2, toVersion: 1 });
+    expect(store.version).toBe(3);
+    expect(afterWrite).toHaveBeenCalledTimes(2);
+    expect(shown().days.find((day) => day.index === 2)?.items.some((item) => item.type === "stop" && item.stop.id === JARDIN)).toBe(true);
+    // Une seule annulation : la suivante ne rejoue rien côté serveur.
+    expect(store.lastMove).toBeNull();
+  });
+
+  it("deplacer: « Appliquer » refusé : conflit (version relue), étape devenue verrouillée (lockedStop), autre (error), rien n'est affiché", async () => {
+    for (const [error, attendu] of [
+      [{ code: "version_conflict", retryable: true, currentVersion: 5 }, "conflict"],
+      [{ code: "validation_failed", field: "stopId" }, "lockedStop"],
+      [{ code: "no_option" }, "error"],
+    ] as const) {
+      const { actions, afterWrite, shown } = setup({ deplacement: { ok: false, error } });
+      const result = await actions.previewMove(DEMANDE, { signal: signal() });
+      if (!result.ok) throw new Error(result.error);
+      expect(await actions.apply(result.preview.id)).toEqual({ ok: false, error: attendu });
+      expect(afterWrite).not.toHaveBeenCalled();
+      expect(shown()).toBe(edimbourg);
+    }
+  });
+
+  it("deplacer: « Annuler » refusé (applyRevert) : lève, l'annulation reste possible", async () => {
+    const { actions, store } = setup({ retour: { ok: false, error: { code: "version_conflict", retryable: true, currentVersion: 3 } } });
+    const result = await actions.previewMove(DEMANDE, { signal: signal() });
+    if (!result.ok) throw new Error(result.error);
+    await actions.apply(result.preview.id);
+    await expect(actions.undo()).rejects.toThrow();
+    expect(store.lastMove).not.toBeNull();
   });
 });

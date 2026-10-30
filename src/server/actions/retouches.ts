@@ -1,7 +1,7 @@
 "use server";
 
 import { revisionEnregistree, signalementsDuVoyage, versionsDuVoyage } from "@/adapters";
-import { fail, type PatchResult, type Result, type RevertPreview, type TripVersionPage } from "@/contracts";
+import { fail, type MoveDraft, type MoveOptions, type PatchResult, type Result, type RevertPreview, type TripVersionPage } from "@/contracts";
 import { contexteFacultatif } from "@/features/compte/session";
 
 /**
@@ -66,4 +66,33 @@ export async function previewRevert(input: unknown): Promise<Result<RevertPrevie
 export async function applyRevert(input: unknown): Promise<Result<PatchResult>> {
   const versions = await versionsDuVoyage();
   return versions === null ? fail("internal") : versions.applyRevert(await contexteFacultatif(), input);
+}
+
+/**
+ * Déplacer une étape (ticket 947 ; feuille « Déplacer » de F7b ; décision 0147 § 8 et § 11), sur `api` seulement (`mock`
+ * garde son jeu simulé dans le navigateur ; hors `api`, `internal` sans rien lire). Aucun appel Google ni Routes.
+ *
+ * - `getMoveOptions` (`{ tripId, stopId }` → `MoveOptions`) : points d'insertion par jour (aucun : « complet ») ;
+ * - `previewMove` (`{ tripId, stopId, pointId, baseVersion }` → `MoveDraft`) : « Ce qui change », jours touchés sans durée
+ *   de trajet ; rien n'est écrit ;
+ * - `applyMove` (`{ tripId, requestId, stopId, pointId, baseVersion }` → `PatchResult`) : version nouvelle, patch `[move]`.
+ *
+ * Erreurs : `unauthenticated`, `validation_failed` (entrée ; étape verrouillée, engagement ou événement : `field: "stopId"` ;
+ * plus de `VERSIONS_MAX_PAR_VOYAGE` versions : `field: "baseVersion"`), `not_found`, `not_unlocked`, `no_option` (point
+ * absent de la version courante), `rate_limited` (règle `retouche`, application), `version_conflict` (avec
+ * `currentVersion`), `generation_in_progress`, `internal`.
+ */
+export async function getMoveOptions(input: unknown): Promise<Result<MoveOptions>> {
+  const revision = revisionEnregistree();
+  return revision === null ? fail("internal") : revision.getMoveOptions(await contexteFacultatif(), input);
+}
+
+export async function previewMove(input: unknown): Promise<Result<MoveDraft>> {
+  const revision = revisionEnregistree();
+  return revision === null ? fail("internal") : revision.previewMove(await contexteFacultatif(), input);
+}
+
+export async function applyMove(input: unknown): Promise<Result<PatchResult>> {
+  const revision = revisionEnregistree();
+  return revision === null ? fail("internal") : revision.applyMove(await contexteFacultatif(), input);
 }
