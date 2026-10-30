@@ -28,6 +28,7 @@ import { ShareButton } from "@/features/partage/ShareButton";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
 import { cn } from "@/lib/utils";
 
+import { villeDeLaPastille } from "./pastille-ville";
 import { DAY_LIST_ID, PLACES_FROM_GOOGLE } from "./constants";
 import { findFicheTarget, type FicheTarget } from "./fiche";
 import {
@@ -633,6 +634,8 @@ export function TripShell({
         index: candidate.index,
         href: routes.jour(candidate.index),
         weekday: weekdayOf(candidate.date) ?? undefined,
+        // Journée d'un changement de ville : « Jour 3, lun., de Rome à Florence » (spécification M4 § 7.7).
+        ...villeDeLaPastille(trip.cities, candidate.date),
       }))}
       current={day ? day.index : "sejour"}
       sejourHref={routes.sejour()}

@@ -46,12 +46,15 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
  */
 export default async function PreparationPage({ params }: { params: Params }) {
   const { id } = await params;
-  await exigerSession(creationRoutes.preparation(id));
+  const ctx = await exigerSession(creationRoutes.preparation(id));
   const status = await getGenerationStatus({ tripId: id });
   if (!status.ok) {
     if (status.error.code === "not_found") notFound();
     throw new Error("avancement de la génération illisible");
   }
+  // Villes du voyage (spécification M4 § 7.2) : seulement quand une version est lisible ; pendant la génération sur `api`,
+  // `getTrip` rend `null` et les rangées ne nomment pas de ville.
+  const cities = (await getTripReader().getTrip(ctx, id))?.cities;
   // Site d'essai (adaptateur `prototype` ; E2E-essai, lot 3) : « Réessayer » relance le brief saisi (décision 0125 § 4).
-  return <PreparationView tripId={id} initial={status.value} recorderKind={devPagesEnabled() ? "console" : "none"} essai={isPrototypeAdapter()} />;
+  return <PreparationView tripId={id} initial={status.value} recorderKind={devPagesEnabled() ? "console" : "none"} essai={isPrototypeAdapter()} {...(cities ? { cities } : {})} />;
 }

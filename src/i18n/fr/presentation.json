@@ -19,7 +19,9 @@
     "photoAuteurs": " · Photo : {authors}",
     "vers": "vers {time}",
     "detail": "Voir le détail de {name}",
-    "option": "option {index} sur {total}"
+    "option": "option {index} sur {total}",
+    "jourVille": "Jour {n} · {ville}",
+    "changement": "De {de} à {vers}"
   },
   "actions": {
     "like": "J'aime",

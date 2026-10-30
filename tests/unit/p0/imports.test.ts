@@ -801,6 +801,9 @@ const GROUNDING_SOURCE_LECTURE: readonly string[] = ["src/grounding/fiches.ts", 
 const DOUBLE_RELECTURES = "src/mocks/relectures-voyages.ts";
 /** B10a (décision 0112 § 2) : règles du tri, importées par l'écran de présentation. */
 const PREFERENCES_DOMAINE = "src/domain/preferences.ts";
+/** M4c (décision 0148 § 6 point 3) : ville d'un jour, fonction pure unique appelée par le serveur et par les écrans. */
+const VILLES_DOMAINE = "src/domain/villes-du-voyage.ts";
+const VILLES_ECRANS = "src/features/voyage/villes.ts";
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 /** Classification des codes de la couche IA (B9b, 0081 B9-TL-1 point 2 ; 0077 § 3 point 4). */
 const NATURES_IA = "src/ai/natures.ts";
@@ -906,6 +909,17 @@ const ARETES_ADMISES: readonly AreteAdmise[] = [
     typeSeulement: false,
     exemple: "src/features/presentation/deck.ts",
     horsArete: "src/features/sejour/load.ts",
+  },
+  {
+    // M4c (décision 0148 § 6 point 3) : la ville d'un jour vient d'une fonction pure unique, `villesDeLaDate`
+    // (`src/domain/villes-du-voyage.ts`, types de `@/contracts` seulement), « appelée par le serveur et par les écrans ».
+    // Les écrans la lisent par un seul module, `src/features/voyage/villes.ts`, qui ne la recopie pas.
+    nom: "M4c : src/features/voyage/villes.ts → src/domain/villes-du-voyage.ts",
+    de: (chemin) => chemin === VILLES_ECRANS,
+    vers: [VILLES_DOMAINE],
+    typeSeulement: false,
+    exemple: VILLES_ECRANS,
+    horsArete: "src/features/sejour/SejourPanel.tsx",
   },
 ];
 
@@ -1586,7 +1600,7 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       // Aucun autre fichier de l'application hors de src/server n'importe src/domain : l'arête ne vaut que pour le double.
       // B10a (0112 § 2) : seule autre arête, l'écran de présentation vers les règles du tri (`src/domain/preferences.ts`).
       const importeurs = application.filter(
-        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/"))),
+        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/")) && !(c === VILLES_DOMAINE && f === VILLES_ECRANS)),
       );
       expect(importeurs).toEqual([DOUBLE_RELECTURES]);
     });

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { createLazyTrack } from "@/analytics/lazy";
 import type { EventRecorder, RecorderKind } from "@/analytics/track";
@@ -17,6 +17,7 @@ import { countToReserve } from "@/contracts/values";
 import { EMPTY_LIVE_REGION_CLASS } from "@/features/creation/fields";
 import { formatDateCourte, plateMeta } from "@/features/voyage/plate";
 import { currentDayIndex } from "@/features/voyage/today";
+import { aPlusieursVilles } from "@/features/voyage/villes";
 import { useClientNow } from "@/features/voyage/use-client-now";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -25,6 +26,7 @@ import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
 import { EventLines, eventRange } from "./EventLines";
+import type { LigneDuJour } from "./JoursParVille";
 import { useSejourOrigin } from "./SejourOrigin";
 import { checklistLabel, daySummary, tripBudgetLine, tripEvents } from "./travel";
 import { useTripShell } from "./TripShell";
@@ -64,6 +66,9 @@ export function joursADebloquer(trip: { unlocked: boolean; start: string; end: s
   return jours;
 }
 
+/** « Jour par jour » groupé par ville : chargé à la demande, pour un voyage à plusieurs villes seulement. */
+const JoursParVille = lazy(() => import("./JoursParVille").then((loaded) => ({ default: loaded.JoursParVille })));
+
 /**
  * Contenu du panneau de l'écran 11 « Séjour » (spécification F5, F5-PO-3), dans cet ordre : plaque de la
  * destination (titre de niveau 1), budget, « À faire avant de partir », « Pendant ton séjour », « Jour par
@@ -100,6 +105,9 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
   const [echecs, setEchecs] = useState(0);
   const toggleFailed = echecs > 0;
   const events = tripEvents(trip.days);
+  // Voyage à plusieurs villes (spécification M4 § 7.5, M4-PO-10) : liste des villes sous la plaque, et « Jour par jour »
+  // groupé par ville. Une seule ville (`Trip.cities` absent) : écran inchangé (critère 25).
+  const villes = aPlusieursVilles(trip.cities) ? trip.cities : null;
   const dayOfEvent = new Map(events.map(({ day, event }) => [event.id, day]));
 
   // Retour du navigateur depuis la fiche d'un événement ouverte ici : focus sur sa ligne (F5-PO-8).
@@ -130,6 +138,49 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
     if (done) await track({ name: "checklist_item_done", properties: {} });
   };
 
+  /** Ligne d'un jour : lien vers la Journée, ou journée « À débloquer ». */
+  function ligneDuJour(ligne: LigneDuJour, vers?: string) {
+    if (ligne.kind === "verrouille") {
+      return (
+        <li key={`verrouille-${ligne.index}`} data-part="jour-a-debloquer" className="border-b border-hairline last:border-b-0">
+          <span className="flex min-h-(--touch-target) items-center gap-3 py-2">
+            {/* Pastille réduite non active, sans « complet » (réservé à Déplacer) ; le nom lu est « Jour 3, à débloquer ». */}
+            <span aria-hidden="true">
+              <DayBadge day={ligne.index} size="sm" />
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="sr-only" data-part="nom-jour-a-debloquer">
+                {format(ts.jourParJour.nomADebloquer, { day: ligne.index })}
+              </span>
+              <span className="text-corps font-bold text-ink">{formatTitreJour(ligne.date)}</span>
+              <span aria-hidden="true" className="text-corps-s text-ink-soft">
+                {ts.jourParJour.aDebloquer}
+              </span>
+            </span>
+          </span>
+        </li>
+      );
+    }
+    const { day } = ligne;
+    return (
+      <li key={day.index} className="border-b border-hairline last:border-b-0">
+        <Link href={routes.jour(day.index)} data-part="jour" className="flex min-h-(--touch-target) items-center gap-3 rounded-control py-2">
+          <DayBadge day={day.index} size="sm" />
+          <span className="flex min-w-0 flex-col">
+            <span className="text-corps font-bold text-ink">{formatTitreJour(day.date)}</span>
+            {/* Journée du changement de ville : « Vers {ville} », puis le résumé actuel (spécification M4 § 7.5). */}
+            {vers ? (
+              <span data-part="vers-ville" className="text-corps-s font-semibold break-words text-ink-2">
+                {format(ts.jourParJour.versVille, { ville: vers })}
+              </span>
+            ) : null}
+            <span className="text-corps-s text-ink-soft tabular-nums">{day.generating ? ts.jourParJour.enPreparation : daySummary(day)}</span>
+          </span>
+        </Link>
+      </li>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5 px-5 pt-2 pb-8">
       {aujourdhui && todayIndex !== null ? (
@@ -142,6 +193,12 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
         </Link>
       ) : null}
       <DestinationPlate name={trip.destination} meta={plateMeta(trip)} color={trip.destinationColor} />
+      {villes ? (
+        // Hors de la plaque, en `ink-2` sur le fond de la page ; passe à la ligne, jamais tronquée (spécification M4 § 7.5).
+        <p data-part="villes" className="-mt-2 text-corps font-semibold break-words text-ink-2">
+          {villes.map((ville) => ville.name).join(ts.villes.separateur)}
+        </p>
+      ) : null}
 
       {budget ? (
         <p data-part="budget" className="text-corps text-ink-2 tabular-nums">
@@ -216,44 +273,20 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
         <h2 id="jour-par-jour" className="text-section font-extrabold text-ink">
           {ts.jourParJour.titre}
         </h2>
-        <ul>
-          {trip.days.map((day) => (
-            <li key={day.index} className="border-b border-hairline last:border-b-0">
-              <Link
-                href={routes.jour(day.index)}
-                data-part="jour"
-                className="flex min-h-(--touch-target) items-center gap-3 rounded-control py-2"
-              >
-                <DayBadge day={day.index} size="sm" />
-                <span className="flex min-w-0 flex-col">
-                  <span className="text-corps font-bold text-ink">{formatTitreJour(day.date)}</span>
-                  <span className="text-corps-s text-ink-soft tabular-nums">
-                    {day.generating ? ts.jourParJour.enPreparation : daySummary(day)}
-                  </span>
-                </span>
-              </Link>
-            </li>
-          ))}
-          {verrouilles.map((day) => (
-            <li key={`verrouille-${day.index}`} data-part="jour-a-debloquer" className="border-b border-hairline last:border-b-0">
-              <span className="flex min-h-(--touch-target) items-center gap-3 py-2">
-                {/* Pastille réduite non active, sans « complet » (réservé à Déplacer) ; le nom lu est « Jour 3, à débloquer ». */}
-                <span aria-hidden="true">
-                  <DayBadge day={day.index} size="sm" />
-                </span>
-                <span className="flex min-w-0 flex-col">
-                  <span className="sr-only" data-part="nom-jour-a-debloquer">
-                    {format(ts.jourParJour.nomADebloquer, { day: day.index })}
-                  </span>
-                  <span className="text-corps font-bold text-ink">{formatTitreJour(day.date)}</span>
-                  <span aria-hidden="true" className="text-corps-s text-ink-soft">
-                    {ts.jourParJour.aDebloquer}
-                  </span>
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
+        {villes ? (
+          <Suspense fallback={null}>
+            <JoursParVille
+              cities={villes}
+              lignes={[...trip.days.map((day): LigneDuJour => ({ kind: "servi", day })), ...verrouilles.map((day): LigneDuJour => ({ kind: "verrouille", ...day }))]}
+              rendreLigne={ligneDuJour}
+            />
+          </Suspense>
+        ) : (
+          <ul>
+            {trip.days.map((day) => ligneDuJour({ kind: "servi", day }))}
+            {verrouilles.map((day) => ligneDuJour({ kind: "verrouille", ...day }))}
+          </ul>
+        )}
         {verrouilles.length > 0 && unlockHref ? (
           <Button asChild className="mt-2 self-start">
             <Link href={unlockHref} prefetch={false} data-part="debloquer">

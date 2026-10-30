@@ -16,7 +16,21 @@
     "enPreparation": "Jour {n} en préparation",
     "etapes": "Étapes du jour {n}",
     "bandeauTrajet": "{trajet} de trajet ce jour, au-delà des {budget} prévues pour ton rythme.",
-    "bandeauPlusLong": "Le plus long : {segment}, vers {name}."
+    "bandeauPlusLong": "Le plus long : {segment}, vers {name}.",
+    "changement": {
+      "vers": "Vers {ville}",
+      "nom": "{titre}, {detail}",
+      "saisi": "{libelle}, {depart} – {arrivee}",
+      "saisiSansArrivee": "{libelle}, départ à {heure}, arrivée à confirmer",
+      "depart": "départ vers {heure} (estimation)",
+      "duree": "environ {duree} (estimation)",
+      "sansDuree": "durée à confirmer",
+      "modes": {
+        "transit": "En train ou en bus",
+        "car": "En voiture"
+      },
+      "pastille": "de {de} à {vers}"
+    }
   },
   "evenements": {
     "titreJour": "Événements du jour",
@@ -98,7 +112,15 @@
       "enPreparation": "En préparation",
       "aDebloquer": "À débloquer",
       "nomADebloquer": "Jour {day}, à débloquer",
-      "debloquer": "Débloquer"
+      "debloquer": "Débloquer",
+      "versVille": "Vers {ville}"
+    },
+    "villes": {
+      "separateur": " · ",
+      "titre": {
+        "une": "{ville} · 1 nuit",
+        "plusieurs": "{ville} · {n} nuits"
+      }
     }
   },
   "aujourdhui": {
