@@ -144,6 +144,26 @@ type ContextePatch = {
 };
 
 /**
+ * Jour portant un `transfer` touché **seulement** par `lock` / `unlock` (réponse du Tech Lead à la revue de M4-C) :
+ * rien ne bouge, le jour est recopié tel quel avec les nouveaux verrous, sans replanification. Toute autre
+ * opération sur ce jour (lignes ajoutées, retirées, déplacées ou remplacées) : `undefined`, refus `no_option`
+ * (règle provisoire jusqu'au domaine `changement-de-ville.ts` de M4b).
+ */
+function verrousSeulement(jour: JourBrouillon): DaySnapshot | undefined {
+  const sansVerrou = (lignes: readonly Ligne[]) =>
+    JSON.stringify(lignes.map((ligne) => (ligne.genre === "etape" ? { ...ligne, stop: { ...ligne.stop, locked: false } } : ligne)));
+  if (sansVerrou(jour.lignes) !== sansVerrou(lignesDe(jour.origine))) return undefined;
+  const verrous = new Map(jour.lignes.flatMap((ligne) => (ligne.genre === "etape" ? [[ligne.stop.id, ligne.stop.locked] as const] : [])));
+  return {
+    ...jour.origine,
+    items: jour.origine.items.map((item) => {
+      const locked = item.type === "stop" ? verrous.get(item.stop.id) : undefined;
+      return item.type === "stop" && locked !== undefined ? { ...item, stop: { ...item.stop, locked } } : item;
+    }),
+  };
+}
+
+/**
  * Replanifie les heures d'un jour touché. Les étapes verrouillées et l'étape posée par l'opération (`fixe`) gardent
  * leur heure ; les autres lignes (étapes non verrouillées, repas ouverts) gardent leur ordre et leur heure si elles
  * tiennent, sinon elles sont décalées au plus tôt après la précédente (trajet le plus rapide et marge, grille de
@@ -157,7 +177,7 @@ type ContextePatch = {
  * que d'être réécrit sans sa ligne « Vers {ville} ». Les jours non touchés et un `revert` le recopient tel quel.
  */
 function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DaySnapshot | undefined {
-  if (jour.origine.items.some((item) => item.type === "transfer")) return undefined;
+  if (jour.origine.items.some((item) => item.type === "transfer")) return verrousSeulement(jour);
   const { configuration, nuits } = contexte.moteur;
   const marge = configuration.margeMinutes;
   const origine = jour.origine;

@@ -227,6 +227,12 @@ describe("instantané : variante transfer reprise par référence (décision 014
     }
   });
 
+  it("plusieurs-villes: estimatedMinutes de l'instantané borné à 600 (601 refusé, décision 0151)", () => {
+    const estime = { type: "transfer", from: "Lisbonne", to: "Porto", source: "estimated", start: "11:30", mode: "transit" };
+    expect(DayLineItemSnapshotSchema.safeParse({ ...estime, estimatedMinutes: 600 }).success).toBe(true);
+    expect(DayLineItemSnapshotSchema.safeParse({ ...estime, estimatedMinutes: 601 }).success).toBe(false);
+  });
+
   it("Trip.cities n'est pas dans l'instantané (lu depuis stays, 0148 § 6 point 2)", () => {
     const base = instantane(edimbourg);
     expect(TripSnapshotSchema.safeParse({ ...base, cities: [] }).success).toBe(false);

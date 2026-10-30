@@ -752,6 +752,30 @@ describe("plusieurs-villes: appliquerPatch recopie le transfer tel quel (décisi
     expect(base).toEqual(gelee);
   });
 
+  it("plusieurs-villes: lock puis unlock sur un jour qui porte un transfer : rien ne bouge, pas de no_option", () => {
+    const base = avecTransfer(version2(), 2);
+    const gelee = structuredClone(base);
+    const cible = activiteDuJour(base, 2);
+    const verrou = !cible.locked;
+    const v3 = reussi(appliquerPatch(entree(base, patch(2, [{ op: verrou ? "lock" : "unlock", stopId: cible.id }]))));
+    expect(v3.resultat.touchedDays).toEqual([2]);
+    const attendu = {
+      ...jourN(base, 2),
+      items: jourN(base, 2).items.map((item) => (item.type === "stop" && item.stop.id === cible.id ? { ...item, stop: { ...item.stop, locked: verrou } } : item)),
+    };
+    expect(jourN(v3.instantane, 2)).toEqual(attendu);
+    expect(jourN(v3.instantane, 2).items).toContainEqual(TRANSFER);
+    expect(TripSnapshotSchema.parse(v3.instantane)).toEqual(v3.instantane);
+    expect(base).toEqual(gelee);
+    // Le verrou et un déplacement ensemble : le jour serait replanifié, refus provisoire (M4b).
+    const autre = etapes(jourN(base, 2)).find((stop) => stop.id !== cible.id && !stop.locked && stop.commitment === undefined);
+    if (autre === undefined) throw new Error("seconde étape absente");
+    const mixte = appliquerPatch(
+      entree(base, patch(2, [{ op: "lock", stopId: autre.id }, { op: "replace", stopId: cible.id, candidateId: RESERVE.proche.id, newStopId: "v3-remplace" }])),
+    );
+    expect(mixte).toEqual({ ok: false, code: "no_option" });
+  });
+
   it("revert : le transfer revient tel quel ; il ne produit aucun changement à son nom", () => {
     const v2 = avecTransfer(version2(), 3);
     const v3 = version2();

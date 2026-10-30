@@ -9,7 +9,15 @@ import {
   refineNoCommitment,
 } from "./refinements";
 import { LONGUEURS_CONTRAT, texteMaison } from "./texte";
-import { CHECKLIST_KINDS, MAX_CITIES, STOP_KINDS, STOP_REPORT_REASONS, TRIP_ID_PATTERN, WEEKDAYS } from "./values";
+import {
+  CHECKLIST_KINDS,
+  MAX_CITIES,
+  STOP_KINDS,
+  STOP_REPORT_REASONS,
+  TRANSFER_ESTIMATED_MINUTES_MAX,
+  TRIP_ID_PATTERN,
+  WEEKDAYS,
+} from "./values";
 
 /**
  * Contrats du programme de voyage (handover front-end § 9).
@@ -190,8 +198,11 @@ export const TransferItemSchema = z
     start: TimeSchema,
     /** Arrivée : seulement l'heure de fin saisie ; absente = « à confirmer ». */
     end: TimeSchema.optional(),
-    /** Durée estimée, en minutes (0148 § 2) ; absente = « durée à confirmer ». */
-    estimatedMinutes: MinutesSchema.optional(),
+    /**
+     * Durée estimée, en minutes (0148 § 2) ; absente = « durée à confirmer ». Bornée en haut par
+     * `TRANSFER_ESTIMATED_MINUTES_MAX` (décision 0151), sans borne basse dans le contrat.
+     */
+    estimatedMinutes: MinutesSchema.max(TRANSFER_ESTIMATED_MINUTES_MAX).optional(),
     /** Libellé saisi par la personne (« Train Rome–Florence »). */
     label: TextSchema.optional(),
     /** Mode d'un départ estimé (spécification M4 § 3.3) ; absent avec la marche seule. */

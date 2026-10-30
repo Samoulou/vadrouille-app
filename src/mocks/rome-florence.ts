@@ -64,8 +64,9 @@ function ordinaryDay(index: number, date: string, hotel: string, activity: [stri
 }
 
 /**
- * J3, jour du changement de ville : une sortie du matin à Rome, temps libre jusqu'au départ, ligne « Vers Florence »
- * (billet saisi, 12:00 – 13:40), une étape à Florence sans trajet avant elle, retour au logement de Florence.
+ * J3, jour du changement de ville : une sortie du matin à Rome, temps libre jusqu'au départ (12:00), ligne « Vers
+ * Florence » (billet saisi, 12:00 – 13:40), temps libre de l'arrivée (13:40) à l'étape suivante (15:00), une étape à
+ * Florence sans trajet avant elle, retour au logement de Florence (option (a) de la spécification M4-suite).
  */
 const changeDay = day(
   3,
@@ -74,7 +75,7 @@ const changeDay = day(
     { type: "terminus", role: "start", time: "08:30", label: HOTEL_ROME },
     walk(10),
     stop("rf-j3-matin", "activity", "[Basilique Saint-Clément]", { area: "[Monti]", durationMinutes: 60 }, "08:45", "09:45"),
-    { type: "free", from: "09:45", to: "11:30" },
+    { type: "free", from: "09:45", to: "12:00" },
     {
       type: "transfer",
       from: "Rome",
@@ -84,6 +85,7 @@ const changeDay = day(
       end: "13:40",
       label: "[Train Rome–Florence]",
     },
+    { type: "free", from: "13:40", to: "15:00" },
     stop("rf-j3-apres-midi", "activity", "[Basilique Santa Croce]", { area: "[Santa Croce]", durationMinutes: 90 }, "15:00", "16:30"),
     walk(10),
     { type: "terminus", role: "end", time: "16:40", label: HOTEL_FLORENCE },

@@ -4,7 +4,7 @@ import type { z } from "zod";
 
 import * as contracts from "./index";
 import { TransferItemSchema } from "./trip";
-import { MAX_CITIES } from "./values";
+import { MAX_CITIES, TRANSFER_ESTIMATED_MINUTES_MAX } from "./values";
 import {
   ChangeSchema,
   DaySchema,
@@ -605,6 +605,13 @@ describe("DayLineItemSchema, variante transfer (décision 0148 § 1)", () => {
     ["minutes", 95],
   ])("refuse le champ %s (objet strict : aucun identifiant, aucune donnée Google)", (key, value) => {
     expect(contracts.DayLineItemSchema.safeParse({ ...estime, [key]: value }).success).toBe(false);
+  });
+
+  it(`plusieurs-villes: estimatedMinutes borné à TRANSFER_ESTIMATED_MINUTES_MAX (${TRANSFER_ESTIMATED_MINUTES_MAX}) : 600 accepté, 601 refusé, pas de borne basse (décision 0151)`, () => {
+    expect(TRANSFER_ESTIMATED_MINUTES_MAX).toBe(600);
+    expect(contracts.DayLineItemSchema.safeParse({ ...estime, estimatedMinutes: 600 }).success).toBe(true);
+    expect(contracts.DayLineItemSchema.safeParse({ ...estime, estimatedMinutes: 601 }).success).toBe(false);
+    expect(contracts.DayLineItemSchema.safeParse({ ...estime, estimatedMinutes: 0 }).success).toBe(true);
   });
 
   it("est admis dans la ligne d'un jour", () => {
