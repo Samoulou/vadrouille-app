@@ -36,8 +36,7 @@ let adaptateur: TripVersionsAdapter;
 // comme pour les cas d'usage appelés directement (le limiteur est éprouvé par `tests/db/limiteur.test.ts`).
 const debitsRetouche = vi.hoisted(() => ({ n: 0 }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
-vi.mock("@/server/rate-limit", async (original) => ({
-  ...(await original<typeof import("@/server/rate-limit")>()),
+vi.mock("@/server/rate-limit", () => ({
   checkRateLimit: async () => {
     debitsRetouche.n += 1;
     return { ok: true, value: undefined };
