@@ -39,6 +39,12 @@ const CONFIG: ConfigurationMoteur = {
   dureesParDefaut: { activity: 90, lunch: 75, dinner: 90, evening: 90 },
   margeMinutes: 5,
   seuilTempsLibreMinutes: 30,
+  changementDeVille: {
+    activitesParRythme: { relaxed: 1, balanced: 2, intense: 2 },
+    departEstime: { heureParDefaut: "10:00", limite: "18:00" },
+    creneauSansDureeMinutes: 180,
+    dureeEstimeeMinutes: { min: 20, max: 600 },
+  },
 };
 
 const FORMULE: ConfigClassement = {
