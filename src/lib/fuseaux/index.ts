@@ -198,13 +198,42 @@ export function memeDecalage(destination: string, ville: string, arrivee: string
 /** Résultat du contrôle des villes d'un voyage : le fuseau du voyage et celui de chaque ville, ou la première ville refusée. */
 export type ControleVilles =
   | { readonly ok: true; readonly fuseau: string; readonly fuseauxDesVilles: readonly string[] }
-  | { readonly ok: false; readonly indice: number; readonly raison: "inconnue" | "decalage" };
+  | { readonly ok: false; readonly indice: number; readonly raison: "inconnue" | "repetee" | "decalage" };
+
+/**
+ * Même ville deux fois de suite (spécification M4 § 4 point 3 ; décision 0148 § 4 point 2) : indice de la **seconde** ville
+ * de la première paire de villes consécutives de même **clé** (`cleVille` : accents, casse, tirets et apostrophes ignorés),
+ * ou `undefined`. Une ville qui revient plus tard (Rome, Florence, puis Rome) est admise. Fonction pure, unique : appelée
+ * par `controlerVilles` (`createTrip` de `api`) et par la validation de l'écran 1 (M4c).
+ */
+export function memeVilleQueLaPrecedente(villes: readonly string[]): number | undefined {
+  for (let indice = 1; indice < villes.length; indice += 1) {
+    const precedente = villes.at(indice - 1);
+    const ville = villes.at(indice);
+    if (precedente !== undefined && ville !== undefined && cleVille(precedente) === cleVille(ville)) return indice;
+  }
+  return undefined;
+}
+
+/**
+ * Nom maison d'une ville de la table (nom français de `villes.json`), ou `null` hors de la table. Sert à la conversion de
+ * `api` à plusieurs villes (décision 0149 § 1.3 point 3 : le nom d'une ville vers le modèle est le nom maison, jamais la
+ * saisie brute).
+ */
+export function nomMaisonDeVille(nom: string): string | null {
+  const ligne = TABLE.get(cleVille(nom));
+  return ligne === undefined || ligne[2] === "" ? null : ligne[2];
+}
 
 /**
  * Contrôle des villes d'un voyage (B9-PO-18, 0087 § 5) : `villes[0]` est la destination, les suivantes les autres villes
  * dans l'ordre du brouillon. Chaque ville doit être connue de la table **du MVP** (62 clés d'origine, 0129 § 8), et chaque autre ville avoir le même décalage
  * que la destination pendant tout le voyage (`arrivee` à `depart`, dates locales de la destination). Le fuseau du voyage
  * est celui de la destination ; chaque ville garde son identifiant (`event_occurrences.timezone`).
+ *
+ * Trois passages, dans cet ordre (décision 0148 § 4 point 2, mineur 10) : ville inconnue (`inconnue`), puis, sur des
+ * villes toutes connues, même ville deux fois de suite (`repetee`, `memeVilleQueLaPrecedente`, indice de la seconde),
+ * puis décalage différent (`decalage`).
  */
 export function controlerVilles(villes: readonly string[], arrivee: string, depart: string): ControleVilles {
   const fuseaux: string[] = [];
@@ -215,6 +244,8 @@ export function controlerVilles(villes: readonly string[], arrivee: string, depa
   }
   const fuseau = fuseaux[0];
   if (fuseau === undefined) return { ok: false, indice: 0, raison: "inconnue" };
+  const repetee = memeVilleQueLaPrecedente(villes);
+  if (repetee !== undefined) return { ok: false, indice: repetee, raison: "repetee" };
   for (const [indice, zone] of fuseaux.entries()) {
     if (indice > 0 && !memeDecalage(fuseau, zone, arrivee, depart)) return { ok: false, indice, raison: "decalage" };
   }
