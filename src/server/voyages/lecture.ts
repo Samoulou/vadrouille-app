@@ -26,6 +26,7 @@ import {
 } from "@/contracts";
 import { CHECKLIST_KINDS, countToReserve } from "@/contracts/values";
 import type { z } from "zod";
+import { ordreDeLecture } from "@/domain/a-faire";
 import { retenirApercu, selectionApercu, servisAvantDeblocage } from "@/domain/apercu";
 import { destinationColor } from "@/domain/calculs";
 import type { ConfigurationMoteur } from "@/domain/configuration";
@@ -139,7 +140,10 @@ const SQL_MOBILITE = "SELECT mobility FROM public.briefs WHERE organization_id =
 const SQL_EN_COURS = `SELECT EXISTS (SELECT 1 FROM public.generation_runs WHERE organization_id = $1 AND trip_id = $2
   AND finished_at IS NULL AND kind IN ('full', 'batch')) AS en_cours`;
 
-/** Ordre : `id` (aucune colonne d'ordre dans `checklist_items` ; question au rôle data, PR de B6a). */
+/**
+ * Ordre stable par `id` à la base (aucune colonne d'ordre dans `checklist_items`) ; l'ordre de l'écran est posé par
+ * `checklistDe` (`ordreDeLecture`, décision 0147 § 7.1 point 3).
+ */
 const SQL_A_FAIRE = `SELECT id, kind, label, moment, done, booking_url, sponsored, stop_id
   FROM public.checklist_items WHERE organization_id = $1 AND trip_id = $2 ORDER BY id`;
 
@@ -382,13 +386,16 @@ async function recomposerJours(
 function checklistDe(etat: Etat): ChecklistItem[] {
   const contexte = { tripId: etat.enTete.id, version: etat.enTete.version };
   const etapes = new Set(etat.snapshot.days.flatMap((day) => [...day.items.flatMap((item) => (item.type === "stop" ? [item.stop.id] : [])), ...day.events.map((e) => e.id)]));
-  return etat.checklist.map((ligne) => {
+  const items = etat.checklist.map((ligne) => {
     const stopId = ligne.stop_id === null ? undefined : texte(ligne.stop_id);
     if (stopId !== undefined && !etapes.has(stopId)) throw echec("checklist_orphan", contexte);
     const item = elementAFaire(ligne);
     if (item === null) throw echec("output_invalid", contexte);
     return item;
   });
+  // Ordre de l'écran (0147 § 7.1 point 3) : par la position de l'étape liée dans la version courante (jour, puis heure),
+  // puis les lignes sans étape (bons plans, lignes faites déliées) par `id`.
+  return ordreDeLecture(items, etat.snapshot);
 }
 
 /**

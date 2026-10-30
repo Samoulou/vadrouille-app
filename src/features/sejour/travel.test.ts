@@ -4,6 +4,7 @@ import type { Day, DayLineItem } from "@/contracts";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import {
+  checklistLabel,
   daySummary,
   dayTravelLine,
   formatMontant,
@@ -272,5 +273,13 @@ describe("travel: événements du séjour (« Pendant ton séjour »)", () => {
       { index: 1, events: [{ ...concert, id: "c", start: "18:00" }] },
     ];
     expect(tripEvents(days).map(({ event }) => event.id)).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("a-faire: libellé affiché (M5e, spécification M5 § 9)", () => {
+  it("« Réserver : {nom} » pour une réservation, libellé tel quel pour un billet ou un bon plan", () => {
+    expect(checklistLabel({ kind: "reservation", label: "[Colisée]" })).toBe("Réserver : [Colisée]");
+    expect(checklistLabel({ kind: "ticket", label: "[Concert]" })).toBe("[Concert]");
+    expect(checklistLabel({ kind: "other", label: "[Prends un pass]" })).toBe("[Prends un pass]");
   });
 });

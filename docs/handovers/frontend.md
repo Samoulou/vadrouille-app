@@ -221,7 +221,7 @@ Thème clair uniquement au MVP. Pas d'ombres : la profondeur vient des aplats et
 | `Tag` | Exception | `kind: toReserve \| toConfirm \| unconfirmed` | Texte toujours présent |
 | `Counter` | Compteur jaune | `value` | `aria-label` explicite |
 | `DestinationPlate` | Plaque destination | `name`, `meta`, `color` | Contraste vérifié par test |
-| `ChecklistRow` | Ligne « à réserver » | `label`, `when`, `done`, `bookingUrl`, `sponsored` | Case de 44 px, `aria-pressed` |
+| `ChecklistRow` | Ligne « à réserver » | `label`, `when`, `done`, `bookingUrl`, `sponsored`, `disabledBy` (facultatif, M5e : identifiant de l'élément qui explique l'inactivité) | Case de 44 px, `aria-pressed` ; avec `disabledBy` : `aria-disabled`, `aria-describedby`, rendu indisponible de `Chip`, aucun appel |
 | `ReasonBlock` | « Pourquoi pour toi » | `text`, `sourceLabel`, `sourceUrl`, `verifiedAt` | Lien source obligatoire |
 | `DeckCard` | Carte de présentation | `proposal`, `onLike`, `onDislike`, `onOpen` | Carte entière = bouton ; gestes doublés de boutons |
 | `DeckProgress` | Progression en ligne | `current`, `total`, `label` | Texte « 4 sur 8 » lisible |

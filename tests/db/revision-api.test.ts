@@ -288,7 +288,7 @@ describe("M1b : « Pas pour moi » change le programme sur api (PR 868 ; décisi
     expect(apresA).toEqual({ ...etat, rang: 1 });
     // Une modification de la personne (version 2) arrive entre `a` et `e`.
     const v1 = (await versions(org, tripId))[0]!.snapshot;
-    await ecrireVersion(admin, { organizationId: org.org, tripId, requestId: crypto.randomUUID(), auteur: "workflow", instantane: v1 });
+    await ecrireVersion(admin, { organizationId: org.org, tripId, requestId: crypto.randomUUID(), auteur: "workflow", instantane: v1, instantanePrecedent: TripSnapshotSchema.parse(v1) });
     const fin = await etapeLotPlanification(apresA, dependances(obs.fabrique));
     expect(fin.arret).toBeUndefined();
     expect(obs.requetes()).toHaveLength(0);
@@ -357,7 +357,7 @@ describe("M1b : « Pas pour moi » change le programme sur api (PR 868 ; décisi
     // La personne modifie le programme (version 2) pendant que le modèle rédige la révision.
     const obs = observee((client) => ({
       async envoyer(requete) {
-        await ecrireVersion(admin, { organizationId: org.org, tripId, requestId: crypto.randomUUID(), auteur: "workflow", instantane: TripSnapshotSchema.parse(v1) });
+        await ecrireVersion(admin, { organizationId: org.org, tripId, requestId: crypto.randomUUID(), auteur: "workflow", instantane: TripSnapshotSchema.parse(v1), instantanePrecedent: TripSnapshotSchema.parse(v1) });
         return client.envoyer(requete);
       },
     }));

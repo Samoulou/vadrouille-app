@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, type MouseEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { createLazyTrack } from "@/analytics/lazy";
 import type { EventRecorder, RecorderKind } from "@/analytics/track";
@@ -11,17 +11,22 @@ import { ChecklistRow } from "@/components/ligne/ChecklistRow";
 import { Counter } from "@/components/ligne/Counter";
 import { DayBadge } from "@/components/ligne/DayBadge";
 import { DestinationPlate } from "@/components/ligne/DestinationPlate";
+import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { ChecklistItem } from "@/contracts";
+import { countToReserve } from "@/contracts/values";
+import { EMPTY_LIVE_REGION_CLASS } from "@/features/creation/fields";
 import { formatDateCourte, plateMeta } from "@/features/voyage/plate";
 import { currentDayIndex } from "@/features/voyage/today";
 import { useClientNow } from "@/features/voyage/use-client-now";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { accessUntil, formatTitreJour } from "@/lib/dates";
+import { useOnline } from "@/lib/online";
+import { cn } from "@/lib/utils";
 
 import { EventLines, eventRange } from "./EventLines";
 import { useSejourOrigin } from "./SejourOrigin";
-import { daySummary, tripBudgetLine, tripEvents } from "./travel";
+import { checklistLabel, daySummary, tripBudgetLine, tripEvents } from "./travel";
 import { useTripShell } from "./TripShell";
 
 const t = messages.sejour;
@@ -84,7 +89,16 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
   const eventsRef = useRef<HTMLElement>(null);
 
   const budget = tripBudgetLine(trip.days);
-  const remaining = trip.checklist.filter((item) => !item.done).length;
+  // Compteur : réservations non faites seulement (M5-PO-13, décision 0147 § 6.2) ; absent à 0 (`Counter`).
+  const remaining = countToReserve(trip.checklist);
+  // Cochage enregistré (adaptateur `api`, M5e) : hors ligne, cases inactives décrites par le bandeau ; échec annoncé.
+  const online = useOnline();
+  const offlineId = `${useId()}-hors-ligne`;
+  const checklistOffline = actions.checklistOnServer === true && !online;
+  // Échecs consécutifs de l'enregistrement : l'alerte reste jusqu'au prochain cochage réussi (revue UX de M5e, m3) ; un
+  // nouvel échec la remonte (clé), pour qu'elle soit annoncée de nouveau.
+  const [echecs, setEchecs] = useState(0);
+  const toggleFailed = echecs > 0;
   const events = tripEvents(trip.days);
   const dayOfEvent = new Map(events.map(({ day, event }) => [event.id, day]));
 
@@ -103,9 +117,16 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
     if (href) origin?.remember(href);
   };
 
-  // Cocher envoie `checklist_item_done` une fois l'action résolue ; décocher n'envoie rien (décision 0015 § 6).
+  // Cocher envoie `checklist_item_done` une fois l'action résolue ; décocher n'envoie rien (décision 0015 § 6). Un échec de
+  // l'action (case non enregistrée, rétablie par l'implémentation) affiche « Impossible d'enregistrer. Réessaie. ».
   const onToggle = async (item: ChecklistItem, done: boolean) => {
-    await actions.setChecklistItemDone(item.id, done);
+    try {
+      await actions.setChecklistItemDone(item.id, done);
+    } catch {
+      setEchecs((n) => n + 1);
+      return;
+    }
+    setEchecs(0);
     if (done) await track({ name: "checklist_item_done", properties: {} });
   };
 
@@ -135,20 +156,28 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
           </h2>
           <Counter value={remaining} label={counterLabel(remaining)} />
         </div>
+        {checklistOffline ? (
+          <div id={offlineId}>
+            <StatusBanner kind="offline" message={ts.aFaire.horsLigne} />
+          </div>
+        ) : null}
+        <p key={echecs} role="alert" data-part="a-faire-echec" className={cn("text-corps-s font-semibold text-ink", toggleFailed ? undefined : EMPTY_LIVE_REGION_CLASS)}>
+          {toggleFailed ? ts.aFaire.echec : null}
+        </p>
         <ul>
           {trip.checklist.map((item) => (
             <li key={item.id} className="border-b border-hairline last:border-b-0">
               <ChecklistRow
-                label={item.label}
+                label={checklistLabel(item)}
                 when={item.when}
                 done={item.done}
                 bookingUrl={item.bookingUrl}
                 sponsored={item.sponsored}
+                disabledBy={checklistOffline ? offlineId : undefined}
                 onToggle={(done) => {
                   onToggle(item, done).catch(() => {
-                    // Échec de l'action (B11) ou de la mesure (chargement impossible) : aucun texte d'erreur
-                    // n'est prévu par F5 (F5-Q1). La case garde l'état rendu par le programme ; la mesure
-                    // perdue n'est pas réessayée, et le prochain cochage retente le chargement (`createLazyTrack`).
+                    // Échec de la mesure (chargement impossible) : la mesure perdue n'est pas réessayée, et le
+                    // prochain cochage retente le chargement (`createLazyTrack`).
                   });
                 }}
               />

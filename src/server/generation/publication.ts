@@ -32,6 +32,12 @@ import { gardeOuverteAuRang } from "./garde";
 
 export type DonneesPublication = {
   readonly instantane: TripSnapshot;
+  /**
+   * Instantané de la version remplacée (décision 0147 § 7.2 point 2), transmis à `ecrireVersion` : `null` pour la version 1
+   * (génération, dont les lignes « À faire » sont écrites par `ecrireDePlus`) ; la version de base pour la révision (M1b),
+   * relue sous le verrou des versions par `ecrireSi`.
+   */
+  readonly instantanePrecedent: TripSnapshot | null;
   readonly cases: readonly (CaseApercu | CaseProgramme)[];
   readonly statut: "ready" | "incomplete";
   /** Écriture des positions de la version dans la transaction de publication ; absente : aucune écriture (suspendue, non autorisée, simulée). */
@@ -99,7 +105,7 @@ export async function publier(
           if (fin.rows.length === 0) throw new ArretEtape("step_expired");
           return { version: null, dejaPubliee: false };
         }
-        const ecrite = await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: donnees.instantane });
+        const ecrite = await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: donnees.instantane, instantanePrecedent: donnees.instantanePrecedent });
         for (const c of donnees.cases) {
           await x.query(SQL_CASE, [
             organizationId,
