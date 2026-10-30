@@ -1,0 +1,286 @@
+{
+  "schema": 1,
+  "id": "lisbonne-porto-jour-changement",
+  "programme": "lisbonne-porto-estime",
+  "cas": "Sortie simulée du prompt revision v3 (M4a-2, ticket #926), écrite à la main : noms usuels de l'IA, aucune donnée Google, aucune ville par créneau, aucun transfer ; version précédente : sortie simulée du prompt programme v5 (lisbonne-porto-estime) ; Lisbonne puis Porto, départ estimé (11:30) ; une étape écartée dans la ville d'arrivée le jour du changement de ville ; durée estimée réécrite (178, lue 180).",
+  "choix": {
+    "pasPourMoi": [
+      "Librairie Lello"
+    ],
+    "jAime": [
+      "Miradouro da Graça"
+    ]
+  },
+  "sortie": {
+    "titre": "Lisbonne et Porto, de colline en colline",
+    "jours": [
+      {
+        "date": "2027-06-10",
+        "titre": "Alfama et Castelo",
+        "creneaux": [
+          {
+            "debut": "10:30",
+            "fin": "11:00",
+            "nature": "arrivee"
+          },
+          {
+            "debut": "12:30",
+            "fin": "13:45",
+            "nature": "repas_midi",
+            "lieu": "Taberna Sal Grosso",
+            "quartier": "Alfama",
+            "pourquoi": "Une petite taverne de quartier, au pied de votre logement."
+          },
+          {
+            "debut": "14:30",
+            "fin": "16:00",
+            "nature": "visite",
+            "lieu": "Château Saint-Georges",
+            "quartier": "Castelo",
+            "pourquoi": "Les remparts et la plus belle vue sur le Tage.",
+            "incontournable": true
+          },
+          {
+            "debut": "16:30",
+            "fin": "17:15",
+            "nature": "visite",
+            "lieu": "Miradouro de Santa Luzia",
+            "quartier": "Alfama",
+            "pourquoi": "Un belvédère aux azulejos, sur le chemin du retour."
+          },
+          {
+            "debut": "18:30",
+            "fin": "19:30",
+            "nature": "apero",
+            "lieu": "Wine With a View",
+            "quartier": "Graça",
+            "pourquoi": "Un verre de vin vert face à la ville."
+          },
+          {
+            "debut": "20:00",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "O Velho Eurico",
+            "quartier": "Alfama",
+            "pourquoi": "Une cuisine lisboète simple et généreuse."
+          }
+        ]
+      },
+      {
+        "date": "2027-06-11",
+        "titre": "Belém",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "11:00",
+            "nature": "visite",
+            "lieu": "Monastère des Hiéronymites",
+            "quartier": "Belém",
+            "pourquoi": "Le chef-d'œuvre manuélin de Lisbonne.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "11:15",
+            "fin": "12:00",
+            "nature": "visite",
+            "lieu": "Tour de Belém",
+            "quartier": "Belém",
+            "pourquoi": "La tour de garde des grandes découvertes, au bord de l'eau.",
+            "incontournable": true
+          },
+          {
+            "debut": "12:15",
+            "fin": "13:00",
+            "nature": "repas_midi",
+            "lieu": "Pastéis de Belém",
+            "quartier": "Belém",
+            "pourquoi": "Les pastéis de nata d'origine, encore tièdes."
+          },
+          {
+            "debut": "14:00",
+            "fin": "15:30",
+            "nature": "visite",
+            "lieu": "MAAT",
+            "quartier": "Belém",
+            "pourquoi": "Le musée d'art et d'architecture au bord du Tage."
+          },
+          {
+            "debut": "20:00",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "Cervejaria Ramiro",
+            "quartier": "Intendente",
+            "pourquoi": "Les fruits de mer de Lisbonne, sans chichis."
+          }
+        ]
+      },
+      {
+        "date": "2027-06-12",
+        "titre": "Baixa, Chiado et Bairro Alto",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "10:30",
+            "nature": "visite",
+            "lieu": "Praça do Comércio",
+            "quartier": "Baixa",
+            "pourquoi": "La grande place ouverte sur le fleuve.",
+            "incontournable": true
+          },
+          {
+            "debut": "10:45",
+            "fin": "11:30",
+            "nature": "visite",
+            "lieu": "Elevador de Santa Justa",
+            "quartier": "Baixa",
+            "pourquoi": "Monter au Chiado sans effort, avec la vue en prime."
+          },
+          {
+            "debut": "12:30",
+            "fin": "13:45",
+            "nature": "repas_midi",
+            "lieu": "Time Out Market",
+            "quartier": "Cais do Sodré",
+            "pourquoi": "Un marché couvert pour goûter un peu de tout."
+          },
+          {
+            "debut": "15:00",
+            "fin": "16:30",
+            "nature": "visite",
+            "lieu": "Livraria Bertrand",
+            "quartier": "Chiado",
+            "pourquoi": "La plus vieille librairie du monde encore ouverte."
+          },
+          {
+            "debut": "18:30",
+            "fin": "19:30",
+            "nature": "apero",
+            "lieu": "Park Bar",
+            "quartier": "Bairro Alto",
+            "pourquoi": "Un toit-terrasse pour le coucher du soleil."
+          },
+          {
+            "debut": "20:00",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "Cantinho do Avillez",
+            "quartier": "Chiado",
+            "pourquoi": "Une cuisine portugaise revisitée."
+          }
+        ]
+      },
+      {
+        "date": "2027-06-13",
+        "dureeEstimeeMinutes": 178,
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "09:45",
+            "nature": "visite",
+            "lieu": "Miradouro da Graça",
+            "quartier": "Graça",
+            "pourquoi": "Un dernier belvédère avant la visite guidée, à deux pas du logement."
+          },
+          {
+            "debut": "15:00",
+            "fin": "16:00",
+            "nature": "visite",
+            "lieu": "Tour des Clercs",
+            "quartier": "Clérigos",
+            "pourquoi": "Monter au clocher baroque pour voir tout Porto en arrivant.",
+            "incontournable": true
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "Cantinho do Avillez Porto",
+            "quartier": "Ribeira",
+            "pourquoi": "Un premier dîner près de votre logement."
+          }
+        ]
+      },
+      {
+        "date": "2027-06-14",
+        "titre": "Ribeira et Vila Nova de Gaia",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "10:30",
+            "nature": "visite",
+            "lieu": "Cathédrale de Porto",
+            "quartier": "Sé",
+            "pourquoi": "Le point de départ de la vieille ville.",
+            "incontournable": true
+          },
+          {
+            "debut": "10:45",
+            "fin": "11:30",
+            "nature": "visite",
+            "lieu": "Pont Dom-Luís I",
+            "quartier": "Ribeira",
+            "pourquoi": "Traverser le Douro par le tablier supérieur.",
+            "incontournable": true
+          },
+          {
+            "debut": "12:00",
+            "fin": "13:15",
+            "nature": "repas_midi",
+            "lieu": "Taberna dos Mercadores",
+            "quartier": "Ribeira",
+            "pourquoi": "Une petite adresse de poissons."
+          },
+          {
+            "debut": "15:00",
+            "fin": "16:30",
+            "nature": "visite",
+            "lieu": "Caves Graham's",
+            "quartier": "Vila Nova de Gaia",
+            "pourquoi": "Une dégustation de porto avec vue sur la ville.",
+            "aReserver": true
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "Casa Guedes",
+            "quartier": "Baixa",
+            "pourquoi": "Le sandwich au porc qui a fait la réputation de Porto."
+          }
+        ]
+      },
+      {
+        "date": "2027-06-15",
+        "titre": "Bolhão et départ",
+        "creneaux": [
+          {
+            "debut": "10:00",
+            "fin": "11:00",
+            "nature": "visite",
+            "lieu": "Marché du Bolhão",
+            "quartier": "Baixa",
+            "pourquoi": "Le marché rénové pour vos derniers achats."
+          },
+          {
+            "debut": "12:00",
+            "fin": "13:15",
+            "nature": "repas_midi",
+            "lieu": "Café Majestic",
+            "quartier": "Baixa",
+            "pourquoi": "Un café Belle Époque pour finir le voyage."
+          },
+          {
+            "debut": "16:00",
+            "fin": "16:30",
+            "nature": "depart"
+          }
+        ]
+      }
+    ],
+    "bonsPlans": [
+      "Prends le train Alfa Pendular entre Lisbonne et Porto, à réserver quelques jours avant.",
+      "Réserve les Hiéronymites et la librairie Lello en ligne."
+    ]
+  }
+}

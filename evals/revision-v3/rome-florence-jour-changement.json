@@ -1,0 +1,266 @@
+{
+  "schema": 1,
+  "id": "rome-florence-jour-changement",
+  "programme": "rome-florence-billet",
+  "cas": "Sortie simulée du prompt revision v3 (M4a-2, ticket #926), écrite à la main : noms usuels de l'IA, aucune donnée Google, aucune ville par créneau, aucun transfer ; version précédente : sortie simulée du prompt programme v5 (rome-florence-billet) ; Rome puis Florence, billet saisi (départ 12:10, arrivée 13:45) ; deux étapes écartées le jour du changement de ville, une de la ville quittée avant le départ, une de la ville d'arrivée après le trajet ; l'étape aimée de ce jour reste.",
+  "choix": {
+    "pasPourMoi": [
+      "Villa Borghese",
+      "Trattoria Mario"
+    ],
+    "jAime": [
+      "Duomo de Florence"
+    ]
+  },
+  "sortie": {
+    "titre": "De la Rome antique à la Florence de la Renaissance",
+    "jours": [
+      {
+        "date": "2027-05-04",
+        "titre": "Monti et le Colisée",
+        "creneaux": [
+          {
+            "debut": "11:00",
+            "fin": "11:30",
+            "nature": "arrivee"
+          },
+          {
+            "debut": "12:30",
+            "fin": "13:30",
+            "nature": "repas_midi",
+            "lieu": "Antico Forno ai Serpenti",
+            "quartier": "Monti",
+            "pourquoi": "Un panini rapide dans votre quartier avant les visites."
+          },
+          {
+            "debut": "14:00",
+            "fin": "16:00",
+            "nature": "visite",
+            "lieu": "Colisée",
+            "quartier": "Colisée",
+            "pourquoi": "Le symbole de la Rome antique, à dix minutes de votre logement.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "16:15",
+            "fin": "17:45",
+            "nature": "visite",
+            "lieu": "Forum romain",
+            "quartier": "Colisée",
+            "pourquoi": "Le cœur de la Rome antique, avec le même billet que le Colisée.",
+            "incontournable": true
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "La Taverna dei Fori Imperiali",
+            "quartier": "Monti",
+            "pourquoi": "Une cuisine romaine de famille, à deux rues de l'hôtel.",
+            "conseil": "Réserve la veille."
+          }
+        ]
+      },
+      {
+        "date": "2027-05-05",
+        "titre": "Vatican et Prati",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "12:00",
+            "nature": "visite",
+            "lieu": "Musées du Vatican",
+            "quartier": "Vatican",
+            "pourquoi": "La chapelle Sixtine et des siècles d'art, à voir une fois.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "12:30",
+            "fin": "13:45",
+            "nature": "repas_midi",
+            "lieu": "Pizzarium",
+            "quartier": "Prati",
+            "pourquoi": "La pizza à la coupe la plus courue de Rome, à deux pas des musées."
+          },
+          {
+            "debut": "14:15",
+            "fin": "15:30",
+            "nature": "visite",
+            "lieu": "Basilique Saint-Pierre",
+            "quartier": "Vatican",
+            "pourquoi": "La plus grande église de la chrétienté, juste à côté.",
+            "incontournable": true
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "Da Cesare al Casaletto",
+            "quartier": "Monteverde",
+            "pourquoi": "Une trattoria de quartier pour une carbonara de référence."
+          }
+        ]
+      },
+      {
+        "date": "2027-05-06",
+        "titre": "Centre historique",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "10:30",
+            "nature": "visite",
+            "lieu": "Panthéon",
+            "quartier": "Centro storico",
+            "pourquoi": "Un temple antique intact, la coupole vous laissera bouche bée.",
+            "incontournable": true
+          },
+          {
+            "debut": "10:45",
+            "fin": "11:30",
+            "nature": "visite",
+            "lieu": "Fontaine de Trevi",
+            "quartier": "Trevi",
+            "pourquoi": "La fontaine la plus célèbre de Rome, tôt pour éviter la foule.",
+            "incontournable": true
+          },
+          {
+            "debut": "12:30",
+            "fin": "13:45",
+            "nature": "repas_midi",
+            "lieu": "Armando al Pantheon",
+            "quartier": "Centro storico",
+            "pourquoi": "Une adresse romaine historique, simple et juste."
+          },
+          {
+            "debut": "15:00",
+            "fin": "16:30",
+            "nature": "visite",
+            "lieu": "Piazza Navona",
+            "quartier": "Centro storico",
+            "pourquoi": "La place baroque par excellence, pour flâner."
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "Roscioli",
+            "quartier": "Campo de' Fiori",
+            "pourquoi": "Une épicerie-restaurant pour finir Rome en beauté."
+          }
+        ]
+      },
+      {
+        "date": "2027-05-07",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "10:00",
+            "nature": "visite",
+            "lieu": "Basilique Sainte-Marie-Majeure",
+            "quartier": "Esquilin",
+            "pourquoi": "Une grande basilique à quelques minutes de ton logement, parfaite avant le train."
+          },
+          {
+            "debut": "10:30",
+            "fin": "11:30",
+            "nature": "repas_midi",
+            "lieu": "Antico Forno ai Serpenti",
+            "quartier": "Monti",
+            "pourquoi": "Un déjeuner rapide avant de rejoindre la gare."
+          },
+          {
+            "debut": "15:00",
+            "fin": "16:30",
+            "nature": "visite",
+            "lieu": "Duomo de Florence",
+            "quartier": "Duomo",
+            "pourquoi": "La cathédrale et sa coupole, à quelques minutes de votre logement.",
+            "incontournable": true
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "Trattoria Sergio Gozzi",
+            "quartier": "San Lorenzo",
+            "pourquoi": "Une cantine florentine de quartier pour ton premier dîner toscan."
+          }
+        ]
+      },
+      {
+        "date": "2027-05-08",
+        "titre": "Offices et Oltrarno",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "11:30",
+            "nature": "visite",
+            "lieu": "Galerie des Offices",
+            "quartier": "Piazza della Signoria",
+            "pourquoi": "Botticelli et la Renaissance au même endroit.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "11:45",
+            "fin": "12:30",
+            "nature": "visite",
+            "lieu": "Ponte Vecchio",
+            "quartier": "Oltrarno",
+            "pourquoi": "Le pont des orfèvres, sur le chemin de l'Oltrarno.",
+            "incontournable": true
+          },
+          {
+            "debut": "12:45",
+            "fin": "14:00",
+            "nature": "repas_midi",
+            "lieu": "All'Antico Vinaio",
+            "quartier": "Santa Croce",
+            "pourquoi": "Le sandwich florentin, à emporter sur les marches."
+          },
+          {
+            "debut": "18:30",
+            "fin": "20:00",
+            "nature": "repas_soir",
+            "lieu": "Osteria Santo Spirito",
+            "quartier": "Santo Spirito",
+            "pourquoi": "Un dîner tôt avant votre concert."
+          }
+        ]
+      },
+      {
+        "date": "2027-05-09",
+        "titre": "Dernière matinée à Florence",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "11:00",
+            "nature": "visite",
+            "lieu": "Piazzale Michelangelo",
+            "quartier": "Oltrarno",
+            "pourquoi": "La vue sur toute la ville pour vous dire au revoir."
+          },
+          {
+            "debut": "12:00",
+            "fin": "13:15",
+            "nature": "repas_midi",
+            "lieu": "Mercato Centrale",
+            "quartier": "San Lorenzo",
+            "pourquoi": "Un dernier repas au marché couvert."
+          },
+          {
+            "debut": "15:00",
+            "fin": "15:30",
+            "nature": "depart"
+          }
+        ]
+      }
+    ],
+    "bonsPlans": [
+      "Réserve le Colisée, les Musées du Vatican et les Offices dès maintenant.",
+      "Votre train vers Florence part à midi : laissez les bagages à la consigne de l'hôtel le matin."
+    ]
+  }
+}

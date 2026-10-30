@@ -695,9 +695,20 @@ export function lireDureeEstimee(brut: unknown): number | undefined {
  * Cadre de lecture d'une sortie du prompt `programme` v5 : `joursDureeEstimee`, les dates des journées de changement de
  * ville à **départ estimé** (`changements` de source `estime` de l'entrée v5), seules journées où `dureeEstimeeMinutes`
  * est lue (0149 S-M4-2 point 2). Ailleurs (journée ordinaire, départ saisi), le champ est ignoré et compté, comme toute
- * clé inconnue ; sans cadre (prompts v4 et `revision`), il l'est partout.
+ * clé inconnue ; sans cadre (prompts `programme` v4 et `revision` v2), il l'est partout. Le cadre des prompts v5 et
+ * `revision` v3 : `cadreLectureChangements`.
  */
 export type CadreLectureProgramme = { readonly joursDureeEstimee?: readonly string[] };
+
+/**
+ * Cadre de lecture d'une sortie des prompts `programme` v5 et `revision` v3 (ticket #926 : mêmes contrôles de la durée
+ * estimée, 0149 S-M4-2) : les dates des changements de ville de source `estime` de l'entrée, seules journées où
+ * `dureeEstimeeMinutes` est lue. Forme structurelle (`changements` de `EntreeProgrammeV5`), une seule règle pour les deux
+ * prompts.
+ */
+export function cadreLectureChangements(changements: readonly { readonly date: string; readonly source: "saisi" | "estime" }[]): CadreLectureProgramme {
+  return { joursDureeEstimee: changements.filter((changement) => changement.source === "estime").map((changement) => changement.date) };
+}
 export type ProgrammeIa = {
   readonly titre?: string;
   readonly jours: readonly JourIa[];
@@ -734,6 +745,9 @@ const coupe = (brut: unknown, garde: unknown, max: number) => typeof brut === "s
  * - aucune journée restante : `valeur: null` ;
  * - `dureeEstimeeMinutes` d'une journée (prompt v5) : lue seulement aux dates `cadre.joursDureeEstimee`, par
  *   `lireDureeEstimee` ; refusée, ou hors de ces dates : retirée, `champsRetires` (0149 S-M4-2).
+ * - `transfer` (prompts v5 et `revision` v3) : jamais lu ; une clé `transfer` (racine, journée ou créneau) est une clé
+ *   inconnue, ignorée et comptée, et un créneau de nature hors de la liste (`transfer`, `trajet`) est retiré : le
+ *   `transfer` est recopié par le code (0148 § 8 point 2), jamais pris au modèle.
  * Journées rangées par date ; l'ordre des créneaux est celui de l'IA, que `ordreEcrit` met ensuite en ordre écrit.
  * Aucune règle de nombre de lieux, de durée, de distance ni de cohérence des horaires.
  */
