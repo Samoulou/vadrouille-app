@@ -186,8 +186,8 @@ export interface RevisionAdapter {
   lockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
   unlockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
   /**
-   * Déplacer une étape (ticket 947 ; feuille « Déplacer » de F7b ; décision 0147 § 4, § 8 et § 11 ; décision 0153, PR en
-   * cours) : `getMoveOptions` (`{ tripId, stopId }` → `MoveOptions`, points proposés, sans relecture), `previewMove`
+   * Déplacer une étape (ticket 947 ; feuille « Déplacer » de F7b ; décision 0147 § 4, § 8 et § 11 ; décision 0153, PR
+   * #959) : `getMoveOptions` (`{ tripId, stopId }` → `MoveOptions`, points proposés, sans relecture), `previewMove`
    * (`{ tripId, stopId, pointId, baseVersion }` → `MoveDraft`) et `applyMove` (`{ tripId, requestId, stopId, pointId,
    * baseVersion }` → `PatchResult`, version nouvelle, patch `[move]` appliqué par le moteur). Aperçu et application : débit
    * `retouche`, **un** appel du port de relectures (échec : `provider_error` ou `cost_cap_reached`, rien n'est écrit) ; le

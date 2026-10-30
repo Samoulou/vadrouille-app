@@ -190,7 +190,7 @@ function MoveContent({
     day: day.index,
     disabled: (options?.days.find((candidate) => candidate.index === day.index)?.points.length ?? 0) === 0,
   }));
-  const allFull = options !== null && !optionsFailed && days.every((day) => day.disabled);
+  const allFull = options !== null && days.every((day) => day.disabled);
   const shownDay = selectedDay === null ? undefined : trip.days.find((day) => day.index === selectedDay);
   const points = options?.days.find((day) => day.index === selectedDay)?.points ?? [];
 
@@ -337,17 +337,20 @@ function MoveContent({
           </div>
         )}
 
-        <section aria-labelledby={titleId} className="flex flex-col gap-3">
-          <h3 id={titleId} className={BLOC}>
-            {d.versQuelJour}
-          </h3>
-          <DayBadgeGroup days={days} value={selectedDay} onChange={chooseDay} labelledBy={titleId} />
-          {allFull ? (
-            <p data-part="aucun-jour" className="text-corps text-ink-2">
-              {d.aucunJour}
-            </p>
-          ) : null}
-        </section>
+        {/* Points indisponibles (ticket 947) : ni pastilles « complet » ni « Aucun jour », seulement le bandeau d'erreur. */}
+        {optionsFailed ? null : (
+          <section aria-labelledby={titleId} className="flex flex-col gap-3">
+            <h3 id={titleId} className={BLOC}>
+              {d.versQuelJour}
+            </h3>
+            <DayBadgeGroup days={days} value={selectedDay} onChange={chooseDay} labelledBy={titleId} />
+            {allFull ? (
+              <p data-part="aucun-jour" className="text-corps text-ink-2">
+                {d.aucunJour}
+              </p>
+            ) : null}
+          </section>
+        )}
 
         {shownDay ? (
           <section aria-label={format(messages.sejour.journee.etapes, { n: shownDay.index })} data-part="ligne-compacte">

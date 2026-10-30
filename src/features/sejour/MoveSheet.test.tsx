@@ -92,7 +92,7 @@ describe("déplacer: feuille", () => {
     expect(await axeViolations(baseElement)).toEqual([]);
   });
 
-  it("points indisponibles (refus ou panne, ticket 947) : bandeau d'erreur existant, sans « Aucun jour » ni « Réessayer » ; tous les jours désactivés", async () => {
+  it("points indisponibles (refus ou panne, ticket 947) : bandeau d'erreur existant, sans « Aucun jour » ni « Réessayer » ni pastille « complet »", async () => {
     const revision = {
       version: () => 1,
       previewReplacement: vi.fn(),
@@ -107,7 +107,8 @@ describe("déplacer: feuille", () => {
     await waitFor(() => expect(alerte).toHaveTextContent("La proposition n'a pas pu être calculée. Ton programme est inchangé."));
     expect(dialog().querySelector("[data-part='aucun-jour']")).toBeNull();
     expect(within(alerte).queryByRole("button")).toBeNull();
-    for (const radio of within(days()).getAllByRole("radio")) expect(radio).toHaveAttribute("aria-disabled", "true");
+    expect(within(dialog()).queryByRole("radiogroup")).toBeNull();
+    expect(within(dialog()).queryByText("complet")).toBeNull();
     expect(revision.previewMove).not.toHaveBeenCalled();
     expect(await axeViolations(baseElement)).toEqual([]);
   });

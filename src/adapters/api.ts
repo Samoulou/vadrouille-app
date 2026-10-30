@@ -48,7 +48,7 @@ export type OptionsAdaptateurApi = DependancesLecture;
  * aperçu ou application, hors transaction). Chaque réponse est validée par son contrat. Le cochage d'une ligne « À faire »
  * (`toggleChecklistItem`, B6b, branché sur l'écran 11 par M5e), le verrou de la fiche (`lockStop`, `unlockStop`, M5a,
  * `src/server/versions/retouches.ts`, sans relecture) et le déplacement (`getMoveOptions`, `previewMove`, `applyMove`, ticket
- * 947, `src/server/versions/deplacement.ts`, même port de relectures ; décision 0153, PR en cours) passent par le même
+ * 947, `src/server/versions/deplacement.ts`, même port de relectures ; décision 0153, PR #959) passent par le même
  * adaptateur.
  */
 function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
@@ -65,7 +65,7 @@ function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
     // M5a (ticket 919) : verrou de la fiche ; aucun appel du port de relectures (décision 0147 § 9).
     lockStop: async (ctx, input) => valide(PatchResultSchema)(await verrouillerEtape(dependances(ctx), input)),
     unlockStop: async (ctx, input) => valide(PatchResultSchema)(await deverrouillerEtape(dependances(ctx), input)),
-    // Ticket 947 : déplacer une étape ; un appel du port de relectures par aperçu ou application (décision 0153, PR en cours).
+    // Ticket 947 : déplacer une étape ; un appel du port de relectures par aperçu ou application (décision 0153, PR #959).
     getMoveOptions: async (ctx, input) => valide(MoveOptionsSchema)(await optionsDeDeplacement(dependances(ctx), input)),
     previewMove: async (ctx, input) => valide(MoveDraftSchema)(await proposerDeplacement(dependances(ctx), input)),
     applyMove: async (ctx, input) => valide(PatchResultSchema)(await appliquerDeplacement(dependances(ctx), input)),

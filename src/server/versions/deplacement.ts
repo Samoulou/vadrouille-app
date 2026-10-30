@@ -43,7 +43,7 @@ import { ACTION_LIMITEUR_RETOUCHE, erreurDuMoteur, patchDeLaPersonne, SQL_DERNIE
 
 /**
  * « Déplacer une étape » sur l'adaptateur `api` (ticket 947 ; spécification `specs/M5-retouches.md` § 3 et § 14 ; décision
- * 0147 § 4, § 8, § 11, § 6.4 point 4, § 5.3 point 7 ; **décision 0153 (PR en cours)** : le déplacement passe par le moteur
+ * 0147 § 4, § 8, § 11, § 6.4 point 4, § 5.3 point 7 ; **décision 0153, PR #959** : le déplacement passe par le moteur
  * avec une relecture, comme le remplacement M1g et l'ajout M5d-1). Trois cas d'usage, dans le cadre commun des actions sur
  * un voyage (`src/server/voyages/actions.ts`) :
  *

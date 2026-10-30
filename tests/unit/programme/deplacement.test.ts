@@ -16,7 +16,7 @@ import {
 import { formeAdmise } from "@/server/versions/retouches";
 
 /**
- * Déplacer une étape sur `api` (ticket 947 ; `src/server/versions/deplacement.ts` ; décision 0153, PR en cours) : fonctions
+ * Déplacer une étape sur `api` (ticket 947 ; `src/server/versions/deplacement.ts` ; décision 0153, PR #959) : fonctions
  * pures — points d'insertion proposés, demande de relectures, patch `[move]` (forme admise), « Ce qui change » d'un rejeu. Le
  * moteur (`appliquerPatch`, cas `move`), la relecture et l'écriture sont éprouvés sous `tests/db/deplacement.test.ts`.
  * Instantané tiré du voyage simulé d'Édimbourg (durées retirées, comme `TripSnapshotSchema` l'exige) ; aucune donnée Google

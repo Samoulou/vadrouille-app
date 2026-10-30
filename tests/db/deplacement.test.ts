@@ -23,7 +23,7 @@ import { closeAll, connect, createOrg, inTx, type DbClient, type Org } from "./h
 
 /**
  * « Déplacer une étape » sur l'adaptateur `api` (ticket 947 ; spécification M5 § 3 et § 14 ; décision 0147 § 4, § 8 et § 11 ;
- * décision 0153, PR en cours : le moteur applique le patch `[move]` avec une relecture), sur la base réelle : cas d'usage de
+ * décision 0153, PR #959 : le moteur applique le patch `[move]` avec une relecture), sur la base réelle : cas d'usage de
  * `src/server/versions/deplacement.ts` sous `vadrouille_app` avec le `withOrg` réel. Le débit `retouche` est injecté et
  * toujours admis (éprouvé par les tests du limiteur). Voyage d'Édimbourg du jeu simulé, débloqué par une ligne `tripUnlocked`.
  *
