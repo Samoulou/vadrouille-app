@@ -82,7 +82,8 @@ describe("conversion du brouillon à plusieurs villes (briefProgrammeDepuisFormu
     const sans = brief();
     const draft: TripDraft = { ...DEUX_VILLES, commitments: [{ kind: "flight", label: "Vol LIBELLE_VOL_M4B", date: "2027-05-07", start: "13:05", end: "14:10" }] };
     const b = brief(draft);
-    expect(b.changements).toEqual([{ date: "2027-05-07", de: "Rome", vers: "Florence", source: "entered", depart: "13:05", arrivee: "14:10", activitesMax: 2 }]);
+    // `nature` (M4-suite-back) : nature du vol, qui choisit ses marges (M4-suite § 3.3 ; T-M4S-4), jamais dans l'entrée v5.
+    expect(b.changements).toEqual([{ date: "2027-05-07", de: "Rome", vers: "Florence", source: "entered", depart: "13:05", arrivee: "14:10", nature: "flight", activitesMax: 2 }]);
     expect(b.billets).toEqual([{ date: "2027-05-07", libelle: "Vol LIBELLE_VOL_M4B" }]);
     expect(b.engagements ?? []).toEqual([]);
     expect([b.heureArrivee, b.heureDepart]).toEqual([sans.heureArrivee, sans.heureDepart]);
@@ -113,7 +114,8 @@ describe("changement de ville: cadrage (cadrerProgramme, 0148 § 5.1)", () => {
         date: "2027-05-07",
         dureeEstimeeMinutes: 120,
         creneaux: [
-          creneau("09:00", "visite", { lieu: "Panthéon", fin: "09:45" }),
+          // M4-suite § 9.1 point 2 : les bornes intègrent les marges (départ estimé : fin au plus 30 minutes avant 10:00).
+          creneau("09:00", "visite", { lieu: "Panthéon", fin: "09:30" }),
           creneau("09:30", "visite", { lieu: "À cheval", fin: "10:30" }),
           creneau("11:00", "visite", { lieu: "Dans le créneau" }),
           creneau("12:30", "repas_midi", { lieu: "Trattoria" }),
@@ -134,7 +136,8 @@ describe("changement de ville: cadrage (cadrerProgramme, 0148 § 5.1)", () => {
   });
 
   it("changement de ville: créneau de l'IA retiré (dans le créneau occupé, à cheval sur le départ) et activités au-delà du rythme retirées", () => {
-    // Départ estimé 10:00, 120 minutes : créneau occupé 10:00-12:00 ; rythme équilibré : 2 activités au plus.
+    // Départ estimé 10:00, 120 minutes : créneau occupé 10:00-12:00, marges de 30 minutes (fenêtre 09:30-12:30) ; rythme
+    // équilibré : 2 activités au plus.
     expect(lieux("2027-05-07")).toEqual([
       ["Panthéon", "Rome"],
       ["Trattoria", "Florence"],
@@ -188,7 +191,8 @@ describe("changement de ville: assemblage (assemblerProgrammeIa, 0148 § 5.1 poi
       ...(date === "2027-05-07" ? { dureeEstimeeMinutes: 120 } : {}),
       creneaux:
         date === "2027-05-07"
-          ? [creneau("09:00", "visite", { lieu: "Panthéon", fin: "09:45", placeId: "SENT_PANTHEON" }), creneau("14:00", "visite", { lieu: "Offices", placeId: "SENT_OFFICES" })]
+          ? // Fin à 09:30 (M4-suite-back, écart justifié dans la PR) : marge de 30 minutes avant le départ estimé de 10:00.
+            [creneau("09:00", "visite", { lieu: "Panthéon", fin: "09:30", placeId: "SENT_PANTHEON" }), creneau("14:00", "visite", { lieu: "Offices", placeId: "SENT_OFFICES" })]
           : [creneau("10:00", "visite", { lieu: `Lieu ${date}`, placeId: `SENT_${date}` })],
     }));
     const complet = assemblerProgrammeIa({
@@ -220,18 +224,18 @@ describe("changement de ville: assemblage (assemblerProgrammeIa, 0148 § 5.1 poi
 });
 
 describe("changement de ville: assemblage, temps libre et terminus (revue de la PR 932)", () => {
-  const assembler = (b: BriefProgramme, jours: Parameters<typeof assemblerProgrammeIa>[0]["jours"], logements: string[]) =>
-    assemblerProgrammeIa({
-      tripId: "00000000-0000-4000-8000-0000000000cc",
-      organizationId: "00000000-0000-4000-8000-0000000000dd",
-      brief: b,
-      jours,
-      bonsPlans: [],
-      logements,
-      configuration: C,
-      mode: modeDeTrajet(b),
-      trajets: () => undefined,
-    });
+  const entreeDe = (b: BriefProgramme, jours: Parameters<typeof assemblerProgrammeIa>[0]["jours"], logements: string[]) => ({
+    tripId: "00000000-0000-4000-8000-0000000000cc",
+    organizationId: "00000000-0000-4000-8000-0000000000dd",
+    brief: b,
+    jours,
+    bonsPlans: [],
+    logements,
+    configuration: C,
+    mode: modeDeTrajet(b),
+    trajets: () => undefined,
+  });
+  const assembler = (b: BriefProgramme, jours: Parameters<typeof assemblerProgrammeIa>[0]["jours"], logements: string[]) => assemblerProgrammeIa(entreeDe(b, jours, logements));
 
   // Bloquant 2 : une étape sans `fin` occupe sa durée par défaut ; le « Temps libre » avant le départ part de sa fin occupée.
   it("changement de ville: temps libre avant le départ depuis la fin occupée d'une étape sans fin", () => {
@@ -260,7 +264,13 @@ describe("changement de ville: assemblage, temps libre et terminus (revue de la 
     const base = brief();
     const b: BriefProgramme = { ...base, changements: [{ ...base.changements[0]!, depart: "10:45" }] };
     const jours = [{ date: "2027-05-07", dureeEstimeeMinutes: 120, creneaux: [creneau("09:00", "visite", { lieu: "Panthéon", placeId: "SENT_PANTHEON" })] }];
-    const items = assembler(b, jours, ["SENT_LOGEMENT_ROME", "SENT_LOGEMENT_FLORENCE"]).trip.days.find((d) => d.date === "2027-05-07")?.items ?? [];
+    // Configuration de test (M4-suite-back, écart justifié dans la PR) : avec les marges du § 2, toutes d'au moins 30 minutes,
+    // l'écart atteint toujours le seuil (M4-suite § 3.4) ; une marge de 10 minutes garde l'étape (fin occupée 10:30).
+    const marges = { ...C.changementDeVille.margesMinutes, avantDepart: { ...C.changementDeVille.margesMinutes.avantDepart, estimated: 10 } };
+    const configuration = { ...C, changementDeVille: { ...C.changementDeVille, margesMinutes: marges } };
+    const items =
+      assemblerProgrammeIa({ ...entreeDe(b, jours, ["SENT_LOGEMENT_ROME", "SENT_LOGEMENT_FLORENCE"]), configuration }).trip.days.find((d) => d.date === "2027-05-07")?.items ?? [];
+    expect(items.some((item) => item.type === "stop" && item.stop.name === "Panthéon")).toBe(true);
     const rang = items.findIndex((item) => item.type === "transfer");
     expect(items.slice(0, rang).some((item) => item.type === "free")).toBe(false);
   });
