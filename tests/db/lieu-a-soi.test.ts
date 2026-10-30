@@ -290,6 +290,24 @@ describe("lieu à soi sur api (M5d-1, ticket 939)", () => {
     expect(await versions(a, tripId)).toHaveLength(1);
   });
 
+  it("ajout sur une étape verrouillée : no_option, rien d'écrit, à l'aperçu comme à l'application (critère 22, ticket 954)", async () => {
+    const tripId = await nouveauVoyage();
+    // Le dîner du J2 (19 h – 20 h 30) verrouillé : version 2. Le lieu ajouté, verrouillé par son propre patch `[add, lock]`,
+    // n'ouvre pas l'exception des conflits entre verrous (B5-PO-6) : refus par le contrôle des étapes fixes du moteur.
+    valeur(await basculerVerrou({ contexte: async () => contexte(a), withOrg, limiteur: async () => ok(undefined) }, "lock", { tripId, requestId: randomUUID(), stopId: "j2-diner", baseVersion: 1 }));
+    const avant = await versions(a, tripId);
+    expect(avant).toHaveLength(2);
+    // À l'heure du dîner, puis 30 minutes avant (le bloc ajouté de 90 minutes le recouvre).
+    for (const time of ["19:00", "18:30"]) {
+      expect(erreur(await apercu(tripId, 2, { time })), time).toEqual({ code: "no_option" });
+      expect(erreur(await appliquer(tripId, 2, randomUUID(), { time })), time).toEqual({ code: "no_option" });
+    }
+    expect(await versions(a, tripId)).toEqual(avant);
+    const texte = await lignesDuVoyage(tripId);
+    expect(texte).not.toContain(LIEU);
+    expect(texte).not.toContain(NOM);
+  });
+
   it("R3 : une étape verrouillée survit à l'ajout (nom, jour, heures, placeId, verrou)", async () => {
     const tripId = await nouveauVoyage();
     // Le dîner du J2, voisin suivant du lieu ajouté (trajet demandé). Pas le jardin botanique : verrouillé à son heure
