@@ -17,7 +17,9 @@ import type { EntreeProgramme } from "./entree";
  *   Google, ni verdict d'ancrage (0011 § 1, 0117 § 3). Les étapes sans `placeId` sont rendues exactement comme les autres.
  *   **Lieu à soi** (décision 0147 § 12 S4 ; M5d-1, ticket 939) : une étape ajoutée par la personne (`addedBy: "person"`)
  *   n'entre **jamais** dans l'entrée (ni son nom saisi, ni son identifiant `ajout-…`, que `ID_ETAPE_REVISION` refuserait) :
- *   elle reste dans le programme, verrouillée, recopiée par le filet du code ; un choix qui la viserait est ignoré.
+ *   elle reste dans le programme : la version révisée la reçoit de la version de base, inchangée et verrouillée
+ *   (`lieuxASoiReinjectes` de `src/server/generation/etapes-revision.ts`, avant le contrôle R3) ; un choix qui la viserait est
+ *   ignoré.
  * - `retirerEtapesEcartees` : filet du code après la lecture de la sortie (0126 § 4) : tout créneau dont le lieu, normalisé,
  *   est celui d'une étape écartée est retiré.
  */

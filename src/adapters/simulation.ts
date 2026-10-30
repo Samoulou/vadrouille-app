@@ -37,6 +37,8 @@ export const MAX_AUTH_ADDRESSES_PER_SCOPE = 50;
 export const MAX_LAUNCHES_PER_SCOPE = 20;
 /** Signalements d'erreur gardés par portée (M5c) ; au-delà, le plus ancien est retiré. */
 export const MAX_STOP_REPORTS_PER_SCOPE = 200;
+/** Recherches de lieu à soi gardées par portée (M5d-1) ; au-delà, la plus ancienne est retirée. */
+export const MAX_PLACE_SEARCHES_PER_SCOPE = 200;
 
 /** Issues de la génération simulée, choisies par `R-sim` (`configureGeneration`) dans une portée explicite. */
 export const GENERATION_OUTCOMES = MOCK_GENERATION_OUTCOMES;
@@ -182,7 +184,7 @@ export interface SimulationScope {
   placeSearches?: PlaceSearchStore;
 }
 
-/** Recherches de lieu à soi simulées de la portée (M5d-1) ; au plus `MAX_STOP_REPORTS_PER_SCOPE`. */
+/** Recherches de lieu à soi simulées de la portée (M5d-1) ; au plus `MAX_PLACE_SEARCHES_PER_SCOPE`. */
 export interface PlaceSearchStore {
   records: { readonly organizationId: string; readonly tripId: string; readonly at: number }[];
 }

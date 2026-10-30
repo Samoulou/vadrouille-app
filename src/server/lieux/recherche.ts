@@ -26,7 +26,7 @@ import { executerActionVoyage, type DependancesAction, type ExecuteurAction } fr
  *
  * 1. cadre des actions sur un voyage (`executerActionVoyage`) : session (`unauthenticated`), entrée stricte
  *    `PlaceSearchRequestSchema` (`validation_failed`), voyage dans l'organisation (`not_found`) ; dans la même transaction en
- *    lecture seule, droit « voyage débloqué » et **nom maison** de la ville de la journée (`stays.city` du séjour qui couvre
+ *    lecture seule, jour dans les dates du voyage (`not_found`, `SQL_JOUR_DU_VOYAGE`), droit « voyage débloqué » et **nom maison** de la ville de la journée (`stays.city` du séjour qui couvre
  *    sa date ; nul : texte saisi seul, § 3 point 2). Ces refus ne sont pas journalisés par `lieu.recherche` (§ 12 S1 point 5) ;
  * 2. entrée revalidée par le cœur (caractère de contrôle dans le texte : `validation_failed`, motif `entree_invalide`) ;
  * 3. voyage non débloqué : `not_unlocked` (`retryable` faux), motif `non_debloque`, sans rien appeler ;
@@ -57,6 +57,10 @@ export const SQL_VILLE_DU_JOUR = `SELECT s.city FROM public.stays s
     AND s.from_date <= t.start_date + ($3::integer - 1) AND t.start_date + ($3::integer - 1) <= s.to_date
   ORDER BY (t.start_date + ($3::integer - 1) < s.to_date) DESC, s.from_date DESC, s.id
   LIMIT 1`;
+
+/** Jour `day` dans les dates du voyage (1 à `end_date − start_date + 1`) : `present` vrai, sinon faux. */
+export const SQL_JOUR_DU_VOYAGE = `SELECT ($3::integer <= (end_date - start_date + 1)) AS present FROM public.trips
+  WHERE organization_id = $1 AND id = $2`;
 
 /** Ville lue : texte d'une ligne de 1 à 120 caractères, sinon aucune ville (requête sans suffixe). */
 function villeLue(valeur: unknown): string | null {
@@ -174,6 +178,8 @@ export async function rechercherLieux(dependances: DependancesRechercheLieux, en
   // 1. Cadre : session, entrée stricte, voyage dans l'organisation ; droit et ville lus en lecture seule.
   const lu = await executerActionVoyage("search-places", dependances, PlaceSearchRequestSchema, entree, async (executeur: ExecuteurAction, ctx, valeur) => {
     await executeur.query("SET TRANSACTION READ ONLY");
+    // Jour du voyage (revue de la PR 943, mineur 5) : un jour hors du voyage est `not_found`, avant toute réservation.
+    if ((await executeur.query(SQL_JOUR_DU_VOYAGE, [ctx.organizationId, valeur.tripId, valeur.day])).rows[0]?.present !== true) return null;
     const debloque = (await lireDroitVoyage(executeur, valeur.tripId)) !== null;
     const ville = debloque ? villeLue((await executeur.query(SQL_VILLE_DU_JOUR, [ctx.organizationId, valeur.tripId, valeur.day])).rows[0]?.city) : null;
     return { lecture: { debloque, ville } satisfies LectureVoyage, valeur };

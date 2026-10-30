@@ -42,6 +42,7 @@ import {
   getSimulationScope,
   MAX_AUTH_ADDRESSES_PER_SCOPE,
   MAX_LAUNCHES_PER_SCOPE,
+  MAX_PLACE_SEARCHES_PER_SCOPE,
   MAX_STOP_REPORTS_PER_SCOPE,
   type SimulationScope,
 } from "./simulation";
@@ -532,7 +533,7 @@ export async function lieuxSimules(
     now: () => scope.clock.now(),
     plafond: plafondRechercheParVoyage(),
     durees: { activity, lunch, dinner },
-    max: MAX_STOP_REPORTS_PER_SCOPE,
+    max: MAX_PLACE_SEARCHES_PER_SCOPE,
   });
 }
 

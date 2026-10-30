@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { TripSnapshot } from "@/contracts";
+import type { DayLineItemSnapshot, StopSnapshot, TripSnapshot } from "@/contracts";
 import type { TriDuRecalcul } from "@/domain/recalcul";
 import { etapesVerrouilleesModifiees } from "@/domain/verrous";
 import type { CapaciteProgramme, ExecuteurPublication, OptionsEtape } from "@/server/composition/generation";
@@ -45,6 +45,12 @@ import { lireTriClos } from "./signaux";
  * `@/domain/verrous` : identifiant, nom, jour, heures, `placeId`). Si elle changeait une étape verrouillée, **rien n'est
  * écrit** (`ecrireSi` faux : la ligne finit `ready`, `last_version` nul, comme une version de base dépassée) ; sinon le
  * verrou des étapes gardées est reporté sur la version écrite (`verrousReportes`), que l'assemblage rend déverrouillées.
+ *
+ * **Lieux à soi** (M5d-1, ticket 939 ; décision 0147 § 12 S4) : une étape ajoutée par la personne (`addedBy: "person"`)
+ * n'entre jamais dans la requête `revision` (`etapesPourLeModele`) ; elle est **réinjectée** de la version de base dans la
+ * version révisée avant R3 (`lieuxASoiReinjectes` : nom, jour, heures, `placeId` et verrou inchangés), si bien que R3 la voit
+ * gardée et que la révision s'écrit. Le voyage complet (M1c) ne la touche pas : il ne remplace qu'un jour sans étape, et
+ * l'ajout est refusé (`generation_in_progress`) tant qu'une exécution `full` ou `batch` du voyage est ouverte.
  *
  * Ce que la révision ne réécrit pas (choix conservateurs, décrits dans la PR) : les cases de l'aperçu (`proposals`) et
  * `stays.place_id` (écrits par la génération). Les lignes « À faire » suivent la version (décision 0147 § 7.2, qui amende 0142
@@ -131,6 +137,58 @@ export function verrousReportes(base: TripSnapshot, revisee: TripSnapshot): Trip
   };
 }
 
+const minutes = (heure: string): number => Number(heure.slice(0, 2)) * 60 + Number(heure.slice(3, 5));
+
+/** Intervalle `[début, fin)` d'une ligne datée de la journée, ou `null` (terminus, trajet, changement de ville). */
+function intervalle(ligne: DayLineItemSnapshot): readonly [number, number] | null {
+  if (ligne.type === "stop") return [minutes(ligne.stop.start), minutes(ligne.stop.end ?? ligne.stop.start)];
+  if (ligne.type === "free") return [minutes(ligne.from), minutes(ligne.to)];
+  if (ligne.type === "openMeal") return [minutes(ligne.time), minutes(ligne.time) + 1];
+  return null;
+}
+
+/**
+ * Lieux à soi réinjectés (fonction pure ; M5d-1, décision 0147 § 12 S4) : chaque étape `addedBy: "person"` de la version de
+ * base est remise, **telle quelle** (identifiant, nom, jour, heures, `placeId`, verrou), dans le même jour de la version
+ * révisée, à son heure (avant la première étape qui commence après elle, sinon avant le terminus de fin). Les lignes de la
+ * révision qui la chevauchent sont retirées : étapes non verrouillées, temps libres et repas ouverts ; une étape verrouillée
+ * de la base n'est jamais retirée (la base les tenait déjà sans chevauchement). Deux trajets devenus voisins n'en font
+ * qu'un. Un jour absent de la révision, ou un lieu déjà présent (même identifiant), est laissé tel quel.
+ */
+export function lieuxASoiReinjectes(base: TripSnapshot, revisee: TripSnapshot): TripSnapshot {
+  const parJour = new Map<number, StopSnapshot[]>();
+  for (const jour of base.days) {
+    for (const ligne of jour.items) {
+      if (ligne.type === "stop" && ligne.stop.addedBy === "person") parJour.set(jour.index, [...(parJour.get(jour.index) ?? []), ligne.stop]);
+    }
+  }
+  if (parJour.size === 0) return revisee;
+  return {
+    ...revisee,
+    days: revisee.days.map((jour) => {
+      const presents = new Set(jour.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop.id] : [])));
+      const aPoser = (parJour.get(jour.index) ?? []).filter((stop) => !presents.has(stop.id));
+      if (aPoser.length === 0) return jour;
+      const chevauche = (ligne: DayLineItemSnapshot) => {
+        if (ligne.type === "stop" && ligne.stop.locked) return false;
+        const lu = intervalle(ligne);
+        if (lu === null) return false;
+        return aPoser.some((stop) => {
+          const [debut, fin] = [minutes(stop.start), minutes(stop.end ?? stop.start)];
+          return lu[0] < Math.max(fin, debut + 1) && debut < lu[1];
+        });
+      };
+      let items: DayLineItemSnapshot[] = jour.items.filter((ligne) => !chevauche(ligne));
+      for (const stop of [...aPoser].sort((x, y) => minutes(x.start) - minutes(y.start))) {
+        const rang = items.findIndex((ligne) => (ligne.type === "stop" && minutes(ligne.stop.start) > minutes(stop.start)) || (ligne.type === "terminus" && ligne.role === "end"));
+        items.splice(rang === -1 ? items.length : rang, 0, { type: "stop", stop });
+      }
+      items = items.filter((ligne, i) => !(ligne.type === "segment" && items[i - 1]?.type === "segment"));
+      return { ...jour, items };
+    }),
+  };
+}
+
 type Lus = { readonly base: TripSnapshot; readonly choix: ChoixRevision };
 
 /** Relectures communes à `a` et `e`, dans une transaction ; `null` : rien à réviser (voir l'en-tête). */
@@ -189,8 +247,9 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
         return (c: CapaciteProgramme) => c.reviser(entree, sejour, (programme) => retirerEtapesEcartees(programme, noms));
       })();
   const { instantane, verifies, obtenuesA } = await redigerEtVerifier(contexte, { brief, capacite, forfait, registre, compteurs: compteursInitiaux() }, reviser);
-  // R3 (voir l'en-tête) : une version qui changerait une étape verrouillée n'est pas écrite.
-  const tenue = verrousReportes(base, instantane);
+  // Lieux à soi de la base réinjectés (voir l'en-tête), puis R3 : une version qui changerait une étape verrouillée n'est pas écrite.
+  const revisee = lieuxASoiReinjectes(base, instantane);
+  const tenue = verrousReportes(base, revisee);
   const publies = new Set(instantane.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));
   const ecrirePositions = contexte.dep.ecriturePositions(fabrique)
     ? (executeur: ExecuteurPublication) => verifies.positions.ecrire(executeur, publies, obtenuesA, contexte.dep.portPositions)
@@ -203,7 +262,7 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
     contexte.dep,
     { organizationId, generationRunId, tripId, requestId: contexte.requestId, echeance: contexte.echeance, rang: contexte.rang },
     {
-      instantane: tenue ?? instantane,
+      instantane: tenue ?? revisee,
       // Version remplacée : la version de base, seule version courante admise par `ecrireSi` (relue sous le verrou).
       instantanePrecedent: base,
       cases: [],

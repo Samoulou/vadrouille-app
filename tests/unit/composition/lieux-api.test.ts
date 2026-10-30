@@ -11,7 +11,7 @@ import { barriereLieuxApi, journaliserExceptionLieux, NIVEAUX_LIEU_API, recherch
 import { RATE_LIMITS } from "@/server/config/limites";
 import { SEUILS_LIEUX, SEUILS_LIEUX_VALIDES } from "@/server/config/lieux";
 import { evaluerBarriere, type EtatBarriere } from "@/server/generation/barriere";
-import { resultatsRendus, SQL_VILLE_DU_JOUR } from "@/server/lieux/recherche";
+import { resultatsRendus, SQL_JOUR_DU_VOYAGE, SQL_VILLE_DU_JOUR } from "@/server/lieux/recherche";
 import { LOG_LIEU_REASONS } from "@/server/log";
 import { SQL_DROIT_VOYAGE } from "@/server/payment/paiements";
 import { createRateLimiter, type RateLimitClient, type RateLimitPool } from "@/server/rate-limit";
@@ -37,11 +37,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Le double numérote chaque paramètre lié : `$3` répété dans la requête devient `$3`, `$4`, `$5`. */
-let rang = 0;
-const VILLE_DU_JOUR = SQL_VILLE_DU_JOUR.replace(/\$\d+/g, () => `$${String((rang += 1))}`);
+/** Le double numérote chaque paramètre lié dans l'ordre d'apparition : `$3` répété devient `$3`, `$4`, `$5`. */
+const renumerotee = (texte: string) => {
+  let rang = 0;
+  return texte.replace(/\$\d+/g, () => `$${String((rang += 1))}`);
+};
+const VILLE_DU_JOUR = renumerotee(SQL_VILLE_DU_JOUR);
+const JOUR_DU_VOYAGE = renumerotee(SQL_JOUR_DU_VOYAGE);
 
-type Base = { voyage?: boolean; debloque?: boolean; ville?: unknown };
+type Base = { voyage?: boolean; jour?: boolean; debloque?: boolean; ville?: unknown };
 
 /** `withOrg` doublé : texte SQL reconstitué (paramètres `$n`), réponses fixées par requête. */
 function doubleWithOrg(base: Base = {}) {
@@ -72,6 +76,7 @@ function doubleWithOrg(base: Base = {}) {
         parametres.push(valeurs);
         if (texte === "SET TRANSACTION READ ONLY") return { rows: [] };
         if (texte === SQL_VOYAGE) return { rows: base.voyage === false ? [] : [{ present: 1 }] };
+        if (texte === JOUR_DU_VOYAGE) return { rows: [{ present: base.jour !== false }] };
         if (texte === SQL_DROIT_VOYAGE) return { rows: base.debloque === false ? [] : [{ id: "droit-1" }] };
         if (texte === VILLE_DU_JOUR) return { rows: base.ville === undefined ? [] : [{ city: base.ville }] };
         throw new Error(`requête inattendue : ${texte}`);
@@ -226,8 +231,9 @@ describe("lieux api: ordre d'une action (0147 § 3 point 6)", () => {
     expect(d.limiteur).toHaveBeenCalledWith({ action: "lieu-recherche", headers: dep.headers, tripId: TRIP });
     expect(d.reserver).toHaveBeenCalledWith("lieux");
     // Lecture seule : voyage, droit, ville du jour (organisation, voyage, jour liés).
-    expect(textes).toEqual([SQL_VOYAGE, "SET TRANSACTION READ ONLY", SQL_DROIT_VOYAGE, VILLE_DU_JOUR]);
-    expect(parametres[3]).toEqual([CTX.organizationId, TRIP, 2, 2, 2]);
+    expect(textes).toEqual([SQL_VOYAGE, "SET TRANSACTION READ ONLY", JOUR_DU_VOYAGE, SQL_DROIT_VOYAGE, VILLE_DU_JOUR]);
+    expect(parametres[2]).toEqual([2, CTX.organizationId, TRIP]);
+    expect(parametres[4]).toEqual([CTX.organizationId, TRIP, 2, 2, 2]);
     // Port borné à un appel ; aucun plafond de forfait.
     const options = d.fabrique.mock.calls[0]?.[0] as { usage: { reserve: () => Promise<{ ok: boolean }> }; plafonds: unknown[] };
     expect(options.plafonds).toEqual([]);
@@ -264,6 +270,8 @@ describe("lieux api: ordre d'une action (0147 § 3 point 6)", () => {
       [{}, {}, entree({ name: "Mon lieu" }), "validation_failed"],
       [{}, {}, entree({ day: 0 }), "validation_failed"],
       [{}, { voyage: false }, entree(), "not_found"],
+      // Jour hors du voyage (revue de la PR 943, mineur 5) : not_found avant le limiteur, le compteur et tout appel.
+      [{}, { jour: false }, entree({ day: 9 }), "not_found"],
     ];
     for (const [options, base, valeur, code] of cas) {
       const d = doubles();
