@@ -1,11 +1,11 @@
 import type { EtapeRequete, Message, RequeteModele } from "@/ai/client";
 import type { TypeCreneau } from "@/ai/candidat";
 import type { ComplementP0 } from "@/ai/complement-p0";
-import type { CandidatPourModele, EntreeModeles, EntreeProgramme, EntreeQuartier, LieuRetenu } from "@/ai/entrees";
+import type { CandidatPourModele, EntreeModeles, EntreeProgramme, EntreeProgrammeV5, EntreeQuartier, LieuRetenu } from "@/ai/entrees";
 import type { EntreeRevision } from "@/ai/entree-revision";
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
-import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
+import { PROMPT_PROGRAMME, PROMPT_PROGRAMME_V5 } from "@/ai/prompts/programme";
 import { PROMPT_REVISION } from "@/ai/prompts/revision";
 import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
@@ -273,6 +273,59 @@ function projectionBrief(entree: EntreeProgramme) {
     ...(entree.engagements === undefined
       ? {}
       : { engagements: entree.engagements.map((engagement) => ({ libelle: engagement.libelle, date: engagement.date, heure: engagement.heure, type: engagement.type })) }),
+    ...(entree.recit === undefined ? {} : { recit: entree.recit }),
+  };
+}
+
+/**
+ * Programme complet d'un voyage à une ou plusieurs villes (prompt `programme` v5, spécification M4 § 5 ; décision 0148
+ * § 8 point 3 ; verdict de la Sécurité 0149 § 1.3 point 1) : `EntreeProgrammeV5` en **projection** champ par champ
+ * (`projectionBriefV5`), jamais une décomposition d'un objet reçu ; aucun champ n'existe pour une donnée Google, pour une
+ * ville par créneau, ni pour le libellé du billet de changement de ville. Même étape de requête que la v4.
+ */
+export function requeteProgrammeV5(entree: EntreeProgrammeV5, modele: string, routage: Routage): RequeteModele {
+  return requete("programme", PROMPT_PROGRAMME_V5, modele, routage, { brief: projectionBriefV5(entree) });
+}
+
+/**
+ * Brief v5 en projection champ par champ : seuls les champs nommés ici passent (0149 § 1.3 point 1). Exportée pour la
+ * requête `revision` d'un voyage à plusieurs villes (M4b), qui doit reprendre la même projection.
+ */
+export function projectionBriefV5(entree: EntreeProgrammeV5) {
+  return {
+    destination: entree.destination,
+    pays: entree.pays,
+    arrivee: entree.arrivee,
+    heureArrivee: entree.heureArrivee,
+    depart: entree.depart,
+    heureDepart: entree.heureDepart,
+    voyageurs: { adultes: entree.voyageurs.adultes, enfants: entree.voyageurs.enfants },
+    rythme: entree.rythme,
+    envies: [...entree.envies],
+    ...(entree.aEviter === undefined ? {} : { aEviter: [...entree.aEviter] }),
+    deplacements: [...entree.deplacements],
+    ...(entree.budgetRepas === undefined ? {} : { budgetRepas: entree.budgetRepas }),
+    villes: entree.villes.map((ville) => ({ nom: ville.nom, arrivee: ville.arrivee, nuits: ville.nuits, logement: ville.logement })),
+    changements: entree.changements.map((changement) => ({
+      date: changement.date,
+      de: changement.de,
+      vers: changement.vers,
+      source: changement.source,
+      depart: changement.depart,
+      ...(changement.arrivee === undefined ? {} : { arrivee: changement.arrivee }),
+      activitesMax: changement.activitesMax,
+    })),
+    ...(entree.engagements === undefined
+      ? {}
+      : {
+          engagements: entree.engagements.map((engagement) => ({
+            libelle: engagement.libelle,
+            date: engagement.date,
+            heure: engagement.heure,
+            ...(engagement.fin === undefined ? {} : { fin: engagement.fin }),
+            type: engagement.type,
+          })),
+        }),
     ...(entree.recit === undefined ? {} : { recit: entree.recit }),
   };
 }

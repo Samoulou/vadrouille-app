@@ -9,9 +9,10 @@ import { createMockStopReports } from "@/adapters/mock-reports";
 
 import type { ClientModeles, EtapeRequete } from "@/ai/client";
 import { creerCoucheIa, type ReglagesIa } from "@/ai/couche";
-import { versEntreeQuartier, type EntreeModeles } from "@/ai/entrees";
-import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
-import { creerRedigerProgramme } from "@/ai/rediger-programme";
+import { EntreeProgrammeV5Schema, versEntreeQuartier, type EntreeModeles, type EntreeProgrammeV5 } from "@/ai/entrees";
+import { PROMPT_PROGRAMME, PROMPT_PROGRAMME_V5 } from "@/ai/prompts/programme";
+import { creerRedigerProgramme, creerRedigerProgrammeV5 } from "@/ai/rediger-programme";
+import { requeteProgrammeV5 } from "@/ai/requetes";
 import type { LodgingRequest } from "@/contracts";
 import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
@@ -149,6 +150,145 @@ describe("prompts: aucun prompt journalisé ne contient de donnée Google", () =
     const glissee = { ...entreeProgrammeDepuisBrief(brief), placeId } as Parameters<typeof rediger>[0];
     await expect(rediger(glissee)).rejects.toBeInstanceOf(RangeError);
     expect(journal.requetes).toHaveLength(2);
+  });
+});
+
+/**
+ * M4a (ticket #920 ; spécification M4 § 5 point 1 ; décision 0148 § 8 point 3 ; verdict de la Sécurité 0149 S-M4-1,
+ * S-M4-2 et S-M4-5, tests exigés de M4a). Entrée v5 d'un voyage Rome puis Florence, telle que la construira
+ * `briefProgrammeDepuisFormulaire` (M4b) d'un brouillon avec un « Billet » « Train Rome–Florence » de 12:10 à 13:45 le
+ * jour du changement de ville : le billet est devenu le changement de ville (`changements`, heures et source seulement)
+ * et n'est plus dans `engagements` ; une Sortie du soir garde son libellé et sa fin. La requête passe par la capacité
+ * de production (`creerRedigerProgrammeV5`), journalisée.
+ */
+const LIBELLE_BILLET = "Train Rome–Florence";
+const ENTREE_V5: EntreeProgrammeV5 = {
+  destination: "Rome",
+  pays: "Italie",
+  arrivee: "2027-05-04",
+  depart: "2027-05-09",
+  heureArrivee: "11:00",
+  heureDepart: "17:00",
+  voyageurs: { adultes: 2, enfants: 0 },
+  rythme: "equilibre",
+  envies: ["heritage", "restaurant", "walk"],
+  deplacements: ["walk", "transit"],
+  budgetRepas: 2,
+  villes: [
+    { nom: "Rome", arrivee: "2027-05-04", nuits: 3, logement: "Hôtel des Monts, Rome" },
+    { nom: "Florence", arrivee: "2027-05-07", nuits: 2, logement: "Maison d'hôtes de l'Arno, Florence" },
+  ],
+  changements: [{ date: "2027-05-07", de: "Rome", vers: "Florence", source: "saisi", depart: "12:10", arrivee: "13:45", activitesMax: 2 }],
+  engagements: [{ libelle: "Concert d'orgue", date: "2027-05-08", heure: "20:30", fin: "22:00", type: "reservation" }],
+  recit: "Nous aimons marcher et bien manger.",
+};
+
+describe("prompts: entrée et requête programme v5 (plusieurs villes, M4a)", () => {
+  const preparer = () => {
+    const modeles: ClientModeles = { envoyer: async () => ({ texte: "{}", coutUsd: 0 }) };
+    const journal = journalDePrompts(modeles);
+    const rediger = creerRedigerProgrammeV5(journal.client, { modele: "test/programme", routage: { data_collection: "allow", zdr: false } as unknown as ReglagesIa["plan"]["routage"] });
+    return { journal, rediger };
+  };
+
+  it("programme: prompt v5 sans donnée Google : requête journalisée sans sentinelle, zdr et data_collection deny imposés", async () => {
+    const { brief, fixtures } = charger();
+    const sentinelles = avecSentinellesGoogle({ places: creerPlacesSimule(fixtures.places), routes: creerRoutesSimule(fixtures.routes) });
+    for (const lieu of Object.values(fixtures.places.lieux)) await sentinelles.places.details(lieu.placeId);
+    expect(sentinelles.valeurs.size).toBeGreaterThan(5);
+    expect(brief.destination).toBeDefined();
+
+    const { journal, rediger } = preparer();
+    await rediger(ENTREE_V5);
+    expect(journal.requetes).toHaveLength(1);
+    const [requete] = journal.requetes;
+    expect(requete?.prompt).toEqual({ id: "programme", version: 5 });
+    expect(PROMPT_PROGRAMME_V5.version).toBe(5);
+    expect(requete?.routage).toMatchObject({ zdr: true, data_collection: "deny" });
+    expect(sentinellesPresentes(journal.texte(), sentinelles)).toEqual([]);
+    for (const cle of ["placeId", "place_id", "websiteUri", "lat", "lng", "location", "duration", "distanceMeters"]) {
+      expect(journal.texte(), cle).not.toContain(`"${cle}"`);
+      expect(journal.texte(), cle).not.toContain(`\\"${cle}\\"`);
+    }
+    // La v4 reste la version du site d'essai et de `p0Run`.
+    expect(PROMPT_PROGRAMME.version).toBe(4);
+  });
+
+  it("prompts: entrée v5 sans libellé du billet de changement de ville (ses heures seulement)", async () => {
+    const { journal, rediger } = preparer();
+    await rediger(ENTREE_V5);
+    const texte = journal.texte();
+    expect(texte).not.toContain(LIBELLE_BILLET);
+    expect(texte).not.toMatch(/Train/);
+    // Les heures du billet et sa source passent, dans le cadre du jour.
+    const donnees = JSON.stringify(journal.requetes[0]?.messages[1]);
+    for (const attendu of ['\\"depart\\":\\"12:10\\"', '\\"arrivee\\":\\"13:45\\"', '\\"source\\":\\"saisi\\"', '\\"activitesMax\\":2']) expect(donnees).toContain(attendu);
+    // Les autres engagements gardent leur libellé, avec leur fin (0149 § 5).
+    expect(donnees).toContain("Concert d'orgue");
+    expect(donnees).toContain('\\"fin\\":\\"22:00\\"');
+    // Aucun champ ne peut porter le libellé : glissé dans le cadre du jour, il est refusé sans requête…
+    const glisse = { ...ENTREE_V5, changements: [{ ...ENTREE_V5.changements[0]!, libelle: LIBELLE_BILLET }] } as unknown as EntreeProgrammeV5;
+    await expect(rediger(glisse)).rejects.toBeInstanceOf(RangeError);
+    expect(journal.requetes).toHaveLength(1);
+    // … et la projection champ par champ ne le recopierait pas, même sans le schéma.
+    expect(JSON.stringify(requeteProgrammeV5(glisse, "test/programme", { data_collection: "deny", zdr: true }))).not.toContain(LIBELLE_BILLET);
+  });
+
+  it("prompts: entrée v5 refuse une clé en trop (schéma strict à chaque niveau), sans requête", async () => {
+    const { journal, rediger } = preparer();
+    const glissees: unknown[] = [
+      { ...ENTREE_V5, placeId: "SENTINELLE" },
+      { ...ENTREE_V5, logements: [{ texte: "Hôtel", nuits: 5 }] },
+      { ...ENTREE_V5, villes: [{ ...ENTREE_V5.villes[0]!, placeId: "SENTINELLE" }, ENTREE_V5.villes[1]] },
+      { ...ENTREE_V5, villes: [{ ...ENTREE_V5.villes[0]!, position: { lat: 41.9, lng: 12.5 } }, ENTREE_V5.villes[1]] },
+      { ...ENTREE_V5, changements: [{ ...ENTREE_V5.changements[0]!, dureeMinutes: 95 }] },
+      { ...ENTREE_V5, changements: [{ ...ENTREE_V5.changements[0]!, ville: "Florence" }] },
+      { ...ENTREE_V5, engagements: [{ ...ENTREE_V5.engagements![0]!, lieu: "Église" }] },
+      { ...ENTREE_V5, engagements: [{ ...ENTREE_V5.engagements![0]!, kind: "booking" }] },
+    ];
+    for (const entree of glissees) {
+      expect(EntreeProgrammeV5Schema.safeParse(entree).success, JSON.stringify(entree).slice(0, 80)).toBe(false);
+      await expect(rediger(entree as EntreeProgrammeV5)).rejects.toBeInstanceOf(RangeError);
+    }
+    expect(journal.requetes).toHaveLength(0);
+    expect(EntreeProgrammeV5Schema.safeParse(ENTREE_V5).success).toBe(true);
+  });
+
+  it("prompts: entrée v5, fin d'engagement au format HH:MM seulement (refusée avant toute requête)", async () => {
+    const { journal, rediger } = preparer();
+    const avecFin = (fin: unknown) => ({ ...ENTREE_V5, engagements: [{ ...ENTREE_V5.engagements![0]!, fin }] }) as unknown as EntreeProgrammeV5;
+    for (const fin of ["22h", "22:00:00", "24:00", "9:30", "", 2200, "20:30", "19:00"]) {
+      expect(EntreeProgrammeV5Schema.safeParse(avecFin(fin)).success, String(fin)).toBe(false);
+      await expect(rediger(avecFin(fin))).rejects.toBeInstanceOf(RangeError);
+    }
+    expect(journal.requetes).toHaveLength(0);
+    expect(EntreeProgrammeV5Schema.safeParse(avecFin("23:59")).success).toBe(true);
+    const sansFin = { ...ENTREE_V5, engagements: [{ libelle: "Concert d'orgue", date: "2027-05-08", heure: "20:30", type: "reservation" as const }] };
+    expect(EntreeProgrammeV5Schema.safeParse(sansFin).success).toBe(true);
+  });
+
+  it("prompts: entrée v5, bornes et cohérence des villes et des changements", () => {
+    const refusees: [string, unknown][] = [
+      ["aucune ville", { ...ENTREE_V5, villes: [], changements: [] }],
+      ["nom de ville trop long", { ...ENTREE_V5, villes: [{ ...ENTREE_V5.villes[0]!, nom: "R".repeat(81) }, ENTREE_V5.villes[1]], changements: [{ ...ENTREE_V5.changements[0]!, de: "R".repeat(81) }] }],
+      ["logement trop long", { ...ENTREE_V5, villes: [ENTREE_V5.villes[0], { ...ENTREE_V5.villes[1]!, logement: "L".repeat(121) }] }],
+      ["changement manquant", { ...ENTREE_V5, changements: [] }],
+      ["changement à une autre date", { ...ENTREE_V5, changements: [{ ...ENTREE_V5.changements[0]!, date: "2027-05-06" }] }],
+      ["ville d'arrivée hors de la suite", { ...ENTREE_V5, changements: [{ ...ENTREE_V5.changements[0]!, vers: "Naples" }] }],
+      ["nuits différentes du séjour", { ...ENTREE_V5, villes: [ENTREE_V5.villes[0], { ...ENTREE_V5.villes[1]!, nuits: 3 }] }],
+      ["même ville deux fois de suite", { ...ENTREE_V5, villes: [ENTREE_V5.villes[0], { ...ENTREE_V5.villes[1]!, nom: "Rome" }], changements: [{ ...ENTREE_V5.changements[0]!, vers: "Rome" }] }],
+      ["arrivée d'un départ estimé", { ...ENTREE_V5, changements: [{ ...ENTREE_V5.changements[0]!, source: "estime" }] }],
+      ["arrivée avant le départ", { ...ENTREE_V5, changements: [{ ...ENTREE_V5.changements[0]!, arrivee: "11:00" }] }],
+      ["activités au-delà de 4", { ...ENTREE_V5, changements: [{ ...ENTREE_V5.changements[0]!, activitesMax: 5 }] }],
+      ["source inconnue", { ...ENTREE_V5, changements: [{ ...ENTREE_V5.changements[0]!, source: "entered" }] }],
+      ["engagements au-delà de 10", { ...ENTREE_V5, engagements: Array(11).fill(ENTREE_V5.engagements![0]) }],
+    ];
+    for (const [nom, entree] of refusees) expect(EntreeProgrammeV5Schema.safeParse(entree).success, nom).toBe(false);
+    // Une seule ville, sans changement ; et un départ estimé sans arrivée : admis.
+    const uneVille = { ...ENTREE_V5, villes: [{ ...ENTREE_V5.villes[0]!, nuits: 5 }], changements: [] };
+    expect(EntreeProgrammeV5Schema.safeParse(uneVille).success).toBe(true);
+    const estime = { date: "2027-05-07", de: "Rome", vers: "Florence", source: "estime", depart: "09:00", activitesMax: 2 };
+    expect(EntreeProgrammeV5Schema.safeParse({ ...ENTREE_V5, changements: [estime] }).success).toBe(true);
   });
 });
 

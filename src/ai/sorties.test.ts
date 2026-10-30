@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { lireBriefDeduit, lireNotes, lireProgramme, lireQuartier, lireRaisons, ordreEcrit, racineLisible, retoursDeQuartier } from "@/ai/sorties";
+import { DUREE_ESTIMEE_MINUTES, lireBriefDeduit, lireDureeEstimee, lireNotes, lireProgramme, lireQuartier, lireRaisons, ordreEcrit, racineLisible, retoursDeQuartier } from "@/ai/sorties";
 
 /**
  * Spécification B7a, critère `sorties: schémas stricts` : les cas existants de P0 restent dans `src/ai/ai.test.ts`
@@ -146,5 +146,112 @@ describe("sorties: retours de quartier (journées sans allers-retours)", () => {
     expect(programme.jours[0]?.creneaux).toHaveLength(5);
     // Ordre écrit : Monti (10:00), Prati (12:30), Monti (14:30), Prati (17:00) ; le départ à Monti ne compte pas.
     expect(retoursDeQuartier(programme)).toEqual([2]);
+  });
+});
+
+/**
+ * M4a (ticket #920) : lecture tolérante de la durée estimée de la sortie du prompt `programme` v5 (décision 0148 § 2 et
+ * § 5.3 ; verdict de la Sécurité 0149 S-M4-2, tests exigés de M4a). La durée n'est lue qu'au niveau d'une journée de
+ * changement de ville à départ estimé (`joursDureeEstimee`), comme nombre JSON entier de 20 à 600, arrondi à 5 ; toute
+ * autre valeur est retirée et comptée (`champsRetires`), jamais convertie ni remplacée : la journée garde alors sa
+ * « durée à confirmer » (champ absent).
+ */
+describe("sorties: durée estimée du programme v5 (0149 S-M4-2)", () => {
+  const SEJOUR = { arrivee: "2027-05-04", depart: "2027-05-08" };
+  const CHANGEMENT = "2027-05-06";
+  const CADRE = { joursDureeEstimee: [CHANGEMENT] };
+  const creneau = { debut: "09:30", fin: "10:30", nature: "visite", lieu: "Musée maison", quartier: "Centre", pourquoi: "Pour commencer la journée." };
+  const sortie = (duree: unknown, date = CHANGEMENT) =>
+    JSON.stringify({
+      jours: [
+        { date: "2027-05-05", titre: "Centre", creneaux: [creneau] },
+        { date, ...(duree === undefined ? {} : { dureeEstimeeMinutes: duree }), creneaux: [creneau] },
+      ],
+      bonsPlans: [],
+    });
+  const lire = (duree: unknown, date = CHANGEMENT) => lireProgramme(sortie(duree, date), SEJOUR, CADRE);
+  const jourDuChangement = (lecture: ReturnType<typeof lireProgramme>) => lecture.valeur?.jours.find((jour) => jour.date === CHANGEMENT);
+
+  it("programme v5: durée estimée entière dans les bornes lue sur la journée de changement de ville", () => {
+    const lecture = lire(90);
+    expect(lecture).toMatchObject({ illisible: false, joursRetires: 0, creneauxRetires: 0, champsRetires: 0 });
+    expect(jourDuChangement(lecture)?.dureeEstimeeMinutes).toBe(90);
+    // Les autres journées n'ont aucune durée ; l'ordre écrit la garde.
+    expect(lecture.valeur?.jours[0]).not.toHaveProperty("dureeEstimeeMinutes");
+    expect(ordreEcrit(lecture.valeur!).jours[1]?.dureeEstimeeMinutes).toBe(90);
+  });
+
+  it.each([
+    ["chaîne de chiffres", "120"],
+    ["texte", "2 h"],
+    ["booléen", true],
+    ["objet", { minutes: 120 }],
+    ["null", null],
+  ])("programme v5: durée estimée en texte retirée (%s), jamais convertie", (_nom, duree) => {
+    const lecture = lire(duree);
+    expect(jourDuChangement(lecture)).not.toHaveProperty("dureeEstimeeMinutes");
+    expect(lecture.champsRetires).toBe(1);
+    expect(lecture.creneauxRetires).toBe(0);
+  });
+
+  it.each([120.5, 92.4, Number.MAX_SAFE_INTEGER + 2])("programme v5: durée estimée non entière retirée (%s), jamais arrondie", (duree) => {
+    const lecture = lire(duree);
+    expect(jourDuChangement(lecture)).not.toHaveProperty("dureeEstimeeMinutes");
+    expect(lecture.champsRetires).toBe(1);
+  });
+
+  it.each([
+    [93, 95],
+    [92, 90],
+    [20, 20],
+    [22, 20],
+    [23, 25],
+    [598, 600],
+    [600, 600],
+  ])("programme v5: durée estimée arrondie aux 5 minutes (%s → %s)", (duree, attendue) => {
+    const lecture = lire(duree);
+    expect(jourDuChangement(lecture)?.dureeEstimeeMinutes).toBe(attendue);
+    expect(lecture.champsRetires).toBe(0);
+  });
+
+  it.each([19, 601, 0, -90, 6000])("programme v5: durée estimée hors bornes retirée (%s) → durée à confirmer", (duree) => {
+    const lecture = lire(duree);
+    expect(jourDuChangement(lecture)).not.toHaveProperty("dureeEstimeeMinutes");
+    expect(lecture.champsRetires).toBe(1);
+  });
+
+  it("programme v5: durée estimée sur un jour ordinaire ignorée et comptée", () => {
+    const ordinaire = lireProgramme(
+      JSON.stringify({ jours: [{ date: "2027-05-05", dureeEstimeeMinutes: 90, creneaux: [creneau] }], bonsPlans: [] }),
+      SEJOUR,
+      CADRE,
+    );
+    expect(ordinaire.valeur?.jours[0]).not.toHaveProperty("dureeEstimeeMinutes");
+    expect(ordinaire.champsRetires).toBe(1);
+    // Départ saisi : la date n'est pas dans le cadre, la durée est ignorée de même (0148 § 2 point 2).
+    const saisi = lireProgramme(sortie(90), SEJOUR, { joursDureeEstimee: [] });
+    expect(jourDuChangement(saisi)).not.toHaveProperty("dureeEstimeeMinutes");
+    expect(saisi.champsRetires).toBe(1);
+    // Sans cadre (prompts v4 et revision) : ignorée partout, comme toute clé inconnue.
+    const v4 = lireProgramme(sortie(90), SEJOUR);
+    expect(jourDuChangement(v4)).not.toHaveProperty("dureeEstimeeMinutes");
+    expect(v4.champsRetires).toBe(1);
+  });
+
+  it("programme v5: durée absente → durée à confirmer, rien n'est compté ni inventé", () => {
+    const lecture = lire(undefined);
+    expect(jourDuChangement(lecture)).not.toHaveProperty("dureeEstimeeMinutes");
+    expect(lecture.champsRetires).toBe(0);
+  });
+
+  it("lireDureeEstimee : ordre des contrôles et bornes inclusives de 0149", () => {
+    expect(DUREE_ESTIMEE_MINUTES).toEqual({ min: 20, max: 600 });
+    expect(DUREE_ESTIMEE_MINUTES.min % 5).toBe(0);
+    expect(DUREE_ESTIMEE_MINUTES.max % 5).toBe(0);
+    for (const refusee of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, "90", 90n, undefined, [90]]) expect(lireDureeEstimee(refusee)).toBeUndefined();
+    expect(lireDureeEstimee(20)).toBe(20);
+    expect(lireDureeEstimee(600)).toBe(600);
+    expect(lireDureeEstimee(137)).toBe(135);
+    expect(lireDureeEstimee(138)).toBe(140);
   });
 });
