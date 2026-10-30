@@ -16,8 +16,10 @@ import { CASES_APERCU, DUREE_ETAPE_MS, RANG_PROGRAMME, RECIT_API_AUTORISE, type 
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { errorNameOf, logEvent } from "@/server/log";
 import { assemblerProgrammeIa, modeDeTrajet } from "@/server/programme/assemblage";
-import { briefDepuisFormulaire, type BriefEssai } from "@/server/programme/brief";
-import { entreeProgrammeDepuisBrief } from "@/server/programme/entree";
+import { briefDepuisFormulaire, briefProgrammeDepuisFormulaire, type BriefEssai } from "@/server/programme/brief";
+import { cadrerProgramme } from "@/server/programme/cadrage";
+import { entreeProgrammeDepuisBrief, entreeProgrammeV5DepuisBrief } from "@/server/programme/entree";
+import type { BriefProgramme } from "@/server/programme/forme";
 import { instantaneDuProgramme } from "@/server/programme/instantane";
 import { avecSiteGarde, compteursNonSoumis, SITES_DUREE_MAX_MS, sitesDuProgramme, verifierSites, type CompteursSites, type ResultatSites } from "@/server/programme/sites";
 import { DELAI_REQUETE_MS } from "@/server/usage/port";
@@ -141,13 +143,29 @@ async function recitDuVoyage(x: Executeur, contexte: Pick<Contexte, "organizatio
   return typeof story === "string" ? story : undefined;
 }
 
-/** Voyage relu et converti (même conversion que le site d'essai) ; illisible ou refusé : `invalid_input`. */
-async function briefOuArreter(contexte: Contexte, x: Executeur): Promise<{ readonly voyage: VoyageLu; readonly brief: BriefEssai }> {
+/**
+ * Brief de la chaîne inversée sur `api` : une seule ville, la conversion du site d'essai (`briefDepuisFormulaire`, inchangée) ;
+ * deux villes ou plus, `briefProgrammeDepuisFormulaire` (décision 0148 § 4 et § 7.1 point 1 : villes, logements par ville,
+ * changements de ville du domaine, libellés de billets à part). Refusé : `invalid_input`.
+ */
+export type BriefDuVoyage = BriefEssai | BriefProgramme;
+
+/** Le brief porte-t-il plusieurs villes (`BriefProgramme` à deux villes ou plus) ? */
+export function briefAPlusieursVilles(brief: BriefDuVoyage): brief is BriefProgramme {
+  return "villes" in brief && brief.villes.length > 1;
+}
+
+function convertir(voyage: VoyageLu, recit: string | undefined): BriefDuVoyage {
+  const conversion = voyage.draft.otherCities.length === 0 ? briefDepuisFormulaire(voyage.draft, voyage.brief, recit) : briefProgrammeDepuisFormulaire(voyage.draft, voyage.brief, recit);
+  if (!conversion.ok) throw new ArretEtape("invalid_input");
+  return conversion.brief;
+}
+
+/** Voyage relu et converti (même conversion que le site d'essai pour une ville) ; illisible ou refusé : `invalid_input`. */
+async function briefOuArreter(contexte: Contexte, x: Executeur): Promise<{ readonly voyage: VoyageLu; readonly brief: BriefDuVoyage }> {
   const voyage = await lireVoyage(x, contexte.organizationId, contexte.tripId);
   if (voyage === null) throw new ArretEtape("invalid_input");
-  const conversion = briefDepuisFormulaire(voyage.draft, voyage.brief, await recitDuVoyage(x, contexte));
-  if (!conversion.ok) throw new ArretEtape("invalid_input");
-  return { voyage, brief: conversion.brief };
+  return { voyage, brief: convertir(voyage, await recitDuVoyage(x, contexte)) };
 }
 
 /**
@@ -155,12 +173,10 @@ async function briefOuArreter(contexte: Contexte, x: Executeur): Promise<{ reado
  * `briefOuArreter`, `recit` toujours absent (choix conservateur tant que la Sécurité n'a pas jugé une requête de révision qui
  * recevrait le récit, verdict 0139 § 1.2 point 2) ; `briefs.story` n'est pas lu. Illisible ou refusé : `invalid_input`.
  */
-export async function voyageEtBriefSansRecit(x: Executeur, organizationId: string, tripId: string): Promise<{ readonly voyage: VoyageLu; readonly brief: BriefEssai }> {
+export async function voyageEtBriefSansRecit(x: Executeur, organizationId: string, tripId: string): Promise<{ readonly voyage: VoyageLu; readonly brief: BriefDuVoyage }> {
   const voyage = await lireVoyage(x, organizationId, tripId);
   if (voyage === null) throw new ArretEtape("invalid_input");
-  const conversion = briefDepuisFormulaire(voyage.draft, voyage.brief, undefined);
-  if (!conversion.ok) throw new ArretEtape("invalid_input");
-  return { voyage, brief: conversion.brief };
+  return { voyage, brief: convertir(voyage, undefined) };
 }
 
 // --- Étape a : brief et forfait ------------------------------------------------------------------------------------------
@@ -288,7 +304,7 @@ export type ProgrammeVerifie = {
 export async function redigerEtVerifier(
   contexte: Pick<Contexte, "dep" | "organizationId" | "tripId" | "echeance">,
   entree: {
-    readonly brief: BriefEssai;
+    readonly brief: BriefDuVoyage;
     readonly capacite: CapaciteProgramme;
     readonly forfait: ForfaitDeLEtape["forfait"];
     readonly registre: ForfaitDeLEtape["registre"];
@@ -314,8 +330,13 @@ export async function redigerEtVerifier(
   compteurs.slotsRemoved = redaction.creneauxRetires;
   compteurs.fieldsRemoved = redaction.champsRetires;
   compteurs.textsCut = redaction.textesCoupes;
-  const programme = redaction.programme;
-  if (programme === null) throw new ArretEtape("model_output_invalid");
+  if (redaction.programme === null) throw new ArretEtape("model_output_invalid");
+  // 2 bis. Cadrage (décision 0148 § 5.1 et § 7.1 point 3) : sur un voyage à plusieurs villes, le code découpe chaque journée
+  // de changement de ville autour du créneau occupé et réécrit la ville de chaque étape ; les étapes retirées s'ajoutent à
+  // `slotsRemoved`. La vérification, les sites et l'assemblage lisent le programme cadré. Une seule ville : rien ne change.
+  const cadre = briefAPlusieursVilles(brief) ? cadrerProgramme(redaction.programme, brief, CONFIGURATION_MOTEUR) : { programme: redaction.programme, retires: 0 };
+  compteurs.slotsRemoved += cadre.retires;
+  const programme = cadre.programme;
   compteurs.days = programme.jours.length;
   compteurs.slots = programme.jours.reduce((total, jour) => total + jour.creneaux.length, 0);
   // Sites proposés : adresses réduites distinctes en ordre écrit, en mémoire seulement (0121 § 2.1 point 1).
@@ -324,7 +345,7 @@ export async function redigerEtVerifier(
   Object.assign(compteurs, compteursNonSoumis(sites.adresses.length));
 
   // 3. Vérification des lieux distincts dans l'ordre écrit, part et échéance avant chaque appel, sans réserve de trajets.
-  const lieux = capacite.lieux(brief.destination);
+  const lieux = capacite.lieux(programme);
   compteurs.placesToVerify = lieux.nombre;
   compteurs.unverifiedForCap = lieuxHorsPart(lieux.nombre, forfait.textSearchRequetes, brief.logements.length);
   const controle: ControleVerification = async (methode) => {
@@ -356,6 +377,7 @@ export async function redigerEtVerifier(
   const jours = programme.jours.map((jour, indiceJour) => ({
     date: jour.date,
     ...(jour.titre === undefined ? {} : { titre: jour.titre }),
+    ...(jour.dureeEstimeeMinutes === undefined ? {} : { dureeEstimeeMinutes: jour.dureeEstimeeMinutes }),
     creneaux: jour.creneaux.map((creneau, rang) => ({ ...avecSiteGarde(creneau, sites.adresseDe(indiceJour, rang), resultatSites.gardees), placeId: verifies.placeIdDe(indiceJour, rang) })),
   }));
   const complet = assemblerProgrammeIa({
@@ -401,7 +423,12 @@ export function etapeProgrammeEcriture(entree: unknown, dependances?: Dependance
         const { complet, instantane, verifies, logements, obtenuesA } = await redigerEtVerifier(
           contexte,
           { brief, capacite, forfait, registre, compteurs },
-          (c) => c.rediger(entreeProgrammeDepuisBrief(brief), { arrivee: brief.arrivee, depart: brief.depart }),
+          // Plusieurs villes : prompt `programme` v5 (0148 § 8 point 3), entrée tirée de la table des villes, jamais d'un libellé
+          // de billet ni d'une donnée Google ; une seule ville : v4, inchangé.
+          (c) =>
+            briefAPlusieursVilles(brief)
+              ? c.redigerV5(entreeProgrammeV5DepuisBrief(brief), { arrivee: brief.arrivee, depart: brief.depart })
+              : c.rediger(entreeProgrammeDepuisBrief(brief), { arrivee: brief.arrivee, depart: brief.depart }),
         );
         const cases = casesDuProgramme(complet.trip.days, instantane);
         const aFaire = lignesDeLaVersion1(instantane, complet.trip.checklist, contexte.generationRunId);

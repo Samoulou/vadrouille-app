@@ -898,7 +898,7 @@ async function ecrireVersion(
         maintenant: () => Date.now(),
         signal: abandonSites.signal,
       });
-      const verificationLieux = verifierLieuxDuProgramme(lieux, brief.destination, capacites, zone, controle).catch((erreur: unknown) => {
+      const verificationLieux = verifierLieuxDuProgramme(lieux, brief.destination, capacites, () => zone, controle).catch((erreur: unknown) => {
         abandonSites.abort();
         throw erreur;
       });

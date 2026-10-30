@@ -1,5 +1,5 @@
 import type { Category, Commitment, MobilityMode } from "@/contracts";
-import type { BriefEssai, RythmeEssai } from "@/server/programme/forme";
+import type { BriefEssai, BriefProgramme, RythmeEssai } from "@/server/programme/forme";
 
 /**
  * Entrée du prompt `programme` depuis le brief de l'essai (décision 0115 § 2) : code tiré de
@@ -54,6 +54,62 @@ export function entreeProgrammeDepuisBrief(brief: BriefEssai): EntreeProgramme {
     ...(brief.engagements === undefined
       ? {}
       : { engagements: brief.engagements.map((engagement) => ({ libelle: engagement.libelle, date: engagement.date, heure: engagement.heure, type: engagement.type })) }),
+    ...(brief.recit === undefined ? {} : { recit: brief.recit }),
+  };
+}
+
+/**
+ * Forme d'`EntreeProgrammeV5` (`src/ai/entrees.ts`, M4a) : les saisies communes de la v4, sans `logements`, plus `villes`,
+ * `changements` (sans libellé) et `engagements[].fin`. Égalité de types vérifiée par `tests/unit/programme/cadrage.test.ts`.
+ */
+export type EntreeProgrammeV5 = Omit<EntreeProgramme, "logements" | "engagements"> & {
+  villes: { nom: string; arrivee: string; nuits: number; logement: string }[];
+  changements: { date: string; de: string; vers: string; source: "saisi" | "estime"; depart: string; arrivee?: string; activitesMax: number }[];
+  engagements?: { libelle: string; date: string; heure: string; fin?: string; type: Commitment }[];
+};
+
+/**
+ * Entrée du prompt `programme` v5 depuis le `BriefProgramme` (décision 0148 § 8 point 3 ; verdict 0149 § 1.3 point 1 et
+ * § 1.2) : copie **champ par champ**, construite depuis la **table des villes** (`villes`, noms maison posés par
+ * `briefProgrammeDepuisFormulaire`) et les changements du domaine. **Jamais** un libellé de billet devenu changement de
+ * ville (`billets` n'est pas lu), jamais une ville par créneau, jamais une donnée Google ; ni fuseau, ni `schema`, ni mode.
+ * Le récit n'y entre que s'il est dans le brief, c'est-à-dire si la garde `RECIT_API_AUTORISE` l'a laissé lire (0139 § 1.2).
+ */
+export function entreeProgrammeV5DepuisBrief(brief: BriefProgramme): EntreeProgrammeV5 {
+  return {
+    destination: brief.destination,
+    pays: brief.pays,
+    arrivee: brief.arrivee,
+    depart: brief.depart,
+    heureArrivee: brief.heureArrivee,
+    heureDepart: brief.heureDepart,
+    voyageurs: { adultes: brief.voyageurs.adultes, enfants: brief.voyageurs.enfants },
+    rythme: brief.rythme,
+    envies: [...brief.envies],
+    ...(brief.aEviter === undefined ? {} : { aEviter: [...brief.aEviter] }),
+    deplacements: [...brief.deplacements],
+    ...(brief.budgetRepas === undefined ? {} : { budgetRepas: brief.budgetRepas }),
+    villes: brief.villes.map((ville) => ({ nom: ville.nom, arrivee: ville.arrivee, nuits: ville.nuits, logement: ville.logement })),
+    changements: brief.changements.map((changement) => ({
+      date: changement.date,
+      de: changement.de,
+      vers: changement.vers,
+      source: changement.source === "entered" ? ("saisi" as const) : ("estime" as const),
+      depart: changement.depart,
+      ...(changement.arrivee === undefined ? {} : { arrivee: changement.arrivee }),
+      activitesMax: changement.activitesMax,
+    })),
+    ...(brief.engagements === undefined
+      ? {}
+      : {
+          engagements: brief.engagements.map((engagement) => ({
+            libelle: engagement.libelle,
+            date: engagement.date,
+            heure: engagement.heure,
+            ...(engagement.fin === undefined ? {} : { fin: engagement.fin }),
+            type: engagement.type,
+          })),
+        }),
     ...(brief.recit === undefined ? {} : { recit: brief.recit }),
   };
 }

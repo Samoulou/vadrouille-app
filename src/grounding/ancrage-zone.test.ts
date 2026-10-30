@@ -4,9 +4,9 @@ import path from "node:path";
 
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { ancrerCandidatsDansZone, ancrerLogementsDuSejour, capacitesAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zone";
+import { ancrerCandidatsDansZone, ancrerLogementsDuSejour, capacitesAncrage, verifierLieuxDuProgramme, type BriefAncrage, type CapacitesAncrage } from "@/grounding/ancrage-zone";
 import { fichesEtapeFinale, fichesLogementsEtapeFinale, margeRemplacement, preTriParCache } from "@/grounding/fiches-finales";
-import { ErreurAncrage, type ClientPlaces, type DetailsLieu, type RequeteTextSearch } from "@/grounding/interfaces";
+import { ErreurAncrage, type ClientPlaces, type DetailsLieu, type RectangleZone, type RequeteTextSearch } from "@/grounding/interfaces";
 import { creerPlacesSimule, type FixturesPlaces } from "@/grounding/places.simule";
 import { dansZone, zoneDuSejour } from "@/grounding/zone";
 import { BriefSchema, type Brief } from "@/prototype/brief";
@@ -107,7 +107,7 @@ describe("p0: aucune fiche de candidat à l'ancrage", () => {
 
   it("forme de l'objet d'ancrage : textSearch et detailsLogement, aucune autre clé (ni details, ni client complet)", () => {
     expectTypeOf<keyof CapacitesAncrage>().toEqualTypeOf<"textSearch" | "detailsLogement">();
-    expectTypeOf<CapacitesAncrage["detailsLogement"]>().parameters.toEqualTypeOf<[Brief, number]>();
+    expectTypeOf<CapacitesAncrage["detailsLogement"]>().parameters.toEqualTypeOf<[BriefAncrage, number]>();
     expect(Object.keys(capacitesAncrage(espion().places)).sort()).toEqual(["detailsLogement", "textSearch"]);
   });
 
@@ -136,6 +136,61 @@ describe("p0: Text Search restreint à la zone", () => {
       [null, undefined],
       [null, undefined],
     ]);
+  });
+});
+
+describe("plusieurs-villes: vérification par ville (décision 0148 § 7.1 point 6 ; 0149 § 1.3 point 5)", () => {
+  const ROME: RectangleZone = { sudOuest: { lat: 41.6, lng: 12.2 }, nordEst: { lat: 42.2, lng: 12.8 } };
+  const FLORENCE: RectangleZone = { sudOuest: { lat: 43.5, lng: 11 }, nordEst: { lat: 44, lng: 11.5 } };
+  const doubles = () => {
+    const recherches: RequeteTextSearch[] = [];
+    const fiches: string[] = [];
+    return {
+      recherches,
+      fiches,
+      capacites: {
+        textSearch: async (requete: RequeteTextSearch) => {
+          recherches.push(requete);
+          return { placeIds: [`SENT_${requete.texte}`] };
+        },
+        places: {
+          details: async (placeId: string): Promise<DetailsLieu> => {
+            fiches.push(placeId);
+            return { placeId, statut: "OPERATIONAL", position: placeId.includes("Florence") ? { lat: 43.77, lng: 11.25 } : { lat: 41.89, lng: 12.49 }, horaires: null };
+          },
+        },
+      },
+    };
+  };
+  const zones = new Map([
+    ["Rome", ROME],
+    ["Florence", FLORENCE],
+  ]);
+
+  it("chaque lieu est cherché et gardé dans la zone de sa ville", async () => {
+    const { recherches, capacites } = doubles();
+    const lieux = [
+      { id: "l_001", lieu: "Colisée", ville: "Rome" },
+      { id: "l_002", lieu: "Offices", ville: "Florence" },
+    ];
+    const issue = await verifierLieuxDuProgramme(lieux, "Rome", capacites, (lieu) => zones.get(lieu.ville ?? "") ?? ROME, async () => "ok");
+    expect(recherches.map((r) => [r.texte, r.restriction])).toEqual([
+      ["Colisée, Rome", ROME],
+      ["Offices, Florence", FLORENCE],
+    ]);
+    expect([...issue.fiches.keys()]).toEqual(["l_001", "l_002"]);
+  });
+
+  it("zone de la ville introuvable : échec fermé (RangeError), aucun appel", async () => {
+    const { recherches, fiches, capacites } = doubles();
+    const zoneDe = (lieu: { readonly ville?: string }) => {
+      const zone = lieu.ville === undefined ? undefined : zones.get(lieu.ville);
+      if (zone === undefined) throw new RangeError("programme : zone de la ville introuvable");
+      return zone;
+    };
+    await expect(verifierLieuxDuProgramme([{ id: "l_001", lieu: "Arène", ville: "Vérone" }], "Rome", capacites, zoneDe, async () => "ok")).rejects.toThrow(RangeError);
+    expect(recherches).toEqual([]);
+    expect(fiches).toEqual([]);
   });
 });
 
