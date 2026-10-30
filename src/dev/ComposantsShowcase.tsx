@@ -41,7 +41,11 @@ const t = messages.dev.composants;
 const ex = t.exemples;
 
 const TAG_KINDS: TagKind[] = ["toReserve", "toConfirm", "unconfirmed"];
-const BANNER_KINDS: StatusBannerKind[] = ["offline", "conflict", "noOption", "error", "generating", "travel"];
+/**
+ * `overlap` (spécification M4-suite § 5) n'est pas encore au catalogue : l'ajouter change la capture de référence de cette
+ * page ; il est rendu et testé par la Journée (`BandeauChevauchement.test.tsx`, `chevauchement.a11y.spec.ts`).
+ */
+const BANNER_KINDS: Exclude<StatusBannerKind, "overlap">[] = ["offline", "conflict", "noOption", "error", "generating", "travel"];
 /** Message de l'état invalide d'OtpInput, relié au groupe par `describedBy` (0012, Q13). */
 const OTP_MESSAGE_ID = "otp-invalide-message";
 const SEGMENT_OPTIONS = [

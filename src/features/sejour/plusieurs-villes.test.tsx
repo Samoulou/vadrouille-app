@@ -110,7 +110,9 @@ describe("Journée: ligne « Vers {ville} »", () => {
     expect(container.querySelector("[data-part='theme-jour']")).toHaveTextContent("De Rome à Florence");
     // Les étapes avant et après restent des liens vers leur fiche ; la ligne n'en est pas une.
     expect(screen.getAllByRole("link", { name: /Basilique/ })).toHaveLength(2);
-    // Aucun bandeau nouveau (spécification M4 § 7.6) ; ce jour-là, le budget de trajet n'est pas dépassé : aucun bandeau.
+    // J3 simulé n'a aucun événement, donc aucun bandeau de chevauchement (spécification M4-suite § 5 ; l'absence de tout
+    // bandeau de M4 § 7.6 est remplacée par le critère 12, M4-suite § 9.1 point 6, `BandeauChevauchement.test.tsx`) ; ce
+    // jour-là, le budget de trajet n'est pas dépassé : aucun bandeau.
     expect(container.querySelectorAll("[data-rail=''][data-kind], [data-kind] > [data-rail='']")).toHaveLength(0);
     expect(await axeViolations(container)).toEqual([]);
   });
