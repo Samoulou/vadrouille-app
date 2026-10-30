@@ -91,6 +91,21 @@ export interface TripAdapter {
    * `getRevisionFixtures` ; `prototype` n'en a pas). Entrées reçues en `unknown`, revalidées par le cas d'usage.
    */
   readonly revision?: RevisionAdapter;
+  /**
+   * Signaler une erreur sur une étape (tâche M5c, ticket 904 ; décision 0147 § 1) : présent sur `api` (table `feedback`).
+   * `mock` tient ses signalements dans la portée de simulation (`signalementsDuVoyage` de `@/adapters`) ; `prototype` n'en
+   * a pas. Entrée reçue en `unknown`, revalidée par le cas d'usage.
+   */
+  readonly reports?: StopReportAdapter;
+}
+
+/**
+ * Signalement d'une erreur sur une étape (M5c ; décision 0147 § 1, § 2) : motif fermé, aucun texte, idempotent par
+ * `requestId`, dédoublonné, plafonné par voyage et par jour UTC. Le contexte est celui **de la session** ; `null` : sans
+ * session (`unauthenticated`). Réponse `null` : aucune donnée, la feuille sait seule si elle propose « Remplacer ».
+ */
+export interface StopReportAdapter {
+  reportStop(ctx: AdapterContext | null, input: unknown): Promise<Result<null>>;
 }
 
 /**

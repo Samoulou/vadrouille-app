@@ -50,7 +50,9 @@ export type NomAction =
   | "preview-replacement"
   | "apply-replacement"
   | "undo-replacement"
-  | "revision-version";
+  | "revision-version"
+  // M5c (ticket 904) : signaler une erreur sur une étape (`src/server/voyages/signalement.ts`).
+  | "report-stop";
 
 type EntreeVoyage = { readonly tripId: string };
 

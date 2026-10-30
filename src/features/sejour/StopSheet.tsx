@@ -12,12 +12,14 @@ import { PracticalNotes } from "@/components/ligne/PracticalNotes";
 import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import { Tag } from "@/components/ligne/Tag";
 import type { Day } from "@/contracts";
+import { EMPTY_LIVE_REGION_CLASS } from "@/features/creation/fields";
 import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
 
 import { PLACES_FROM_GOOGLE } from "./constants";
 import { ficheMoment, type FicheTarget } from "./fiche";
 import type { TripRoutes } from "./routes";
+import { etapeSignalableSurFiche } from "./signalement";
 import { pathTo, pathToLabel } from "./travel";
 
 const t = messages.sejour.fiche;
@@ -34,6 +36,18 @@ export interface StopSheetProps extends FicheTarget {
   /** Préchargement de la feuille « Déplacer » au survol ou au focus du bouton. */
   onMoveIntent?: () => void;
   /**
+   * « Signaler une erreur » (M5c ; spécification M5 § 5) : ouvre la feuille du signalement ; sans fonction, pas de bouton.
+   * Jamais pour un événement, un engagement ni un lieu à soi (`etapeSignalable`).
+   */
+  onReport?: () => void;
+  /** Préchargement de la feuille du signalement au survol ou au focus du bouton. */
+  onReportIntent?: () => void;
+  /**
+   * Signalement enregistré pour cette étape : « Merci, c'est noté. » (`role="status"`), et, pour un motif `closed` sur une
+   * étape non verrouillée d'un voyage débloqué, le lien « Remplacer cette étape » (`replaceHref`) ; `null` sinon.
+   */
+  reported?: { replaceHref: string | null } | null;
+  /**
    * Mention « Données de lieux : Google » en fin de fiche (adaptateur `prototype`, spécification P0) : la fiche
    * remplace le panneau du jour et recouvre en grande partie la carte. `PLACES_FROM_GOOGLE` par défaut.
    */
@@ -45,7 +59,8 @@ export interface StopSheetProps extends FicheTarget {
  * provisoire, F5-Q1). Titre de niveau 1 (le titre du jour n'est plus rendu), focus sur ce titre à
  * l'ouverture ; Échap ou « Fermer » ferment la fiche. Un événement de `Day.events` est en lecture seule,
  * signalé comme hors programme, sans action. « Garder » attend la réponse de Samuel (Q67) ; « Déplacer » (F7b)
- * suit « Remplacer », absent pour une étape verrouillée ; « Signaler une erreur » vient après B11.
+ * suit « Remplacer », absent pour une étape verrouillée ; « Signaler une erreur » (M5c) vient après les autres actions, sur
+ * toute étape du programme sauf un engagement ou un lieu à soi, sa confirmation juste après.
  */
 export function StopSheet({
   stop,
@@ -56,6 +71,9 @@ export function StopSheet({
   onToggleLock,
   onMove,
   onMoveIntent,
+  onReport,
+  onReportIntent,
+  reported = null,
   placesFromGoogle = PLACES_FROM_GOOGLE,
 }: StopSheetProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -75,6 +93,8 @@ export function StopSheet({
   const path = inProgramme ? pathTo(day.items, stop.id) : null;
   const titleId = `fiche-${stop.id}`;
   const faits = formatFaits(stop.facts);
+  // Ni engagement, ni lieu à soi (`etapeSignalableSurFiche`, équivalente à la règle du serveur) ; le serveur la refait.
+  const reportable = inProgramme && onReport !== undefined && etapeSignalableSurFiche(stop);
 
   return (
     <div data-part="fiche" data-stop-id={stop.id} onKeyDown={onKeyDown} className="flex flex-col gap-4 px-5 pt-2 pb-8">
@@ -181,7 +201,36 @@ export function StopSheet({
           >
             {t.verrouiller}
           </Button>
+          {reportable ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-haspopup="dialog"
+              data-part="signaler"
+              onClick={onReport}
+              onPointerEnter={onReportIntent}
+              onFocus={onReportIntent}
+            >
+              {t.signaler}
+            </Button>
+          ) : null}
         </section>
+      ) : null}
+
+      {reportable ? (
+        <div data-part="signalement" className={reported ? "flex flex-col items-start gap-2" : undefined}>
+          {/* Région présente dès l'ouverture de la fiche : la confirmation y est annoncée sans déplacer le focus. */}
+          <p role="status" data-part="confirmation-signalement" className={reported ? "text-corps text-ink" : EMPTY_LIVE_REGION_CLASS}>
+            {reported ? messages.sejour.signaler.merci : null}
+          </p>
+          {reported?.replaceHref ? (
+            <Button asChild variant="secondary" size="sm">
+              <Link href={reported.replaceHref} data-part="signalement-remplacer">
+                {messages.sejour.signaler.remplacer}
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       ) : null}
 
       <PlacesAttribution placesFromGoogle={placesFromGoogle} />

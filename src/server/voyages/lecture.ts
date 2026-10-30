@@ -783,3 +783,25 @@ export function recomposerJourDeRevision(
   if (!resultat.ok) throw echec(resultat.raison, { tripId: base.tripId, version: base.version, dayIndex: jour.index });
   return resultat.valeur;
 }
+
+// --- Signalement d'une erreur sur une étape (M5c, ticket 904 ; décision 0147 § 1 point 4) ---------------------------
+
+/**
+ * Jours de la version courante qu'un signalement peut viser (`reportStop`, `src/server/voyages/signalement.ts`) : tous les
+ * jours d'un voyage débloqué (ou lu sur l'ancienne chaîne) ; **avant le déblocage** sur la chaîne inversée, les seules
+ * journées servies (`servisAvantDeblocage`, même sélection que la lecture, 0136 § 3.5), pour qu'une étape d'une journée
+ * cachée rende `not_found` comme une étape inconnue. Mêmes requêtes et mêmes erreurs fermées que `lireEtat`, dans la
+ * transaction de l'appelant ; aucun appel du port de relectures. `null` : voyage inconnu, d'une autre organisation ou
+ * sans version courante.
+ */
+export async function lireJoursSignalables(
+  executeur: ExecuteurLecture,
+  ctx: AdapterContext,
+  tripId: string,
+  chaine: ChaineApercu,
+): Promise<readonly DaySnapshot[] | null> {
+  const etat = await lireEtat(executeur, ctx, tripId, { debloque: true });
+  if (etat === null) return null;
+  const lisibles = lisiblesAvantDeblocage(etat, chaine);
+  return lisibles === null ? etat.snapshot.days : servisAvantDeblocage(etat.snapshot.days, [], lisibles).jours;
+}
