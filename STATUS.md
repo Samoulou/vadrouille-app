@@ -1,4 +1,4 @@
-# État du studio — 2026-10-30 (230e cycle)
+# État du studio — 2026-10-30 (231e cycle)
 
 Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (décision 0029, fusionnée) · Régime : cycle toutes les 2 heures (routine « Vadrouille - Cycle (projet) », 7 */2 * * * UTC), au plus 4 fils en parallèle (Samuel, 2026-10-19 21:40 UTC) · Feuille de route : `/mnt/project-files/plans/roadmap-20-cycles.md` (feuille des 20 cycles terminée au 122e cycle ; on poursuit sa priorité, le parcours de bout en bout) · Tableau de bord produit : https://claude.ai/artifact/91yQ94uq5Zm8Heovkvc36v (republié à chaque fin de cycle).
 
@@ -23,8 +23,11 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - 2026-10-29 20:10 UTC : aucun nouveau message (#studio et fil du cycle). #866 attend toujours son `owner-approved` (rappel de 18:25 UTC) ; carte Q634 à Q641 sans réponse.
 - 2026-10-29 22:10 UTC : aucun nouveau message (#studio et fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.
 - 2026-10-30 00:10 UTC : aucun nouveau message (#studio et fil du cycle). #866 attend toujours son `owner-approved` (rappel du 29 à 18:25 UTC) ; carte Q634 à Q641 sans réponse.
+- 2026-10-30 02:10 UTC : aucun nouveau message (#studio : seule l’annonce automatique de la version v2026.10.29-21 ; fil du cycle). #866 attend toujours son `owner-approved` ; carte Q634 à Q641 sans réponse.
 
 ## Fait
+- **Statut du 230e cycle** (#910) fusionné.
+- **M5c** (#909, ticket #904) fusionnée : signaler une erreur sur une étape (`reportStop`, feuille accessible, confirmation, lien « Remplacer », plafonds 20 par voyage et par jour UTC et 10 par minute par adresse IP, événement `voyages.stop_reported`), captures `docs/ux/captures/904/`, références visuelles régénérées.
 - **Statut du 229e cycle** (#906) fusionné.
 - **Statut du 228e cycle** (#901) fusionné.
 - **M5-C** (#900, ticket #895) fusionnée : contrats des retouches (`Change` étendu, `changements()` sans `removed` pour un remplacement, `not_unlocked`, `StopReport`, recherche de lieu, `ChecklistItem.kind`), test du remplacement sur l’aperçu M1g d’`api`.
@@ -74,7 +77,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 ## En cours
 - **Voyage de Zakynthos absent de « Mes voyages »** : enquête ; attend la capture de la page des lancements par Samuel.
 - **Audit UX « séduire les nouveaux clients »** (#801 à #804, #813) : tout est fusionné et sur le site d'essai depuis la mise en ligne #816 (18:55 UTC).
-- **MVP étape 1 (génération)** : M1a (#847, #854, #862), M1b (#875), M1e (#882), M1g (#877) et M1f (#885) fusionnées. **M1i** = PR #866 (#864) : approuvée, attend l’`owner-approved` de Samuel puis S3. **M4** : spec fusionnée (#876) ; **M4-TL** = PR #907 (#905, décision 0148 : élément `transfer` par une PR de contrat M4-C, `MAX_CITIES` 3, départ estimé = fin occupée avant 18:00 sinon 09:00, créneau de 180 min, découpage M4-C ∥ M4a → M4b → M4c) : 3 bloquants du Tech Lead (ordre vérification/assemblage, champ `ville` de l’IA, attentes de tests à lister) → correction 1 en cours ; exception « une spécification, plusieurs tâches » demandée pour M4 (Q723). **M5** (décision 0147) : M5-D (#899) et M5-C (#900) fusionnées ; **M5e** = PR #908 (#903) : UX/UI approuvé, 2 bloquants (tests nommés des critères 27, 29, 31) → correction 1 en cours ; **M5c** = PR #909 (#904) : 6 bloquants (tests des critères 13 et 18, captures 390 × 844, confirmation périmée, textes d’échec, ligne du § 13) → correction 1 en cours, références visuelles de la fiche à régénérer ensuite. Ensuite M5a (après M5e et M5c : mêmes fichiers), M5b, M5d-1, M5d-2, « Déplacer une étape sur `api` » (Q721). M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
+- **MVP étape 1 (génération)** : M1a (#847, #854, #862), M1b (#875), M1e (#882), M1g (#877) et M1f (#885) fusionnées. **M1i** = PR #866 (#864) : approuvée, attend l’`owner-approved` de Samuel puis S3. **M4** : spec fusionnée (#876) ; **M4-TL** = PR #907 (#905, décision 0148) : les 12 points de la correction 1 acceptés (étape 2 bis `cadrerProgramme` avant la vérification, ville du code), 1 bloquant restant (`verifierLieuxDuProgramme` doit recevoir les zones par ville) → **correction 2, la dernière**, en cours ; si elle bloque encore, le CEO et le Tech Lead choisissent une troisième tentative bornée ou un découpage. **M5** (décision 0147) : M5-D (#899), M5-C (#900) et **M5c (#909) fusionnées** ; **M5e** = PR #908 (#903) : Tech Lead et UX/UI approuvés (`techlead-approved`), `verify` rouge sur 2 références visuelles changées par la liste « À faire » (Séjour grand écran, Séjour à 92 %) → références régénérées par le workflow, puis fusion automatique. Ensuite M5a (dès M5e fusionnée), M5b, M5d-1, M5d-2, « Déplacer une étape sur `api` » (Q721). M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
 - **MVP étape 1 (paiement)** : B4b (#836), B4b-ci (#853), 0140 (#848), B4c (#867), B4d reçu simulé (#884) et B4d-TL (#890, décision 0144) fusionnées. **B4e** = ticket #887 (data puis back, migration d’abord) : la partie `data` part au prochain cycle libre de `db/migrations`, après la fusion de #866 (0144 § 7).
 - **MVP étape 2 (e-mails)** : M2-S (#840), M2a (#850) et M7a (#873) fusionnées. Action S1 de Samuel quand M1h sera fusionnée (§ 11 du plan).
 - **Mise en ligne main → p0-reel (#837)** : attend la fusion par Samuel ; ensuite un seul réglage Vercel (protection des préversions, 0135 § 9 : contournement ciblé `/p/` de préférence) pour que son amie ouvre le lien, puis le lien du voyage de Tokyo.
@@ -87,7 +90,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
 - **Badge « fermé ce jour-là »** : Q564. **Purge du MVP** : Q438.
 
 ## Prochain cycle
-1. Revues : #907 (correction 1), #908 (correction 1), #909 (correction 1, puis label `update-snapshots` pour les 5 références de la fiche) ; #866 attend Samuel. Après #907 : tickets M4-C (contrat, backend) et M4-suite (Product Owner), puis M4a. Après #908 et #909 : M5a, puis « Déplacer une étape sur `api` ». Après #866 : B4e-data (#887) et la PR de workflow `MIGRATIONS_APPROUVEES` pour 0022. M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
+1. Revues : #907 (correction 2, dernière) ; #908 (références visuelles puis fusion automatique) ; #866 attend Samuel. Dès #908 : M5a (verrous sur `api`), puis « Déplacer une étape sur `api` ». Dès #907 : tickets M4-C (contrat, backend) et M4-suite (Product Owner), puis M4a. Après #866 : B4e-data (#887) et la PR de workflow `MIGRATIONS_APPROUVEES` pour 0022. M1c attend Q638 ; M1h attend M1c, Q645 et Q696.
 2. Vérifier que Samuel a posé `owner-approved` sur #866 et lancé S3 (rappel du 2026-10-29 à 18:25 UTC ; un second rappel possible le 2026-10-30 en journée). Vérifier le lien de partage de Tokyo. Vercel a refusé les déploiements de préversion le 29 vers 22:30 UTC (« Resource is limited, api-deployments-free-per-day », plus de 100 par jour) puis a repris vers 23:18 UTC ; à surveiller, et à signaler à Samuel si cela se reproduit (plan Vercel).
 3. Lire les réponses de Samuel aux questions Q634 à Q641 (carte « Je suis tes recos ») ; Q638 bloque M1c ; Q645 (extension de Q636) bloque M1h.
 4. Zakynthos absent de « Mes voyages » : toujours en attente de la capture de Samuel. #527 : Q438.
@@ -112,7 +115,7 @@ Phase : 0 — Valider, avec la construction de toute la chaîne MVP ouverte (dé
   - 2 jours après leur publication dans la note de version : 0011 (sauf S4 et S5), 0031, 0032 et ses amendements (#211, 0045), 0037, 0040, 0046, 0048, 0049, 0050, 0051, 0054, 0057, 0058, décisions B1-PO-1 à 6 (#185).
 
 ## Questions ajoutées
-- Q723 à Q727 (CEO : exception « une spécification, plusieurs tâches » pour M4 accordée, tickets M4-C et M4-suite après 0148 ; Samuel : durée maximale d’un voyage multi-villes et plafonds (0148) ; Sécurité : S-M4-1 à S-M4-5 ; UX/UI : disposition de la rangée de l’écran 5 ; Vercel : limite journalière de déploiements atteinte le 29).
+- Q728 à Q730 (Product Owner : billet de musée ou de spectacle le jour d’un changement de ville, engagement à cheval sur le départ (0148, M4-suite) ; UX/UI : textes nouveaux de la feuille « Signaler une erreur » (#909)).
 
 ## Part d'usage estimée
 - 74e cycle : sous-agents terminés depuis le 73e : bloquant tardif de #357, correction 1 de #364, décision 0066, correction 1 de #365, correction de `main` (#368), `P0RUN_COMPLET` (#367) ; 1 en cours (#370).
