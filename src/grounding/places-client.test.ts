@@ -750,7 +750,7 @@ describe("places: recherche d'un lieu à soi (0147 § 3)", () => {
     expect(MASQUE_RECHERCHE_LIEU).toBe("places.id,places.displayName,places.shortFormattedAddress");
     const corps = JSON.parse(String(init.body)) as Record<string, unknown>;
     expect(corps).toEqual({ textQuery: "Café bleu, Lisbonne", pageSize: 5, languageCode: "fr" });
-    for (const champ of ["locationBias", "locationRestriction", "includedType"]) expect(corps[champ]).toBeUndefined();
+    expect(Object.keys(corps).sort()).toEqual(["languageCode", "pageSize", "textQuery"]);
     expect(port.lignes.map((l) => [l.etat, l.demande.methode, l.demande.sku, l.demande.coutEstimeMicros])).toEqual([
       ["confirmee", "places_text_search", SKU_RECHERCHE_LIEU, COUT_ESTIME_MICROS.rechercheLieu],
     ]);

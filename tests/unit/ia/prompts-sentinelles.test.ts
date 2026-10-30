@@ -21,6 +21,7 @@ import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
 import { EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, MOCK_USER_ID } from "@/mocks/edimbourg";
 import { RECIT_API_AUTORISE } from "@/server/config/generation";
+import type { EntreeProgramme } from "@/server/programme/entree";
 import { entreeRevisionDepuisJours } from "@/server/programme/revision";
 import { candidatPourModele, entreeModelesDepuisBrief, entreeProgrammeDepuisBrief, lieuRetenuDepuisCandidat } from "@/server/p0/vers-couche-ia";
 
@@ -562,7 +563,7 @@ describe("prompts: lieu à soi jamais dans une entrée de modèle (0147 § 12 S4
     const jour = (items: ReturnType<typeof etape>[]) => ({ index: 1, date: "2027-05-04", theme: "Old Town", travelBudgetMinutes: 90, events: [], items });
     const sans = [jour([etape("j1-1", "Château d'Édimbourg", "10:00"), etape("j1-2", "Royal Mile", "13:00")])];
     const jours = [jour([etape("j1-1", "Château d'Édimbourg", "10:00"), etape("j1-2", "Royal Mile", "13:00"), etape(AJOUT, NOM, "16:00", { placeId: PLACE, locked: true, addedBy: "person" })])];
-    const brief: Parameters<typeof entreeRevisionDepuisJours>[1] = {
+    const brief: EntreeProgramme = {
       destination: "Édimbourg",
       pays: "Royaume-Uni",
       arrivee: "2027-05-04",
