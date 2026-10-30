@@ -31,10 +31,16 @@ const RESULTATS = path.join(RACINE, "evals", "resultats", "programme-v5.json");
 const JEUX = ["rome-florence-billet", "lisbonne-porto-estime", "paris-lyon-marseille-intense"] as const;
 const CONTROLE = "controle-rome-florence";
 
-/** Valeurs de mesure (0148 § 5.1 point 5 et § 5.3 ; `fenetreJour.fin` et `dureesParDefaut` de `moteur.json`). */
-const FIN_DU_JOUR = "22:30";
+/**
+ * Valeurs de mesure lues dans `moteur.json` (revue de la PR #921, mineur 5) : `fenetreJour.fin` et `dureesParDefaut`,
+ * natures de la sortie rapportées aux durées comme 0148 § 5.1 point 3 (a). Seul le créneau sans durée (180 minutes,
+ * 0148 § 5.3) est écrit ici : la section `changementDeVille` de `moteur.json` vient avec M4b.
+ */
+const MOTEUR = lireJson("src/server/config/moteur.json") as { fenetreJour: { fin: string }; dureesParDefaut: { activity: number; lunch: number; dinner: number; evening: number } };
+const FIN_DU_JOUR = MOTEUR.fenetreJour.fin;
 const CRENEAU_SANS_DUREE_MINUTES = 180;
-const DUREE_PAR_NATURE: Partial<Record<CreneauIa["nature"], number>> = { visite: 90, repas_midi: 75, repas_soir: 90, soiree: 90, apero: 90, pause: 90 };
+const { activity, lunch, dinner, evening } = MOTEUR.dureesParDefaut;
+const DUREE_PAR_NATURE: Partial<Record<CreneauIa["nature"], number>> = { visite: activity, repas_midi: lunch, repas_soir: dinner, soiree: evening, apero: activity, pause: activity };
 const NATURES_ACTIVITE: ReadonlySet<CreneauIa["nature"]> = new Set(["visite", "soiree", "pause"]);
 
 type Fichier = { id: string; cas: string; entree: unknown; attendu: { incontournables: Record<string, string[][]> }; sortie: unknown };

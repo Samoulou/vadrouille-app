@@ -254,8 +254,11 @@ export function requeteProgramme(entree: EntreeProgramme, modele: string, routag
   return requete("programme", PROMPT_PROGRAMME, modele, routage, { brief: projectionBrief(entree) });
 }
 
-/** Brief du prototype en projection champ par champ (requêtes `programme` et `revision`) : aucun autre champ ne passe. */
-function projectionBrief(entree: EntreeProgramme) {
+/**
+ * Champs communs des briefs v4 et v5, en projection champ par champ, dans l'ordre de la v4 (octets de la requête v4
+ * inchangés ; revue de la PR #921, mineur 2).
+ */
+function projectionCommune(entree: EntreeProgramme | EntreeProgrammeV5) {
   return {
     destination: entree.destination,
     pays: entree.pays,
@@ -269,6 +272,13 @@ function projectionBrief(entree: EntreeProgramme) {
     ...(entree.aEviter === undefined ? {} : { aEviter: [...entree.aEviter] }),
     deplacements: [...entree.deplacements],
     ...(entree.budgetRepas === undefined ? {} : { budgetRepas: entree.budgetRepas }),
+  };
+}
+
+/** Brief du prototype en projection champ par champ (requêtes `programme` et `revision`) : aucun autre champ ne passe. */
+function projectionBrief(entree: EntreeProgramme) {
+  return {
+    ...projectionCommune(entree),
     logements: entree.logements.map((logement) => ({ texte: logement.texte, nuits: logement.nuits })),
     ...(entree.engagements === undefined
       ? {}
@@ -293,18 +303,7 @@ export function requeteProgrammeV5(entree: EntreeProgrammeV5, modele: string, ro
  */
 export function projectionBriefV5(entree: EntreeProgrammeV5) {
   return {
-    destination: entree.destination,
-    pays: entree.pays,
-    arrivee: entree.arrivee,
-    heureArrivee: entree.heureArrivee,
-    depart: entree.depart,
-    heureDepart: entree.heureDepart,
-    voyageurs: { adultes: entree.voyageurs.adultes, enfants: entree.voyageurs.enfants },
-    rythme: entree.rythme,
-    envies: [...entree.envies],
-    ...(entree.aEviter === undefined ? {} : { aEviter: [...entree.aEviter] }),
-    deplacements: [...entree.deplacements],
-    ...(entree.budgetRepas === undefined ? {} : { budgetRepas: entree.budgetRepas }),
+    ...projectionCommune(entree),
     villes: entree.villes.map((ville) => ({ nom: ville.nom, arrivee: ville.arrivee, nuits: ville.nuits, logement: ville.logement })),
     changements: entree.changements.map((changement) => ({
       date: changement.date,

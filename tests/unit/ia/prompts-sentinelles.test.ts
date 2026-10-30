@@ -13,7 +13,7 @@ import { EntreeProgrammeV5Schema, versEntreeQuartier, type EntreeModeles, type E
 import { PROMPT_PROGRAMME, PROMPT_PROGRAMME_V5 } from "@/ai/prompts/programme";
 import { creerRedigerProgramme, creerRedigerProgrammeV5 } from "@/ai/rediger-programme";
 import { requeteProgrammeV5 } from "@/ai/requetes";
-import type { LodgingRequest } from "@/contracts";
+import { MAX_CITIES, type LodgingRequest } from "@/contracts";
 import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
 import { EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, MOCK_USER_ID } from "@/mocks/edimbourg";
@@ -192,11 +192,10 @@ describe("prompts: entrée et requête programme v5 (plusieurs villes, M4a)", ()
   };
 
   it("programme: prompt v5 sans donnée Google : requête journalisée sans sentinelle, zdr et data_collection deny imposés", async () => {
-    const { brief, fixtures } = charger();
+    const { fixtures } = charger();
     const sentinelles = avecSentinellesGoogle({ places: creerPlacesSimule(fixtures.places), routes: creerRoutesSimule(fixtures.routes) });
     for (const lieu of Object.values(fixtures.places.lieux)) await sentinelles.places.details(lieu.placeId);
     expect(sentinelles.valeurs.size).toBeGreaterThan(5);
-    expect(brief.destination).toBeDefined();
 
     const { journal, rediger } = preparer();
     await rediger(ENTREE_V5);
@@ -265,6 +264,46 @@ describe("prompts: entrée et requête programme v5 (plusieurs villes, M4a)", ()
     expect(EntreeProgrammeV5Schema.safeParse(avecFin("23:59")).success).toBe(true);
     const sansFin = { ...ENTREE_V5, engagements: [{ libelle: "Concert d'orgue", date: "2027-05-08", heure: "20:30", type: "reservation" as const }] };
     expect(EntreeProgrammeV5Schema.safeParse(sansFin).success).toBe(true);
+  });
+
+  // Revue de la PR #921, bloquant 1 : une date invalide (format accepté par la forme, refusée par `IsoDateSchema`) est
+  // refusée par `safeParse` sans exception, et la capacité rejette par `RangeError`, sans requête.
+  it("prompts: entrée v5, date invalide refusée sans exception ni requête", async () => {
+    const { journal, rediger } = preparer();
+    const [rome, florence] = ENTREE_V5.villes;
+    for (const date of ["2027-13-45", "2027-02-30"]) {
+      const entrees: unknown[] = [
+        { ...ENTREE_V5, villes: [rome, { ...florence!, arrivee: date }] },
+        { ...ENTREE_V5, villes: [{ ...rome!, arrivee: date }, florence] },
+        { ...ENTREE_V5, depart: date },
+        { ...ENTREE_V5, arrivee: date },
+      ];
+      for (const entree of entrees) {
+        let lu: ReturnType<typeof EntreeProgrammeV5Schema.safeParse> | undefined;
+        expect(() => {
+          lu = EntreeProgrammeV5Schema.safeParse(entree);
+        }, date).not.toThrow();
+        expect(lu?.success, date).toBe(false);
+        await expect(rediger(entree as EntreeProgrammeV5)).rejects.toBeInstanceOf(RangeError);
+      }
+    }
+    // Nuits non entières : même règle, aucune exception.
+    expect(() => EntreeProgrammeV5Schema.safeParse({ ...ENTREE_V5, villes: [{ ...rome!, nuits: 1.5 }, florence] })).not.toThrow();
+    expect(journal.requetes).toHaveLength(0);
+  });
+
+  // Revue de la PR #921, mineur 3 : plafond `MAX_CITIES` des villes et `MAX_CITIES - 1` des changements, sans valeur en dur.
+  it("prompts: entrée v5, au plus MAX_CITIES villes et MAX_CITIES - 1 changements", () => {
+    const noms = Array.from({ length: MAX_CITIES + 1 }, (_, i) => `Ville ${String.fromCharCode(65 + i)}`);
+    const entree = (n: number) => {
+      const villes = noms.slice(0, n).map((nom, i) => ({ nom, arrivee: `2027-05-${String(4 + i).padStart(2, "0")}`, nuits: 1, logement: `Logement, ${nom}` }));
+      const changements = villes.slice(1).map((ville, i) => ({ date: ville.arrivee, de: villes[i]!.nom, vers: ville.nom, source: "estime" as const, depart: "09:00", activitesMax: 2 }));
+      return { ...ENTREE_V5, depart: `2027-05-${String(4 + n).padStart(2, "0")}`, villes, changements };
+    };
+    expect(EntreeProgrammeV5Schema.safeParse(entree(MAX_CITIES)).success).toBe(true);
+    const trop = EntreeProgrammeV5Schema.safeParse(entree(MAX_CITIES + 1));
+    expect(trop.success).toBe(false);
+    expect(trop.error?.issues.map((issue) => issue.path[0])).toEqual(expect.arrayContaining(["villes", "changements"]));
   });
 
   it("prompts: entrée v5, bornes et cohérence des villes et des changements", () => {

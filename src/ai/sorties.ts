@@ -679,13 +679,14 @@ export type JourIa = { readonly date: string; readonly titre?: string; readonly 
 export const DUREE_ESTIMEE_MINUTES = { min: 20, max: 600 } as const;
 
 /**
- * Durée estimée lue **sans conversion** (0149 S-M4-2 point 1), dans cet ordre : nombre JSON fini, puis entier
- * (`Number.isSafeInteger` : `120.5` est refusé, jamais arrondi), puis bornes `DUREE_ESTIMEE_MINUTES`, puis arrondi au
+ * Durée estimée lue **sans conversion** (0149 S-M4-2 point 1), dans cet ordre : nombre JSON, puis entier fini
+ * (`Number.isSafeInteger`, qui refuse aussi `NaN` et les infinis : `120.5` est refusé, jamais arrondi), puis bornes `DUREE_ESTIMEE_MINUTES`, puis arrondi au
  * multiple de 5 le plus proche (93 → 95). Une chaîne (`"120"`, `"2 h"`), un booléen, un objet ou `null` sont refusés.
  * Rend `undefined` pour toute valeur refusée : l'appelant retire le champ et le compte, jamais une valeur par défaut.
  */
 export function lireDureeEstimee(brut: unknown): number | undefined {
-  if (typeof brut !== "number" || !Number.isFinite(brut) || !Number.isSafeInteger(brut)) return undefined;
+  // `Number.isSafeInteger` refuse aussi `NaN` et les infinis : il couvre le contrôle « nombre fini ».
+  if (typeof brut !== "number" || !Number.isSafeInteger(brut)) return undefined;
   if (brut < DUREE_ESTIMEE_MINUTES.min || brut > DUREE_ESTIMEE_MINUTES.max) return undefined;
   return Math.round(brut / 5) * 5;
 }

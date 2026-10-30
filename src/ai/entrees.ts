@@ -179,35 +179,52 @@ export function versEntreeQuartier(demande: LodgingRequest): EntreeQuartier {
  * horaire, statut, durée, verdict) : schéma strict, une clé en trop est refusée avant toute requête.
  */
 const texteBrief = (max: number) => z.string().trim().min(1).max(max);
+
+/**
+ * Champs du brief communs aux entrées `programme` v4 et v5 (revue de la PR #921, mineur 2) : une seule définition, dans
+ * l'ordre de la v4 (`logements` et `engagements` s'insèrent entre `budgetRepas` et `recit`). La v4 n'en est pas changée :
+ * mêmes champs, mêmes bornes, même ordre, même contrôle (`controlerBriefProgramme`).
+ */
+const CHAMPS_BRIEF_PROGRAMME = {
+  destination: texteBrief(80),
+  pays: texteBrief(60),
+  arrivee: IsoDateSchema,
+  depart: IsoDateSchema,
+  heureArrivee: TimeSchema,
+  heureDepart: TimeSchema,
+  voyageurs: z.strictObject({ adultes: z.number().int().min(1).max(9), enfants: z.number().int().min(0).max(9) }),
+  rythme: z.enum(["tranquille", "equilibre", "intense"]),
+  envies: z.array(CategorySchema).min(1).refine(sansDoublon, "envies sans doublon"),
+  /** Catégories « à éviter » saisies (lot 5 de E2E-essai), absentes quand rien n'est coché. */
+  aEviter: z.array(CategorySchema).min(1).refine(sansDoublon, "à éviter sans doublon").optional(),
+  deplacements: z.array(MobilityModeSchema).min(1).refine(sansDoublon, "déplacements sans doublon"),
+  budgetRepas: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+} as const;
+const RECIT_BRIEF_PROGRAMME = texteBrief(1000).optional();
+
+/** Contrôle commun des entrées `programme` v4 et v5 : départ après l'arrivée, « à éviter » sans élément des envies. */
+function controlerBriefProgramme(
+  entree: { readonly arrivee: string; readonly depart: string; readonly envies: readonly string[]; readonly aEviter?: readonly string[] },
+  ctx: z.RefinementCtx,
+) {
+  if (entree.depart < entree.arrivee) ctx.addIssue({ code: "custom", path: ["depart"], message: "départ avant l'arrivée" });
+  const envies = new Set<string>(entree.envies);
+  if ((entree.aEviter ?? []).some((categorie) => envies.has(categorie))) {
+    ctx.addIssue({ code: "custom", path: ["aEviter"], message: "à éviter commun avec les envies" });
+  }
+}
+
 export const EntreeProgrammeSchema = z
   .strictObject({
-    destination: texteBrief(80),
-    pays: texteBrief(60),
-    arrivee: IsoDateSchema,
-    depart: IsoDateSchema,
-    heureArrivee: TimeSchema,
-    heureDepart: TimeSchema,
-    voyageurs: z.strictObject({ adultes: z.number().int().min(1).max(9), enfants: z.number().int().min(0).max(9) }),
-    rythme: z.enum(["tranquille", "equilibre", "intense"]),
-    envies: z.array(CategorySchema).min(1).refine(sansDoublon, "envies sans doublon"),
-    /** Catégories « à éviter » saisies (lot 5 de E2E-essai), absentes quand rien n'est coché. */
-    aEviter: z.array(CategorySchema).min(1).refine(sansDoublon, "à éviter sans doublon").optional(),
-    deplacements: z.array(MobilityModeSchema).min(1).refine(sansDoublon, "déplacements sans doublon"),
-    budgetRepas: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+    ...CHAMPS_BRIEF_PROGRAMME,
     logements: z.array(z.strictObject({ texte: texteBrief(120), nuits: z.number().int().min(1).max(60) })).min(1).max(5),
     engagements: z
       .array(z.strictObject({ libelle: texteBrief(80), date: IsoDateSchema, heure: TimeSchema, type: CommitmentSchema }))
       .max(10)
       .optional(),
-    recit: texteBrief(1000).optional(),
+    recit: RECIT_BRIEF_PROGRAMME,
   })
-  .superRefine((entree, ctx) => {
-    if (entree.depart < entree.arrivee) ctx.addIssue({ code: "custom", path: ["depart"], message: "départ avant l'arrivée" });
-    const envies = new Set<string>(entree.envies);
-    if ((entree.aEviter ?? []).some((categorie) => envies.has(categorie))) {
-      ctx.addIssue({ code: "custom", path: ["aEviter"], message: "à éviter commun avec les envies" });
-    }
-  });
+  .superRefine(controlerBriefProgramme);
 export type EntreeProgramme = z.infer<typeof EntreeProgrammeSchema>;
 
 /**
@@ -267,26 +284,16 @@ export const ChangementDeVilleEntreeSchema = z
   });
 export type ChangementDeVilleEntree = z.infer<typeof ChangementDeVilleEntreeSchema>;
 
-const ajouterJours = (date: string, jours: number) => {
+/** Date plus `jours` jours ; `undefined` si le calcul n'aboutit pas (jamais d'exception dans un contrôle de schéma). */
+const ajouterJours = (date: string, jours: number): string | undefined => {
   const jour = new Date(`${date}T00:00:00Z`);
   jour.setUTCDate(jour.getUTCDate() + jours);
-  return jour.toISOString().slice(0, 10);
+  return Number.isNaN(jour.getTime()) ? undefined : jour.toISOString().slice(0, 10);
 };
 
 export const EntreeProgrammeV5Schema = z
   .strictObject({
-    destination: texteBrief(80),
-    pays: texteBrief(60),
-    arrivee: IsoDateSchema,
-    depart: IsoDateSchema,
-    heureArrivee: TimeSchema,
-    heureDepart: TimeSchema,
-    voyageurs: z.strictObject({ adultes: z.number().int().min(1).max(9), enfants: z.number().int().min(0).max(9) }),
-    rythme: z.enum(["tranquille", "equilibre", "intense"]),
-    envies: z.array(CategorySchema).min(1).refine(sansDoublon, "envies sans doublon"),
-    aEviter: z.array(CategorySchema).min(1).refine(sansDoublon, "à éviter sans doublon").optional(),
-    deplacements: z.array(MobilityModeSchema).min(1).refine(sansDoublon, "déplacements sans doublon"),
-    budgetRepas: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+    ...CHAMPS_BRIEF_PROGRAMME,
     villes: VillesProgrammeSchema,
     changements: z.array(ChangementDeVilleEntreeSchema).max(MAX_CITIES - 1),
     engagements: z
@@ -297,14 +304,15 @@ export const EntreeProgrammeV5Schema = z
       )
       .max(MAX_COMMITMENTS)
       .optional(),
-    recit: texteBrief(1000).optional(),
+    recit: RECIT_BRIEF_PROGRAMME,
   })
   .superRefine((entree, ctx) => {
-    if (entree.depart < entree.arrivee) ctx.addIssue({ code: "custom", path: ["depart"], message: "départ avant l'arrivée" });
-    const envies = new Set<string>(entree.envies);
-    if ((entree.aEviter ?? []).some((categorie) => envies.has(categorie))) {
-      ctx.addIssue({ code: "custom", path: ["aEviter"], message: "à éviter commun avec les envies" });
-    }
+    controlerBriefProgramme(entree, ctx);
+    // Avec Zod 4, un échec de format (`IsoDateSchema`, `nuits`) n'arrête pas ce contrôle : la cohérence n'est calculée
+    // que sur des dates et des nuits valides, sinon le refus déjà posé suffit (revue de la PR #921, bloquant 1).
+    const dateValide = (date: string) => IsoDateSchema.safeParse(date).success;
+    if (![entree.arrivee, entree.depart, ...entree.villes.map((ville) => ville.arrivee)].every(dateValide)) return;
+    if (!entree.villes.every((ville) => Number.isSafeInteger(ville.nuits) && ville.nuits >= 1 && ville.nuits <= 60)) return;
     // Villes : la première arrive le premier jour ; chacune arrive le lendemain de la dernière nuit de la précédente ;
     // la dernière nuit de la dernière ville est la veille du départ (une ville a au moins une nuit, spécification § 3.1).
     // Paires (ville quittée, ville d'arrivée) dans l'ordre, sans accès calculé (confinement du dépôt).

@@ -45,7 +45,7 @@ const EMPREINTES: Record<string, Record<number, string>> = {
     4: "851f7045685335f9269630cb8e959d3ec5b12c392e8e0385af5b61c1cfa7831d",
     // M4a (ticket #920, décision 0148) : plusieurs villes, cadre des journées de changement de ville, durée estimée ;
     // coexiste avec la v4 (site d'essai et `p0Run`).
-    5: "6414d3cbb7d647386426f4d24d1dca0eae35778bd28985426d56a0855d7eafd9",
+    5: "d9e2ec9bdd95066ffeea8a8cda1a378ff04da2c50ea1ab0199dc1ccef01630b2",
   },
   // E2E-essai, lot 4 (décision 0126) : révision du programme après le tri « J'aime / Pas pour moi ».
   // v2 (ticket #800, amendement 4 de P0-programme-par-ia) : mêmes règles de site et de parcours que `programme` v4.
@@ -155,6 +155,8 @@ describe("prompts: versionnés", () => {
     expect(texte).toContain('"dureeEstimeeMinutes" (nombre entier, seulement pour un changement "estime")');
     expect(texte).toMatch(/un nombre entier \(jamais un texte\)/);
     expect(texte).toMatch(/Omets ce champ si tu ne sais pas l'estimer, pour un changement "saisi" et pour toute autre journée/);
+    // Sans estimation, le code réserve 180 minutes (0148 § 5.3) : le prompt le dit (revue de la PR #921, mineur 4).
+    expect(texte).toMatch(/Sans estimation, laisse au moins trois heures entre le départ et la première étape de la ville d'arrivée/);
     // Aucun champ `ville` par créneau (0148 § 7.1 point 3) : ni dans la forme du créneau, ni dans les longueurs.
     const creneau = texte.split("\n").find((ligne) => ligne.startsWith("Chaque créneau"));
     expect(creneau).toBeDefined();
