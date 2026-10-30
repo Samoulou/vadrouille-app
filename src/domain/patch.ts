@@ -46,6 +46,9 @@ import { controlerVersion, type Refus } from "@/domain/version";
  *    changent pas (R3) ; l'étape visée par un `add` ou un `move` est posée à l'heure demandée ;
  * 4. validation des jours touchés (R1 à R9, R3 contre la base) : une entrée bloquante **nouvelle** (absente du
  *    rapport des mêmes jours de la base) fait refuser le patch, code `no_option` ;
+ *    **verrou seul** (décision 0147 § 9, M5a) : un patch fait seulement de `lock` et d'`unlock` ne déplace rien ; ni
+ *    replanification ni validation, l'instantané de sortie est la base avec `locked` basculé (R3 tient trivialement,
+ *    R1 à R9 sont inchangés), et « Ce qui change » est calculé sans aucune relecture (aucun trajet ne change) ;
  * 5. sortie : instantané validé par `TripSnapshotSchema` (aucune durée, aucune date de contrôle, aucun `toConfirm`),
  *    `PatchResult` validé par `PatchResultSchema` (les `Change[segment]` n'existent que là, calculés en mémoire à la
  *    réponse) et rapport de validation en mémoire.
@@ -703,6 +706,25 @@ export function appliquerPatch(entree: EntreePatch): ResultatPatch {
   for (const operation of patch.operations) {
     const resultat = appliquerOperation(operation);
     if (resultat !== undefined) return resultat;
+  }
+
+  // 3 bis. Verrou seul (décision 0147 § 9) : la base, verrous basculés ; aucune replanification, aucune relecture.
+  if (patch.operations.every((operation) => operation.op === "lock" || operation.op === "unlock")) {
+    const verrous = new Map(brouillon.flatMap((jour) => jour.lignes.flatMap((ligne) => (ligne.genre === "etape" ? [[ligne.stop.id, ligne.stop.locked] as const] : []))));
+    const days = base.days.map((jour) =>
+      touches.has(jour.index)
+        ? { ...jour, items: jour.items.map((item) => (item.type === "stop" ? { ...item, stop: { ...item.stop, locked: verrous.get(item.stop.id) ?? item.stop.locked } } : item)) }
+        : jour,
+    );
+    const joursTouches = [...touches].sort((a, b) => a - b);
+    const instantane = TripSnapshotSchema.parse({ days });
+    const sansRelecture: ContextePatch = { ...contexte, moteur: { ...moteur, relectures: { validite: () => INCONNU, plages: () => INCONNU, duree: () => INCONNU } } };
+    const resultat = PatchResultSchema.parse({
+      version: patch.baseVersion + 1,
+      touchedDays: joursTouches,
+      changes: changements(base.days, instantane.days, joursTouches, cibles, sansRelecture),
+    });
+    return { ok: true, instantane, resultat, rapport: [] };
   }
 
   // 4. Replanification des seuls jours touchés, puis validation.

@@ -9,7 +9,7 @@ import { axeViolations } from "../../../tests/unit/axe";
 
 import { findFicheTarget, ficheMoment } from "./fiche";
 import { tripRoutes } from "./routes";
-import { StopSheet } from "./StopSheet";
+import { StopSheet, type LockFailure } from "./StopSheet";
 
 const routes = tripRoutes("/voyages", edimbourg.id);
 const day = (n: number): Day => edimbourg.days.find((candidate) => candidate.index === n)!;
@@ -245,5 +245,78 @@ describe("StopSheet : « Déplacer » (F7b, F7-PO-15, C19)", () => {
     unmount();
     renderFiche(2, "j2-concert-orgue");
     expect(screen.queryByRole("button", { name: "Déplacer" })).toBeNull();
+  });
+});
+
+describe("StopSheet : verrou sur api (M5a, spécification M5 § 3)", () => {
+  function renderSansVerrou(
+    n: number,
+    stopId: string,
+    overrides: Partial<Stop> = {},
+    extra: { onToggleLock?: (locked: boolean) => void; lockFailure?: LockFailure | null; commitmentReadOnly?: boolean; onMove?: () => void } = {},
+  ) {
+    const target = findFicheTarget(day(n), stopId)!;
+    return render(
+      <StopSheet stop={{ ...target.stop, ...overrides }} inProgramme={target.inProgramme} day={day(n)} routes={routes} onClose={vi.fn()} {...extra} />,
+    );
+  }
+
+  it("verrou: refusé avant le déblocage : sans fonction de verrou, la fiche ne montre pas « Verrouiller » (ni sa région d'échec)", () => {
+    const { container } = renderSansVerrou(2, "j2-dean-village");
+    expect(screen.queryByRole("button", { name: "Verrouiller" })).toBeNull();
+    expect(container.querySelector("[data-part='verrou-echec']")).toBeNull();
+    // Les autres actions restent.
+    expect(screen.getByRole("link", { name: "Remplacer" })).toBeInTheDocument();
+  });
+
+  it("verrou: un engagement ne se déverrouille pas : sa fiche (événement de Day.events sur api) montre « Déjà réservé », sans « Verrouiller »", () => {
+    const { container } = renderSansVerrou(2, "j2-concert-orgue", { commitment: "ticket", locked: true }, { onToggleLock: vi.fn(), commitmentReadOnly: true });
+    expect(container.querySelector("[data-part='deja-reserve']")).toHaveTextContent("Déjà réservé : cette étape ne bouge pas.");
+    expect(container.querySelector("[data-part='hors-programme']")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Verrouiller" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Remplacer" })).toBeNull();
+  });
+
+  it("verrou: engagement dans le programme sur api : « Déjà réservé », ni « Verrouiller », ni « Déplacer », ni « Remplacer » (M5-PO-3)", async () => {
+    const { container } = renderSansVerrou(
+      2,
+      "j2-dean-village",
+      { commitment: "reservation", locked: true },
+      { onToggleLock: vi.fn(), onMove: vi.fn(), commitmentReadOnly: true, lockFailure: null },
+    );
+    expect(container.querySelector("[data-part='deja-reserve']")).toHaveTextContent("Déjà réservé : cette étape ne bouge pas.");
+    expect(screen.queryByRole("button", { name: "Verrouiller" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Déplacer" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Remplacer" })).toBeNull();
+    // Aucune action : ni groupe d'actions, ni région d'échec du verrou, ni mention du verrou (doublon de « Déjà réservé »).
+    expect(container.querySelector("[data-part='actions']")).toBeNull();
+    expect(container.querySelector("[data-part='verrou-echec']")).toBeNull();
+    expect(container.querySelector("[data-part='verrou']")).toBeNull();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("verrou: mock inchangé : sans lecture seule, l'engagement du programme garde « Verrouiller », et celui de Day.events reste hors programme", () => {
+    const programme = renderSansVerrou(2, "j2-dean-village", { commitment: "reservation", locked: true }, { onToggleLock: vi.fn() });
+    expect(programme.container.querySelector("[data-part='deja-reserve']")).toBeNull();
+    expect(screen.getByRole("button", { name: "Verrouiller" })).toHaveAttribute("aria-pressed", "true");
+    programme.unmount();
+    const { container } = renderSansVerrou(2, "j2-concert-orgue", { commitment: "ticket", locked: true }, { onToggleLock: vi.fn() });
+    expect(container.querySelector("[data-part='deja-reserve']")).toBeNull();
+    expect(container.querySelector("[data-part='hors-programme']")).not.toBeNull();
+  });
+
+  it("verrou: conflit de version : le message est annoncé dans la région d'alerte de la fiche, présente dès l'ouverture", async () => {
+    const vide = renderSansVerrou(2, "j2-dean-village", {}, { onToggleLock: vi.fn() });
+    const region = vide.container.querySelector("[data-part='verrou-echec']");
+    expect(region).toHaveAttribute("role", "alert");
+    expect(region).toBeEmptyDOMElement();
+    vide.unmount();
+    const { container } = renderSansVerrou(2, "j2-dean-village", {}, { onToggleLock: vi.fn(), lockFailure: { kind: "conflict", message: messages.sejour.fiche.verrouConflit } });
+    expect(screen.getByRole("alert")).toHaveTextContent("Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.");
+    // Ton d'état de Ligne (revue de la PR 923, mineur 12) : bandeau `conflict`, sans rôle propre (la région l'annonce).
+    const bandeau = container.querySelector("[data-part='verrou-echec'] [data-kind]");
+    expect(bandeau).toHaveAttribute("data-kind", "conflict");
+    expect(bandeau).not.toHaveAttribute("role");
+    expect(await axeViolations(container)).toEqual([]);
   });
 });

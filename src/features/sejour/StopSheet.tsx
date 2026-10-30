@@ -10,6 +10,7 @@ import { IconCroix } from "@/components/ligne/icons";
 import { DateConsultation, LienSource } from "@/components/ligne/LienSource";
 import { PracticalNotes } from "@/components/ligne/PracticalNotes";
 import { ReasonBlock } from "@/components/ligne/ReasonBlock";
+import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { Tag } from "@/components/ligne/Tag";
 import type { Day } from "@/contracts";
 import { EMPTY_LIVE_REGION_CLASS } from "@/features/creation/fields";
@@ -24,13 +25,31 @@ import { pathTo, pathToLabel } from "./travel";
 
 const t = messages.sejour.fiche;
 
+/** Refus d'un verrou affiché sur la fiche : conflit de version, ou tout autre refus ou panne. */
+export type LockFailure = { kind: "conflict" | "error"; message: string };
+
 export interface StopSheetProps extends FicheTarget {
   day: Day;
   routes: TripRoutes;
   /** « Fermer » et Échap (F5-PO-8). */
   onClose: () => void;
-  /** Bascule du verrou (F5-PO-10) ; reçoit la nouvelle valeur. */
-  onToggleLock: (locked: boolean) => void;
+  /**
+   * Bascule du verrou (F5-PO-10) ; reçoit la nouvelle valeur. Sans fonction, pas de bouton « Verrouiller » (adaptateur
+   * `api` : voyage non débloqué, M5-PO-1).
+   */
+  onToggleLock?: (locked: boolean) => void;
+  /**
+   * Verrou non enregistré (adaptateur `api`, M5a) : bandeau d'état de Ligne (`StatusBanner`, `conflict` ou `error`) annoncé
+   * par la région `role="alert"` sous les actions, ou `null`. La région existe dès l'ouverture de la fiche quand le bouton
+   * « Verrouiller » est là.
+   */
+  lockFailure?: LockFailure | null;
+  /**
+   * Engagement en lecture seule (adaptateur `api`, M5a ; spécification M5 § 3, M5-PO-3) : toute fiche à `commitment`, dans
+   * le programme ou non, affiche « Déjà réservé : cette étape ne bouge pas. » sans « Verrouiller », « Déplacer » ni
+   * « Remplacer ». Faux par défaut : `mock` inchangé.
+   */
+  commitmentReadOnly?: boolean;
   /** « Déplacer » (F7-PO-15) : ouvre la feuille « Déplacer » ; sans fonction, pas de bouton. */
   onMove?: () => void;
   /** Préchargement de la feuille « Déplacer » au survol ou au focus du bouton. */
@@ -60,7 +79,8 @@ export interface StopSheetProps extends FicheTarget {
  * l'ouverture ; Échap ou « Fermer » ferment la fiche. Un événement de `Day.events` est en lecture seule,
  * signalé comme hors programme, sans action. « Garder » attend la réponse de Samuel (Q67) ; « Déplacer » (F7b)
  * suit « Remplacer », absent pour une étape verrouillée ; « Signaler une erreur » (M5c) vient après les autres actions, sur
- * toute étape du programme sauf un engagement ou un lieu à soi, sa confirmation juste après.
+ * toute étape du programme sauf un engagement ou un lieu à soi, sa confirmation juste après. Sur `api` (M5a), une fiche à
+ * engagement est en lecture seule : « Déjà réservé », aucune action (`commitmentReadOnly`).
  */
 export function StopSheet({
   stop,
@@ -69,6 +89,8 @@ export function StopSheet({
   routes,
   onClose,
   onToggleLock,
+  lockFailure = null,
+  commitmentReadOnly = false,
   onMove,
   onMoveIntent,
   onReport,
@@ -95,6 +117,9 @@ export function StopSheet({
   const faits = formatFaits(stop.facts);
   // Ni engagement, ni lieu à soi (`etapeSignalableSurFiche`, équivalente à la règle du serveur) ; le serveur la refait.
   const reportable = inProgramme && onReport !== undefined && etapeSignalableSurFiche(stop);
+  // Engagement sur `api` : déjà réservé, jamais verrouillé, déplacé ni remplacé (M5-PO-3) ; le serveur refuse aussi.
+  const dejaReserve = commitmentReadOnly && stop.commitment !== undefined;
+  const actionsDuProgramme = inProgramme && !dejaReserve;
 
   return (
     <div data-part="fiche" data-stop-id={stop.id} onKeyDown={onKeyDown} className="flex flex-col gap-4 px-5 pt-2 pb-8">
@@ -110,7 +135,11 @@ export function StopSheet({
         <IconButton icon={<IconCroix />} label={t.fermer} onClick={onClose} data-part="fermer" />
       </header>
 
-      {inProgramme ? null : (
+      {dejaReserve ? (
+        <p data-part="deja-reserve" className="text-corps-s text-ink-2">
+          {t.dejaReserve}
+        </p>
+      ) : inProgramme ? null : (
         <p data-part="hors-programme" className="text-corps-s text-ink-2">
           {t.evenement}
         </p>
@@ -132,7 +161,7 @@ export function StopSheet({
             ))}
           </span>
         ) : null}
-        {inProgramme && stop.locked ? (
+        {actionsDuProgramme && stop.locked ? (
           <p data-part="verrou" className="text-legende text-ink-soft">
             {t.verrou}
           </p>
@@ -170,7 +199,7 @@ export function StopSheet({
 
       <PracticalNotes facts={stop.facts} />
 
-      {inProgramme ? (
+      {actionsDuProgramme ? (
         <section aria-label={t.actions} data-part="actions" className="flex flex-wrap gap-3">
           {stop.locked ? null : (
             <Button asChild variant="secondary" size="sm">
@@ -192,15 +221,17 @@ export function StopSheet({
               {t.deplacer}
             </Button>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-pressed={stop.locked}
-            data-part="verrouiller"
-            onClick={() => onToggleLock(!stop.locked)}
-          >
-            {t.verrouiller}
-          </Button>
+          {onToggleLock ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-pressed={stop.locked}
+              data-part="verrouiller"
+              onClick={() => onToggleLock(!stop.locked)}
+            >
+              {t.verrouiller}
+            </Button>
+          ) : null}
           {reportable ? (
             <Button
               variant="secondary"
@@ -215,6 +246,12 @@ export function StopSheet({
             </Button>
           ) : null}
         </section>
+      ) : null}
+
+      {actionsDuProgramme && onToggleLock ? (
+        <div role="alert" data-part="verrou-echec" className={lockFailure ? undefined : EMPTY_LIVE_REGION_CLASS}>
+          {lockFailure ? <StatusBanner kind={lockFailure.kind} message={lockFailure.message} announce={false} /> : null}
+        </div>
       ) : null}
 
       {reportable ? (

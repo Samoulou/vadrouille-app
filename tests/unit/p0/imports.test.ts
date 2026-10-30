@@ -2035,6 +2035,8 @@ const FRONTIERE_P0R3B = {
     { fichier: "src/server/actions/villes-essai.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // Recherche de ville de api (décision 0141 § 6.1).
     { fichier: "src/server/actions/villes.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Retouches de api (décision 0147 § 13 ligne 1 ; M5a, ticket 919 : `lockStop`, `unlockStop` ; M5c : `reportStop`).
+    { fichier: "src/server/actions/retouches.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
     // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
@@ -2288,6 +2290,7 @@ describe("p0: clé côté serveur seulement", () => {
       "src/server/actions/p0-lancement.ts",
       "src/server/actions/villes-essai.ts",
       "src/server/actions/villes.ts",
+      "src/server/actions/retouches.ts",
       "src/server/routes/simulated-webhook.ts",
       "src/server/routes/stripe-webhook.ts",
       "src/server/p0/page-acces.ts",

@@ -1,16 +1,22 @@
-import type { ApplyResult, ChecklistItem, Day, ReplacementOffer, ReplacementWrite, Result, RevisionPreview, RevisionResult } from "@/contracts";
+import type { ApplyResult, ChecklistItem, Day, PatchResult, ReplacementOffer, ReplacementWrite, Result, RevisionPreview, RevisionResult } from "@/contracts";
 import { applyReplacement, previewReplacement, undoReplacement } from "@/server/actions/remplacement";
+import { lockStop, unlockStop } from "@/server/actions/retouches";
 import { toggleChecklistItem } from "@/server/actions/sejour";
 
-import type { MemoryProgramme, ProgrammeActions } from "./programme";
+import { VerrouNonEnregistre, type MemoryProgramme, type ProgrammeActions } from "./programme";
 import { abortReason, type RevisionActions } from "./revision";
 
 /**
  * Révision enregistrée de l'écran 14 sur l'adaptateur `api` (tâche M1g, ticket 869) : implémentation serveur de
  * `RevisionActions` et de `ProgrammeActions.undo`, choisie par `TripShell` quand la mise en page lui passe la version
  * courante du voyage (`revisionVersion` non nul, adaptateur `api`). N'importe de `src/server` que
- * `@/server/actions/remplacement` et `@/server/actions/sejour`. Le reste (verrous, déplacement) reste l'implémentation en
- * mémoire.
+ * `@/server/actions/remplacement`, `@/server/actions/retouches` et `@/server/actions/sejour`. Le déplacement reste
+ * l'implémentation en mémoire.
+ *
+ * - Verrou de la fiche (M5a, spécification M5 § 3) : `lockStop` ou `unlockStop` écrit une version (aucun appel Google ni
+ *   Routes) ; l'état s'affiche une fois la version écrite, puis la mise en page relit le voyage : après un rechargement, le
+ *   verrou vient du serveur. « Annuler » du toast écrit le geste inverse (une version de plus). Un refus lève
+ *   `VerrouNonEnregistre` (`conflict` : version dépassée, le voyage est relu ; `error` sinon) : rien n'est affiché.
  *
  * - Liste « À faire » (M5e, spécification M5 § 7.3) : cocher ou décocher s'affiche aussitôt (état en mémoire), puis
  *   `toggleChecklistItem` l'enregistre (hors des versions, aucun « Annuler ») ; un refus ou une panne rétablit la case et
@@ -46,10 +52,12 @@ export interface ServerRevisionStore {
   readonly pending: Map<string, ApercuEnAttente>;
   /** Dernière modification annulable, si c'est un remplacement enregistré. */
   last: { readonly version: number; readonly avant: readonly Day[] } | null;
+  /** Dernière modification annulable, si c'est un verrou enregistré (M5a) : « Annuler » écrit le geste inverse. */
+  lastLock: { readonly stopId: string; readonly locked: boolean } | null;
 }
 
 export function createServerRevisionStore(version: number): ServerRevisionStore {
-  return { version, serial: 0, pending: new Map(), last: null };
+  return { version, serial: 0, pending: new Map(), last: null, lastLock: null };
 }
 
 /** Version relue par la mise en page : elle ne fait jamais reculer celle que les écritures ont rendue. */
@@ -63,14 +71,16 @@ export type ServerRevisionCalls = {
   applyReplacement(input: unknown): Promise<Result<ReplacementWrite>>;
   undoReplacement(input: unknown): Promise<Result<ReplacementWrite>>;
   toggleChecklistItem(input: unknown): Promise<Result<ChecklistItem>>;
+  lockStop(input: unknown): Promise<Result<PatchResult>>;
+  unlockStop(input: unknown): Promise<Result<PatchResult>>;
 };
 
-const APPELS: ServerRevisionCalls = { previewReplacement, applyReplacement, undoReplacement, toggleChecklistItem };
+const APPELS: ServerRevisionCalls = { previewReplacement, applyReplacement, undoReplacement, toggleChecklistItem, lockStop, unlockStop };
 
 export interface ServerRevisionOptions {
   tripId: string;
   store: ServerRevisionStore;
-  /** Implémentation en mémoire : verrous, liste, déplacement, et annulation d'une modification locale. */
+  /** Implémentation en mémoire : affichage des verrous et de la liste, déplacement, et annulation d'une modification locale. */
   memory: MemoryProgramme;
   /** Jours affichés (données de l'adaptateur et écarts locaux). */
   currentDays: () => readonly Day[];
@@ -88,13 +98,44 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
   const calls = options.calls ?? APPELS;
   const newRequestId = options.newRequestId ?? (() => crypto.randomUUID());
 
+  /** Écrit le verrou (version nouvelle) puis l'affiche ; un refus lève `VerrouNonEnregistre` sans rien afficher. */
+  async function ecrireVerrou(stopId: string, locked: boolean): Promise<void> {
+    const appel = locked ? calls.lockStop : calls.unlockStop;
+    let result: Result<PatchResult> | null;
+    try {
+      result = await appel({ tripId, requestId: newRequestId(), stopId, baseVersion: store.version });
+    } catch {
+      result = null;
+    }
+    if (result === null || !result.ok) {
+      if (result?.ok === false && result.error.code === "version_conflict") {
+        // Le programme a changé entre-temps : la version relue sert de base au prochain geste (spécification M5 § 3).
+        if (result.error.currentVersion !== undefined) syncServerRevisionVersion(store, result.error.currentVersion);
+        options.afterWrite();
+        throw new VerrouNonEnregistre("conflict");
+      }
+      throw new VerrouNonEnregistre("error");
+    }
+    store.version = result.value.version;
+    await memory.setStopLocked(stopId, locked);
+    options.afterWrite();
+  }
+
   return {
     async setStopLocked(stopId, locked) {
+      await ecrireVerrou(stopId, locked);
       // Une nouvelle modification rend le remplacement définitif (une seule modification annulable à la fois).
       store.last = null;
-      await memory.setStopLocked(stopId, locked);
+      store.lastLock = { stopId, locked };
     },
     async undo() {
+      const lastLock = store.lastLock;
+      if (lastLock !== null) {
+        // Geste inverse, enregistré comme une version de plus ; un refus lève, l'annulation reste possible.
+        await ecrireVerrou(lastLock.stopId, !lastLock.locked);
+        store.lastLock = null;
+        return;
+      }
       const last = store.last;
       if (last === null) {
         await memory.undo();
@@ -175,6 +216,7 @@ export function createServerRevision(options: ServerRevisionOptions): ProgrammeA
       store.pending.delete(previewId);
       store.version = write.version;
       store.last = { version: write.version, avant: pending.avant };
+      store.lastLock = null;
       options.showDays(pending.apres);
       options.afterWrite();
       return { ok: true, version: write.version };

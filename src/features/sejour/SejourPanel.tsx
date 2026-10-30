@@ -162,7 +162,7 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
           </div>
         ) : null}
         <p key={echecs} role="alert" data-part="a-faire-echec" className={cn("text-corps-s font-semibold text-ink", toggleFailed ? undefined : EMPTY_LIVE_REGION_CLASS)}>
-          {toggleFailed ? ts.aFaire.echec : null}
+          {toggleFailed ? t.echecEnregistrement : null}
         </p>
         <ul>
           {trip.checklist.map((item) => (

@@ -16,6 +16,7 @@ import type {
   LodgingRequest,
   LodgingSuggestion,
   Offer,
+  PatchResult,
   PreviewSlot,
   Proposal,
   Receipt,
@@ -123,6 +124,13 @@ export interface RevisionAdapter {
    * spécification M5 § 7.3) : état final, idempotent, hors des versions.
    */
   toggleChecklistItem(ctx: AdapterContext | null, input: unknown): Promise<Result<ChecklistItem>>;
+  /**
+   * Verrouiller ou déverrouiller une étape (M5a, ticket 919 ; décision 0147 § 8 et § 9) : `{ tripId, requestId, stopId,
+   * baseVersion }` → `PatchResult` (version nouvelle, auteur `user`). Voyage débloqué seulement (`not_unlocked`), jamais un
+   * événement ni un engagement (`validation_failed`, `stopId`), débit `retouche` ; aucun appel du port de relectures.
+   */
+  lockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+  unlockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
 }
 
 /**
