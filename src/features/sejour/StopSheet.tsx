@@ -10,6 +10,7 @@ import { IconCroix } from "@/components/ligne/icons";
 import { DateConsultation, LienSource } from "@/components/ligne/LienSource";
 import { PracticalNotes } from "@/components/ligne/PracticalNotes";
 import { ReasonBlock } from "@/components/ligne/ReasonBlock";
+import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { Tag } from "@/components/ligne/Tag";
 import type { Day } from "@/contracts";
 import { EMPTY_LIVE_REGION_CLASS } from "@/features/creation/fields";
@@ -24,6 +25,9 @@ import { pathTo, pathToLabel } from "./travel";
 
 const t = messages.sejour.fiche;
 
+/** Refus d'un verrou affiché sur la fiche : conflit de version, ou tout autre refus ou panne. */
+export type LockFailure = { kind: "conflict" | "error"; message: string };
+
 export interface StopSheetProps extends FicheTarget {
   day: Day;
   routes: TripRoutes;
@@ -35,10 +39,11 @@ export interface StopSheetProps extends FicheTarget {
    */
   onToggleLock?: (locked: boolean) => void;
   /**
-   * Verrou non enregistré (adaptateur `api`, M5a) : message annoncé (`role="alert"`) sous les actions, ou `null`. La
-   * région existe dès l'ouverture de la fiche quand le bouton « Verrouiller » est là.
+   * Verrou non enregistré (adaptateur `api`, M5a) : bandeau d'état de Ligne (`StatusBanner`, `conflict` ou `error`) annoncé
+   * par la région `role="alert"` sous les actions, ou `null`. La région existe dès l'ouverture de la fiche quand le bouton
+   * « Verrouiller » est là.
    */
-  lockFailure?: string | null;
+  lockFailure?: LockFailure | null;
   /**
    * Engagement en lecture seule (adaptateur `api`, M5a ; spécification M5 § 3, M5-PO-3) : toute fiche à `commitment`, dans
    * le programme ou non, affiche « Déjà réservé : cette étape ne bouge pas. » sans « Verrouiller », « Déplacer » ni
@@ -244,9 +249,9 @@ export function StopSheet({
       ) : null}
 
       {actionsDuProgramme && onToggleLock ? (
-        <p role="alert" data-part="verrou-echec" className={lockFailure ? "text-corps-s font-semibold text-ink" : EMPTY_LIVE_REGION_CLASS}>
-          {lockFailure}
-        </p>
+        <div role="alert" data-part="verrou-echec" className={lockFailure ? undefined : EMPTY_LIVE_REGION_CLASS}>
+          {lockFailure ? <StatusBanner kind={lockFailure.kind} message={lockFailure.message} announce={false} /> : null}
+        </div>
       ) : null}
 
       {reportable ? (

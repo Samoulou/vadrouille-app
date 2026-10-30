@@ -11,7 +11,7 @@ import * as messages from "@/i18n/messages";
 import { JourneePanel } from "./JourneePanel";
 import { VerrouNonEnregistre } from "./programme";
 import { cleEtapeSignalee, proposeRemplacer } from "./signalement";
-import { StopSheet } from "./StopSheet";
+import { StopSheet, type LockFailure } from "./StopSheet";
 import { useTripShell } from "./TripShell";
 
 const t = messages.sejour.fiche;
@@ -51,7 +51,7 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
   // Identité de l'étape : jour, identifiant et `placeId` (`cleEtapeSignalee`) ; vidé dès que la fiche se ferme ou change.
   const [reported, setReported] = useState<{ cle: string; reason: StopReportReason } | null>(null);
   // Verrou non enregistré (adaptateur `api`, M5a) : message de la fiche, vidé dès que la fiche change.
-  const [lockFailure, setLockFailure] = useState<string | null>(null);
+  const [lockFailure, setLockFailure] = useState<LockFailure | null>(null);
   const { day, fiche, etape, routes, closedFiche, consumeClosedFiche, reportMissingEtape, focusRequest, consumeFocusRequest } = shell;
   const contentRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -119,7 +119,11 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
       await shell.actions.setStopLocked(fiche.stop.id, locked);
     } catch (erreur) {
       // Rien n'est affiché : conflit de version (le voyage est relu) ou refus ; le message est annoncé sur la fiche.
-      setLockFailure(erreur instanceof VerrouNonEnregistre && erreur.raison === "conflict" ? t.verrouConflit : messages.sejour.echecEnregistrement);
+      setLockFailure(
+        erreur instanceof VerrouNonEnregistre && erreur.raison === "conflict"
+          ? { kind: "conflict", message: t.verrouConflit }
+          : { kind: "error", message: messages.sejour.echecEnregistrement },
+      );
       return;
     }
     shell.notifyChange(locked ? t.toastVerrouillee : t.toastDeverrouillee, () => {

@@ -9,7 +9,7 @@ import { axeViolations } from "../../../tests/unit/axe";
 
 import { findFicheTarget, ficheMoment } from "./fiche";
 import { tripRoutes } from "./routes";
-import { StopSheet } from "./StopSheet";
+import { StopSheet, type LockFailure } from "./StopSheet";
 
 const routes = tripRoutes("/voyages", edimbourg.id);
 const day = (n: number): Day => edimbourg.days.find((candidate) => candidate.index === n)!;
@@ -253,7 +253,7 @@ describe("StopSheet : verrou sur api (M5a, spécification M5 § 3)", () => {
     n: number,
     stopId: string,
     overrides: Partial<Stop> = {},
-    extra: { onToggleLock?: (locked: boolean) => void; lockFailure?: string | null; commitmentReadOnly?: boolean; onMove?: () => void } = {},
+    extra: { onToggleLock?: (locked: boolean) => void; lockFailure?: LockFailure | null; commitmentReadOnly?: boolean; onMove?: () => void } = {},
   ) {
     const target = findFicheTarget(day(n), stopId)!;
     return render(
@@ -311,8 +311,12 @@ describe("StopSheet : verrou sur api (M5a, spécification M5 § 3)", () => {
     expect(region).toHaveAttribute("role", "alert");
     expect(region).toBeEmptyDOMElement();
     vide.unmount();
-    const { container } = renderSansVerrou(2, "j2-dean-village", {}, { onToggleLock: vi.fn(), lockFailure: messages.sejour.fiche.verrouConflit });
+    const { container } = renderSansVerrou(2, "j2-dean-village", {}, { onToggleLock: vi.fn(), lockFailure: { kind: "conflict", message: messages.sejour.fiche.verrouConflit } });
     expect(screen.getByRole("alert")).toHaveTextContent("Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.");
+    // Ton d'état de Ligne (revue de la PR 923, mineur 12) : bandeau `conflict`, sans rôle propre (la région l'annonce).
+    const bandeau = container.querySelector("[data-part='verrou-echec'] [data-kind]");
+    expect(bandeau).toHaveAttribute("data-kind", "conflict");
+    expect(bandeau).not.toHaveAttribute("role");
     expect(await axeViolations(container)).toEqual([]);
   });
 });

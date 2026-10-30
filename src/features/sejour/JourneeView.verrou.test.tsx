@@ -75,6 +75,7 @@ describe("JourneeView : verrou sur api (M5a)", () => {
     await act(async () => verrouiller()?.click());
     expect(serveur.lockStop).toHaveBeenCalledWith(expect.objectContaining({ tripId: edimbourgDebloque.id, stopId: DEAN, baseVersion: 1 }));
     expect(screen.getByRole("alert")).toHaveTextContent("Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.");
+    expect(region(container)?.querySelector("[data-kind]")).toHaveAttribute("data-kind", "conflict");
     expect(verrouiller()).toHaveAttribute("aria-pressed", "false");
 
     await act(async () => verrouiller()?.click());
@@ -82,6 +83,7 @@ describe("JourneeView : verrou sur api (M5a)", () => {
     expect(serveur.lockStop).toHaveBeenLastCalledWith(expect.objectContaining({ stopId: DEAN, baseVersion: 3 }));
     expect(screen.getByRole("alert")).toHaveTextContent("Impossible d'enregistrer. Réessaie.");
     expect(verrouiller()).toHaveAttribute("aria-pressed", "false");
+    expect(region(container)?.querySelector("[data-kind]")).toHaveAttribute("data-kind", "error");
     expect(container.querySelector("[data-undo-toast]")).toBeNull();
   });
 
