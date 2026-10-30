@@ -1,7 +1,7 @@
 import "server-only";
 
 import { ProposalRecordSchema, type Day, type ProposalRecord, type TripSnapshot } from "@/contracts";
-import { etapeEnCase, retenirApercu, selectionApercu } from "@/domain/apercu";
+import { etapeEnCase, joursHorsChangement, retenirApercu, selectionApercu } from "@/domain/apercu";
 
 /**
  * Cases de l'aperçu de la chaîne inversée (décision 0136 § 3.4 ; M1a-2), calculées à l'écriture depuis le voyage assemblé
@@ -37,7 +37,9 @@ export { etapeAncreeEtRedigee, retenirApercu } from "@/domain/apercu";
 
 /** Cases de l'aperçu, dans l'ordre du programme, positions 1 à 8 au plus. */
 export function casesDuProgramme(jours: readonly Day[], instantane: TripSnapshot): CaseProgramme[] {
-  const selection = selectionApercu(jours, retenirApercu(jours));
+  // Journées d'un changement de ville retirées avant la sélection, qui ne change pas (0148 § 10.1 point 1 ; M4-PO-9).
+  const candidates = joursHorsChangement(jours);
+  const selection = selectionApercu(candidates, retenirApercu(candidates));
   const stockees = new Map(
     instantane.days.flatMap((jour) =>
       jour.items.flatMap((ligne, rang) => {

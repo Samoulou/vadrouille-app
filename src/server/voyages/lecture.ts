@@ -27,7 +27,7 @@ import {
 import { CHECKLIST_KINDS, countToReserve } from "@/contracts/values";
 import type { z } from "zod";
 import { ordreDeLecture } from "@/domain/a-faire";
-import { retenirApercu, selectionApercu, servisAvantDeblocage } from "@/domain/apercu";
+import { joursHorsChangement, retenirApercu, selectionApercu, servisAvantDeblocage } from "@/domain/apercu";
 import { destinationColor } from "@/domain/calculs";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { modesAdmis } from "@/domain/generation";
@@ -42,6 +42,8 @@ import {
   type SejourDeNuit,
   type SourceRelectures,
 } from "@/domain/relectures";
+import { villesDesSejours } from "@/domain/villes-du-voyage";
+import { nomMaisonDeVille } from "@/lib/fuseaux";
 import { CHAINE_APERCU, type ChaineApercu } from "@/server/config/generation";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { EchecPositions, lirePositions } from "@/server/positions/lecture";
@@ -406,7 +408,8 @@ function checklistDe(etat: Etat): ChecklistItem[] {
  */
 function lisiblesAvantDeblocage(etat: Etat, chaine: ChaineApercu): ReadonlySet<number> | null {
   if (chaine !== "inversee" || etat.debloque) return null;
-  const jours = etat.snapshot.days;
+  // Journées d'un changement de ville retirées avant la sélection (0148 § 10.1 point 1), comme à l'écriture des cases.
+  const jours = joursHorsChangement(etat.snapshot.days);
   return selectionApercu(jours, retenirApercu(jours)).jours;
 }
 
@@ -581,6 +584,8 @@ export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripA
       const checklist = servis.aFaire;
       const days = await recomposerJours(source, etat, servis.jours, { ctx, portee: "voyage" }, laChaine);
       const { enTete } = etat;
+      // `Trip.cities` (décision 0148 § 6 point 2) : depuis `stays`, jamais l'instantané ; noms maison ; absent pour une ville.
+      const cities = villesDesSejours(etat.sejours.map((sejour) => ({ ville: sejour.ville === null ? null : (nomMaisonDeVille(sejour.ville) ?? sejour.ville), from: sejour.from, to: sejour.to })));
       return sortie(
         TripSchema,
         {
@@ -595,6 +600,7 @@ export function creerLectureVoyages(dependances: DependancesLecture): Omit<TripA
           days,
           checklist,
           unlocked: etat.debloque,
+          ...(cities === undefined ? {} : { cities }),
         },
         { tripId: enTete.id, version: enTete.version },
       );

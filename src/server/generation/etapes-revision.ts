@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { TripSnapshot } from "@/contracts";
+import type { RedactionProgramme } from "@/server/composition/generation";
 import type { TriDuRecalcul } from "@/domain/recalcul";
 import type { ExecuteurPublication, OptionsEtape } from "@/server/composition/generation";
 import { RANG_LOT } from "@/server/config/generation";
@@ -10,7 +11,7 @@ import { verrouillerVersions } from "@/server/versions/ecrire";
 
 import type { EtatBarriere } from "./barriere";
 import type { DependancesResolues } from "./dependances";
-import { compteursInitiaux, redigerEtVerifier, sql, voyageEtBriefSansRecit } from "./etapes-programme";
+import { briefAPlusieursVilles, compteursInitiaux, redigerEtVerifier, sql, voyageEtBriefSansRecit } from "./etapes-programme";
 import { cibleDuForfait, forfaitDeLaRevision } from "./forfait-etape";
 import { lireInstantane, lireVersion, type ExecuteurLecture } from "./lecture";
 import { publier } from "./publication";
@@ -46,6 +47,24 @@ import { lireTriClos } from "./signaux";
  * jamais lu ni envoyé (`voyageEtBriefSansRecit`). Aucun journal propre : l'arrêt est connu par `generation_runs.stop_reason`.
  * État sérialisé inchangé (`EtatLotSchema`) : aucun choix, aucun nom ni `placeId` n'y entre.
  */
+
+/**
+ * Voyage à plusieurs villes (M4b ; décision 0148 § 5.4 et § 7.1 point 3) : la requête `revision` ne rend pas de durée estimée
+ * (prompt `revision` v2 tant que M4a-2 n'est pas fusionnée). La durée d'un changement de ville à départ estimé est celle de
+ * la version de base (`transfer.estimatedMinutes`, déjà bornée par le cadrage de la génération), reposée sur la journée
+ * avant le cadrage ; absente, le cadrage prend le créneau sans durée de la configuration. Fonction pure, exportée pour les tests.
+ */
+export function avecDureesDeLaBase(redaction: RedactionProgramme, base: TripSnapshot): RedactionProgramme {
+  if (redaction.programme === null) return redaction;
+  const durees = new Map(
+    base.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "transfer" && item.source === "estimated" && item.estimatedMinutes !== undefined ? [[jour.date, item.estimatedMinutes] as const] : []))),
+  );
+  const jours = redaction.programme.jours.map((jour) => {
+    const duree = durees.get(jour.date);
+    return duree === undefined ? jour : { ...jour, dureeEstimeeMinutes: duree };
+  });
+  return { ...redaction, programme: { ...redaction.programme, jours } };
+}
 
 /** Exécution `batch` ouverte par la garde du lot (champs de `ContexteLot`, `etapes-lot.ts`). */
 export type ContexteRevision = {
@@ -147,12 +166,17 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
   const fabrique = await contexte.dep.composer(contexte.barriere, { destination: voyage.draft.destination });
   const capacite = fabrique.programme(options);
   // Entrée de la requête `revision` : textes de l'IA de la version de base et choix (identifiants maison), jamais une donnée Google.
+  // Plusieurs villes : entrée v4 tirée du brief (logements de toutes les villes, jamais un libellé de billet) jusqu'à la
+  // projection v5 de M4a-2 (prompt `revision` v3), prérequis de fusion de M4b.
   const entree = entreeRevisionDepuisJours(base.days, entreeProgrammeDepuisBrief(brief), choix);
   const noms = nomsEcartesDesJours(base.days, entree.choix.pasPourMoi);
   const { instantane, verifies, obtenuesA } = await redigerEtVerifier(
     contexte,
     { brief, capacite, forfait, registre, compteurs: compteursInitiaux() },
-    (c) => c.reviser(entree, { arrivee: brief.arrivee, depart: brief.depart }, (programme) => retirerEtapesEcartees(programme, noms)),
+    async (c) => {
+      const redaction = await c.reviser(entree, { arrivee: brief.arrivee, depart: brief.depart }, (programme) => retirerEtapesEcartees(programme, noms));
+      return briefAPlusieursVilles(brief) ? avecDureesDeLaBase(redaction, base) : redaction;
+    },
   );
   const publies = new Set(instantane.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));
   const ecrirePositions = contexte.dep.ecriturePositions(fabrique)
