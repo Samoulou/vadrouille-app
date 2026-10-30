@@ -307,26 +307,31 @@ export const EntreeProgrammeV5Schema = z
     }
     // Villes : la première arrive le premier jour ; chacune arrive le lendemain de la dernière nuit de la précédente ;
     // la dernière nuit de la dernière ville est la veille du départ (une ville a au moins une nuit, spécification § 3.1).
-    entree.villes.forEach((ville, rang) => {
-      const attendue = rang === 0 ? entree.arrivee : ajouterJours(entree.villes[rang - 1]!.arrivee, entree.villes[rang - 1]!.nuits);
+    // Paires (ville quittée, ville d'arrivée) dans l'ordre, sans accès calculé (confinement du dépôt).
+    const paires: { readonly de: string; readonly vers: string; readonly date: string }[] = [];
+    let precedente: (typeof entree.villes)[number] | undefined;
+    for (const [rang, ville] of entree.villes.entries()) {
+      const attendue = precedente === undefined ? entree.arrivee : ajouterJours(precedente.arrivee, precedente.nuits);
       if (ville.arrivee !== attendue) ctx.addIssue({ code: "custom", path: ["villes", rang, "arrivee"], message: "arrivée hors de la suite des nuits" });
-      if (rang > 0 && ville.nom === entree.villes[rang - 1]!.nom) ctx.addIssue({ code: "custom", path: ["villes", rang, "nom"], message: "même ville deux fois de suite" });
-    });
-    const derniere = entree.villes.at(-1);
-    if (derniere !== undefined && ajouterJours(derniere.arrivee, derniere.nuits) !== entree.depart) {
+      if (precedente !== undefined) {
+        if (ville.nom === precedente.nom) ctx.addIssue({ code: "custom", path: ["villes", rang, "nom"], message: "même ville deux fois de suite" });
+        paires.push({ de: precedente.nom, vers: ville.nom, date: ville.arrivee });
+      }
+      precedente = ville;
+    }
+    if (precedente !== undefined && ajouterJours(precedente.arrivee, precedente.nuits) !== entree.depart) {
       ctx.addIssue({ code: "custom", path: ["villes"], message: "nuits différentes du séjour" });
     }
     // Un changement par ville ajoutée, à sa date d'arrivée, de la ville précédente vers elle (spécification § 3.1).
-    if (entree.changements.length !== entree.villes.length - 1) {
+    if (entree.changements.length !== paires.length) {
       ctx.addIssue({ code: "custom", path: ["changements"], message: "un changement par ville ajoutée" });
       return;
     }
-    entree.changements.forEach((changement, rang) => {
-      const de = entree.villes[rang]!;
-      const vers = entree.villes[rang + 1]!;
-      if (changement.date !== vers.arrivee || changement.de !== de.nom || changement.vers !== vers.nom) {
+    for (const [rang, changement] of entree.changements.entries()) {
+      const paire = paires.at(rang);
+      if (paire === undefined || changement.date !== paire.date || changement.de !== paire.de || changement.vers !== paire.vers) {
         ctx.addIssue({ code: "custom", path: ["changements", rang], message: "changement hors de la suite des villes" });
       }
-    });
+    }
   });
 export type EntreeProgrammeV5 = z.infer<typeof EntreeProgrammeV5Schema>;
