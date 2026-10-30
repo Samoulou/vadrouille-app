@@ -5,6 +5,7 @@ import type { AdapterContext } from "@/adapters/types";
 import { ApiErrorSchema, TripSnapshotSchema, type TripPatch, type TripSnapshot } from "@/contracts";
 import { REFUS_MOTEUR } from "@/domain/version";
 import { RATE_LIMITS } from "@/server/config/limites";
+import { SQL_DROIT_VOYAGE } from "@/server/payment/paiements";
 import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
 import { SQL_VERROU_TRI } from "@/server/presentation/etat";
 import { SQL_VERROU_VERSIONS } from "@/server/versions/ecrire";
@@ -22,7 +23,6 @@ import {
   patchDuVerrou,
   situerEtapeAVerrouiller,
   SQL_DERNIERE_VERSION,
-  SQL_DROIT_DEBLOQUE,
   type DependancesRetouche,
 } from "./retouches";
 
@@ -157,7 +157,7 @@ function doubleWithOrg(base: Base = {}) {
         const texte = morceaux.join("");
         textes.push(texte);
         if (texte === SQL_VOYAGE) return { rows: base.voyage === false ? [] : [{ present: 1 }] };
-        if (texte === SQL_DROIT_DEBLOQUE) return { rows: base.debloque === false ? [] : [{ present: 1 }] };
+        if (texte === SQL_DROIT_VOYAGE) return { rows: base.debloque === false ? [] : [{ id: "droit-1" }] };
         if (texte === SQL_VERROU_TRI || texte === SQL_VERROU_VERSIONS) return { rows: [{}] };
         if (texte === SQL_PAR_DEMANDE) return { rows: base.deja === true ? [{ version: 2, patch: null, author_kind: "engine" }] : [] };
         if (texte === SQL_EN_COURS) return { rows: [{ en_cours: base.enCours === true }] };
@@ -210,7 +210,7 @@ describe("retouches: ordre des refus d'un verrou (0147 § 8 point 2, § 6.4 poin
       const resultat = await basculerVerrou(b.dependances, op, entree());
       expect(resultat).toEqual({ ok: false, error: { code: "not_unlocked", retryable: false } });
       if (!resultat.ok) expect(ApiErrorSchema.safeParse(resultat.error).success).toBe(true);
-      expect(b.textes).toEqual([SQL_VOYAGE, SQL_DROIT_DEBLOQUE]);
+      expect(b.textes).toEqual([SQL_VOYAGE, SQL_DROIT_VOYAGE]);
       expect(b.limiteur).not.toHaveBeenCalled();
     }
   });
@@ -218,13 +218,13 @@ describe("retouches: ordre des refus d'un verrou (0147 § 8 point 2, § 6.4 poin
   it("débit retouche refusé : rate_limited, aucun verrou pris, rien relu", async () => {
     const b = banc({}, { limiteur: async () => ({ ok: false, error: { code: "rate_limited", retryable: true } }) });
     expect(await basculerVerrou(b.dependances, "lock", entree())).toEqual({ ok: false, error: { code: "rate_limited", retryable: true } });
-    expect(b.textes).toEqual([SQL_VOYAGE, SQL_DROIT_DEBLOQUE]);
+    expect(b.textes).toEqual([SQL_VOYAGE, SQL_DROIT_VOYAGE]);
   });
 
   it("recalcul en cours : generation_in_progress (retryable), après les verrous et le rejeu", async () => {
     const b = banc({ enCours: true });
     expect(await basculerVerrou(b.dependances, "lock", entree())).toEqual({ ok: false, error: { code: "generation_in_progress", retryable: true } });
-    expect(b.textes).toEqual([SQL_VOYAGE, SQL_DROIT_DEBLOQUE, SQL_VERROU_TRI, SQL_VERROU_VERSIONS, SQL_PAR_DEMANDE, SQL_EN_COURS]);
+    expect(b.textes).toEqual([SQL_VOYAGE, SQL_DROIT_VOYAGE, SQL_VERROU_TRI, SQL_VERROU_VERSIONS, SQL_PAR_DEMANDE, SQL_EN_COURS]);
     expect(b.limiteur).toHaveBeenCalledTimes(1);
   });
 
@@ -237,8 +237,8 @@ describe("retouches: ordre des refus d'un verrou (0147 § 8 point 2, § 6.4 poin
     expect(b.textes.at(-1)).toBe(SQL_DERNIERE_VERSION);
   });
 
-  it("requêtes : déblocage lu dans l'organisation (droit tripUnlocked), borne par max(version)", () => {
-    expect(SQL_DROIT_DEBLOQUE).toContain("organization_id = $1 AND trip_id = $2 AND kind = 'tripUnlocked'");
+  it("requêtes : déblocage lu par la lecture partagée de B4a (droit tripUnlocked, RLS de l'organisation), borne par max(version)", () => {
+    expect(SQL_DROIT_VOYAGE).toContain("trip_id = $1 AND kind = 'tripUnlocked'");
     expect(SQL_DERNIERE_VERSION).toContain("max(version)");
   });
 });

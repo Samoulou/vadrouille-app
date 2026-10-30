@@ -8,6 +8,7 @@ import type { ConfigurationMoteur } from "@/domain/configuration";
 import { appliquerPatch, type ResultatPatch } from "@/domain/patch";
 import { erreurDeVersion } from "@/domain/version";
 import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
+import { lireDroitVoyage } from "@/server/payment/paiements";
 import { SQL_VERROU_TRI } from "@/server/presentation/etat";
 import { checkRateLimit } from "@/server/rate-limit";
 import { executerActionVoyage, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
@@ -35,13 +36,17 @@ import {
  * **Ordre des contrôles d'un verrou, fixé** : (a) session, (b) entrée stricte, (c) voyage dans l'organisation (`not_found`)
  * — tous trois par le cadre ; (d) déblocage (`not_unlocked`, `retryable` faux, sans rien relire ; 0147 § 8 point 2) ; (e)
  * débit `retouche` par adresse IP (`rate_limited` ; 0147 § 6.4 point 4) ; puis, sous le verrou du tri et le verrou des
- * versions (même ordre que M1g), (f) rejeu d'une demande déjà écrite ; (g) recalcul en cours (`generation_in_progress`) ;
+ * versions (même ordre que M1g), (f) rejeu d'une demande déjà écrite (même réponse ; autre sorte de geste ou autre
+ * `stopId` sous le même `requestId` : `version_conflict`) ; (g) recalcul en cours (`generation_in_progress`) ;
  * (h) borne `VERSIONS_MAX_PAR_VOYAGE` (`validation_failed`, `field: "baseVersion"`) ; (i) version de base
  * (`version_conflict` avec `currentVersion`) ; (j) étape : absente de la version courante, `not_found` ; événement de
  * `Day.events`, engagement ou idée « Surprends-moi », `validation_failed` (`field: "stopId"`, 0147 § 8 point 3), **avant le
  * moteur** ; (k) moteur (`appliquerPatch`, verrou seul : ni replanification ni relecture, 0147 § 9) ; (l) écriture de la
  * version (`ecrireVersion`, auteur `user`, `instantanePrecedent` obligatoire, 0147 § 7.2 : les lignes `checklist` de
  * « Ce qui change » en viennent).
+ *
+ * **Un rejeu consomme un jeton `retouche`** : le débit (e) est pris avant la recherche du rejeu (f), qui demande les verrous
+ * (0147 § 6.4 point 4) ; c'est voulu, et diffère de `reportStop` (revue de la PR 923, mineur 7).
  *
  * **Aucun appel Google ni Routes** : le port de relectures n'est jamais appelé pour un verrou (relectures vides,
  * `RELECTURES_INCONNUES`). Aucun prompt, aucune donnée Google : seuls l'identifiant de l'étape et les noms maison des
@@ -147,8 +152,6 @@ function moteurDuVerrou(contexte: ContexteVoyage, patch: TripPatch, base: TripSn
 
 // --- Requêtes (constantes ; paramètres liés) ------------------------------------------------------------------
 
-/** Droit `tripUnlocked` du voyage dans l'organisation (0147 § 8 point 2), lu avant toute autre lecture. */
-export const SQL_DROIT_DEBLOQUE = "SELECT 1 AS present FROM public.entitlements WHERE organization_id = $1 AND trip_id = $2 AND kind = 'tripUnlocked'";
 /** Dernière version du voyage (borne `VERSIONS_MAX_PAR_VOYAGE`, comptée sous le verrou des versions ; 0147 § 5.3 point 7). */
 export const SQL_DERNIERE_VERSION = "SELECT max(version) AS n FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2";
 
@@ -173,16 +176,24 @@ const refus = (error: ApiError): Issue => ({ ok: false, error: ApiErrorSchema.pa
 const conflit = (currentVersion: number): Issue => refus({ code: "version_conflict", retryable: true, currentVersion });
 
 /**
- * Rejeu d'une demande déjà écrite (même `requestId`) : la même réponse si c'est bien un verrou de la même sorte écrit par
- * une personne (recalculée par le moteur depuis l'instantané de sa version de base : le patch stocké se rejoue tel quel),
+ * Rejeu d'une demande déjà écrite (même `requestId`) : la même réponse si c'est bien un verrou de la même sorte, sur la même
+ * étape (revue de la PR 923, mineur 6), écrit par une personne (recalculée par le moteur depuis l'instantané de sa version de base : le patch stocké se rejoue tel quel),
  * sinon `version_conflict`.
  */
-async function rejeu(executeur: ExecuteurAction, ctx: AdapterContext, tripId: string, op: OperationDeVerrou, ligne: Record<string, unknown>, configuration?: ConfigurationMoteur): Promise<Issue | null> {
+async function rejeu(
+  executeur: ExecuteurAction,
+  ctx: AdapterContext,
+  demande: { readonly tripId: string; readonly stopId: string },
+  op: OperationDeVerrou,
+  ligne: Record<string, unknown>,
+  configuration?: ConfigurationMoteur,
+): Promise<Issue | null> {
+  const { tripId, stopId } = demande;
   const contexte = await contexteVoyage(executeur, ctx, tripId);
   if (contexte === null) return null;
   const patch = TripPatchSchema.safeParse(ligne.patch);
   const version = typeof ligne.version === "number" ? ligne.version : Number.NaN;
-  if (!patch.success || ligne.author_kind !== "user" || patch.data.operations.length !== 1 || patch.data.operations[0]?.op !== op || !Number.isInteger(version)) {
+  if (!patch.success || ligne.author_kind !== "user" || patch.data.operations.length !== 1 || patch.data.operations[0]?.op !== op || patch.data.operations[0]?.stopId !== stopId || !Number.isInteger(version)) {
     return conflit(contexte.base.version);
   }
   const base = await lireVersion(executeur, ctx.organizationId, tripId, patch.data.baseVersion);
@@ -202,7 +213,8 @@ export async function basculerVerrou(dependances: DependancesRetouche, op: Opera
   const lu = await executerActionVoyage(nom, dependances, DemandeVerrouSchema, entree, async (executeur, ctx, valeur): Promise<Issue | null> => {
     const org = ctx.organizationId;
     // (d) Déblocage, avant toute relecture (0147 § 8 point 2).
-    if ((await executeur.query(SQL_DROIT_DEBLOQUE, [org, valeur.tripId])).rows.length === 0) return refus({ code: "not_unlocked", retryable: false });
+    // Lecture partagée avec B4a (`lireDroitVoyage`, revue de la PR 923, mineur 4) : organisation de la transaction par la RLS.
+    if ((await lireDroitVoyage(executeur, valeur.tripId)) === null) return refus({ code: "not_unlocked", retryable: false });
     // (e) Débit, avant toute relecture ou écriture (0147 § 6.4 point 4). Comme `reportStop`, le limiteur écrit par une autre
     // connexion du pool ; ici aucun verrou n'est encore tenu.
     const debit = await limiteur();
@@ -212,7 +224,7 @@ export async function basculerVerrou(dependances: DependancesRetouche, op: Opera
     await verrouillerVersions(executeur, valeur.tripId);
     // (f) Rejeu.
     const deja = (await executeur.query(SQL_PAR_DEMANDE, [org, valeur.tripId, valeur.requestId])).rows[0];
-    if (deja !== undefined) return rejeu(executeur, ctx, valeur.tripId, op, deja, dependances.configuration);
+    if (deja !== undefined) return rejeu(executeur, ctx, valeur, op, deja, dependances.configuration);
     // (g) Recalcul en cours.
     await refuserPendantUnRecalcul(executeur, org, valeur.tripId);
     // (h) Borne du nombre de versions.

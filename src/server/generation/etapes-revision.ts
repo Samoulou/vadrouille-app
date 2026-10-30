@@ -2,6 +2,7 @@ import "server-only";
 
 import type { TripSnapshot } from "@/contracts";
 import type { TriDuRecalcul } from "@/domain/recalcul";
+import { etapesVerrouilleesModifiees } from "@/domain/verrous";
 import type { ExecuteurPublication, OptionsEtape } from "@/server/composition/generation";
 import { RANG_LOT } from "@/server/config/generation";
 import { entreeProgrammeDepuisBrief } from "@/server/programme/entree";
@@ -37,6 +38,12 @@ import { lireTriClos } from "./signaux";
  *   (`publication.ts`, même rejeu borné, confirmation perdue comprise) : garde au rang, puis `ecrireSi` (verrou des versions,
  *   version courante relue : toujours la version de base, sinon rien n'est écrit), nouvelle version par le module unique
  *   (`author_kind = 'workflow'`, `request_id` de la ligne), positions (variante réelle seulement), fin `ready`, aucune case.
+ *
+ * **Étapes verrouillées (R3)** (spécification M5 § 3 et critère 2 ; décision 0147 § 9 ; revue de la PR 923, bloquant 1) : la
+ * version révisée est contrôlée contre la version de base par la seule définition de R3 (`etapesVerrouilleesModifiees`,
+ * `@/domain/verrous` : identifiant, nom, jour, heures, `placeId`). Si elle changeait une étape verrouillée, **rien n'est
+ * écrit** (`ecrireSi` faux : la ligne finit `ready`, `last_version` nul, comme une version de base dépassée) ; sinon le
+ * verrou des étapes gardées est reporté sur la version écrite (`verrousReportes`), que l'assemblage rend déverrouillées.
  *
  * Ce que la révision ne réécrit pas (choix conservateurs, décrits dans la PR) : les cases de l'aperçu (`proposals`) et
  * `stays.place_id` (écrits par la génération). Les lignes « À faire » suivent la version (décision 0147 § 7.2, qui amende 0142
@@ -105,6 +112,24 @@ export function choixDuTri(tri: TriDuRecalcul, base: TripSnapshot): ChoixRevisio
   return { pasPourMoi, jAime: jAime.filter((id) => !pasPourMoi.includes(id)) };
 }
 
+/**
+ * R3 sur la version révisée (fonction pure) : `null` si une étape verrouillée de la base y est changée ou absente (écriture
+ * refusée en entier) ; sinon la version révisée, le verrou des étapes verrouillées de la base reporté sur elles (mêmes
+ * identifiant, nom, jour, heures et `placeId`, garantis par R3), rien d'autre changé.
+ */
+export function verrousReportes(base: TripSnapshot, revisee: TripSnapshot): TripSnapshot | null {
+  if (etapesVerrouilleesModifiees(base.days, revisee.days).length > 0) return null;
+  const verrouillees = new Set(base.days.flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" && ligne.stop.locked ? [ligne.stop.id] : []))));
+  if (verrouillees.size === 0) return revisee;
+  return {
+    ...revisee,
+    days: revisee.days.map((jour) => ({
+      ...jour,
+      items: jour.items.map((ligne) => (ligne.type === "stop" && verrouillees.has(ligne.stop.id) ? { ...ligne, stop: { ...ligne.stop, locked: true } } : ligne)),
+    })),
+  };
+}
+
 type Lus = { readonly base: TripSnapshot; readonly choix: ChoixRevision };
 
 /** Relectures communes à `a` et `e`, dans une transaction ; `null` : rien à réviser (voir l'en-tête). */
@@ -154,6 +179,8 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
     { brief, capacite, forfait, registre, compteurs: compteursInitiaux() },
     (c) => c.reviser(entree, { arrivee: brief.arrivee, depart: brief.depart }, (programme) => retirerEtapesEcartees(programme, noms)),
   );
+  // R3 (voir l'en-tête) : une version qui changerait une étape verrouillée n'est pas écrite.
+  const tenue = verrousReportes(base, instantane);
   const publies = new Set(instantane.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));
   const ecrirePositions = contexte.dep.ecriturePositions(fabrique)
     ? (executeur: ExecuteurPublication) => verifies.positions.ecrire(executeur, publies, obtenuesA, contexte.dep.portPositions)
@@ -166,7 +193,7 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
     contexte.dep,
     { organizationId, generationRunId, tripId, requestId: contexte.requestId, echeance: contexte.echeance, rang: contexte.rang },
     {
-      instantane,
+      instantane: tenue ?? instantane,
       // Version remplacée : la version de base, seule version courante admise par `ecrireSi` (relue sous le verrou).
       instantanePrecedent: base,
       cases: [],
@@ -174,7 +201,7 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
       ...(ecrirePositions === undefined ? {} : { ecrirePositions }),
       ecrireSi: async (x) => {
         await verrouillerVersions(x, tripId);
-        return (await lireInstantane(x, organizationId, tripId)).version === contexte.baseVersion;
+        return tenue !== null && (await lireInstantane(x, organizationId, tripId)).version === contexte.baseVersion;
       },
     },
   );
