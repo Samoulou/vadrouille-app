@@ -970,7 +970,10 @@ describe("chaîne inversée : échecs et reprise", () => {
     expect(await nombre(org, "proposals", tripId)).toBe(8);
   });
 
-  it("chaine-inversee: une seule ville (otherCities refusé sur draft.otherCities sans écriture ; admis sous l'ancienne chaîne)", async () => {
+  // Attente modifiée (décision 0148 § 10.2 point 1, M4b) : sous `inversee`, Rome puis Florence est accepté (deux lignes
+  // `stays`) ; la partie « admis sous l'ancienne chaîne » ne change pas. Le refus de `draft.otherCities` reste tenu par
+  // le site d'essai (`tests/unit/p0/depuis-formulaire.test.ts`, inchangé).
+  it("chaine-inversee: deux villes acceptées (admis aussi sous l'ancienne chaîne)", async () => {
     const org = await createOrg(auth);
     const autres = {
       otherCities: [
@@ -981,25 +984,24 @@ describe("chaîne inversée : échecs et reprise", () => {
         },
       ],
     };
-    const refus = await adaptateur("inversee").adapter.createTrip(
+    const accepte = await adaptateur("inversee").adapter.createTrip(
       contexteDe(org),
       demandeRome(autres),
     );
-    expect(refus).toMatchObject({
-      ok: false,
-      error: { code: "validation_failed", field: "draft.otherCities" },
-    });
+    expect(accepte.ok).toBe(true);
     expect(
       (
-        await lire<{ n: number }>(
+        await lire<{ city: string }>(
           org,
-          "SELECT count(*)::int AS n FROM public.trips",
+          "SELECT city FROM public.stays ORDER BY from_date",
           [],
         )
-      )[0]!.n,
-    ).toBe(0);
+      ).map((ligne) => ligne.city),
+    ).toEqual(["Rome", "Florence"]);
+    // Une autre organisation : le voyage accepté ci-dessus est en cours de génération (un seul par organisation).
+    const autreOrg = await createOrg(auth);
     const admis = await adaptateur("ancienne").adapter.createTrip(
-      contexteDe(org),
+      contexteDe(autreOrg),
       demandeRome(autres),
     );
     expect(admis.ok).toBe(true);

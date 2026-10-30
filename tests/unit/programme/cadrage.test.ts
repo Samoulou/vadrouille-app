@@ -2,7 +2,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { TripSchema, type Brief, type TripDraft } from "@/contracts";
-import type { EntreeProgrammeV5 as EntreeV5DeLIa } from "@/ai/entrees";
+import { EntreeProgrammeV5Schema, type EntreeProgrammeV5 as EntreeV5DeLIa } from "@/ai/entrees";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { assemblerProgrammeIa, modeDeTrajet, type CreneauAssemble } from "@/server/programme/assemblage";
 import { briefProgrammeDepuisFormulaire } from "@/server/programme/brief";
@@ -71,6 +71,9 @@ describe("conversion du brouillon à plusieurs villes (briefProgrammeDepuisFormu
     expect(JSON.stringify(entree)).not.toContain("LIBELLE_BILLET_M4B");
     expect(entree.changements).toEqual([{ date: "2027-05-07", de: "Rome", vers: "Florence", source: "saisi", depart: "10:12", arrivee: "11:50", activitesMax: 2 }]);
     expect(entree.villes.map((ville) => ville.nom)).toEqual(["Rome", "Florence"]);
+    // Entrée admise par le schéma strict du prompt v5 (M4a), sans clé en trop.
+    expect(EntreeProgrammeV5Schema.safeParse(entree).success).toBe(true);
+    expect(EntreeProgrammeV5Schema.safeParse(entreeProgrammeV5DepuisBrief(brief())).success).toBe(true);
   });
 
   it("entrée v5 : même forme que celle du prompt (M4a)", () => {
