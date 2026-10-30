@@ -17,13 +17,17 @@ import type {
   LodgingSuggestion,
   Offer,
   PatchResult,
+  PlaceSearchResult,
   PreviewSlot,
   Proposal,
   Receipt,
   ReplacementOffer,
   ReplacementWrite,
+  RevisionPreview,
   ChecklistItem,
   Result,
+  RevertPreview,
+  TripVersionPage,
   RetryGenerationRequest,
   Session,
   ShareStatus,
@@ -98,6 +102,54 @@ export interface TripAdapter {
    * a pas. Entrée reçue en `unknown`, revalidée par le cas d'usage.
    */
   readonly reports?: StopReportAdapter;
+  /**
+   * Versions du programme et retour à une version (tâche M5b, ticket 934 ; décision 0147 § 5.3) : présent sur `api`
+   * (`trip_versions`). `mock` tient un historique simulé dans la portée de simulation (`versionsDuVoyage` de
+   * `@/adapters`) ; `prototype` n'en a pas. Entrées reçues en `unknown`, revalidées par le cas d'usage.
+   */
+  readonly versions?: TripVersionsAdapter;
+  /**
+   * Lieu à soi, aperçu et application d'un ajout `[add, lock]` (tâche M5d-1, ticket 939 ; décision 0147 § 3, § 4 et § 11) :
+   * présent sur `api` (`src/server/lieux/ajout.ts`, port de relectures de la lecture). La recherche de `api` ne passe pas par
+   * l'adaptateur : l'action serveur appelle le terminal `src/server/composition/lieux-api.ts` (seul chemin vers le client
+   * Places). `mock` tient les trois dans la portée de simulation (`lieuxDuVoyage` de `@/adapters`) ; `prototype` n'en a pas.
+   */
+  readonly places?: AddPlaceAdapter;
+}
+
+/**
+ * Ajout d'un lieu à soi (M5d-1 ; décision 0147 § 3 point 5 et § 11) : `AddPlaceRequest` → `RevisionPreview` (`kind:
+ * "add"`), `AddPlaceApply` → `PatchResult` (version nouvelle, auteur `user`, patch `[add, lock]`). Voyage débloqué seulement
+ * (`not_unlocked`), débit `retouche`, `version_conflict`, `no_option` (« Pas de place ce jour-là »), `provider_error`. Le
+ * contexte est celui **de la session** ; `null` : `unauthenticated`. Aucun nom ni adresse Google dans la demande.
+ */
+export interface AddPlaceAdapter {
+  previewAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<RevisionPreview>>;
+  applyAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+}
+
+/**
+ * Lieu à soi complet (M5d-1) : recherche (`PlaceSearchRequest` → `PlaceSearchResult[]`, 5 au plus ; noms et adresses
+ * affichés avec l'attribution, jamais stockés) et ajout. Implémenté par `mock` ; sur `api`, la recherche est celle du
+ * terminal de la composition.
+ */
+export interface PlaceAdapter extends AddPlaceAdapter {
+  searchPlaces(ctx: AdapterContext | null, input: unknown): Promise<Result<PlaceSearchResult[]>>;
+}
+
+/**
+ * Versions du programme (M5b ; décision 0147 § 5.3 et § 8) : voyage débloqué seulement (`not_unlocked`), débit `retouche`.
+ * Le contexte est celui **de la session** ; `null` : sans session (`unauthenticated`).
+ *
+ * - `listTripVersions` (`TripVersionsRequest` → `TripVersionPage`) : 20 par page, de la plus récente à la plus ancienne ;
+ * - `previewRevert` (`RevertPreviewRequest` → `RevertPreview`) : « Ce qui change », rien n'est écrit ;
+ * - `applyRevert` (`RevertApply` → `PatchResult`) : version nouvelle, copie identique de la version visée, idempotente par
+ *   `requestId` ; refus `validation_failed` (`field: "toVersion"`) d'une version non proposée au retour.
+ */
+export interface TripVersionsAdapter {
+  listTripVersions(ctx: AdapterContext | null, input: unknown): Promise<Result<TripVersionPage>>;
+  previewRevert(ctx: AdapterContext | null, input: unknown): Promise<Result<RevertPreview>>;
+  applyRevert(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
 }
 
 /**

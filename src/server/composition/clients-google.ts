@@ -1,7 +1,7 @@
 import "server-only";
 
 import { erreurGoogleDe } from "@/grounding/enveloppe-google";
-import type { ClientPlacesMvp, ClientRoutes, ClientVilles, OptionsFicheVille } from "@/grounding/interfaces";
+import type { ClientLieux, ClientPlacesMvp, ClientRoutes, ClientVilles, OptionsFicheVille } from "@/grounding/interfaces";
 import { COUT_ESTIME_MICROS, createPlacesClient, SKU_DETAILS, SKU_IDENTIFIANT, SKU_POSITION, SKU_TEXT_SEARCH } from "@/grounding/places-client";
 import { COUT_ELEMENT_MICROS, createRoutesClient, SKU_MATRICE } from "@/grounding/routes-client";
 import { avecReservation, DELAI_REQUETE_MS, demandeDe, horlogeSysteme, type AppelFacture, type ContexteAppel, type Horloge, type Plafond, type PortConsommation } from "@/server/usage/port";
@@ -56,6 +56,17 @@ export function creerClientVilles(options: OptionsClientsGoogle, fiche: OptionsF
     suggererVilles: (saisie, session) => places.suggererVilles(saisie, session),
     ficheVille: (placeId, session) => places.ficheVille(placeId, session, fiche),
   };
+}
+
+/**
+ * Client de la recherche d'un lieu à soi (M5d-1, décision 0147 § 3 point 6) : la seule méthode `rechercherLieux` du client
+ * Places réel (Text Search Pro, masque `places.id,places.displayName,places.shortFormattedAddress`, sans position), pour le
+ * terminal `src/server/composition/lieux-api.ts` seul. Même port, mêmes plafonds, même barrière de sortie et même clé que
+ * les autres clients ; lève de même avant toute requête.
+ */
+export function creerClientLieux(options: OptionsClientsGoogle): ClientLieux {
+  const places = createPlacesClient({ usage: options.usage, contexte: options.contexte, plafonds: options.plafonds, horloge: options.horloge ?? horlogeSysteme });
+  return { rechercherLieux: (texte, ville) => places.rechercherLieux(texte, ville) };
 }
 
 /**

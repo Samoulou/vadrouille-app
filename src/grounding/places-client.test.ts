@@ -26,6 +26,7 @@ import {
   MASQUE_PHOTOS,
   MASQUE_IDENTIFIANT,
   MASQUE_POSITION,
+  MASQUE_RECHERCHE_LIEU,
   MASQUE_SUGGESTIONS,
   MASQUE_TEXT_SEARCH,
   ORIGINE_PLACES,
@@ -35,6 +36,7 @@ import {
   SKU_MEDIA_PHOTO,
   SKU_PHOTOS,
   SKU_POSITION,
+  SKU_RECHERCHE_LIEU,
   SKU_SUGGESTIONS,
   SKU_TEXT_SEARCH,
   type OptionsPlaces,
@@ -717,6 +719,75 @@ describe("fiche de ville", () => {
     expect(MASQUE_FICHE_VILLE).toBe("id,addressComponents,location");
     // Même SKU Essentials dans les deux cas.
     expect(port.lignes.map((l) => l.demande.sku)).toEqual([SKU_FICHE_VILLE, SKU_FICHE_VILLE, SKU_FICHE_VILLE]);
+  });
+});
+
+// M5d-1 (ticket 939 ; décision 0147 § 3 points 1 et 2) : recherche d'un lieu à soi, Text Search Pro sans position.
+describe("places: recherche d'un lieu à soi (0147 § 3)", () => {
+  it("POST searchText, masque id + nom + adresse courte, SKU Pro au prix de la table, texte puis ville, 5 résultats, français, aucune position", async () => {
+    const { client, appels, port } = monter([
+      async () =>
+        json({
+          places: [
+            { id: PLACE_ID, displayName: { text: "SENTINELLE-NOM" }, shortFormattedAddress: "SENTINELLE-ADRESSE", location: { latitude: 1, longitude: 2 } },
+            { id: "AUTRE_ID", displayName: { text: "SENTINELLE-SEUL" } },
+          ],
+        }),
+    ]);
+    expect(await client.rechercherLieux("  Café bleu ", "Lisbonne")).toStrictEqual([
+      { placeId: PLACE_ID, nom: "SENTINELLE-NOM", adresse: "SENTINELLE-ADRESSE" },
+      { placeId: "AUTRE_ID", nom: "SENTINELLE-SEUL", adresse: null },
+    ]);
+    const { url, init } = premier(appels);
+    expect(new URL(url).origin).toBe(ORIGINE_PLACES);
+    expect(new URL(url).pathname).toBe("/v1/places:searchText");
+    expect(new URL(url).search).toBe("");
+    expect(url).not.toContain(CLE);
+    expect(init.method).toBe("POST");
+    expect(init.cache).toBe("no-store");
+    expect(init.redirect).toBe("manual");
+    expect(new Headers(init.headers).get("x-goog-fieldmask")).toBe(MASQUE_RECHERCHE_LIEU);
+    expect(MASQUE_RECHERCHE_LIEU).toBe("places.id,places.displayName,places.shortFormattedAddress");
+    const corps = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(corps).toEqual({ textQuery: "Café bleu, Lisbonne", pageSize: 5, languageCode: "fr" });
+    expect(Object.keys(corps).sort()).toEqual(["languageCode", "pageSize", "textQuery"]);
+    expect(port.lignes.map((l) => [l.etat, l.demande.methode, l.demande.sku, l.demande.coutEstimeMicros])).toEqual([
+      ["confirmee", "places_text_search", SKU_RECHERCHE_LIEU, COUT_ESTIME_MICROS.rechercheLieu],
+    ]);
+    expect(COUT_ESTIME_MICROS.rechercheLieu).toBe(prixUnitaireMicros(SKU_RECHERCHE_LIEU));
+  });
+
+  it("sans ville : texte seul ; aucun résultat : liste vide ; sans nom, doublon : écarté ; 5 au plus", async () => {
+    const lieu = (id: string, nom?: string) => ({ id, ...(nom === undefined ? {} : { displayName: { text: nom } }) });
+    const { client, appels } = monter([
+      async () => json({}),
+      async () => json({ places: [lieu("P1"), lieu("P2", "Deux"), lieu("P2", "Deux bis"), lieu("P3", "  "), ...["P4", "P5", "P6", "P7", "P8", "P9"].map((id) => lieu(id, id))] }),
+    ]);
+    expect(await client.rechercherLieux("Café", null)).toEqual([]);
+    expect(JSON.parse(String(premier(appels).init.body))).toEqual({ textQuery: "Café", pageSize: 5, languageCode: "fr" });
+    expect((await client.rechercherLieux("Café", "  ")).map((r) => r.placeId)).toEqual(["P2", "P4", "P5", "P6", "P7"]);
+    expect(JSON.parse(String(appels[1]?.init.body)).textQuery).toBe("Café");
+  });
+
+  it("entrée refusée sans appel (texte de moins de 2 ou plus de 80 caractères, caractère de contrôle, ville trop longue) ; réponse hors schéma refusée ; erreur réduite à son code", async () => {
+    const { client, transport } = monter([
+      async () => json({ places: [{ id: "a b", displayName: { text: "x" } }] }),
+      async () => json({ error: { message: `SENTINELLE-FOURNISSEUR ${CLE}` } }, 403),
+    ]);
+    for (const [texte, ville] of [
+      ["C", null],
+      ["x".repeat(81), null],
+      ["Ca\u0000fé", null],
+      ["Café", "x".repeat(121)],
+      ["Café", "Lis\nbonne"],
+    ] as const) {
+      expect((await erreurDe(client.rechercherLieux(texte, ville))).code, JSON.stringify([texte, ville])).toBe("invalid_request");
+    }
+    expect(transport).not.toHaveBeenCalled();
+    expect((await erreurDe(client.rechercherLieux("Café", null))).code).toBe("invalid_response");
+    const refus = await erreurDe(client.rechercherLieux("Café", null));
+    expect([refus.code, refus.status]).toEqual(["upstream_error", 403]);
+    expect(JSON.stringify(refus)).not.toContain("SENTINELLE-FOURNISSEUR");
   });
 });
 

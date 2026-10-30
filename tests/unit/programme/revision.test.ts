@@ -9,11 +9,12 @@ import { composerSimuleeAvec, type EntreeRevisionDuProgramme, type FiltreRevisio
 import { ArretEtape } from "@/server/generation/codes";
 import { resoudre } from "@/server/generation/dependances";
 import { forfaitDeLaRevision } from "@/server/generation/forfait-etape";
-import { choixDuTri, verrousReportes } from "@/server/generation/etapes-revision";
+import { choixDuTri, lieuxASoiReinjectes, verrousReportes } from "@/server/generation/etapes-revision";
 import * as p0 from "@/server/p0/revision";
 import type { EntreeProgramme } from "@/server/programme/entree";
 import {
   entreeRevisionDepuisJours,
+  etapesPourLeModele,
   nomNormalise,
   nomsEcartesDesJours,
   retirerEtapesEcartees,
@@ -91,6 +92,19 @@ describe("révision partagée (PR 868 ; décision 0126 § 3)", () => {
     expect(entree.choix).toEqual({ pasPourMoi: ["j1-1"], jAime: ["j2-1"] });
     const texte = JSON.stringify(entree);
     for (const sentinelle of [PLACE, SITE, "SENTINELLE_TERMINUS", "toReserve", "segment", "locked", "commitment", "placeId", "source"]) expect(texte).not.toContain(sentinelle);
+  });
+
+  it("M5d-1 (0147 § 12 S4) : une étape ajoutée par la personne n'entre pas dans l'entrée ; un choix qui la vise est ignoré", () => {
+    const AJOUT = "ajout-0d000000-0000-4000-8000-0000000000cc";
+    const NOM = "SENTINELLE-NOM-SAISI-M5D";
+    const jours = INSTANTANE.days.map((jour) =>
+      jour.index === 1 ? { ...jour, items: [...jour.items, etape(AJOUT, NOM, { placeId: "SENTINELLE_PLACE_AJOUT", locked: true, addedBy: "person" })] } : jour,
+    );
+    const avec = entreeRevisionDepuisJours(TripSnapshotSchema.parse({ days: jours }).days, BRIEF, { pasPourMoi: [AJOUT, "j1-1"], jAime: [AJOUT] });
+    expect(avec).toEqual(entreeRevisionDepuisJours(INSTANTANE.days, BRIEF, { pasPourMoi: ["j1-1"], jAime: [] }));
+    expect(etapesPourLeModele(jours.find((j) => j.index === 1)!).map((e) => e.id)).toEqual(["j1-1", "j1-2", "j1-3"]);
+    const texte = JSON.stringify(avec);
+    for (const sentinelle of [AJOUT, NOM, "SENTINELLE_PLACE_AJOUT", "addedBy"]) expect(texte).not.toContain(sentinelle);
   });
 
   it("PR 868 : EntreeRevisionProgramme a la forme de EntreeRevision, celle que reçoit la capacité reviser", () => {
@@ -235,6 +249,43 @@ describe("R3 sur la version révisée (spécification M5 § 3, critère 2 ; revu
     expect(verrousReportes(INSTANTANE, revisee([etape("j1-2", "Trevi")]))).toBeNull();
     expect(verrousReportes(INSTANTANE, revisee([etape("j1-2", "Forum romain", { placeId: `${PLACE}_9` })]))).toBeNull();
     expect(verrousReportes(INSTANTANE, revisee([etape("j1-1", "Colisée")]))).toBeNull();
+  });
+});
+
+describe("lieu à soi dans la révision (M5d-1, ticket 939 ; 0147 § 12 S4 ; revue de la PR 943, bloquant 1)", () => {
+  const AJOUT = "ajout-0d000000-0000-4000-8000-0000000000cc";
+  const ajoutee = etape(AJOUT, "SENTINELLE-NOM-SAISI-M5D", { start: "15:00", end: "16:00", placeId: "SENTINELLE_PLACE_AJOUT", locked: true, addedBy: "person" });
+  const base = TripSnapshotSchema.parse({ days: INSTANTANE.days.map((jour) => (jour.index === 1 ? { ...jour, items: [...jour.items, ajoutee] } : jour)) });
+  const revisee = (j1: unknown[]): TripSnapshot =>
+    TripSnapshotSchema.parse({ days: INSTANTANE.days.map((jour) => (jour.index === 1 ? { ...jour, items: j1 } : jour)) });
+  const sortie = revisee([
+    { type: "terminus", role: "start", label: "Monti", time: "09:00" },
+    etape("j1-1", "Panthéon"),
+    etape("j1-2", "Forum romain", { kind: "meal" }),
+    { type: "segment", segment: { mode: "walk", estimated: true } },
+    { type: "free", from: "14:00", to: "15:20" },
+    { type: "segment", segment: { mode: "walk", estimated: true } },
+    etape("j1-4", "Trevi", { start: "15:30", end: "16:30" }),
+    etape("j1-5", "Pincio", { start: "17:00", end: "18:00" }),
+    { type: "terminus", role: "end", label: "Monti", time: "20:00" },
+  ]);
+
+  it("sans réinjection, la sortie du modèle (qui ne voit pas le lieu à soi) serait refusée par R3 ; réinjecté, il est gardé tel quel et la version s'écrit", () => {
+    expect(verrousReportes(base, sortie)).toBeNull();
+    const tenue = verrousReportes(base, lieuxASoiReinjectes(base, sortie));
+    expect(tenue).not.toBeNull();
+    const j1 = tenue!.days.find((jour) => jour.index === 1)!.items;
+    // Trevi (non verrouillée) et le temps libre qui chevauchent le lieu à soi sont retirés ; deux trajets voisins n'en font qu'un.
+    expect(j1.map((l) => (l.type === "stop" ? l.stop.id : l.type))).toEqual(["terminus", "j1-1", "j1-2", "segment", AJOUT, "j1-5", "terminus"]);
+    expect(j1.find((l) => l.type === "stop" && l.stop.id === AJOUT)).toEqual(ajoutee);
+    // Le verrou de la base reste reporté sur l'étape verrouillée de l'IA.
+    expect(j1.find((l) => l.type === "stop" && l.stop.id === "j1-2")).toMatchObject({ stop: { locked: true } });
+  });
+
+  it("sans lieu à soi dans la base, ou déjà présent : rien ne change", () => {
+    expect(lieuxASoiReinjectes(INSTANTANE, sortie)).toBe(sortie);
+    const deja = lieuxASoiReinjectes(base, lieuxASoiReinjectes(base, sortie));
+    expect(deja).toEqual(lieuxASoiReinjectes(base, sortie));
   });
 });
 

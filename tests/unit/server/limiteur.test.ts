@@ -6,9 +6,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FINS_MODELE, MAX_TOKENS } from "@/ai/client";
 import { RATE_LIMITS, type RateLimitConfig } from "@/server/config/limites";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
-import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_VILLE_API_REASONS, LOG_FICHES_REASONS, LOG_FINISH_REASONS, LOG_POSITIONS_REASONS, LOG_PROVIDER_ERROR_CLASSES, LOG_READ_REASONS, logEvent, MAX_JETONS_JOURNAL } from "@/server/log";
+import { errorNameOf, formatLogLine, LOG_EVENTS, LOG_LIEU_REASONS, LOG_VILLE_API_REASONS, LOG_FICHES_REASONS, LOG_FINISH_REASONS, LOG_POSITIONS_REASONS, LOG_PROVIDER_ERROR_CLASSES, LOG_READ_REASONS, logEvent, MAX_JETONS_JOURNAL } from "@/server/log";
 import { NIVEAUX_VILLE_API } from "@/server/composition/villes-api";
-import { createRateLimiter, type RateLimitClient, type RateLimitPool, rateLimitKey, rateLimitMessage } from "@/server/rate-limit";
+import { createRateLimiter, type RateLimitClient, type RateLimitPool, rateLimitKey, rateLimitMessage, reglesOrdonnees } from "@/server/rate-limit";
 
 /**
  * Limiteur et journal sans base (spécification B3, critères A1 « limiteur sans secret », A3 (événement), A8, A9 et
@@ -583,6 +583,9 @@ describe("module de journal", () => {
       "recalcul.start_failed",
       "recalcul.unlock_failed",
       "voyages.stop_reported",
+      // M5d-1 (décision 0147 § 3 et § 14, ticket 939) : recherche d'un lieu à soi, raison fermée, nombre de résultats,
+      // code Google et statut HTTP seulement (aucun texte saisi, aucun nom, aucun identifiant de lieu).
+      "lieu.recherche",
       "log.unknown_event",
     ]);
   });
@@ -619,5 +622,116 @@ describe("module de journal", () => {
       expect(JSON.parse(ligneBrute)).toEqual({ level: "warn", event: "voyages.positions_non_ecrites", reason: "base", dropped: 3 });
       expect(ligneBrute).not.toContain("SENTINELLE");
     });
+  });
+});
+
+describe("limiteur: espèce trip (M5d-1, ticket 939 ; décision 0147 § 6.4 point 1)", () => {
+  const TRIP = "0D000000-0000-4000-8000-0000000000AA";
+  const CONFIG_VOYAGE: RateLimitConfig = {
+    "essai-voyage": [
+      { kind: "trip", windowSeconds: 86_400, threshold: 2 },
+      { kind: "ip", windowSeconds: 60, threshold: 3 },
+    ],
+  };
+
+  it("règles ordonnées ip, email, trip quelle que soit la configuration ; message rl/v1/<action>/86400s/trip/<uuid en minuscules>", () => {
+    expect(reglesOrdonnees(CONFIG_VOYAGE["essai-voyage"] ?? []).map((r) => r.kind)).toEqual(["ip", "trip"]);
+    expect(reglesOrdonnees(RATE_LIMITS["lieu-recherche"] ?? []).map((r) => r.kind)).toEqual(["ip", "trip"]);
+    const octets = randomBytes(32);
+    const env = { VADROUILLE_ENV: "ci", TRUSTED_IP_HEADER: "x-vercel-forwarded-for", [HMAC]: octets.toString("base64url") };
+    const { pool, increments } = poolSimule();
+    return (async () => {
+      const limiteur = createRateLimiter({ pool, env, config: CONFIG_VOYAGE });
+      expect(await limiteur.verdict({ action: "essai-voyage", headers: entetes({ "x-vercel-forwarded-for": "192.0.2.7" }), tripId: TRIP })).toEqual({ ok: true });
+      const cles = increments().map((r) => r.values?.[0]);
+      expect(cles).toEqual([
+        rateLimitKey(octets, rateLimitMessage("essai-voyage", 60, "ip/192.0.2.7")),
+        rateLimitKey(octets, rateLimitMessage("essai-voyage", 86_400, `trip/${TRIP.toLowerCase()}`)),
+      ]);
+      expect(rateLimitMessage("lieu-recherche", 86_400, `trip/${TRIP.toLowerCase()}`)).toBe(`rl/v1/lieu-recherche/86400s/trip/${TRIP.toLowerCase()}`);
+    })();
+  });
+
+  it("sans identifiant de voyage lisible : refus fermé, rate_limit.failed MissingTripId, aucun incrément", async () => {
+    for (const tripId of [undefined, "", "voyage-1", `${TRIP}x`]) {
+      const { pool, increments } = poolSimule();
+      const journal = capturerJournal();
+      const limiteur = createRateLimiter({ pool, env: ENV_CI(), config: CONFIG_VOYAGE });
+      const verdict = await limiteur.verdict({ action: "essai-voyage", headers: entetes(), ...(tripId === undefined ? {} : { tripId }) });
+      expect(verdict.ok, String(tripId)).toBe(false);
+      expect(await limiteur.check({ action: "essai-voyage", headers: entetes(), ...(tripId === undefined ? {} : { tripId }) })).toEqual(REFUS);
+      expect(increments()).toEqual([]);
+      expect(journal.evenements()[0]).toMatchObject({ event: "rate_limit.failed", action: "essai-voyage", errorName: "MissingTripId" });
+      expect(journal.lignes.join("\n")).not.toContain("voyage-1");
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("verdict : espèce de la règle qui refuse ; un refus ip n'incrémente pas la règle trip ; check rend le refus habituel", async () => {
+    const { pool, increments } = poolSimule();
+    const limiteur = createRateLimiter({ pool, env: ENV_CI(), config: CONFIG_VOYAGE });
+    const depuis = (ip: string) => ({ action: "essai-voyage", headers: entetes({ "x-vercel-forwarded-for": ip }), tripId: TRIP });
+    expect(await limiteur.verdict(depuis("192.0.2.1"))).toEqual({ ok: true });
+    expect(await limiteur.verdict(depuis("192.0.2.2"))).toEqual({ ok: true });
+    expect(await limiteur.verdict(depuis("192.0.2.3"))).toEqual({ ok: false, kind: "trip" });
+    expect(await limiteur.check(depuis("192.0.2.4"))).toEqual(REFUS);
+    // Même adresse : la 4e est refusée par la règle ip, et la clé trip n'est pas incrémentée.
+    const { pool: pool2, increments: increments2 } = poolSimule();
+    const limiteur2 = createRateLimiter({ pool: pool2, env: ENV_CI(), config: { "essai-voyage": [{ kind: "trip", windowSeconds: 86_400, threshold: 99 }, { kind: "ip", windowSeconds: 60, threshold: 3 }] } });
+    for (let i = 0; i < 3; i += 1) expect(await limiteur2.verdict(depuis("192.0.2.9"))).toEqual({ ok: true });
+    expect(await limiteur2.verdict(depuis("192.0.2.9"))).toEqual({ ok: false, kind: "ip" });
+    expect(increments2()).toHaveLength(7);
+    expect(increments()).toHaveLength(8);
+  });
+
+  it("lieu-recherche : configuration de 0147 § 6.4 (5 par minute par adresse, 20 par voyage et par 24 heures)", () => {
+    expect(RATE_LIMITS["lieu-recherche"]).toEqual([
+      { kind: "ip", windowSeconds: 60, threshold: 5 },
+      { kind: "trip", windowSeconds: 86_400, threshold: 20 },
+    ]);
+  });
+});
+
+describe("journal: lieu.recherche (M5d-1, ticket 939 ; décision 0147 § 12 S1 point 5)", () => {
+  const lire = (champs: Record<string, unknown>) => JSON.parse(formatLogLine("lieu.recherche", champs)) as Record<string, unknown>;
+
+  it("raisons fermées ; raison hors liste retirée", () => {
+    expect([...LOG_LIEU_REASONS]).toEqual([
+      "ok",
+      "aucun_resultat",
+      "entree_invalide",
+      "non_debloque",
+      "seuils_non_valides",
+      "barriere",
+      "client",
+      "limite",
+      "limite_voyage",
+      "limite_jour",
+      "compteur_indisponible",
+      "google_erreur",
+      "exception",
+    ]);
+    expect(lire({ reason: "ok", places: 3 })).toMatchObject({ event: "lieu.recherche", reason: "ok", places: 3 });
+    expect(lire({ reason: SENTINELLE }).reason).toBeUndefined();
+  });
+
+  it("champs admis seulement (places, reason, googleCode, httpStatus, errorName) : requête, ville, placeId, nom, voyage, organisation retirés ; places en texte retiré", () => {
+    const ligne = lire({
+      reason: "google_erreur",
+      googleCode: "upstream_error",
+      httpStatus: 503,
+      errorName: "ErreurClientGoogle",
+      query: SENTINELLE,
+      city: SENTINELLE,
+      placeId: SENTINELLE,
+      name: SENTINELLE,
+      tripId: "0d000000-0000-4000-8000-0000000000aa",
+      organizationId: "0d000000-0000-4000-8000-000000000001",
+      action: "search-places",
+    });
+    expect(ligne).toMatchObject({ event: "lieu.recherche", reason: "google_erreur", googleCode: "upstream_error", httpStatus: 503, errorName: "ErreurClientGoogle" });
+    for (const champ of ["query", "city", "placeId", "name", "tripId", "organizationId", "action"]) expect(ligne[champ], champ).toBeUndefined();
+    expect(JSON.stringify(ligne)).not.toContain(SENTINELLE);
+    expect(lire({ reason: "ok", places: SENTINELLE }).places).toBeUndefined();
   });
 });

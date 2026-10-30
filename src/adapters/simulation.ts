@@ -8,6 +8,7 @@ import { devPagesEnabled, isProductionDeployment } from "@/dev/flags";
 import { MOCK_GENERATION_OUTCOMES, type MockGenerationOutcome } from "@/mocks/creation-edimbourg";
 import { FIXED_SHARE_LINKS } from "@/mocks/edimbourg-partage";
 
+import type { TripVersionsStore } from "./mock-versions";
 import { hashShareToken } from "./share-token";
 
 /**
@@ -37,6 +38,8 @@ export const MAX_AUTH_ADDRESSES_PER_SCOPE = 50;
 export const MAX_LAUNCHES_PER_SCOPE = 20;
 /** Signalements d'erreur gardés par portée (M5c) ; au-delà, le plus ancien est retiré. */
 export const MAX_STOP_REPORTS_PER_SCOPE = 200;
+/** Recherches de lieu à soi gardées par portée (M5d-1) ; au-delà, la plus ancienne est retirée. */
+export const MAX_PLACE_SEARCHES_PER_SCOPE = 200;
 
 /** Issues de la génération simulée, choisies par `R-sim` (`configureGeneration`) dans une portée explicite. */
 export const GENERATION_OUTCOMES = MOCK_GENERATION_OUTCOMES;
@@ -175,6 +178,20 @@ export interface SimulationScope {
    * pas ; l'adaptateur le crée au premier signalement.
    */
   reports?: StopReportStore;
+  /**
+   * Versions simulées du programme (M5b). Facultatif, comme `reports` : l'adaptateur le crée à la première lecture.
+   */
+  versions?: TripVersionsStore;
+  /**
+   * Recherches de lieu à soi (M5d-1) : organisation, voyage, instant, pour le plafond par voyage de `mock`. Facultatif comme
+   * `reports` ; aucune requête ni aucun résultat n'est gardé.
+   */
+  placeSearches?: PlaceSearchStore;
+}
+
+/** Recherches de lieu à soi simulées de la portée (M5d-1) ; au plus `MAX_PLACE_SEARCHES_PER_SCOPE`. */
+export interface PlaceSearchStore {
+  records: { readonly organizationId: string; readonly tripId: string; readonly at: number }[];
 }
 
 interface ManualClock extends Clock {
@@ -197,6 +214,11 @@ function manualClock(start: number): ManualClock {
 
 function emptyCreationStore(): CreationStore {
   return { launches: new Map(), outcome: "ready" };
+}
+
+/** Versions simulées vides (M5b) : l'historique d'un voyage est créé à sa première lecture. */
+export function emptyVersionsStore(): TripVersionsStore {
+  return { records: [], unlockedAt: new Map() };
 }
 
 function emptyAuthStore(): AuthStore {
@@ -249,6 +271,8 @@ function registry(): Registry {
       auth: emptyAuthStore(),
       creation: emptyCreationStore(),
       reports: { records: [] },
+      placeSearches: { records: [] },
+      versions: emptyVersionsStore(),
     },
     explicit: new Map(),
     authKey: randomBytes(32),
@@ -283,6 +307,8 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
       auth: emptyAuthStore(),
       creation: emptyCreationStore(),
       reports: { records: [] },
+      placeSearches: { records: [] },
+      versions: emptyVersionsStore(),
     };
   }
   scopes.set(name, scope);
@@ -297,7 +323,8 @@ export function explicitScope(name: string): SimulationScope & { clock: ManualCl
 /**
  * Vide paiements et droits de la portée, remet le délai de confirmation à 0, efface les liens de partage créés et
  * rétablit les liens fixes (F10-PO-18), vide les codes, compteurs et session de la connexion simulée (F8b), vide les
- * lancements et remet l'issue de la génération à `ready` (F8c), vide les signalements (M5c), et fixe l'horloge.
+ * lancements et remet l'issue de la génération à `ready` (F8c), vide les signalements (M5c), les recherches de lieu
+ * (M5d-1) et les versions simulées (M5b), et fixe l'horloge.
  */
 export function resetScope(name: string, now: number): void {
   const scope = explicitScope(name);
@@ -306,6 +333,8 @@ export function resetScope(name: string, now: number): void {
   scope.auth = emptyAuthStore();
   scope.creation = emptyCreationStore();
   scope.reports = { records: [] };
+  scope.placeSearches = { records: [] };
+  scope.versions = emptyVersionsStore();
   scope.clock.set(now);
 }
 

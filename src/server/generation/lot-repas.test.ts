@@ -41,9 +41,11 @@ const CONFIG: ConfigurationMoteur = {
   seuilTempsLibreMinutes: 30,
   changementDeVille: {
     activitesParRythme: { relaxed: 1, balanced: 2, intense: 2 },
-    departEstime: { heureParDefaut: "10:00", limite: "18:00" },
+    departEstime: { heureParDefaut: "10:00", limite: "18:00", arrondiMinutes: 15 },
     creneauSansDureeMinutes: 180,
     dureeEstimeeMinutes: { min: 20, max: 600 },
+    margesMinutes: { avantDepart: { ticket: 45, flight: 120, estimated: 30 }, apresArrivee: { ticket: 30, flight: 60, estimated: 30 } },
+    long: { seuilMinutes: 240, activitesMax: 1 },
   },
 };
 

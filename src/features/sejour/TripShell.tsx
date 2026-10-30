@@ -43,7 +43,7 @@ import {
 } from "./programme";
 import { layoutFitPadding, layoutVisibleInsets, useMapLayout } from "./map-layout";
 import { HIGHLIGHT_MS, type RevisionActions } from "./revision";
-import { createServerRevision, createServerRevisionStore, syncServerRevisionVersion } from "./revision-serveur";
+import { createServerRevision, createServerRevisionStore, recordServerRevert, syncServerRevisionVersion } from "./revision-serveur";
 import { tripRoutes, type TripRoutes, type TripRoutesBase } from "./routes";
 
 const t = messages.sejour;
@@ -61,6 +61,8 @@ interface ToastState {
   afterUndo?: () => void;
   /** Toast revenu après une annulation qui n'a pas abouti : « Annuler » reprend le focus. */
   refocus?: boolean;
+  /** Annulation propre à cette modification (retour à une version, M5b) ; sinon `actions.undo()`. */
+  undo?: () => Promise<void>;
 }
 
 /** Fiche fermée dont le lien d'origine doit reprendre le focus (handover § 7). */
@@ -160,6 +162,23 @@ export interface TripShellValue {
   commitmentReadOnly: boolean;
   /** Retire `etape` inconnu de l'adresse et annonce l'absence (F5-PO-8). */
   reportMissingEtape: () => void;
+  /**
+   * Adresse de « Versions du programme » (M5b ; spécification M5 § 4) : voyage débloqué, adaptateurs `mock` et `api`,
+   * routes `/voyages` (décidé côté serveur par la mise en page) ; sinon `null` (ni lien, ni page).
+   */
+  versionsHref: string | null;
+  /**
+   * Retour à une version appliqué (M5b) : toast « Programme rétabli. » ; son « Annuler » appelle `undo` (un retour vers la
+   * version d'avant), qui lève en cas d'échec (le toast revient avec l'annonce de l'échec).
+   */
+  notifyReverted: (message: string, undo: () => Promise<void>) => void;
+  /**
+   * Version écrite par un retour ou par son annulation (M5b) : base des gestes suivants de la révision enregistrée
+   * (`api`), écarts locaux retirés, puis relecture du voyage.
+   */
+  recordRevert: (version: number) => void;
+  /** L'écran des versions signale son montage (`true`) et son démontage (`false`) : « Retour » mène alors au Séjour. */
+  markVersionsOpen: (open: boolean) => void;
 }
 
 const TripShellContext = createContext<TripShellValue | null>(null);
@@ -235,6 +254,11 @@ export interface TripShellProps {
    * page (adaptateur `mock` ou `api`, base `/voyages`) ; absent par défaut.
    */
   reportable?: boolean;
+  /**
+   * « Versions du programme » (tâche M5b ; spécification M5 § 4) : décidé côté serveur par la mise en page (adaptateur
+   * `mock` ou `api`, base `/voyages`) ; le lien n'est montré que sur un voyage débloqué (M5-PO-1). Absent par défaut.
+   */
+  versionable?: boolean;
   children: ReactNode;
 }
 
@@ -258,6 +282,7 @@ export function TripShell({
   shareable = false,
   unlockHref = null,
   reportable = false,
+  versionable = false,
   children,
 }: TripShellProps) {
   const routes = useMemo(() => tripRoutes(base, sourceTrip.id), [base, sourceTrip.id]);
@@ -459,6 +484,22 @@ export function TripShell({
     router.replace(routes.jour(dayIndex), { scroll: false });
   }, [dayIndex, router, routes]);
 
+  // « Versions du programme » (M5b) : voyage débloqué seulement (M5-PO-1 ; le serveur refuse aussi, `not_unlocked`).
+  const versionsRoute = routes.versions();
+  const versionsHref = versionable && sourceTrip.unlocked ? versionsRoute : null;
+  // Écran des versions monté (il le signale) : « Retour » sur la carte mène au Séjour, comme depuis une Journée.
+  const [onVersions, setOnVersions] = useState(false);
+  const markVersionsOpen = useCallback((open: boolean) => setOnVersions(open), []);
+  const recordRevert = useCallback(
+    (version: number) => {
+      // Le retour rend définitive toute modification précédente (une seule modification annulable à la fois).
+      if (serverStore !== null) recordServerRevert(serverStore, version);
+      send({ type: "reset" });
+      afterWrite();
+    },
+    [serverStore, send, afterWrite],
+  );
+
   // Toast d'annulation, partagé par le verrou de F5 et les révisions de F7 (décision 0016 § 9) : une nouvelle
   // modification ferme le toast précédent et rend la précédente définitive.
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -485,6 +526,17 @@ export function TripShell({
       clearHighlight();
       setUndone(null);
       setToast({ id: toastId.current, message, afterUndo });
+    },
+    [clearHighlight],
+  );
+  const notifyReverted = useCallback(
+    (message: string, undo: () => Promise<void>) => {
+      toastId.current += 1;
+      const id = toastId.current;
+      clearHighlight();
+      setUndone(null);
+      // « Annuler » réussi : « Modification annulée. » est annoncé par la région du toast, comme après une révision.
+      setToast({ id, message, undo, afterUndo: () => setUndone({ id }) });
     },
     [clearHighlight],
   );
@@ -522,12 +574,13 @@ export function TripShell({
     if (current === null || undoing.current) return;
     undoing.current = true;
     try {
-      await actions.undo();
+      if (current.undo) await current.undo();
+      else await actions.undo();
     } catch {
       // Annulation refusée ou réseau perdu : la modification reste, et reste annulable. Le toast revient (délai relancé)
       // avec l'annonce de l'échec (`role="status"` de sa région) et le focus sur « Annuler ».
       toastId.current += 1;
-      setToast({ id: toastId.current, message: messages.revision.annulationEchouee, afterUndo: current.afterUndo, refocus: true });
+      setToast({ id: toastId.current, message: messages.revision.annulationEchouee, afterUndo: current.afterUndo, undo: current.undo, refocus: true });
       return;
     } finally {
       undoing.current = false;
@@ -573,6 +626,10 @@ export function TripShell({
       reportable,
       lockable,
       commitmentReadOnly,
+      versionsHref,
+      notifyReverted,
+      recordRevert,
+      markVersionsOpen,
     }),
     [
       routes,
@@ -601,6 +658,10 @@ export function TripShell({
       reportable,
       lockable,
       commitmentReadOnly,
+      versionsHref,
+      notifyReverted,
+      recordRevert,
+      markVersionsOpen,
     ],
   );
 
@@ -611,7 +672,7 @@ export function TripShell({
 
   const retour = (
     <Link
-      href={day ? routes.sejour() : routes.mesVoyages()}
+      href={day || onVersions ? routes.sejour() : routes.mesVoyages()}
       aria-label={t.retour}
       data-part="retour"
       className="absolute left-3 top-3 z-10 inline-flex size-(--touch-target) items-center justify-center rounded-control border border-outline bg-raised text-ink"

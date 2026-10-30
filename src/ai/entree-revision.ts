@@ -13,6 +13,12 @@ import { EntreeProgrammeSchema, EntreeProgrammeV5Schema } from "@/ai/entrees";
  * **Aucun champ** pour une donnée Google ou un verdict d'ancrage (0011 § 1 ; 0117 § 3) : ni identifiant de lieu, ni
  * position, ni temps de trajet, ni badge (`toReserve`, `toConfirm`), ni site vérifié, ni marque « vérifié ». Schéma
  * strict : une clé en trop (un `placeId` glissé par erreur, par exemple) refuse l'entrée avant toute requête.
+ *
+ * **Lieu à soi** (décision 0147 § 12 S4 ; M5d-1, ticket 939) : une étape ajoutée par la personne (`Stop.addedBy:
+ * "person"`) n'entre jamais dans une entrée de modèle, ni par son nom saisi ni par son identifiant. Le filtre est posé par
+ * le constructeur de l'entrée (`etapesPourLeModele`, `src/server/programme/revision.ts`, que la révision de la vraie app et
+ * le site d'essai partagent) ; ce schéma le tient aussi par forme : `ID_ETAPE_REVISION` refuse l'identifiant `ajout-…`, si
+ * bien qu'une étape ajoutée glissée par erreur refuse l'entrée avant toute requête.
  */
 
 /** Identifiant d'étape maison du programme écrit (`j<jour>-<rang>`, `src/server/p0/assemblage.ts`) ; jamais Google. */

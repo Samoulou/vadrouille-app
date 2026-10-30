@@ -1,7 +1,7 @@
 import { LONGUEURS_CONTRAT, TripSchema, texteMaison, type Day, type DayLineItem, type Pace, type Proposal, type Segment, type Stop, type Trip } from "@/contracts";
 import { budgetTrajetDuJour } from "@/domain/budget-trajet";
 import { destinationColor } from "@/domain/calculs";
-import { elementDuChangement, themeDuChangement } from "@/domain/changement-de-ville";
+import { arriveeAffichee, elementDuChangement, themeDuChangement } from "@/domain/changement-de-ville";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { logementsDuJour } from "@/domain/relectures";
 import { joursEntre, versHeure } from "@/domain/temps";
@@ -200,6 +200,12 @@ function plusieursVilles(brief: BriefEssai | BriefProgramme): BriefProgramme | u
   return briefAPlusieursVilles(brief) ? brief : undefined;
 }
 
+/** Heure de fin d'un engagement du brief, si elle est saisie et postérieure à son début (`BriefProgramme` seulement). */
+function finDeLEngagement(engagement: { readonly heure: string; readonly fin?: string } | { readonly heure: string }): { end?: string } {
+  const fin = "fin" in engagement ? engagement.fin : undefined;
+  return fin !== undefined && minutesDe(fin) > minutesDe(engagement.heure) ? { end: fin } : {};
+}
+
 export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompletIa {
   const { brief } = entree;
   const programme = plusieursVilles(brief);
@@ -223,7 +229,13 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
       changement === undefined || programme === undefined
         ? undefined
         : elementDuChangement(changement, programme.billets.find((billet) => billet.date === changement.date)?.libelle, partage?.dureeEstimeeMinutes);
-    const premierDebut = partage === undefined ? contenu[0]?.debut : (partage.avant[0]?.debut ?? ligneChangement?.start);
+    // Jour d'un changement de ville sans étape avant la ligne : le terminus `start` est à `fenetreJour.debut` (M4-suite § 3.4),
+    // ou au départ s'il le précède (train à 07:00 : ni étape ni « Temps libre » avant la ligne, § 3.8).
+    const debutFenetre = entree.configuration.fenetreJour.debut;
+    const premierDebut =
+      partage === undefined
+        ? contenu[0]?.debut
+        : (partage.avant[0]?.debut ?? (ligneChangement !== undefined && minutesDe(ligneChangement.start) < minutesDe(debutFenetre) ? ligneChangement.start : debutFenetre));
     const debutJour = arrivee?.debut ?? (index === 1 ? brief.heureArrivee : (premierDebut ?? "09:00"));
     const items: DayLineItem[] = [{ type: "terminus", role: "start", time: debutJour, label: logementDepart.texte }];
     let precedent: string | undefined = logementDepart.placeId === "" ? undefined : logementDepart.placeId;
@@ -244,9 +256,12 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
       items.push({ type: "segment", segment: { mode: entree.mode, minutes: valeur, estimated: false } });
     };
     /**
-     * Ligne « Vers {ville} » : « Temps libre » de la dernière ligne au départ si l'écart atteint `seuilTempsLibreMinutes`
-     * (aucun trou, spécification M4 § 3.2 point 1 ; un écart plus court est une marge, M4-suite), puis le `transfer`. Aucun
-     * segment à travers lui (§ 7.3) : le trajet suivant part de l'arrivée, inconnue ici.
+     * Ligne « Vers {ville} » (M4-suite § 3.4, option (a) des marges) : « Temps libre » de la dernière ligne **jusqu'au
+     * départ** si l'écart atteint `seuilTempsLibreMinutes`, puis le `transfer`, puis, quand l'arrivée est connue et tient dans
+     * le jour (billet ou vol avec heure de fin, départ estimé avec durée), « Temps libre » **dès l'arrivée** jusqu'à la ligne
+     * suivante (`suivant` : première étape après la ligne ; sans étape, le terminus `end`, à `fenetreJour.fin` sauf départ du
+     * voyage) si l'écart atteint le seuil. Arrivée « à confirmer » : aucune ligne `free` après la ligne. Les marges ne sont
+     * jamais un trou : le « Temps libre » les couvre. Aucun segment à travers le `transfer` (§ 7.3).
      */
     const poserChangement = (ligne: NonNullable<typeof ligneChangement>, suivant: string | undefined): void => {
       const seuil = entree.configuration.seuilTempsLibreMinutes;
@@ -256,11 +271,14 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
       items.push(ligne);
       precedent = undefined;
       apresChangement = true;
-      derniere = ligne.end ?? ligne.start;
-      // Arrivée connue (billet ou vol avec heure de fin) : « Temps libre » dès l'arrivée jusqu'à la ligne suivante.
-      if (ligne.end !== undefined && suivant !== undefined && minutesDe(suivant) - minutesDe(ligne.end) >= seuil) {
-        items.push({ type: "free", from: ligne.end, to: suivant });
-        derniere = suivant;
+      derniere = ligne.start;
+      const arrivee = arriveeAffichee(ligne);
+      if (arrivee === undefined || arrivee > minutesDe(entree.configuration.fenetreJour.fin)) return;
+      derniere = versHeure(arrivee);
+      const jusqua = suivant ?? depart?.debut ?? (index === dernierIndice ? brief.heureDepart : entree.configuration.fenetreJour.fin);
+      if (minutesDe(jusqua) - arrivee >= seuil) {
+        items.push({ type: "free", from: derniere, to: jusqua });
+        derniere = jusqua;
       }
     };
     let rang = 0;
@@ -331,6 +349,9 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
         kind: "event",
         name: engagement.libelle,
         start: engagement.heure,
+        // Heure de fin saisie (`BriefProgramme` seulement : plusieurs villes) : lue par `chevauchementDuChangement` à
+        // l'affichage (M4-suite § 3.5 point 4 et § 5) ; une seule ville, sans `fin` : inchangé.
+        ...finDeLEngagement(engagement),
         facts: {},
         exceptions: [],
         locked: true,

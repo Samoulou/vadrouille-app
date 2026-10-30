@@ -55,7 +55,15 @@ export type NomAction =
   | "report-stop"
   // M5a (ticket 919) : verrouiller ou déverrouiller une étape sur `api` (`src/server/versions/retouches.ts`).
   | "lock-stop"
-  | "unlock-stop";
+  | "unlock-stop"
+  // M5d-1 (ticket 939) : lieu à soi sur `api` (`src/server/lieux/recherche.ts`, `src/server/lieux/ajout.ts`).
+  | "search-places"
+  | "preview-add-place"
+  | "apply-add-place"
+  // M5b (ticket 934) : versions du programme et retour à une version sur `api` (`src/server/versions/historique.ts`).
+  | "list-versions"
+  | "preview-revert"
+  | "apply-revert";
 
 type EntreeVoyage = { readonly tripId: string };
 

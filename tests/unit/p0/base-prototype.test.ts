@@ -49,6 +49,9 @@ describe("ancrage: masques de champs exacts", () => {
     expect(constante("MASQUE_FICHE_VILLE")).toBe("id,addressComponents,location");
     // Recherche de ville de `api` (décision 0141 § 6.3 point 3, PR 885) : même fiche sans la position.
     expect(constante("MASQUE_FICHE_VILLE_SANS_POSITION")).toBe("id,addressComponents");
+    // M5d-1 (décision 0147 § 3, ticket 939) : recherche d'un lieu à soi (Text Search Pro), identifiant, nom affiché et
+    // adresse courte seulement ; seul l'identifiant est conservé.
+    expect(constante("MASQUE_RECHERCHE_LIEU")).toBe("places.id,places.displayName,places.shortFormattedAddress");
     // Décision 0128 (photos du tri) : la liste des photos (`photos`, SKU « IDs Only ») et le média (`photoUri`).
     expect(constante("MASQUE_PHOTOS")).toBe("photos");
     expect(constante("MASQUE_MEDIA_PHOTO")).toBe("photoUri");
@@ -61,6 +64,7 @@ describe("ancrage: masques de champs exacts", () => {
       "MASQUE_SUGGESTIONS",
       "MASQUE_FICHE_VILLE",
       "MASQUE_FICHE_VILLE_SANS_POSITION",
+      "MASQUE_RECHERCHE_LIEU",
       "MASQUE_PHOTOS",
       "MASQUE_MEDIA_PHOTO",
     ]);
@@ -84,6 +88,8 @@ describe("places: masque de champ inchangé", () => {
       MASQUE_FICHE_VILLE: "id,addressComponents,location",
       // Recherche de ville de `api` (décision 0141 § 6.3 point 3, PR 885).
       MASQUE_FICHE_VILLE_SANS_POSITION: "id,addressComponents",
+      // Recherche d'un lieu à soi (décision 0147 § 3, ticket 939).
+      MASQUE_RECHERCHE_LIEU: "places.id,places.displayName,places.shortFormattedAddress",
       MASQUE_PHOTOS: "photos",
       MASQUE_MEDIA_PHOTO: "photoUri",
     });

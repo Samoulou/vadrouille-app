@@ -233,8 +233,11 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
     if (libre !== undefined) items.push(libre);
   };
 
-  /** Pose une étape à `debut` ; `false` si une heure dépasse la journée. */
-  const poserEtape = (stop: StopSnapshot, debut: number, trajet: ReturnType<Trajet>): boolean => {
+  /**
+   * Pose une étape à `debut` ; `false` si une heure dépasse la journée. `verrou` : l'étape ouvre-t-elle l'exception des
+   * conflits entre verrous à l'étape fixe suivante (voir `poserFixe`) ?
+   */
+  const poserEtape = (stop: StopSnapshot, debut: number, trajet: ReturnType<Trajet>, verrou = stop.locked): boolean => {
     const decalage = debut - versMinutes(stop.start);
     const finEcrite = stop.end === undefined ? undefined : heureSure(versMinutes(stop.end) + decalage);
     const start = heureSure(debut);
@@ -247,7 +250,7 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
     fin = Math.max(fin, occupee);
     if (stop.placeId !== undefined) position = { lieu: stop.placeId };
     apresChangement = false;
-    precedentVerrouille = stop.locked;
+    precedentVerrouille = verrou;
     dernierVerrouille = stop.locked;
     return true;
   };
@@ -270,16 +273,23 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
     return true;
   };
 
-  /** Étape fixe : à son heure ; refusée si elle chevauche la précédente, sauf entre deux étapes verrouillées. */
+  /**
+   * Étape fixe : à son heure ; refusée si elle chevauche la précédente, sauf entre deux étapes verrouillées (B5-PO-6).
+   * L'exception ne vaut que pour un verrou **de la base** : une étape posée par une opération de ce patch (`fixe`, un `add`
+   * ou un `move`) et verrouillée par lui (`[add, lock]` du lieu à soi, décision 0147 § 11) ne l'ouvre ni pour elle ni pour
+   * l'étape fixe suivante. Sinon le verrou que le patch pose lui-même ferait admettre un ajout qui recouvre une étape
+   * verrouillée (critère 22 de la spécification M5, ticket 954 ; addendum 0147 § 4, A.8 écart 4).
+   */
   const poserFixe = (ligne: Ligne): boolean => {
     if (ligne.genre === "changement") return poserChangement(ligne.item);
     if (ligne.genre !== "etape") return false;
     const { stop } = ligne;
+    const verrou = stop.locked && !ligne.fixe;
     const debut = versMinutes(stop.start);
     const trajet = stop.placeId === undefined || apresChangement ? undefined : contexte.trajet(position, { lieu: stop.placeId });
     const auPlusTot = fin + (trajet === undefined ? 0 : trajet.minutes + marge);
-    if (debut < auPlusTot && !(precedentVerrouille && stop.locked)) return false;
-    return poserEtape(stop, debut, trajet);
+    if (debut < auPlusTot && !(precedentVerrouille && verrou)) return false;
+    return poserEtape(stop, debut, trajet, verrou);
   };
 
   /** Fin occupée d'une ligne mobile posée à `debut`, et son lieu (un changement de ville n'est jamais mobile). */

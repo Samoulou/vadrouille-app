@@ -103,6 +103,21 @@ export interface ClientVilles {
 }
 
 /**
+ * Résultat de la recherche d'un lieu à soi (Text Search (New), masque `places.id,places.displayName,places.shortFormattedAddress`,
+ * décision 0147 § 3 point 1) : **donnée Google affichée**, avec l'attribution « Données de lieux : Google », jamais stockée
+ * (seul `placeId` l'est, et seulement si la personne ajoute le lieu), journalisée ni envoyée à un modèle (§ 12 S2 et S3).
+ */
+export type ResultatLieu = { readonly placeId: string; readonly nom: string; readonly adresse: string | null };
+
+/**
+ * Recherche d'un lieu à soi (M5d-1, décision 0147 § 3) : une requête Text Search par le texte saisi, orientée par le **nom
+ * maison** de la ville de la journée (`null` : texte seul), sans position ; 5 résultats au plus ; aucune fiche ensuite.
+ */
+export interface ClientLieux {
+  rechercherLieux(texte: string, ville: string | null): Promise<readonly ResultatLieu[]>;
+}
+
+/**
  * Photo d'un lieu pour le tri d'un voyage d'essai (décision 0128, demande de Samuel du 2026-10-23) : **donnée Google
  * chargée à la demande**, jamais stockée (ni l'adresse, ni le nom de ressource, ni l'image) ni mise dans un prompt ou un
  * journal. `uri` : adresse courte de l'image (`photoUri` de Place Photos (New), hôte `googleusercontent.com`) ; auteurs

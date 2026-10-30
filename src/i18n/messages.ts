@@ -14,6 +14,7 @@ export { default as sejour } from "./fr/sejour.json";
 export { default as voyage } from "./fr/voyage.json";
 export { default as mesVoyages } from "./fr/mesVoyages.json";
 export { default as debloquer } from "./fr/debloquer.json";
+export { default as plaque } from "./fr/plaque.json";
 export { default as etats } from "./fr/etats.json";
 export { default as creation } from "./fr/creation.json";
 export { default as connexion } from "./fr/connexion.json";
