@@ -34,9 +34,13 @@ describe("plusieurs-villes: jeu simulé Rome puis Florence", () => {
   });
 
   it("passe l'instantané, et la vue partagée n'en garde ni le transfer ni les villes", () => {
-    const days = romeFlorence.days.map(({ budgetPerPerson: _b, generating: _g, travelMinutes: _t, ...day }) => ({
-      ...day,
-      items: day.items.map((item) => (item.type === "segment" ? { type: "segment" as const, segment: { mode: item.segment.mode, estimated: item.segment.estimated } } : item)),
+    const days = romeFlorence.days.map(({ index, date, events, travelBudgetMinutes, theme, items }) => ({
+      index,
+      date,
+      events,
+      travelBudgetMinutes,
+      ...(theme === undefined ? {} : { theme }),
+      items: items.map((item) => (item.type === "segment" ? { type: "segment" as const, segment: { mode: item.segment.mode, estimated: item.segment.estimated } } : item)),
     }));
     expect(TripSnapshotSchema.safeParse({ days }).success).toBe(true);
     const shared = projectSharedTrip(romeFlorence);
