@@ -1,5 +1,5 @@
 import type { ConfigurationMoteur } from "@/domain/configuration";
-import { creneauOccupe, dureeEstimeeAdmise } from "@/domain/changement-de-ville";
+import { activitesMaxDuChangement, creneauDepasseLeJour, creneauOccupe, dureeConnue, dureeEstimeeAdmise, margesDuChangement } from "@/domain/changement-de-ville";
 import { villesDeLaDate } from "@/domain/villes-du-voyage";
 import { ajouterJours, versMinutes } from "@/domain/temps";
 import type { ChangementDuBrief, VilleDuBrief } from "@/server/programme/forme";
@@ -12,19 +12,26 @@ import type { ChangementDuBrief, VilleDuBrief } from "@/server/programme/forme";
  * - **ville de chaque créneau**, posée par le code (`villesDeLaDate` appliquée aux villes du brief) ; le champ `ville` de
  *   l'IA est toujours écrasé (bloquant 2 de 0148). Le jour d'un changement de ville : ville quittée pour un créneau rangé
  *   avant la ligne « Vers {ville} », ville d'arrivée pour un créneau rangé après ;
- * - le jour d'un changement de ville, **rangement** par la fin occupée (`finOccupeeDuCreneau`) : fin occupée ≤ départ,
- *   avant ; `debut` ≥ fin du créneau occupé (`creneauOccupe` de `changement-de-ville.ts`), après ; tout autre créneau
- *   (à cheval sur le départ, ou commencé dans le créneau occupé) est **retiré**. Créneau occupé borné à la fin du jour :
- *   aucun créneau n'est gardé après la ligne (0148 § 5.1 point 5). `arrivee` et `depart` sont des terminus, jamais rangés
- *   ni retirés ;
- * - **plafond d'activités** de ce jour (`activitesMax`), dans l'ordre écrit : `visite`, `soiree` et `pause` avec lieu
- *   comptent ; les repas (`repas_midi`, `repas_soir`, `apero`) et les pauses sans lieu, non ; les suivantes sont retirées ;
+ * - le jour d'un changement de ville, **rangement** par la fin occupée (`finOccupeeDuCreneau`) et les **marges** de
+ *   M4-suite § 3.3 (`margesDuChangement` : billet 45 et 30, vol 120 et 60, estimé 30 et 30) : fin occupée ≤ départ − marge
+ *   avant (et `debut` dans le jour), avant ; `debut` ≥ fin du créneau occupé (`creneauOccupe`, 180 minutes pour une arrivée
+ *   « à confirmer ») + marge après, après ; tout autre créneau (dans la fenêtre du changement de ville, à cheval sur ses
+ *   bords, ou hors du jour) est **retiré**. Créneau occupé borné à la fin du jour, ou fenêtre qui finit après lui : aucun
+ *   créneau n'est gardé après la ligne (0148 § 5.1 point 5 ; M4-suite § 3.8). `arrivee` et `depart` sont des terminus,
+ *   jamais rangés ni retirés ;
+ * - **plafond d'activités** de ce jour, dans l'ordre écrit : `activitesMax` du brief, ramené à `long.activitesMax` (1)
+ *   pour un **long changement de ville** (durée connue ≥ `long.seuilMinutes`, M4-suite § 3.6 point 2) ; `visite`, `soiree`
+ *   et `pause` avec lieu comptent ; les repas et les pauses sans lieu, non ; les suivantes sont retirées ;
+ * - **repas** de ce jour (M4-suite § 3.6 point 3) : au plus un `repas_midi` et un `repas_soir` gardés (les suivants, dans
+ *   l'ordre écrit, retirés) ; **aucun `apero`** (retiré) ; un repas dans la fenêtre du changement de ville est retiré par
+ *   le rangement, sans texte de remplacement ;
  * - **`aReserver`** retiré de chaque créneau ce jour-là (spécification M4 § 3.2) ;
  * - **durée estimée** du jour (`dureeEstimeeMinutes`) rebornée (`dureeEstimeeAdmise` : entier, bornes de
  *   `changementDeVille.dureeEstimeeMinutes`, arrondi à 5) pour un départ estimé, retirée sinon ou hors bornes (0149 S-M4-2
  *   point 3 : une entrée qui ne serait pas passée par la lecture est rebornée ici) ; ignorée un jour ordinaire.
- * Les jours ordinaires ne changent que par la ville de leurs créneaux. Les retraits sont comptés (`retires`) ; un créneau
- * retiré n'est jamais cherché (tout ce qui suit lit le programme cadré).
+ * Les jours ordinaires ne changent que par la ville de leurs créneaux : ni marge, ni plafond, ni retrait de repas. Les
+ * retraits sont comptés (`retires`, puis `compteurs.slotsRemoved`) ; un créneau retiré n'est jamais cherché (tout ce qui
+ * suit lit le programme cadré). Ni déplacement ni priorité (M4-suite § 3.7).
  *
  * Module pur, chargé par `pnpm p0` (importé par `assemblage.ts` pour le second contrôle ; décision 0149 § 6) : n'importe que
  * `src/domain` et `forme.ts` (types), jamais `src/ai`, `src/grounding`, `src/research`, `src/prototype` ni `src/server/p0`.
@@ -135,34 +142,42 @@ export function partageDuJour<C extends CreneauCadrable>(
     ...(duree === undefined ? {} : { estimatedMinutes: duree }),
   };
   const creneau = creneauOccupe(transfert, configuration);
-  // Créneau occupé borné à la fin du jour (durée longue) : aucun créneau de l'IA n'est gardé après la ligne (0148 § 5.1 point 5).
-  const borne =
-    changement.source === "estimated" &&
-    versMinutes(changement.depart) + (duree ?? configuration.changementDeVille.creneauSansDureeMinutes) > versMinutes(configuration.fenetreJour.fin);
-  const depart = versMinutes(changement.depart);
+  const marges = margesDuChangement(changement, configuration);
+  const debutDuJour = versMinutes(configuration.fenetreJour.debut);
+  const finDuJour = versMinutes(configuration.fenetreJour.fin);
+  // Fenêtre du changement de ville (M4-suite § 3.3) : de départ − marge avant à fin du créneau + marge après. Créneau borné à
+  // la fin du jour, ou fenêtre qui en sort : aucun créneau de l'IA n'est gardé après la ligne (0148 § 5.1 point 5).
+  const finAvant = versMinutes(changement.depart) - marges.avant;
+  const debutApres = creneauDepasseLeJour(transfert, configuration) || creneau.fin + marges.apres > finDuJour ? undefined : creneau.fin + marges.apres;
+  const activitesMax = activitesMaxDuChangement(changement.activitesMax, dureeConnue(transfert), configuration);
   const avant: C[] = [];
   const apres: C[] = [];
   const terminus: C[] = [];
   let retires = 0;
   let activites = 0;
+  const repas = new Set<string>();
   for (const lu of jour.creneaux) {
     if (estTerminus(lu)) {
       terminus.push(lu);
       continue;
     }
-    const finOccupee = finOccupeeDuCreneau(lu, configuration);
-    const cote = finOccupee <= depart ? "avant" : !borne && versMinutes(lu.debut) >= creneau.fin ? "apres" : undefined;
-    if (cote === undefined) {
+    const debut = versMinutes(lu.debut);
+    const cote =
+      finOccupeeDuCreneau(lu, configuration) <= finAvant && debut >= debutDuJour ? "avant" : debutApres !== undefined && debut >= debutApres ? "apres" : undefined;
+    // Aucun apéro le jour d'un changement de ville ; au plus un déjeuner et un dîner (M4-suite § 3.6 point 3).
+    const repasEnTrop = lu.nature === "apero" || ((lu.nature === "repas_midi" || lu.nature === "repas_soir") && repas.has(lu.nature));
+    if (cote === undefined || repasEnTrop) {
       retires += 1;
       continue;
     }
     if (estActivite(lu)) {
-      if (activites >= changement.activitesMax) {
+      if (activites >= activitesMax) {
         retires += 1;
         continue;
       }
       activites += 1;
     }
+    if (lu.nature === "repas_midi" || lu.nature === "repas_soir") repas.add(lu.nature);
     const cadre = { ...sansCle(lu, "aReserver"), ville: cote === "avant" ? changement.de : changement.vers } as C;
     if (cote === "avant") avant.push(cadre);
     else apres.push(cadre);

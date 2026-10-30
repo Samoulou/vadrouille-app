@@ -167,7 +167,8 @@ const PROGRAMME_DEUX_VILLES: Programme = {
       titre: "Titre de l'IA remplacé",
       dureeEstimeeMinutes: 150,
       creneaux: [
-        etape("09:00", "09:50", "visite", "Panthéon"),
+        // Fin à 09:30 (M4-suite § 9.1 point 2) : les bornes intègrent la marge de 30 minutes avant le départ estimé de 10:00.
+        etape("09:00", "09:30", "visite", "Panthéon"),
         etape("10:30", "11:30", "visite", "Lieu dans le créneau M4B"),
         etape("13:00", "14:00", "repas_midi", "Trattoria Mario", { ville: "Paris" }),
         etape("14:30", "16:00", "visite", "Galerie des Offices", { aReserver: true }),
@@ -542,7 +543,8 @@ describe("plusieurs-villes : forfait (critère 21 ; 0148 § 3)", () => {
       // Jour ordinaire : 6 lieux ; jour de changement : 4 lieux (1 avant le départ de 10:00, 3 après le créneau occupé).
       const creneaux = changement
         ? [
-            etape("09:00", "09:45", "visite", lieu(date, 1, villePrecedente(date))),
+            // Fin à 09:30 (M4-suite-back, écart justifié dans la PR) : marge de 30 minutes avant le départ estimé de 10:00.
+            etape("09:00", "09:30", "visite", lieu(date, 1, villePrecedente(date))),
             etape("13:00", "14:00", "repas_midi", lieu(date, 2)),
             etape("14:30", "16:00", "visite", lieu(date, 3)),
             etape("19:30", "21:00", "repas_soir", lieu(date, 4)),
@@ -569,5 +571,61 @@ describe("plusieurs-villes : forfait (critère 21 ; 0148 § 3)", () => {
     expect(etapes).toHaveLength(86);
     expect(etapes.filter((s) => s.placeId === undefined).map((s) => s.name)).toEqual([]);
     expect(v1.days.filter((d) => d.items.some((item) => item.type === "transfer")).map((d) => d.date)).toEqual(["2027-05-09", "2027-05-14"]);
+  });
+});
+
+describe("M4-suite : journée du changement de ville sur api (critères 3, 8 et 9 ; M4-suite-back)", () => {
+  // Billet « Train Rome–Florence » de 15:05 à 16:40 le jour du changement (marges du billet : 45 et 30 minutes). Les lieux
+  // gardés de ce jour n'apparaissent aucun autre jour, pour compter ses recherches.
+  const GARDES = ["Panthéon", "Roscioli", "Galerie des Offices", "Trattoria Mario"];
+  const RETIRES = ["Second déjeuner M4S", "Lieu à cheval M4S", "Lieu trop tôt M4S", "Apéro M4S", "Soirée M4S"];
+  const J2: Programme["jours"][number] = {
+    date: "2027-05-05",
+    creneaux: [
+      etape("09:30", "11:00", "visite", "Panthéon"),
+      etape("12:00", "13:15", "repas_midi", "Roscioli"),
+      etape("13:15", "14:00", "repas_midi", "Second déjeuner M4S"),
+      // Finit à 14:25, au-delà de 15:05 − 45 minutes : retiré.
+      etape("13:30", "14:25", "visite", "Lieu à cheval M4S"),
+      // Commence à 17:05, avant 16:40 + 30 minutes : retiré.
+      etape("17:05", "17:30", "visite", "Lieu trop tôt M4S"),
+      etape("17:10", "18:30", "visite", "Galerie des Offices"),
+      etape("18:30", "19:15", "apero", "Apéro M4S"),
+      etape("19:30", "21:00", "repas_soir", "Trattoria Mario"),
+      // Troisième activité (rythme équilibré : 2) : retirée.
+      etape("21:00", "22:00", "soiree", "Soirée M4S"),
+    ],
+  };
+
+  it("M4-suite: marges, repas et apéro retirés avant la vérification, jamais cherchés ; slotsRemoved", async () => {
+    const org = await createOrg(auth);
+    const draft: TripDraft = { ...DEUX_VILLES, commitments: [{ kind: "ticket", label: "Train Rome–Florence", date: "2027-05-05", start: "15:05", end: "16:40" }] };
+    const programme: Programme = { ...PROGRAMME_DEUX_VILLES, jours: PROGRAMME_DEUX_VILLES.jours.map((j) => (j.date === "2027-05-05" ? J2 : j)) };
+    const c = composition(programme, PLACES_DEUX_VILLES());
+    const espion = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const { tripId, fin } = await generer(org, draft, c.fabrique);
+    const journal = espion.mock.calls.map((args) => String(args[0])).filter((ligne) => ligne.includes('"event":"generation.programme_written"'));
+    espion.mockRestore();
+    expect(fin.arret).toBeUndefined();
+
+    const j2 = jour(await version(org, tripId, 1), "2027-05-05");
+    const rang = j2.items.findIndex((item) => item.type === "transfer");
+    expect(j2.items[rang]).toEqual({ type: "transfer", from: "Rome", to: "Florence", source: "entered", start: "15:05", end: "16:40", label: "Train Rome–Florence" });
+    expect(nomsDesEtapes(j2.items.slice(0, rang))).toEqual(["Panthéon", "Roscioli"]);
+    expect(nomsDesEtapes(j2.items.slice(rang + 1))).toEqual(["Galerie des Offices", "Trattoria Mario"]);
+    // « Temps libre » jusqu'au départ et dès l'arrivée (option (a) des marges).
+    expect(j2.items[rang - 1]).toEqual({ type: "free", from: "13:15", to: "15:05" });
+    expect(j2.items[rang + 1]).toEqual({ type: "free", from: "16:40", to: "17:10" });
+
+    // Créneaux retirés jamais cherchés ; au plus 4 lieux de ce jour cherchés par Text Search, logements exclus.
+    const textes = c.recherches.map((r) => r.texte);
+    for (const nom of RETIRES) expect(textes.some((t) => t.startsWith(nom))).toBe(false);
+    const duJour = textes.filter((t) => GARDES.some((nom) => t.startsWith(`${nom},`)));
+    expect(duJour.length).toBeLessThanOrEqual(4);
+    expect(new Set(duJour.map((t) => t.split(",")[0]))).toEqual(new Set(GARDES));
+
+    // Les cinq retraits du cadrage sont comptés dans `compteurs.slotsRemoved`.
+    expect(journal).toHaveLength(1);
+    expect((JSON.parse(journal[0]!) as { slotsRemoved: number }).slotsRemoved).toBe(RETIRES.length);
   });
 });

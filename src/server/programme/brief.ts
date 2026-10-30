@@ -225,16 +225,22 @@ export function briefProgrammeDepuisFormulaire(
       destination: premiere,
       villes,
       logements: villes.map((ville) => ({ texte: ville.logement, nuits: ville.nuits, ville: ville.nom })),
-      changements: changements.map((changement) => ({
-        date: changement.date,
-        de: changement.de,
-        vers: changement.vers,
-        source: changement.source,
-        depart: changement.depart,
-        ...(changement.arrivee === undefined ? {} : { arrivee: changement.arrivee }),
-        ...(changement.mode === undefined ? {} : { mode: changement.mode }),
-        activitesMax: changement.activitesMax,
-      })),
+      changements: changements.map((changement) => {
+        // Nature du billet ou du vol devenu ce changement de ville (marges de M4-suite § 3.3) ; jamais une « Sortie ».
+        const kind = changement.engagement === undefined ? undefined : draft.commitments.at(changement.engagement)?.kind;
+        const nature = kind === "ticket" || kind === "flight" ? kind : undefined;
+        return {
+          date: changement.date,
+          de: changement.de,
+          vers: changement.vers,
+          source: changement.source,
+          depart: changement.depart,
+          ...(changement.arrivee === undefined ? {} : { arrivee: changement.arrivee }),
+          ...(changement.mode === undefined ? {} : { mode: changement.mode }),
+          ...(nature === undefined ? {} : { nature }),
+          activitesMax: changement.activitesMax,
+        };
+      }),
       billets: changements.flatMap((changement) => {
         const engagement = changement.engagement === undefined ? undefined : draft.commitments.at(changement.engagement);
         return engagement === undefined ? [] : [{ date: changement.date, libelle: engagement.label.trim() }];

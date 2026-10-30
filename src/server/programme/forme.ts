@@ -53,6 +53,11 @@ export type ChangementDuBrief = {
   readonly depart: string;
   readonly arrivee?: string;
   readonly mode?: "car" | "transit";
+  /**
+   * Nature du billet ou du vol devenu changement de ville (départ saisi seulement), lue dans le brouillon à la génération et
+   * à la révision (T-M4S-4) : choisit les marges (`margesDuChangement`, M4-suite § 3.3). Jamais dans l'entrée d'un modèle.
+   */
+  readonly nature?: "ticket" | "flight";
   readonly activitesMax: number;
 };
 
