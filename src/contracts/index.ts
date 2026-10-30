@@ -120,8 +120,11 @@ export {
   PlaceSearchRequestSchema,
   PlaceSearchResultSchema,
   PlaceSearchResultsSchema,
+  RevertApplySchema,
+  RevertPreviewRequestSchema,
   RevertPreviewSchema,
   TripVersionPageSchema,
+  TripVersionsRequestSchema,
   TripVersionSummarySchema,
 } from "./retouches";
 export type {
@@ -130,8 +133,11 @@ export type {
   GooglePlaceLabel,
   PlaceSearchRequest,
   PlaceSearchResult,
+  RevertApply,
   RevertPreview,
+  RevertPreviewRequest,
   TripVersionPage,
+  TripVersionsRequest,
   TripVersionSummary,
 } from "./retouches";
 export { TripSummarySchema } from "./trip-summary";

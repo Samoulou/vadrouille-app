@@ -4,6 +4,7 @@ import { unlockRoutes } from "@/features/presentation/routes";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR } from "@/server/config/lieux";
 import { OFFER_CONFIG } from "@/server/config/offer";
+import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
 
 import { apiCreationAdapter } from "./api-creation-instance";
 import { photosApi, type PhotosApiBranchees } from "./api-photos-instance";
@@ -15,6 +16,7 @@ import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
 import { createMockStopReports } from "./mock-reports";
+import { createMockTripVersions } from "./mock-versions";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
 import {
   assertPrototypeAllowedOnProcess,
@@ -40,6 +42,7 @@ import {
   MAX_AUTH_ADDRESSES_PER_SCOPE,
   MAX_LAUNCHES_PER_SCOPE,
   MAX_STOP_REPORTS_PER_SCOPE,
+  emptyVersionsStore,
   type SimulationScope,
 } from "./simulation";
 import type {
@@ -52,6 +55,7 @@ import type {
   ShareAdapter,
   StopReportAdapter,
   TripAdapter,
+  TripVersionsAdapter,
 } from "./types";
 
 export type {
@@ -65,6 +69,7 @@ export type {
   RevisionAdapter,
   ShareAdapter,
   TripAdapter,
+  TripVersionsAdapter,
 } from "./types";
 export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
 /**
@@ -498,6 +503,30 @@ export async function signalementsDuVoyage(
     plafond: SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR,
     max: MAX_STOP_REPORTS_PER_SCOPE,
   });
+}
+
+/**
+ * Versions du programme (tâche M5b, ticket 934 ; décision 0147 § 5.3) : `mock`, historique simulé dans la portée de
+ * simulation (`options.scope`, sinon celle de la requête), voyages lus par `getTripReader()` de la même portée ; `api`,
+ * `trip_versions` (`TripAdapter.versions`) ; `null` pour `prototype` (le site d'essai n'a pas de versions : ni lien, ni
+ * page). Lu par les actions serveur de `src/server/actions/retouches.ts` et par l'écran « Versions du programme ».
+ */
+export async function versionsDuVoyage(
+  value: string | undefined = process.env.DATA_ADAPTER,
+  options: { scope?: SimulationScope } = {},
+): Promise<TripVersionsAdapter | null> {
+  const choice = adapterChoice(value);
+  if (choice === "api") return getTripAdapter(value).versions ?? null;
+  if (choice !== "mock") return null;
+  const scope = options.scope ?? (await getSimulationScope());
+  const store = (scope.versions ??= emptyVersionsStore());
+  return createMockTripVersions({ trips: getTripReader({ scope }), store, now: () => scope.clock.now(), max: VERSIONS_MAX_PAR_VOYAGE });
+}
+
+/** Lien « Versions du programme » et écran des versions (M5b) : adaptateurs `mock` et `api` seulement, décidé côté serveur. */
+export function versionsDisponibles(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  const choice = adapterChoice(value);
+  return choice === "mock" || choice === "api";
 }
 
 /** Bouton « Signaler une erreur » de la fiche (M5c) : adaptateurs `mock` et `api` seulement, décidé côté serveur. */

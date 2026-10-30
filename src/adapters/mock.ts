@@ -139,6 +139,8 @@ export function createMockTripAdapter(entries: MockEntry[] = DEFAULT_ENTRIES): T
     revision: undefined,
     // Signalement (M5c) : `mock` le tient dans la portée de simulation (`signalementsDuVoyage`), pas dans la fabrique.
     reports: undefined,
+    // Versions (M5b) : `mock` tient son historique simulé dans la portée de simulation (`versionsDuVoyage`), pas dans la fabrique.
+    versions: undefined,
     async listTrips(ctx) {
       return entries
         .filter((entry) => entry.trip.organizationId === ctx.organizationId)
