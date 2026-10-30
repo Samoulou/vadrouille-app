@@ -26,6 +26,8 @@ import { createServerRevision, createServerRevisionStore, syncServerRevisionVers
  */
 
 const DINER = "j1-diner";
+/** `VERSIONS_MAX_PAR_VOYAGE` (`src/server/config/retouches.ts`, serveur seulement) : la borne est tenue par le serveur. */
+const VERSIONS_MAX = 200;
 const NOUVELLE: Stop = {
   id: "remplacement-v2-abcdef12",
   kind: "meal",
@@ -340,5 +342,29 @@ describe("verrou enregistré sur api (M5a, ticket 919)", () => {
     expect(chateau(shown())?.locked).toBe(false);
     expect(store.version).toBe(1);
     expect(afterWrite).not.toHaveBeenCalled();
+  });
+
+  it(`verrou: « Annuler » au plafond de ${VERSIONS_MAX} versions : le geste inverse refusé (validation_failed) lève, l'étape reste verrouillée, l'annulation reste possible`, async () => {
+    // Le verrou écrit la dernière version admise ; le geste inverse de « Annuler » tombe sur la borne (0147 § 5.3 point 7).
+    let plafond = false;
+    const { actions, calls, store, shown } = setup({
+      verrou: async (input) => {
+        const { baseVersion } = input as { baseVersion: number };
+        if (plafond) return { ok: false, error: { code: "validation_failed", field: "baseVersion" } };
+        plafond = true;
+        return ok<PatchResult>({ version: baseVersion + 1, touchedDays: [1], changes: [] });
+      },
+    });
+    syncServerRevisionVersion(store, VERSIONS_MAX - 1);
+    await actions.setStopLocked("j1-chateau", true);
+    expect(store.version).toBe(VERSIONS_MAX);
+    await expect(actions.undo()).rejects.toEqual(new VerrouNonEnregistre("error"));
+    expect(calls.unlockStop).toHaveBeenCalledWith(expect.objectContaining({ stopId: "j1-chateau", baseVersion: VERSIONS_MAX }));
+    expect(chateau(shown())?.locked).toBe(true);
+    expect(store.version).toBe(VERSIONS_MAX);
+    // L'annulation n'est pas oubliée : un second « Annuler » redemande le même geste inverse.
+    await expect(actions.undo()).rejects.toEqual(new VerrouNonEnregistre("error"));
+    expect(calls.unlockStop).toHaveBeenCalledTimes(2);
+    expect(calls.undoReplacement).not.toHaveBeenCalled();
   });
 });

@@ -214,6 +214,8 @@ describe("verrou sur api (M5a, ticket 919)", () => {
       await c.query("UPDATE trips SET current_version = $3 WHERE organization_id = $1 AND id = $2", [a.org, tripId, VERSIONS_MAX_PAR_VOYAGE]);
     });
     expect(erreur(await verrouiller(tripId, "j1-chateau", VERSIONS_MAX_PAR_VOYAGE))).toEqual({ code: "validation_failed", field: "baseVersion" });
+    // Le geste inverse (« Annuler » du toast : déverrouiller) tombe aussi sur la borne, avant tout examen de l'étape.
+    expect(erreur(await deverrouiller(tripId, "j1-chateau", VERSIONS_MAX_PAR_VOYAGE))).toEqual({ code: "validation_failed", field: "baseVersion" });
     expect(await versions(a, tripId)).toHaveLength(2);
   });
 

@@ -152,6 +152,11 @@ export interface TripShellValue {
    * M5a), sur un voyage débloqué seulement (M5-PO-1 ; le serveur refuse aussi, `not_unlocked`).
    */
   lockable: boolean;
+  /**
+   * Fiche d'un engagement en lecture seule (« Déjà réservé », ni « Verrouiller », ni « Déplacer », ni « Remplacer ») : avec la
+   * révision enregistrée (adaptateur `api`, M5a ; M5-PO-3) seulement ; l'implémentation en mémoire (`mock`) est inchangée.
+   */
+  commitmentReadOnly: boolean;
   /** Retire `etape` inconnu de l'adresse et annonce l'absence (F5-PO-8). */
   reportMissingEtape: () => void;
 }
@@ -293,6 +298,7 @@ export function TripShell({
   const actions = injected ?? server ?? memory;
   // Verrou enregistré (M5a) : jamais proposé avant le déblocage.
   const lockable = serverStore === null || sourceTrip.unlocked;
+  const commitmentReadOnly = serverStore !== null;
   const revision = injectedRevision ?? server ?? memory;
   const trip = useMemo(() => applyProgramme(sourceTrip, programme), [sourceTrip, programme]);
   // Voyage relu (révision enregistrée) : les jours affichés en attendant la relecture sont retirés.
@@ -565,6 +571,7 @@ export function TripShell({
       unlockHref,
       reportable,
       lockable,
+      commitmentReadOnly,
     }),
     [
       routes,
@@ -592,6 +599,7 @@ export function TripShell({
       unlockHref,
       reportable,
       lockable,
+      commitmentReadOnly,
     ],
   );
 

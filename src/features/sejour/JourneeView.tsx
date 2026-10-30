@@ -119,7 +119,7 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
       await shell.actions.setStopLocked(fiche.stop.id, locked);
     } catch (erreur) {
       // Rien n'est affiché : conflit de version (le voyage est relu) ou refus ; le message est annoncé sur la fiche.
-      setLockFailure(erreur instanceof VerrouNonEnregistre && erreur.raison === "conflict" ? t.verrouConflit : t.verrouEchec);
+      setLockFailure(erreur instanceof VerrouNonEnregistre && erreur.raison === "conflict" ? t.verrouConflit : messages.sejour.echecEnregistrement);
       return;
     }
     shell.notifyChange(locked ? t.toastVerrouillee : t.toastDeverrouillee, () => {
@@ -181,6 +181,7 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
           onClose={shell.closeFiche}
           {...(shell.lockable ? { onToggleLock } : {})}
           lockFailure={lockFailure}
+          commitmentReadOnly={shell.commitmentReadOnly}
           onMove={() => setMoving({ stopId: fiche.stop.id, dayIndex: day.index, open: true })}
           onMoveIntent={preloadMoveSheet}
           {...(shell.reportable
