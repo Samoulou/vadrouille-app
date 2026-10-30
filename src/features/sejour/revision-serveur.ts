@@ -65,6 +65,16 @@ export function syncServerRevisionVersion(store: ServerRevisionStore, version: n
   if (version > store.version) store.version = version;
 }
 
+/**
+ * Version écrite par un retour à une version ou par son annulation (M5b, écran « Versions du programme ») : base des gestes
+ * suivants ; le retour rend définitive la modification précédente (remplacement ou verrou), qui n'est plus annulable.
+ */
+export function recordServerRevert(store: ServerRevisionStore, version: number): void {
+  syncServerRevisionVersion(store, version);
+  store.last = null;
+  store.lastLock = null;
+}
+
 /** Actions serveur injectées (tests) ; celles de `@/server/actions/remplacement` par défaut. */
 export type ServerRevisionCalls = {
   previewReplacement(input: unknown): Promise<Result<ReplacementOffer>>;

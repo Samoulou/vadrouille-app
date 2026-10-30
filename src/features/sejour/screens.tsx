@@ -2,7 +2,15 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { getRevisionFixtures, getRevisionVersion, isPrototypeAdapter, paymentAvailable, shareButtonVisible, signalementDisponible } from "@/adapters";
+import {
+  getRevisionFixtures,
+  getRevisionVersion,
+  isPrototypeAdapter,
+  paymentAvailable,
+  shareButtonVisible,
+  signalementDisponible,
+  versionsDisponibles,
+} from "@/adapters";
 import { contexteFacultatif } from "@/features/compte/session";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { format } from "@/i18n";
@@ -43,6 +51,8 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
   const unlockHref = base === "/voyages" && !data.trip.unlocked && paymentAvailable() ? unlockRoutes(data.trip.id).debloquer() : null;
   // « Signaler une erreur » (M5c) : routes `/voyages`, adaptateurs `mock` et `api` (le site d'essai n'en a pas).
   const reportable = base === "/voyages" && signalementDisponible();
+  // « Versions du programme » (M5b) : routes `/voyages`, adaptateurs `mock` et `api` ; le lien attend le déblocage (TripShell).
+  const versionable = base === "/voyages" && versionsDisponibles();
   return (
     <TripShell
       trip={data.trip}
@@ -54,6 +64,7 @@ export async function TripLayout({ tripId, base, children }: { tripId: string; b
       shareable={shareable}
       unlockHref={unlockHref}
       reportable={reportable}
+      versionable={versionable}
     >
       <SejourOriginProvider>{children}</SejourOriginProvider>
     </TripShell>
@@ -79,6 +90,12 @@ export async function journeeMetadata(tripId: string, n: string, etape?: string 
     ? format(t.etape, { name: fiche.stop.name, n: day.index })
     : format(t.jour, { destination: data.trip.destination, n: day.index });
   return { title, robots: ROBOTS };
+}
+
+/** Titre du document de « Versions du programme » (M5b) : « {destination} · Versions du programme ». */
+export async function versionsMetadata(tripId: string): Promise<Metadata> {
+  const data = await loadTrip(tripId);
+  return data ? { title: format(t.versions, { destination: data.trip.destination }), robots: ROBOTS } : { robots: ROBOTS };
 }
 
 /** Titre du document de l'écran 14 : « Remplacer {nom} · Jour {n} » (F7-PO-2) ; rien hors programme (404). */

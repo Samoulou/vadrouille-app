@@ -107,6 +107,15 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // M5b (spécification M5 § 4 ; décision 0147 § 5.3 point 3) : « Versions du programme », sur le voyage débloqué du jeu
+    // simulé (le lien du Séjour et la page n'existent qu'après le déblocage, M5-PO-1) ; budgets en `journal`, comme R14.
+    id: "R-versions",
+    path: `/voyages/${INVENTORY_TRIP}_debloque/versions`,
+    page: "voyages/[id]/(programme)/versions/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     // F10a : écran 15 « Aujourd'hui » ; hors des dates du voyage simulé, l'état mesuré est « avant le voyage ».
     id: "R15",
     path: `${TRIP}/aujourdhui`,
