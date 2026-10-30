@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createDatabase } from "../../../db/index.ts";
+import { SEUILS_LIEUX } from "@/server/config/lieux";
 import { AUTOCOMPLETE_COUNTS_RETENTION_DAYS, SEUILS_AUTOCOMPLETION } from "@/server/config/villes";
 import { errorNameOf, logEvent } from "@/server/log";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
@@ -30,10 +31,14 @@ import prixGoogle from "../../../prototype/config/prix-google.json";
  * - **Échec fermé** : seuil absent ou invalide, action hors liste, connexion ou requête en erreur (dont `42P01`, `42501`,
  *   `42704`), compte illisible → `indisponible` ; aucun appel Google ne suit.
  * - **Coûts dérivés** (option A, § 7) : `coutDesCompteurs`, au prix plein de la table commitée, aucune colonne de coût.
+ * - **Recherche d'un lieu à soi** (M5d-1, décision 0147 § 6.4 point 3 ; migration 0022) : action `lieux` ajoutée à la liste
+ *   fermée, colonne `lieux` de la même table (nom devenu un peu large : la table compte aussi Text Search), requête
+ *   constante, seuil `SEUILS_LIEUX.recherches` de `src/server/config/lieux.ts`, même purge de 40 jours, coût dérivé
+ *   `lieux × places_text_search_pro`. Seul appelant pour cette action : le terminal `src/server/composition/lieux-api.ts`.
  */
 
-/** Actions comptées, une colonne chacune (liste fermée, 0141 § 5.1). */
-export const ACTIONS_AUTOCOMPLETION = ["suggestions", "choix"] as const;
+/** Actions comptées, une colonne chacune (liste fermée, 0141 § 5.1 ; `lieux` : 0147 § 6.4 point 3). */
+export const ACTIONS_AUTOCOMPLETION = ["suggestions", "choix", "lieux"] as const;
 export type ActionAutocompletion = (typeof ACTIONS_AUTOCOMPLETION)[number];
 
 /** Client et pool minimaux (`pg.PoolClient`, `pg.Pool`), injectables par les tests. */
@@ -56,7 +61,7 @@ export type ReservationAutocompletion =
 export type AutocompleteCounterOptions = {
   /** Tests seulement : pool injecté (sinon le pool propre de `vadrouille_app`, créé au premier appel). */
   readonly pool?: AutocompleteCounterPool;
-  /** Tests seulement : seuils par action (sinon `SEUILS_AUTOCOMPLETION`) ; invalides : échec fermé. */
+  /** Tests seulement : seuils par action (sinon `SEUILS_AUTOCOMPLETION` et `SEUILS_LIEUX`) ; invalides : échec fermé. */
   readonly seuils?: Readonly<Record<string, unknown>>;
   /** Tests seulement : appelé dans la transaction de purge, avant la suppression (purge en erreur). */
   readonly beforePurge?: () => void | Promise<void>;
@@ -82,7 +87,13 @@ RETURNING suggestions AS compte`,
   choix: `UPDATE public.autocomplete_daily_counts SET choix = choix + 1
 WHERE day = ${JOUR} AND choix < $1::integer
 RETURNING choix AS compte`,
+  lieux: `UPDATE public.autocomplete_daily_counts SET lieux = lieux + 1
+WHERE day = ${JOUR} AND lieux < $1::integer
+RETURNING lieux AS compte`,
 });
+
+/** Seuils par défaut, par action : ceux de la ville (0141 § 2.3) et celui de la recherche d'un lieu (0147 § 6.4 point 3). */
+const SEUILS_PAR_DEFAUT: Readonly<Record<ActionAutocompletion, number>> = Object.freeze({ ...SEUILS_AUTOCOMPLETION, lieux: SEUILS_LIEUX.recherches });
 const PURGE = `DELETE FROM public.autocomplete_daily_counts WHERE day < ${JOUR} - $1::integer`;
 
 const PLAFOND: ReservationAutocompletion = Object.freeze({ ok: false, raison: "plafond" });
@@ -99,7 +110,7 @@ async function annuler(client: AutocompleteCounterClient): Promise<void> {
 }
 
 export function createAutocompleteCounter(options: AutocompleteCounterOptions = {}): AutocompleteCounter {
-  const seuils = options.seuils ?? SEUILS_AUTOCOMPLETION;
+  const seuils = options.seuils ?? SEUILS_PAR_DEFAUT;
   let pool: AutocompleteCounterPool | undefined = options.pool;
   /** Une réservation de cette instance a ouvert la ligne d'un jour nouveau depuis la dernière purge. */
   let purgeDue = false;
@@ -163,7 +174,10 @@ export function createAutocompleteCounter(options: AutocompleteCounterOptions = 
 
 let parDefaut: AutocompleteCounter | undefined;
 
-/** Réserve une action dans le seuil du jour (pool propre de `vadrouille_app`, seuils de `src/server/config/villes.ts`). */
+/**
+ * Réserve une action dans le seuil du jour (pool propre de `vadrouille_app`, seuils de `src/server/config/villes.ts` et,
+ * pour `lieux`, de `src/server/config/lieux.ts`).
+ */
 export function reserverAutocompletion(action: ActionAutocompletion): Promise<ReservationAutocompletion> {
   return (parDefaut ??= createAutocompleteCounter()).reserve(action);
 }
@@ -176,23 +190,30 @@ export function purgerAutocompletion(): Promise<void> {
   return (parDefaut ??= createAutocompleteCounter()).purge();
 }
 
-/** Compteurs lus d'un ou plusieurs jours (somme), pour le coût dérivé. */
-export type CompteursAutocompletion = { readonly suggestions: number; readonly choix: number };
+/** Compteurs lus d'un ou plusieurs jours (somme), pour le coût dérivé ; `lieux` absent vaut 0 (avant la migration 0022). */
+export type CompteursAutocompletion = { readonly suggestions: number; readonly choix: number; readonly lieux?: number };
 
 /**
  * Coût dérivé des compteurs (option A, 0141 § 7.1), en micro-USD arrondis au-dessus, au **prix plein** de la table
  * commitée (`prototype/config/prix-google.json`), sans tranche gratuite : `suggestions × places_autocomplete_requests +
- * choix × places_details_essentials` (`places_autocomplete_session_usage`, gratuit, n'entre pas). Table illisible ou
- * compteurs invalides : `null`, jamais 0. Aucun consommateur encore (relevé mensuel, § 14).
+ * choix × places_details_essentials + lieux × places_text_search_pro` (`places_autocomplete_session_usage`, gratuit,
+ * n'entre pas ; `lieux` : 0147 § 6.4 point 3). Table illisible ou compteurs invalides : `null`, jamais 0. Aucun
+ * consommateur encore (relevé mensuel, § 14).
  */
 export function coutDesCompteurs(compteurs: CompteursAutocompletion, table: unknown = prixGoogle): number | null {
   const lue = TablePrixGoogleSchema.safeParse(table);
   if (!lue.success) return null;
   const suggestion = lue.data.skus.places_autocomplete_requests;
   const fiche = lue.data.skus.places_details_essentials;
-  if (suggestion === undefined || fiche === undefined) return null;
+  const recherche = lue.data.skus.places_text_search_pro;
+  if (suggestion === undefined || fiche === undefined || recherche === undefined) return null;
   const entier = (n: number) => Number.isSafeInteger(n) && n >= 0;
-  if (!entier(compteurs.suggestions) || !entier(compteurs.choix)) return null;
+  const lieux = compteurs.lieux ?? 0;
+  if (!entier(compteurs.suggestions) || !entier(compteurs.choix) || !entier(lieux)) return null;
   // Prix d'une action arrondi au micro-USD supérieur (comme le site d'essai), puis produit entier : aucun flottant cumulé.
-  return compteurs.suggestions * Math.ceil(suggestion.prixPour1000 * 1_000) + compteurs.choix * Math.ceil(fiche.prixPour1000 * 1_000);
+  return (
+    compteurs.suggestions * Math.ceil(suggestion.prixPour1000 * 1_000) +
+    compteurs.choix * Math.ceil(fiche.prixPour1000 * 1_000) +
+    lieux * Math.ceil(recherche.prixPour1000 * 1_000)
+  );
 }

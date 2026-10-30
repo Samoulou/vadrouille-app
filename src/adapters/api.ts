@@ -7,6 +7,7 @@ import {
   MoveOptionsSchema,
   PatchResultSchema,
   PreviewSlotsSchema,
+  RevisionPreviewSchema,
   ProposalSchema,
   ReplacementOfferSchema,
   ReplacementWriteSchema,
@@ -16,6 +17,7 @@ import {
   TripVersionPageSchema,
   type Result,
 } from "@/contracts";
+import { appliquerAjout, proposerAjout } from "@/server/lieux/ajout";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
 import { annulerRemplacement, appliquerRemplacement, proposerRemplacement, versionDuVoyage, type DependancesRemplacement } from "@/server/versions/remplacement";
 import { appliquerDeplacement, optionsDeDeplacement, proposerDeplacement } from "@/server/versions/deplacement";
@@ -25,7 +27,7 @@ import { basculerAFaire } from "@/server/voyages/a-faire";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
 import { signalerEtape } from "@/server/voyages/signalement";
 
-import type { AdapterContext, RevisionAdapter, StopReportAdapter, TripAdapter, TripVersionsAdapter } from "./types";
+import type { AddPlaceAdapter, AdapterContext, RevisionAdapter, StopReportAdapter, TripAdapter, TripVersionsAdapter } from "./types";
 
 /**
  * Adaptateur `api` (spécification B6, B6a point 5 ; handover § 11 : aucun appel HTTP vers soi-même) : implémente
@@ -82,6 +84,21 @@ function signalementsApi(options: OptionsAdaptateurApi): StopReportAdapter {
 }
 
 /**
+ * Lieu à soi, aperçu et application d'un ajout (M5d-1, ticket 939) : cas d'usage de `src/server/lieux/ajout.ts`, dans le même
+ * processus, avec le contexte de la session et **le même port de relectures** que la lecture (un appel par aperçu ou
+ * application, hors transaction ; décision 0147 § 4). Chaque réponse est validée par son contrat.
+ */
+function lieuxApi(options: OptionsAdaptateurApi): AddPlaceAdapter {
+  const { withOrg, relectures } = options;
+  const dependances = (ctx: AdapterContext | null) => ({ contexte: async () => ctx, relectures, ...(withOrg === undefined ? {} : { withOrg }) });
+  const valide = <T>(schema: { parse(valeur: unknown): T }) => (resultat: Result<T>): Result<T> => (resultat.ok ? { ok: true, value: schema.parse(resultat.value) } : resultat);
+  return {
+    previewAddPlace: async (ctx, input) => valide(RevisionPreviewSchema)(await proposerAjout(dependances(ctx), input)),
+    applyAddPlace: async (ctx, input) => valide(PatchResultSchema)(await appliquerAjout(dependances(ctx), input)),
+  };
+}
+
+/**
  * Versions du programme et retour à une version (M5b, ticket 934) : cas d'usage de `src/server/versions/historique.ts`, dans
  * le même processus, avec le contexte de la session reçu de l'action serveur. Aucun appel du port de relectures (un retour
  * recopie un instantané). Chaque réponse est validée par son contrat.
@@ -103,6 +120,7 @@ export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter
   return {
     revision: revisionApi(options),
     reports: signalementsApi(options),
+    places: lieuxApi(options),
     versions: versionsApi(options),
     async listTrips(ctx) {
       return TripSummarySchema.array().parse(await lecture.listTrips(ctx));

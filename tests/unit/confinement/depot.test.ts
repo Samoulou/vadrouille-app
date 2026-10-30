@@ -535,7 +535,8 @@ describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)"
   const contenant = (texte: string) => fichiersDuCode().filter((c) => lireFichier(c).includes(texte)).sort();
 
   it("compteurs : seul importateur hors des tests, le terminal de api ; cœur : les deux terminaux seulement", () => {
-    expect(importateursHorsTests(COMPTEURS)).toEqual([TERMINAL_API]);
+    // Décision 0147 § 6.4 (M5d-1, ticket 939) : le terminal de la recherche d'un lieu à soi réserve le compteur `lieux`.
+    expect(importateursHorsTests(COMPTEURS)).toEqual(["src/server/composition/lieux-api.ts", TERMINAL_API]);
     expect(importateursHorsTests(RECHERCHE)).toEqual(["src/server/composition/villes-api.ts", "src/server/composition/villes.ts"]);
   });
 
@@ -547,7 +548,12 @@ describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)"
   });
 
   it("crochet accesReelApi : défini dans acces-reel.ts, lu par le seul terminal de api (jamais par la page de l'écran 1)", () => {
-    expect(contenant("accesReelApi")).toEqual(["src/server/composition/villes-api.ts", "src/server/generation/acces-reel.ts"]);
+    // Décision 0147 § 3 (M5d-1, ticket 939) : le terminal de la recherche d'un lieu à soi lit le même crochet.
+    expect(contenant("accesReelApi")).toEqual([
+      "src/server/composition/lieux-api.ts",
+      "src/server/composition/villes-api.ts",
+      "src/server/generation/acces-reel.ts",
+    ]);
   });
 
   it("SEUILS_AUTOCOMPLETION_VALIDES : une seule déclaration, `export const …: boolean = false`, aucune affectation", () => {
@@ -586,6 +592,57 @@ describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)"
       visiter(arbre);
     }
     expect(declarations).toEqual([`${CONFIG}: export const ${NOM}: boolean = false;`]);
+    expect(affectations).toEqual([]);
+  });
+});
+
+describe("confinement: recherche d'un lieu à soi de api (décision 0147 § 3 et § 14 ligne M5d-1, ticket 939)", () => {
+  const COEUR = "src/server/lieux/recherche.ts";
+  const TERMINAL = "src/server/composition/lieux-api.ts";
+  const CLIENTS = "src/server/composition/clients-google.ts";
+  const horsTests = (chemin: string) => !estFichierTest(chemin) && !chemin.startsWith("docs/");
+  const importateursHorsTests = (cible: string) =>
+    resultats
+      .filter((r) => horsTests(r.fichier) && r.imports.some((i) => i.cible === cible))
+      .map((r) => r.fichier)
+      .sort();
+
+  it("cœur : importé par le seul terminal ; terminal : importé par la seule action serveur ; le cœur n'importe ni la fabrique ni la barrière", () => {
+    expect(importateursHorsTests(COEUR)).toEqual([TERMINAL]);
+    expect(importateursHorsTests(TERMINAL)).toEqual(["src/server/actions/lieux.ts"]);
+    const cibles = resultats.find((r) => r.fichier === COEUR)?.imports.map((i) => i.cible) ?? [];
+    for (const interdit of [CLIENTS, "src/server/generation/barriere.ts", "src/server/generation/acces-reel.ts", "src/server/villes/compteurs.ts"]) {
+      expect(cibles).not.toContain(interdit);
+    }
+    expect(resultats.find((r) => r.fichier === TERMINAL)?.imports.map((i) => i.cible)).toContain(CLIENTS);
+  });
+
+  it("SEUILS_LIEUX_VALIDES : une seule déclaration, `export const …: boolean = false`, aucune affectation", () => {
+    const NOM = "SEUILS_LIEUX_VALIDES";
+    const declarations: string[] = [];
+    const affectations: string[] = [];
+    for (const chemin of suivis.map((f) => f.chemin).filter(estAnalyse)) {
+      const texte = lireFichier(chemin);
+      if (!texte.includes(NOM)) continue;
+      const arbre = ts.createSourceFile(chemin, texte, ts.ScriptTarget.Latest, true);
+      const visiter = (n: ts.Node) => {
+        if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === NOM) declarations.push(`${chemin}: ${n.parent.parent.getText(arbre)}`);
+        if (
+          ts.isBinaryExpression(n) &&
+          n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+          n.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
+          n.left.getText(arbre).includes(NOM)
+        ) {
+          affectations.push(`${chemin}: ${n.getText(arbre)}`);
+        }
+        if (ts.isCallExpression(n) && /^Object\.define|^Object\.assign/.test(n.expression.getText(arbre)) && n.getText(arbre).includes(NOM)) {
+          affectations.push(`${chemin}: ${n.getText(arbre)}`);
+        }
+        ts.forEachChild(n, visiter);
+      };
+      visiter(arbre);
+    }
+    expect(declarations).toEqual([`src/server/config/lieux.ts: export const ${NOM}: boolean = false;`]);
     expect(affectations).toEqual([]);
   });
 });

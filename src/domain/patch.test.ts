@@ -520,6 +520,60 @@ describe("patch: aucune option compatible", () => {
   });
 });
 
+/**
+ * Critère 22 de `specs/M5-retouches.md` (ticket 954 ; addendum 0147 § 4, A.8 écart 4) : le lieu à soi est verrouillé par son
+ * propre patch `[add, lock]`. Ce verrou ne lui ouvre pas l'exception des conflits entre étapes verrouillées (B5-PO-6) : un
+ * ajout qui recouvrirait une étape verrouillée de la base rend `no_option`, par le contrôle des étapes fixes de la
+ * replanification, et rien n'est produit. Deux étapes verrouillées **de la base** qui se chevauchent restent admises.
+ */
+describe("ajouter: refus sur une étape verrouillée (critère 22)", () => {
+  const ajoutVerrouille = (time: string): TripPatchOperation[] => [
+    { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time, name: "Mon lieu à moi", placeId: place("proche") },
+    { op: "lock", stopId: "ajout-1" },
+  ];
+  /** Version 3 : la version 2, première activité du J2 verrouillée (patch `[lock]`, sans replanification). */
+  function avecVerrou() {
+    const base = version2();
+    const activite = activiteDuJour(base, 2);
+    const verrouillee = reussi(appliquerPatch(entree(base, patch(2, [{ op: "lock", stopId: activite.id }])))).instantane;
+    return { verrouillee, activite: { ...activite, locked: true } };
+  }
+
+  it("[add, lock] à l'heure, avant ou pendant une étape verrouillée : no_option, rien produit ; [add] seul aussi", () => {
+    const { verrouillee, activite } = avecVerrou();
+    const gelee = structuredClone(verrouillee);
+    const debut = versMinutes(activite.start);
+    const heure = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    // Même heure ; 30 min avant (le bloc ajouté de 90 min déborde sur l'étape verrouillée) ; 30 min après son début.
+    for (const time of [activite.start, heure(debut - 30), heure(debut + 30)]) {
+      expect(appliquerPatch(entree(verrouillee, patch(3, ajoutVerrouille(time)), { versionCourante: 3 })), time).toEqual({ ok: false, code: "no_option" });
+      expect(appliquerPatch(entree(verrouillee, patch(3, ajoutVerrouille(time).slice(0, 1)), { versionCourante: 3 })), time).toEqual({ ok: false, code: "no_option" });
+    }
+    expect(verrouillee).toEqual(gelee);
+  });
+
+  it("[add, lock] hors de l'étape verrouillée : accepté, l'étape verrouillée inchangée (R3)", () => {
+    const { verrouillee, activite } = avecVerrou();
+    const { instantane } = reussi(appliquerPatch(entree(verrouillee, patch(3, ajoutVerrouille("21:00")), { versionCourante: 3 })));
+    expect(etape(instantane, (stop) => stop.id === "ajout-1")).toMatchObject({ start: "21:00", locked: true, addedBy: "person" });
+    expect(etape(instantane, (stop) => stop.id === activite.id)).toEqual(activite);
+  });
+
+  it("deux étapes verrouillées de la base qui se chevauchent restent admises (B5-PO-6) : un [add, lock] ailleurs dans le jour passe", () => {
+    const { verrouillee, activite } = avecVerrou();
+    // Étape verrouillée sans lieu, posée sur l'activité verrouillée (conflit entre deux verrous de la base).
+    const doublon: StopSnapshot = { id: "verrou-2", kind: "activity", name: "Visite saisie", start: activite.start, end: activite.end, facts: {}, exceptions: [], locked: true };
+    const base = structuredClone(verrouillee);
+    const jour = jourN(base, 2);
+    const rang = jour.items.findIndex((item) => item.type === "stop" && item.stop.id === activite.id);
+    jour.items.splice(rang + 1, 0, { type: "stop", stop: doublon });
+    // Rythme soutenu : l'étape saisie et le lieu ajouté ne dépassent pas le rythme (R8), seul le chevauchement est éprouvé.
+    const { instantane } = reussi(appliquerPatch(entree(base, patch(3, ajoutVerrouille("21:00")), { versionCourante: 3, moteur: moteur("intense") })));
+    expect(etape(instantane, (stop) => stop.id === doublon.id)).toEqual(doublon);
+    expect(etape(instantane, (stop) => stop.id === activite.id)).toEqual(activite);
+  });
+});
+
 describe("patch: entrée bloquante nouvelle (validation des jours touchés)", () => {
   it("replace par un candidat dont le lieu est fermé : entrée bloquante nouvelle, no_option, rien produit", () => {
     const base = version2();

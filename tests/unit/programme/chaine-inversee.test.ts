@@ -519,8 +519,10 @@ describe("journal: generation.programme_written (0139 § 2)", () => {
     );
     // Décision 0141 § 6.3 point 4 (PR 885) : `ville.refusee` et `ville.purge_failed` ont aussi leur liste fermée.
     // Décision 0147 § 12 S1 point 4 (M5c, ticket 904) : `voyages.stop_reported`, motif seul.
+    // Décision 0147 § 12 S1 point 5 (M5d-1, ticket 939) : `lieu.recherche`, motif, nombre de résultats et diagnostic fermé.
     expect([...CHAMPS_ADMIS_PAR_EVENEMENT.keys()].sort()).toEqual([
       "generation.programme_written",
+      "lieu.recherche",
       "ville.purge_failed",
       "ville.refusee",
       "voyages.stop_reported",
