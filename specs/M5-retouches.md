@@ -322,7 +322,7 @@ Chaque critère est vérifié par un test nommé dans la PR de sa tâche. Les te
 
 ## 14. Hors périmètre
 
-- « Remplacer » (écran 14) sur `api` : M1g (#869). « Déplacer » sur `api` : tâche à ouvrir par le CEO (non listée dans le plan ; question au CEO).
+- « Remplacer » (écran 14) sur `api` : M1g (#869). « Déplacer » sur `api` : ticket #947 (PR #953), par le moteur (`appliquerPatch`, patch `[move]`) et la relecture du port de la lecture, comme M1g et l'ajout : décision 0153 (`docs/decisions/0153-deplacement-sur-api.md`).
 - « Garder » sur la fiche (Q67, Samuel).
 - Le nombre de remplacements inclus dans le voyage complet (« [N] remplacements », Q88, Samuel).
 - La file de vérification humaine des signalements, toute vérification Google déclenchée par un signalement, et tout apprentissage tiré des signalements.
