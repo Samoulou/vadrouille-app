@@ -7,6 +7,7 @@ import { edimbourgDebloque } from "@/mocks/edimbourg";
 
 import {
   CreatedShareLinkSchema,
+  SharedDayItemSchema,
   SharedDaySchema,
   SharedDayViewSchema,
   SharedEventSchema,
@@ -187,7 +188,8 @@ describe("actions : entrée et réponses", () => {
 describe("plusieurs-villes: transfer absent de la vue partagée (décision 0148 § 1 point 4, S-M4-4)", () => {
   const transfer = { type: "transfer", from: "Rome", to: "Florence", source: "estimated", start: "11:30", estimatedMinutes: 180, mode: "transit" };
 
-  it("SharedDaySchema refuse un transfer (liste blanche, aucune nouvelle variante)", () => {
+  it("partage: SharedDayItemSchema refuse un transfer (liste blanche, aucune nouvelle variante)", () => {
+    expect(SharedDayItemSchema.safeParse(transfer).success).toBe(false);
     expect(SharedDaySchema.safeParse({ ...day2, items: [...day2.items, transfer] }).success).toBe(false);
   });
 

@@ -72,12 +72,19 @@ export function stopKeys(day: Pick<Day, "items">): Map<Stop["id"], string> {
   return keys;
 }
 
+/** Élément de la ligne du jour que la liste blanche de la vue partagée nomme (tous sauf le changement de ville). */
+type ItemPartageable = Exclude<Day["items"][number], { type: "transfer" }>;
+
 /**
- * Élément partagé, ou `undefined` pour un élément que la liste blanche ne nomme pas : le changement de ville
- * (`transfer`, décision 0148 § 1 point 4) est retiré, comme `public.shared_line_item` rend `NULL` et `shared_day`
- * filtre les `NULL`.
+ * Filtre explicite sur le type (décision 0149 § 4 point 2, S-M4-4) : le changement de ville (`transfer`, décision
+ * 0148 § 1 point 4) est **retiré**, jamais converti en un autre élément partagé, et aucun de ses champs n'est recopié,
+ * comme `public.shared_line_item` rend `NULL` pour un type qu'elle ne nomme pas et `shared_day` filtre les `NULL`.
  */
-function sharedItem(item: Day["items"][number], keys: Map<Stop["id"], string>): SharedDayItem | undefined {
+function estPartageable(item: Day["items"][number]): item is ItemPartageable {
+  return item.type !== "transfer";
+}
+
+function sharedItem(item: ItemPartageable, keys: Map<Stop["id"], string>): SharedDayItem {
   switch (item.type) {
     case "terminus":
       return { type: "terminus", role: item.role, time: item.time };
@@ -92,8 +99,6 @@ function sharedItem(item: Day["items"][number], keys: Map<Stop["id"], string>): 
       return { type: "free", from: item.from, to: item.to };
     case "openMeal":
       return { type: "openMeal", time: item.time, meal: item.meal };
-    case "transfer":
-      return undefined;
   }
 }
 
@@ -103,10 +108,7 @@ export function projectSharedDay(day: Day): SharedDay {
     index: day.index,
     date: day.date,
     generating: day.generating,
-    items: day.items.flatMap((item) => {
-      const shared = sharedItem(item, keys);
-      return shared === undefined ? [] : [shared];
-    }),
+    items: day.items.filter(estPartageable).map((item) => sharedItem(item, keys)),
     events: day.events.map(sharedEvent),
   };
 }

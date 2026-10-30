@@ -205,7 +205,7 @@ describe("points de carte (F10-TL-14)", () => {
 });
 
 describe("plusieurs-villes: la projection retire le transfer (décisions 0148 § 1 point 4 et 0149, S-M4-4)", () => {
-  it("un transfer n'apparaît pas dans la vue partagée, sous aucune forme ; les autres éléments restent dans l'ordre", () => {
+  it("partage: transfer absent de la projection (retiré, jamais converti ; ni son libellé ni ses villes ; les autres éléments restent dans l'ordre)", () => {
     const jour = trip.days[1]!;
     const transfer = {
       type: "transfer",
