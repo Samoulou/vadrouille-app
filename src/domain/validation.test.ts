@@ -38,6 +38,12 @@ const CONFIG: ConfigurationMoteur = {
   dureesParDefaut: { activity: 90, lunch: 75, dinner: 90, evening: 90 },
   margeMinutes: 5,
   seuilTempsLibreMinutes: 30,
+  changementDeVille: {
+    activitesParRythme: { relaxed: 1, balanced: 2, intense: 2 },
+    departEstime: { heureParDefaut: "10:00", limite: "18:00" },
+    creneauSansDureeMinutes: 180,
+    dureeEstimeeMinutes: { min: 20, max: 600 },
+  },
 };
 
 /** Valeurs sentinelles des doubles : aucune ne doit figurer dans un rapport. */
@@ -456,6 +462,17 @@ describe("validation: R8 rythme et temps libre", () => {
   it("trou de 30 min ou plus non écrit comme temps libre : violation (B5-PO-9)", () => {
     const jour = jourDeReference();
     expect(r8(cas({ ...jour, items: jour.items.filter((item) => item.type !== "free") }))).toEqual([{ regle: "R8", jour: 2 }]);
+  });
+
+  it("plusieurs-villes: un transfer remet le précédent à zéro, aucun trajet d'une ville à l'autre (décision 0151 § 4)", () => {
+    const jour = jourDeReference();
+    const sansLibre = jour.items.filter((item) => item.type !== "free");
+    // Un transfer à la place de chaque temps libre : le trou qu'il couvre n'est plus mesuré d'une étape à la suivante.
+    const items = jour.items.flatMap((item): DayLineItem[] =>
+      item.type === "free" ? [{ type: "transfer", from: "Ville 1", to: "Ville 2", source: "estimated", start: "11:30", estimatedMinutes: 120 }] : [item],
+    );
+    expect(r8(cas({ ...jour, items: sansLibre }))).toEqual([{ regle: "R8", jour: 2 }]);
+    expect(r8(cas({ ...jour, items }))).toEqual([]);
   });
 });
 

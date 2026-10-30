@@ -25,9 +25,13 @@ import type { EntreeProgramme } from "./entree";
 /** Choix du tri retenus pour la révision : identifiants d'étapes maison (`j<jour>-<rang>`), jamais un nom ni un lieu. */
 export type ChoixRevision = { readonly pasPourMoi: readonly string[]; readonly jAime: readonly string[] };
 
-/** Forme d'`EntreeRevision` (`src/ai/entree-revision.ts`, que ce module n'importe pas) ; égalité vérifiée par les tests. */
-export type EntreeRevisionProgramme = {
-  brief: EntreeProgramme;
+/**
+ * Forme d'`EntreeRevision` (`src/ai/entree-revision.ts`, que ce module n'importe pas) ; égalité vérifiée par les tests. Le
+ * brief est celui du prompt `programme` v4 par défaut ; la révision d'un voyage à plusieurs villes (M4b) passe l'entrée v5
+ * sans récit (`EntreeRevisionV3`, M4a-2).
+ */
+export type EntreeRevisionProgramme<B = EntreeProgramme> = {
+  brief: B;
   programme: {
     jours: {
       date: string;
@@ -77,7 +81,7 @@ export function etapesPourLeModele(jour: JourRevisable): EtapeRevisable[] {
  * choix. Seuls les choix portant sur une étape des journées sont gardés (un identifiant inconnu est ignoré, jamais transmis) ;
  * une étape à la fois aimée et écartée reste écartée.
  */
-export function entreeRevisionDepuisJours(journees: readonly JourRevisable[], brief: EntreeProgramme, choix: ChoixRevision): EntreeRevisionProgramme {
+export function entreeRevisionDepuisJours<B = EntreeProgramme>(journees: readonly JourRevisable[], brief: B, choix: ChoixRevision): EntreeRevisionProgramme<B> {
   const jours = [...journees].sort((a, b) => a.index - b.index);
   const ids = new Set(jours.flatMap((jour) => etapesPourLeModele(jour).map((etape) => etape.id)));
   const pasPourMoi = [...new Set(choix.pasPourMoi)].filter((id) => ids.has(id));

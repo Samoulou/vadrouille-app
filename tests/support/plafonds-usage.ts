@@ -11,8 +11,8 @@ import type { PlafondsUsage } from "@/server/config/usage";
  * - complet : 0,20 + 40 fiches (0,80) + 400 éléments (2,00) = 3,00 USD ;
  * - mini : 0,02 + 6 fiches (0,12) + 0 élément = 0,14 USD ;
  * - lot : 0,02 + 40 fiches (0,80) + 200 éléments (1,00) = 1,82 USD ;
- * - programme (chaîne inversée, décision 0136 § 6.4) : 0,60 + 90 fiches (1,80) + 0 élément = 2,40 USD ;
- * - revision (« Pas pour moi » de la chaîne inversée, décision 0142) : 0,70 + 90 fiches (1,80) + 0 élément = 2,50 USD ;
+ * - programme (chaîne inversée, décision 0136 § 6.4 ; 100 fiches depuis M4b, 0148 § 3) : 0,60 + 100 fiches (2,00) + 0 élément = 2,60 USD ;
+ * - revision (« Pas pour moi » de la chaîne inversée, décision 0142 ; 100 fiches depuis M4b) : 0,70 + 100 fiches (2,00) + 0 élément = 2,70 USD ;
  * - relecture d'un jour (profil `relecture`, valeurs de départ de 0100 § 1.4) : 20 fiches (0,40) + 24 éléments (0,12) =
  *   0,52 USD ; relecture d'un voyage (`relectureVoyage`) : 100 fiches (2,00) + 240 éléments (1,20) = 3,20 USD ;
  * - `structureBrief` : 0,01 USD ; `suggestLodging` : 0,02 USD (Text Search à 0).
@@ -26,9 +26,9 @@ export const PLAFONDS_USAGE_TEST: PlafondsUsage = {
     // Recalcul d'un tri (B10b, décision 0119 § 4.1 point 3) : six jours, deux jours touchés, une ville.
     lot: { coutModelesMicros: 20_000, placesTextSearch: 4, placesDetails: 40, routesRequetes: 4, routesElements: 200 },
     // Aperçu de la chaîne inversée (décision 0136 § 6.4) : valeurs de `PLAFONDS_VARIANTE_SIMULEE.generations.programme`.
-    programme: { coutModelesMicros: 600_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 },
+    programme: { coutModelesMicros: 600_000, placesTextSearch: 100, placesDetails: 100, routesRequetes: 0, routesElements: 0 },
     // Révision de la chaîne inversée (décision 0142) : valeurs de `PLAFONDS_VARIANTE_SIMULEE.generations.revision`.
-    revision: { coutModelesMicros: 700_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 },
+    revision: { coutModelesMicros: 700_000, placesTextSearch: 100, placesDetails: 100, routesRequetes: 0, routesElements: 0 },
   },
   relecture: {
     jour: { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 },

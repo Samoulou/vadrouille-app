@@ -200,6 +200,10 @@ function regleR8(jour: JourProgramme, contexte: ContexteValidation, entrees: Ent
       precedent = { fin: versMinutes(item.time), point: { logement: logements.depart } };
     } else if (item.type === "free" || item.type === "openMeal") {
       precedent = undefined;
+    } else if (item.type === "transfer") {
+      // Changement de ville (décision 0151 § 4) : aucun trajet n'est calculé d'une ville à l'autre ; la première étape
+      // après l'arrivée n'a pas d'élément précédent (spécification M4 § 7.3).
+      precedent = undefined;
     } else if (item.type === "stop") {
       const stop = item.stop;
       if (precedent !== undefined && stop.placeId !== undefined) {

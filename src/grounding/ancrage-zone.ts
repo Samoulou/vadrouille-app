@@ -4,7 +4,6 @@ import { ancrerLogement, ficheOuNull, RAYON_BIAIS_METRES } from "@/grounding/anc
 import { ErreurAncrage, type ClientPlaces, type RectangleZone, type ReponseTextSearch, type RequeteTextSearch } from "@/grounding/interfaces";
 import { dansZone, zoneDuSejour } from "@/grounding/zone";
 import type { AncrageResolu } from "@/prototype/ancrage";
-import type { Brief } from "@/prototype/brief";
 
 /**
  * Étape d'ancrage de `p0Run` (décision 0055, section 6 point 3, qui amende 0011 § 2 pour `p0Run` seulement ; section 3
@@ -20,10 +19,21 @@ import type { Brief } from "@/prototype/brief";
  * Tout ce qui sort de ce module est une donnée Google (identifiants, positions) : en mémoire, jamais dans un prompt.
  */
 
+/**
+ * Brief lu par l'ancrage des logements (décision 0148 § 7.1 point 7) : **type structurel local**, qui remplace le `Brief` de
+ * `@/prototype/brief` ; le `Brief` de `p0Run`, `BriefEssai` et `BriefProgramme` y sont tous assignables. `ville` (nom maison
+ * de la ville du logement) n'est porté que par le brief de `api` à plusieurs villes : chaque logement est ancré sur **sa**
+ * ville (`« {texte}, {ville} »`, 0148 § 7.1 point 1), sinon sur la destination, comme aujourd'hui.
+ */
+export type BriefAncrage = {
+  readonly destination: string;
+  readonly logements: readonly { readonly texte: string; readonly nuits: number; readonly ville?: string }[];
+};
+
 /** Capacités Places de l'étape d'ancrage (0055 § 3 point 5) : `textSearch` et `detailsLogement`, rien d'autre. */
 export type CapacitesAncrage = {
   readonly textSearch: (requete: RequeteTextSearch) => Promise<ReponseTextSearch>;
-  readonly detailsLogement: (brief: Brief, indice: number) => Promise<AncrageResolu>;
+  readonly detailsLogement: (brief: BriefAncrage, indice: number) => Promise<AncrageResolu>;
 };
 
 /**
@@ -32,7 +42,7 @@ export type CapacitesAncrage = {
  * même logement du même brief rend la même fiche, sans nouvelle requête (une fiche par logement à l'ancrage).
  */
 export function capacitesAncrage(places: ClientPlaces): CapacitesAncrage {
-  const dejaResolus = new WeakMap<Brief, Map<number, Promise<AncrageResolu>>>();
+  const dejaResolus = new WeakMap<BriefAncrage, Map<number, Promise<AncrageResolu>>>();
   return {
     textSearch: (requete) => places.textSearch(requete),
     detailsLogement(brief, indice) {
@@ -45,18 +55,35 @@ export function capacitesAncrage(places: ClientPlaces): CapacitesAncrage {
       }
       const connu = parIndice.get(indice);
       if (connu !== undefined) return connu;
-      const fiche = ancrerLogement(logement, brief.destination, places);
+      const fiche = ancrerLogement(logement, logement.ville ?? brief.destination, places);
       parIndice.set(indice, fiche);
       return fiche;
     },
   };
 }
 
-/** Logements résolus (une fiche chacun) et zone du séjour : rectangle des cercles de `RAYON_BIAIS_METRES`. */
-export async function ancrerLogementsDuSejour(brief: Brief, capacites: Pick<CapacitesAncrage, "detailsLogement">): Promise<{ logements: AncrageResolu[]; zone: RectangleZone }> {
+/**
+ * Logements résolus (une fiche chacun) et zones (décision 0148 § 7.1 points 2 et 6) :
+ * - `zone` : zone du séjour, rectangle des cercles de `RAYON_BIAIS_METRES` autour de **tous** les logements (inchangée,
+ *   celle de `p0Run`) ;
+ * - `zonesParVille` : par nom maison de ville, le rectangle des cercles autour des logements de **cette** ville (une ville
+ *   qui revient couvre ses deux logements). Remplie seulement pour les logements qui portent une `ville` : vide pour
+ *   `p0Run`. Positions en mémoire seulement (0011).
+ */
+export async function ancrerLogementsDuSejour(
+  brief: BriefAncrage,
+  capacites: Pick<CapacitesAncrage, "detailsLogement">,
+): Promise<{ logements: AncrageResolu[]; zone: RectangleZone; zonesParVille: ReadonlyMap<string, RectangleZone> }> {
   const logements: AncrageResolu[] = [];
-  for (let indice = 0; indice < brief.logements.length; indice += 1) logements.push(await capacites.detailsLogement(brief, indice));
-  return { logements, zone: zoneDuSejour(logements.map((logement) => logement.position), RAYON_BIAIS_METRES) };
+  const positionsParVille = new Map<string, AncrageResolu["position"][]>();
+  for (let indice = 0; indice < brief.logements.length; indice += 1) {
+    const logement = await capacites.detailsLogement(brief, indice);
+    logements.push(logement);
+    const ville = brief.logements.at(indice)?.ville;
+    if (ville !== undefined) positionsParVille.set(ville, [...(positionsParVille.get(ville) ?? []), logement.position]);
+  }
+  const zonesParVille = new Map([...positionsParVille].map(([ville, positions]) => [ville, zoneDuSejour(positions, RAYON_BIAIS_METRES)] as const));
+  return { logements, zone: zoneDuSejour(logements.map((logement) => logement.position), RAYON_BIAIS_METRES), zonesParVille };
 }
 
 /** Candidat résolu dans la zone, sans fiche : seulement son `placeId` (statut, position et horaires inconnus ici). */
@@ -107,7 +134,8 @@ export type ControleAppel = (methode: "textSearch" | "fiche") => Promise<"ok" | 
  * 1. Text Search par `ancrerCandidatsDansZone` (**réutilisée**, jamais recopiée ni modifiée), **un appel par lieu
  *    distinct** (liste d'un seul lieu) : texte `« <lieu>, <ville> »` construit des seuls `lieu` et `ville` contrôlés
  *    (la ville passe par le paramètre `destination`), ou `« <lieu>, <destination> »` sans ville ; restriction à la zone
- *    des logements, masque `id`, premier identifiant gardé ;
+ *    du lieu (`zoneDe(lieu)` : zone commune des logements pour `p0Run`, zone de la ville du lieu pour `api`, 0148 § 7.1
+ *    point 6), masque `id`, premier identifiant gardé ;
  * 2. une fiche par identifiant distinct (`ficheOuNull`) : gardée si elle existe, n'est pas fermée définitivement et
  *    tombe dans la zone. Les horaires ne sont **pas** évalués ici (0116 § 4.4) : un lieu fermé le jour du créneau garde
  *    son identifiant, son badge vient de la relecture des horaires à l'affichage (0116 § 5.3).
@@ -120,13 +148,16 @@ export async function verifierLieuxDuProgramme(
   lieux: readonly LieuProgramme[],
   destination: string,
   capacites: { readonly textSearch: (requete: RequeteTextSearch) => Promise<ReponseTextSearch>; readonly places: Pick<ClientPlaces, "details"> },
-  zone: RectangleZone,
+  zoneDe: (lieu: LieuProgramme) => RectangleZone,
   controle: ControleAppel,
 ): Promise<IssueVerification> {
   const fiches = new Map<string, AncrageResolu>();
   const lues = new Map<string, AncrageResolu | null>();
   for (const lieu of lieux) {
     if ((await controle("textSearch")) !== "ok") break;
+    // Zone du lieu (décision 0148 § 7.1 point 6) : une fonction appelée pour chaque lieu, **avant** tout appel ; `p0Run` passe
+    // la zone commune, `api` celle de la ville posée par le cadrage. Une zone introuvable lève (échec fermé, sans appel).
+    const zone = zoneDe(lieu);
     const ancrage = (await ancrerCandidatsDansZone([{ id: lieu.id, nom: lieu.lieu }], lieu.ville ?? destination, capacites, zone)).get(lieu.id);
     if (ancrage === undefined || !ancrage.resolu) continue;
     let fiche = lues.get(ancrage.placeId);

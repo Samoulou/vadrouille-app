@@ -86,8 +86,8 @@ function voisinDe(item: DayLineItemSnapshot, configuration: ConfigurationMoteur)
  * Changement de ville (`transfer`, décision 0148 § 1 point 3 ; spécification M4 § 7.3) : il n'est jamais un voisin et
  * **arrête la recherche** de son côté, rangé par son départ `start` comme les autres éléments. Le plus proche élément
  * avant la proposition est le `transfer` : `before` absent ; le plus proche après : `after` absent. Un élément situé
- * au-delà du `transfer` n'est jamais un voisin. (Le repas de midi compté comme absent le jour d'un changement de ville,
- * 0148 § 10.1 point 3, est à M4b.)
+ * au-delà du `transfer` n'est jamais un voisin. Aucun paramètre ni attente « déjeuner » propre au jour d'un changement
+ * de ville (décision 0151 § 3) : un déjeuner n'y est cité que s'il est le voisin direct, comme un autre jour.
  */
 export function voisins(
   jour: Pick<JourProgramme, "items" | "generating">,

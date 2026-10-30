@@ -163,13 +163,14 @@ export const PLAFONDS_VARIANTE_SIMULEE: PlafondsUsage = chargerPlafondsUsage({
     // requêtes, 2 × 100 éléments), au plus deux villes `area` ou `none` par jour touché. Valeurs de test, pas des montants.
     lot: { coutModelesMicros: 20_000, placesTextSearch: 4, placesDetails: 40, routesRequetes: 4, routesElements: 200 },
     // Aperçu de la chaîne inversée (décision 0136 § 6.4) : Text Search et fiches de `prototype/config/mode-reel.json` (le
-    // programme simulé de Rome compte 30 lieux distincts et un logement), aucune requête Routes à la génération (§ 2.4).
+    // programme simulé de Rome compte 30 lieux distincts et un logement), aucune requête Routes à la génération (§ 2.4). 100 et
+    // 100 depuis M4b (décision 0148 § 3 point 2 : 3 villes et 15 jours, 13 × 6 + 2 × 4 lieux + 3 logements = 89, avec marge).
     // Valeurs de test, pas des montants : la barrière ne les lit jamais.
-    programme: { coutModelesMicros: 600_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 },
+    programme: { coutModelesMicros: 600_000, placesTextSearch: 100, placesDetails: 100, routesRequetes: 0, routesElements: 0 },
     // Révision de la chaîne inversée (décision 0142) : une requête `revision` (entrée plus longue que celle du programme : les
     // textes de la version de base), toute la version revérifiée (Text Search et fiches du profil `programme`), aucune requête
     // Routes. Valeurs de test, pas des montants : la barrière ne les lit jamais.
-    revision: { coutModelesMicros: 700_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 },
+    revision: { coutModelesMicros: 700_000, placesTextSearch: 100, placesDetails: 100, routesRequetes: 0, routesElements: 0 },
   },
   relecture: {
     jour: { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 },

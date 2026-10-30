@@ -28,8 +28,7 @@ export function debutDeLigne(item: DayLineItemSnapshot): number | undefined {
     case "segment":
       return undefined;
     case "transfer":
-      // Changement de ville (décision 0148 § 1 point 3) : traité avant cet appel par `voisins` ; son heure (départ
-      // `start`) pour les autres parcours est à M4b.
-      return undefined;
+      // Changement de ville (décision 0151 § 4) : son heure est le départ (`start`). `voisins` l'arrête avant cet appel.
+      return versMinutes(item.start);
   }
 }

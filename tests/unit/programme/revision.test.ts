@@ -255,7 +255,7 @@ describe("R3 sur la version révisée (spécification M5 § 3, critère 2 ; revu
 describe("capacité reviser et filet du code (PR 868 ; revue de la PR 875, bloquant 2)", () => {
   it("PR 868 : profil de forfait `revision` (décision 0142) : même valeurs de test partout, aucune requête Routes", async () => {
     expect(PROFILS_FORFAIT).toContain("revision");
-    const attendu = { coutModelesMicros: 700_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 };
+    const attendu = { coutModelesMicros: 700_000, placesTextSearch: 100, placesDetails: 100, routesRequetes: 0, routesElements: 0 };
     expect(PLAFONDS_VARIANTE_SIMULEE.generations.revision).toEqual(attendu);
     expect(PLAFONDS_USAGE_TEST.generations.revision).toEqual(attendu);
     expect(PLAFONDS_LARGES.generations.revision).toEqual(attendu);
@@ -291,7 +291,7 @@ describe("capacité reviser et filet du code (PR 868 ; revue de la PR 875, bloqu
     const capacite = await capaciteRome(seulEcarte);
     await capacite.reviser(ENTREE, SEJOUR_ROME, (p) => retirerEtapesEcartees(p, ["Colisée"]));
     // Rien n'a été lu : la suite de l'étape (lieux, vérification) n'a aucun programme.
-    expect(() => capacite.lieux("Rome")).toThrow(RangeError);
+    expect(() => capacite.lieux({ jours: [], bonsPlans: [] })).toThrow(RangeError);
   });
 
   it("PR 868 (c) : une seule journée vidée par le filtre : les autres journées sont gardées", async () => {
