@@ -203,3 +203,28 @@ describe("points de carte (F10-TL-14)", () => {
     expect(projectSharedMaps(trip, maps).map((map) => map.index)).toEqual(trip.days.map((day) => day.index));
   });
 });
+
+describe("plusieurs-villes: la projection retire le transfer (décisions 0148 § 1 point 4 et 0149, S-M4-4)", () => {
+  it("un transfer n'apparaît pas dans la vue partagée, sous aucune forme ; les autres éléments restent dans l'ordre", () => {
+    const jour = trip.days[1]!;
+    const transfer = {
+      type: "transfer",
+      from: "Édimbourg",
+      to: "Glasgow",
+      source: "entered",
+      start: "12:00",
+      end: "13:15",
+      label: "[Train Édimbourg–Glasgow]",
+    } as const;
+    const avec = { ...jour, items: [...jour.items.slice(0, 2), transfer, ...jour.items.slice(2)] };
+    const avecCities: Trip = { ...trip, days: [avec], cities: [{ name: "Édimbourg", start: "2026-08-29", end: "2026-08-31" }, { name: "Glasgow", start: "2026-08-31", end: "2026-09-03" }] };
+    const projete = projectSharedTrip(avecCities);
+    const sansTransfer = projectSharedTrip({ ...trip, days: [jour] });
+    // Retiré, jamais converti : la projection est exactement celle du jour sans le transfer.
+    expect(projete.days[0]!.items).toEqual(sansTransfer.days[0]!.items);
+    expect(projete.days[0]!.items).toHaveLength(jour.items.length);
+    expect(JSON.stringify(projete)).not.toMatch(/transfer|Glasgow|Train/);
+    expect(projete).not.toHaveProperty("cities");
+    expect(SharedTripSchema.parse(projete)).toEqual(projete);
+  });
+});

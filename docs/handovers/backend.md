@@ -292,6 +292,7 @@ Appliquées par **B2** (une seule PR, avec `src/mocks/edimbourg.ts`, les composa
 | E10 | `ApiError.currentVersion` (B5) — **fait (B2)** | — | bandeau `conflict` |
 | E11 | `Trip.timeZone` (identifiant IANA obligatoire, F10-TL-1 ; décision 0021 § 3) et `TripSummary.timeZone` (repris de `TripSchema` par `pick`, 0021 § 1.2), créés par F10a (ou par F11a si F10a n'est pas fusionnée, 0021 § 3) ; côté serveur, colonne `trips.time_zone` (§ 6) et ligne `Trip.timeZone` du § 5 | `Europe/London` (Édimbourg), `Europe/Lisbon` | écran 15, « Mes voyages » (date locale de la destination) |
 | E12 | `ApiError.activeTripId` (F8c) — **fait** : identifiant du voyage en préparation, présent si et seulement si `code` vaut `active_preview_exists` (`superRefine`, comme `currentVersion`) ; `createTrip` renvoie `Result<CreatedTrip>` | — | `R-lancer` : bandeau `conflict` et « Voir ces propositions » |
+| E13 | Plusieurs villes (décision 0148 § 1, § 4, § 6 ; PR de contrat M4-C) — **fait (contrat)** : variante `transfer` de `DayLineItem` (et de l'instantané, par référence ; absente de `SharedDayItem`), `Trip.cities` facultatif (`TripCity`), `MAX_CITIES` = 3 ; `appliquerPatch` et `changements` recopient le `transfer` tel quel (un jour touché qui en porte un n'est pas replanifié, `no_option`, jusqu'à M4b), `voisins` s'arrête au `transfer`, `pointsDuJour` rend un tronçon par partie de la ligne | `src/mocks/rome-florence.ts` (deux villes, un `transfer` saisi à J3), pas encore branché dans `mock` | `DayLine` et la carte acceptent la variante sans la rendre (M4c) ; écran 15 la recopie |
 
 ---
 
@@ -342,6 +343,15 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `DayLineItem[openMeal].type` | stocké | Discriminant (décision 0015 § 2) |
 | `DayLineItem[openMeal].time` | stocké | Sortie du moteur : créneau de repas laissé vide (F6-PO-7) |
 | `DayLineItem[openMeal].meal` | stocké | Déjeuner ou dîner |
+| `DayLineItem[transfer].type` | stocké | Discriminant : changement de ville, ligne « Vers {ville} » (décision 0148 § 1) ; pas une étape, sans identifiant, jamais visé par un patch ; recopié tel quel par `appliquerPatch` ; **absent de la vue partagée** (liste blanche, aucune migration, 0148 § 1 point 4) |
+| `DayLineItem[transfer].from` | stocké | Nom maison de la ville quittée (celui de `Trip.cities`) ; jamais un nom Google |
+| `DayLineItem[transfer].to` | stocké | Nom maison de la ville d'arrivée |
+| `DayLineItem[transfer].source` | stocké | `entered` (billet ou vol saisi par la personne) ou `estimated` (départ estimé par le code, 0148 § 5.2) |
+| `DayLineItem[transfer].start` | stocké | Départ : heure du billet ou du vol, sinon départ estimé |
+| `DayLineItem[transfer].end` | stocké | Arrivée saisie seulement (`entered`) ; absente = « à confirmer » ; postérieure à `start` (`superRefine`) |
+| `DayLineItem[transfer].estimatedMinutes` | stocké | Durée estimée par le modèle (`estimated` seulement), entier de minutes (0148 § 2) ; **pas une donnée Google** ; absente = « durée à confirmer » |
+| `DayLineItem[transfer].label` | stocké | Libellé saisi par la personne (`entered` seulement, obligatoire), comme le libellé d'un engagement |
+| `DayLineItem[transfer].mode` | stocké | `car` ou `transit`, mode d'un départ estimé (`estimated` seulement) ; absent avec la marche seule |
 | `Day.index` | stocké | 1 = J1 |
 | `Day.date` | stocké | Date ISO |
 | `Day.items` | stocké | Ligne du jour, voir `DayLineItem[*].*` |
@@ -388,6 +398,10 @@ Le tableau couvre chaque champ de chaque schéma objet ou union discriminée exp
 | `Trip.travellers.children` | stocké | Brief |
 | `Trip.days` | stocké | Instantané de la version courante, voir `Day.*` |
 | `Trip.checklist` | stocké | `checklist_items`, voir `ChecklistItem.*` |
+| `Trip.cities` | calculé | Serveur, à la lecture des voyages, depuis les lignes `stays` (une par ville, `stays.city`) ; **absent pour une seule ville**, de 2 à `MAX_CITIES` (3) sinon (décision 0148 § 6) ; jamais lu depuis l'instantané, absent de `TripSnapshot` et de la vue partagée (`SharedTripSchema`) |
+| `TripCity.name` | stocké | `stays.city` : nom maison de la ville (écran 1), jamais un nom Google |
+| `TripCity.start` | stocké | `stays` : date d'arrivée dans la ville |
+| `TripCity.end` | stocké | `stays` : date d'arrivée dans la ville suivante, ou fin du voyage (exclusive) |
 | `Trip.unlocked` | calculé | Serveur, depuis `entitlements` (PO-4) seulement ; aucune colonne de `trips` ne porte le déblocage (`trips.status` n'a pas de valeur `unlocked`, § 6) |
 | `TripSummary.id` | stocké | `trips.id` (B6-PO-12) |
 | `TripSummary.destination` | stocké | `trips.destination` |

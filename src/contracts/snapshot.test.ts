@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { edimbourg, propositions } from "@/mocks/edimbourg";
 
-import { DaySnapshotSchema, ProposalRecordSchema, TripSnapshotSchema, type Proposal, type Trip } from "./index";
+import { DayLineItemSnapshotSchema, DaySnapshotSchema, ProposalRecordSchema, TripSnapshotSchema, type Proposal, type Trip } from "./index";
 
 /*
  * Schémas de stockage dérivés (spécification B2, § 1 ; décisions 0010, 0011 point 5, 0037) : ce que
@@ -205,5 +205,30 @@ describe("instantané et enregistrement de proposition", () => {
     const item = (jour.items as Json[]).find((i) => i.type === "stop") as Json;
     (item.stop as Json).commitment = engagement;
     expect(DaySnapshotSchema.safeParse(jour).success).toBe(true);
+  });
+});
+
+describe("instantané : variante transfer reprise par référence (décision 0148 § 1)", () => {
+  const transfer = { type: "transfer", from: "Rome", to: "Florence", source: "entered", start: "12:00", end: "13:40", label: "[Train Rome–Florence]" };
+
+  it("un jour de l'instantané admet un transfer ; mêmes règles que DayLineItemSchema", () => {
+    const base = instantane(edimbourg);
+    const jour = (base.days as Json[])[1] as Json;
+    jour.items = [...(jour.items as Json[]).slice(0, -1), transfer, ...(jour.items as Json[]).slice(-1)];
+    expect(TripSnapshotSchema.safeParse(base).success).toBe(true);
+    expect(DayLineItemSnapshotSchema.safeParse(transfer).success).toBe(true);
+    for (const [nom, item] of [
+      ["placeId", { ...transfer, placeId: "mock_place" }],
+      ["saisi sans label", { ...transfer, label: undefined }],
+      ["estimé avec end", { ...transfer, source: "estimated", label: undefined }],
+      ["end avant start", { ...transfer, end: "11:00" }],
+    ] as const) {
+      expect(DayLineItemSnapshotSchema.safeParse(item).success, nom).toBe(false);
+    }
+  });
+
+  it("Trip.cities n'est pas dans l'instantané (lu depuis stays, 0148 § 6 point 2)", () => {
+    const base = instantane(edimbourg);
+    expect(TripSnapshotSchema.safeParse({ ...base, cities: [] }).success).toBe(false);
   });
 });

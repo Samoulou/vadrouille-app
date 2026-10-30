@@ -72,7 +72,12 @@ export function stopKeys(day: Pick<Day, "items">): Map<Stop["id"], string> {
   return keys;
 }
 
-function sharedItem(item: Day["items"][number], keys: Map<Stop["id"], string>): SharedDayItem {
+/**
+ * Élément partagé, ou `undefined` pour un élément que la liste blanche ne nomme pas : le changement de ville
+ * (`transfer`, décision 0148 § 1 point 4) est retiré, comme `public.shared_line_item` rend `NULL` et `shared_day`
+ * filtre les `NULL`.
+ */
+function sharedItem(item: Day["items"][number], keys: Map<Stop["id"], string>): SharedDayItem | undefined {
   switch (item.type) {
     case "terminus":
       return { type: "terminus", role: item.role, time: item.time };
@@ -87,6 +92,8 @@ function sharedItem(item: Day["items"][number], keys: Map<Stop["id"], string>): 
       return { type: "free", from: item.from, to: item.to };
     case "openMeal":
       return { type: "openMeal", time: item.time, meal: item.meal };
+    case "transfer":
+      return undefined;
   }
 }
 
@@ -96,7 +103,10 @@ export function projectSharedDay(day: Day): SharedDay {
     index: day.index,
     date: day.date,
     generating: day.generating,
-    items: day.items.map((item) => sharedItem(item, keys)),
+    items: day.items.flatMap((item) => {
+      const shared = sharedItem(item, keys);
+      return shared === undefined ? [] : [shared];
+    }),
     events: day.events.map(sharedEvent),
   };
 }

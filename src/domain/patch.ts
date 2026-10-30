@@ -92,6 +92,10 @@ type Cible =
   | { type: "added"; id: string }
   | { type: "moved"; id: string; avant: { day: number; time: string } };
 
+/**
+ * Lignes déplaçables d'un jour. Un changement de ville (`transfer`, décision 0148 § 1) n'en est pas une : sans
+ * identifiant, aucun patch ne le vise ; un jour qui en porte un n'est pas replanifié (`replanifierHoraires`).
+ */
 function lignesDe(jour: DaySnapshot): Ligne[] {
   return jour.items.flatMap((item): Ligne[] => {
     if (item.type === "stop") return [{ genre: "etape", stop: item.stop, fixe: false }];
@@ -145,9 +149,15 @@ type ContextePatch = {
  * tiennent, sinon elles sont décalées au plus tôt après la précédente (trajet le plus rapide et marge, grille de
  * 5 min), et passent après une étape fixe avant laquelle elles ne tiennent plus. Le temps libre, les trajets et le
  * terminus de fin sont réécrits comme à la génération. `undefined` : le jour ne peut pas être replanifié (trajet
- * inconnu vers une étape à décaler, chevauchement avec une étape fixe, fin du jour dépassée).
+ * inconnu vers une étape à décaler, chevauchement avec une étape fixe, fin du jour dépassée, changement de ville).
+ *
+ * Changement de ville (`transfer`, décision 0148 § 1 point 3, PR M4-C) : il n'est jamais réécrit ni déplacé. Son
+ * créneau occupé et les règles de ce jour sont posés par le domaine `changement-de-ville.ts` (M4b) ; d'ici là, un
+ * jour touché qui en porte un n'est **pas replanifié** (`undefined`, donc refus `no_option` sans écriture), plutôt
+ * que d'être réécrit sans sa ligne « Vers {ville} ». Les jours non touchés et un `revert` le recopient tel quel.
  */
 function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DaySnapshot | undefined {
+  if (jour.origine.items.some((item) => item.type === "transfer")) return undefined;
   const { configuration, nuits } = contexte.moteur;
   const marge = configuration.margeMinutes;
   const origine = jour.origine;
@@ -283,7 +293,11 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
 
 // --- Ce qui change (B5-PO-15) ----------------------------------------------------------------------------------
 
-/** Trajets d'un jour : minutes du mode le plus rapide vers chaque étape, et retour au logement, en mémoire. */
+/**
+ * Trajets d'un jour : minutes du mode le plus rapide vers chaque étape, et retour au logement, en mémoire. Un
+ * changement de ville (`transfer`, décision 0148 § 1 point 3) coupe la ligne : aucun trajet vers la première étape
+ * après lui (spécification M4 § 7.3), ni retour au logement s'il n'est suivi d'aucune étape avec lieu.
+ */
 type TrajetsDuJour = { versEtape: Map<string, { minutes: number; estimee: boolean }>; retour?: { minutes: number; estimee: boolean } };
 
 function trajetsDuJour(jour: DaySnapshot, contexte: ContextePatch): TrajetsDuJour {
@@ -291,13 +305,20 @@ function trajetsDuJour(jour: DaySnapshot, contexte: ContextePatch): TrajetsDuJou
   const modes = modesAdmis(contexte.moteur.brief.mobility);
   const logements = logementsDuJour(jour.index - 1, nuits.length);
   const versEtape: TrajetsDuJour["versEtape"] = new Map();
-  let position: Point = { logement: logements.depart };
-  for (const stop of etapesDuJour(jour)) {
-    if (stop.placeId === undefined) continue;
-    const trajet = trajetLePlusRapide(relectures, position, { lieu: stop.placeId }, modes);
-    if (trajet !== INCONNU) versEtape.set(stop.id, { minutes: trajet.minutes, estimee: trajet.estimee });
-    position = { lieu: stop.placeId };
+  let position: Point | undefined = { logement: logements.depart };
+  for (const item of jour.items) {
+    if (item.type === "transfer") {
+      position = undefined;
+      continue;
+    }
+    if (item.type !== "stop") continue;
+    const { id, placeId } = item.stop;
+    if (placeId === undefined) continue;
+    const trajet = position === undefined ? INCONNU : trajetLePlusRapide(relectures, position, { lieu: placeId }, modes);
+    if (trajet !== INCONNU) versEtape.set(id, { minutes: trajet.minutes, estimee: trajet.estimee });
+    position = { lieu: placeId };
   }
+  if (position === undefined) return { versEtape };
   const retour = trajetLePlusRapide(relectures, position, { logement: logements.arrivee }, modes);
   return retour === INCONNU ? { versEtape } : { versEtape, retour: { minutes: retour.minutes, estimee: retour.estimee } };
 }

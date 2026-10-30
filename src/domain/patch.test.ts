@@ -706,3 +706,60 @@ describe("changements: M5-C (décision 0147 § 5.2)", () => {
     expect(etape(suivant.instantane, (stop) => stop.id === "ajout-1").addedBy).toBe("person");
   });
 });
+
+/**
+ * Changement de ville (décision 0148 § 1 points 2 et 3, PR M4-C) : le `transfer` n'a pas d'identifiant, aucun patch
+ * ne le vise ; il est recopié tel quel. Il est posé ici à la main dans un instantané généré (le domaine qui l'écrit
+ * est à M4b).
+ */
+describe("plusieurs-villes: appliquerPatch recopie le transfer tel quel (décision 0148 § 1)", () => {
+  const TRANSFER: DaySnapshot["items"][number] = {
+    type: "transfer",
+    from: "Ville 1",
+    to: "Ville 2",
+    source: "estimated",
+    start: "11:30",
+    estimatedMinutes: 120,
+    mode: "transit",
+  };
+
+  /** Instantané dont le jour `index` porte un `transfer`, juste avant son terminus de fin. */
+  function avecTransfer(base: TripSnapshot, index: number): TripSnapshot {
+    return {
+      ...base,
+      days: base.days.map((jour) => (jour.index === index ? { ...jour, items: [...jour.items.slice(0, -1), TRANSFER, ...jour.items.slice(-1)] } : jour)),
+    };
+  }
+
+  it("un jour non touché qui porte un transfer est recopié tel quel", () => {
+    const base = avecTransfer(version2(), 3);
+    const gelee = structuredClone(base);
+    const cible = activiteDuJour(base, 2);
+    const v3 = reussi(appliquerPatch(entree(base, patch(2, [{ op: "replace", stopId: cible.id, candidateId: RESERVE.proche.id, newStopId: "v3-remplace" }]))));
+    expect(v3.resultat.touchedDays).toEqual([2]);
+    expect(jourN(v3.instantane, 3)).toEqual(jourN(base, 3));
+    expect(jourN(v3.instantane, 3).items).toContainEqual(TRANSFER);
+    expect(TripSnapshotSchema.parse(v3.instantane)).toEqual(v3.instantane);
+    expect(base).toEqual(gelee);
+  });
+
+  it("un jour touché qui porte un transfer n'est pas replanifié sans lui : no_option, base intacte (domaine à M4b)", () => {
+    const base = avecTransfer(version2(), 2);
+    const gelee = structuredClone(base);
+    const cible = activiteDuJour(base, 2);
+    const resultat = appliquerPatch(entree(base, patch(2, [{ op: "replace", stopId: cible.id, candidateId: RESERVE.proche.id, newStopId: "v3-remplace" }])));
+    expect(resultat).toEqual({ ok: false, code: "no_option" });
+    expect(base).toEqual(gelee);
+  });
+
+  it("revert : le transfer revient tel quel ; il ne produit aucun changement à son nom", () => {
+    const v2 = avecTransfer(version2(), 3);
+    const v3 = version2();
+    const v4 = reussi(appliquerPatch(entree(v3, patch(3, [{ op: "revert", toVersion: 2 }]), { versionsAnterieures: new Map([[2, v2]]) })));
+    expect(v4.instantane).toEqual(v2);
+    expect(v4.resultat.touchedDays).toEqual([3]);
+    expect(PatchResultSchema.parse(v4.resultat)).toEqual(v4.resultat);
+    // Les étapes du jour n'ont pas bougé : uniquement des `unchanged` (aucune ligne pour le transfer, qui n'est pas une étape).
+    expect(v4.resultat.changes.every((change) => change.type === "unchanged")).toBe(true);
+  });
+});

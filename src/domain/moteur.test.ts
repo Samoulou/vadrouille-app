@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ProposalNeighboursSchema, type Day, type Stop, type TripCommitment } from "@/contracts";
 
 import { budgetsDuVoyage, budgetTrajetDuJour, demanderReduction, reduireBudget } from "@/domain/budget-trajet";
-import { budgetParPersonne, changementDeBudget, destinationColor, minutesDeTrajet, optionDeRepas, voisins } from "@/domain/calculs";
+import { budgetParPersonne, changementDeBudget, destinationColor, minutesDeTrajet, optionDeRepas, pointsDuJour, voisins } from "@/domain/calculs";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { identifiantEtape } from "@/domain/identifiant";
 import { INCONNU, logementsDuJour, trajetLePlusRapide, type Point, type Relectures } from "@/domain/relectures";
@@ -136,6 +136,113 @@ describe("moteur: voisins d'une proposition", () => {
     for (const time of ["08:00", "11:00", "15:30", "23:00"]) {
       expect(ProposalNeighboursSchema.safeParse(voisins(jour(), { time, stopId: "v1-j2-c1" }, CONFIG)).success).toBe(true);
     }
+  });
+});
+
+/**
+ * Changement de ville (décision 0148 § 1 point 3, PR M4-C) : J2 d'un voyage à deux villes, sortie du matin dans la
+ * ville quittée, ligne « Vers {ville} » (billet saisi), une étape et un dîner ouvert dans la ville d'arrivée.
+ */
+function jourDeChangement(): Day {
+  return {
+    index: 2,
+    date: "2026-11-24",
+    items: [
+      { type: "terminus", role: "start", time: "09:00", label: "Logement de test 1" },
+      segment,
+      { type: "stop", stop: etape("v1-j2-1", "activity", "09:25", "10:55", 0) },
+      { type: "transfer", from: "Ville 1", to: "Ville 2", source: "entered", start: "11:30", end: "13:30", label: "[Train]" },
+      { type: "stop", stop: etape("v1-j2-2", "activity", "14:30", "16:00", 12) },
+      { type: "openMeal", time: "19:00", meal: "dinner" },
+      segment,
+      { type: "terminus", role: "end", time: "21:00", label: "Logement de test 2" },
+    ],
+    events: [],
+    generating: false,
+    travelMinutes: 34,
+    travelBudgetMinutes: 90,
+  };
+}
+
+describe("plusieurs-villes: le transfer arrête la recherche du voisin (décision 0148 § 1 point 3)", () => {
+  it("le transfer n'est jamais un voisin : le voisin de son côté est absent", () => {
+    // Juste après la ligne : rien avant (le transfer arrête la recherche), l'étape de la ville d'arrivée après.
+    expect(voisins(jourDeChangement(), { time: "14:00", stopId: "v1-j2-c1" }, CONFIG)).toEqual({ after: { type: "stop", stopId: "v1-j2-2" } });
+    // Juste avant la ligne : l'étape de la ville quittée avant, rien après.
+    expect(voisins(jourDeChangement(), { time: "11:00", stopId: "v1-j2-c1" }, CONFIG)).toEqual({ before: { type: "stop", stopId: "v1-j2-1" } });
+  });
+
+  it("les éléments du même côté que la proposition restent ses voisins", () => {
+    expect(voisins(jourDeChangement(), { time: "17:00", stopId: "v1-j2-c1" }, CONFIG)).toEqual({
+      before: { type: "stop", stopId: "v1-j2-2" },
+      after: { type: "meal", meal: "dinner" },
+    });
+    expect(voisins(jourDeChangement(), { time: "09:10", stopId: "v1-j2-c1" }, CONFIG)).toEqual({
+      before: { type: "terminus", role: "start" },
+      after: { type: "stop", stopId: "v1-j2-1" },
+    });
+    for (const time of ["09:10", "11:00", "14:00", "17:00"]) {
+      expect(ProposalNeighboursSchema.safeParse(voisins(jourDeChangement(), { time, stopId: "v1-j2-c1" }, CONFIG)).success).toBe(true);
+    }
+  });
+
+  it("un jour sans transfer garde le même résultat", () => {
+    expect(voisins(jour(), { time: "11:00", stopId: "v1-j2-c1" }, CONFIG)).toEqual({
+      before: { type: "free" },
+      after: { type: "meal", meal: "lunch" },
+    });
+  });
+});
+
+describe("plusieurs-villes: pointsDuJour coupé au transfer (décision 0148 § 1 point 3)", () => {
+  const relectures = (duree: (depuis: Point, vers: Point) => number | typeof INCONNU): Relectures => ({
+    validite: () => "valide",
+    plages: () => INCONNU,
+    duree: (depuis, vers) => {
+      const minutes = duree(depuis, vers);
+      return minutes === INCONNU ? INCONNU : { minutes, estimee: false };
+    },
+  });
+
+  it("un jour sans transfer : un seul tronçon, logement → étapes → logement", () => {
+    expect(pointsDuJour(jour(), 2)).toEqual([
+      [
+        { logement: 0 },
+        { lieu: "SENTINELLE_PLACE_v1-j2-1" },
+        { lieu: "SENTINELLE_PLACE_v1-j2-2" },
+        { lieu: "SENTINELLE_PLACE_v1-j2-3" },
+        { logement: 1 },
+      ],
+    ]);
+  });
+
+  it("le transfer coupe la ligne : aucun point pour lui, aucun trajet à travers lui", () => {
+    expect(pointsDuJour(jourDeChangement(), 2)).toEqual([
+      [{ logement: 0 }, { lieu: "SENTINELLE_PLACE_v1-j2-1" }],
+      [{ lieu: "SENTINELLE_PLACE_v1-j2-2" }, { logement: 1 }],
+    ]);
+  });
+
+  it("travelMinutes ne compte pas le changement de ville (M4-PO-11)", () => {
+    // Logement 1 → étape 1, puis étape 2 → logement 2 : 2 trajets ; jamais étape 1 → étape 2.
+    const vus: [Point, Point][] = [];
+    const total = minutesDeTrajet(
+      jourDeChangement(),
+      2,
+      relectures((depuis, vers) => {
+        vus.push([depuis, vers]);
+        return 17;
+      }),
+      ["walk"],
+    );
+    expect(total).toBe(2 * 17);
+    expect(vus).not.toContainEqual([{ lieu: "SENTINELLE_PLACE_v1-j2-1" }, { lieu: "SENTINELLE_PLACE_v1-j2-2" }]);
+  });
+
+  it("transfer sans étape d'un côté : le tronçon n'a qu'un point, sans trajet", () => {
+    const sansApres: Day = { ...jourDeChangement(), items: jourDeChangement().items.filter((item) => !(item.type === "stop" && item.stop.id === "v1-j2-2")) };
+    expect(pointsDuJour(sansApres, 2)).toEqual([[{ logement: 0 }, { lieu: "SENTINELLE_PLACE_v1-j2-1" }], [{ logement: 1 }]]);
+    expect(minutesDeTrajet(sansApres, 2, relectures(() => 17), ["walk"])).toBe(17);
   });
 });
 

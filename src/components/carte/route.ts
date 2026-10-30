@@ -22,7 +22,9 @@ export type RouteItem =
   | { type: "terminus"; role: "start" | "end" }
   | { type: "segment"; segment: { mode: "walk" | "transit" | "car" } }
   | { type: "free" }
-  | { type: "openMeal" };
+  | { type: "openMeal" }
+  /** Changement de ville (décision 0148 § 1) : pas une étape, ni marqueur ni tronçon ; la carte coupée est à M4c. */
+  | { type: "transfer" };
 
 /** Jour tel que la carte le lit : `Day` en est un sous-type. */
 export interface RouteDay {

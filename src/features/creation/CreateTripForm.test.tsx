@@ -198,7 +198,7 @@ describe("CreateTripForm", () => {
     const addCity = screen.getByRole("button", { name: "Ajouter une ville" });
     expect(addCity).toHaveAttribute("aria-disabled", "true");
     expect(addCity).not.toBeDisabled();
-    expect(addCity).toHaveAccessibleDescription("Au plus 4 villes en tout, destination comprise.");
+    expect(addCity).toHaveAccessibleDescription(`Au plus ${MAX_CITIES} villes en tout, destination comprise.`);
     fireEvent.click(addCity);
     const addCommitment = screen.getByRole("button", { name: "Ajouter une réservation" });
     expect(addCommitment).toHaveAttribute("aria-disabled", "true");

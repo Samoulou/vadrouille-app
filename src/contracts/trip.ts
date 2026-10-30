@@ -9,7 +9,7 @@ import {
   refineNoCommitment,
 } from "./refinements";
 import { LONGUEURS_CONTRAT, texteMaison } from "./texte";
-import { CHECKLIST_KINDS, STOP_KINDS, STOP_REPORT_REASONS, TRIP_ID_PATTERN, WEEKDAYS } from "./values";
+import { CHECKLIST_KINDS, MAX_CITIES, STOP_KINDS, STOP_REPORT_REASONS, TRIP_ID_PATTERN, WEEKDAYS } from "./values";
 
 /**
  * Contrats du programme de voyage (handover front-end § 9).
@@ -168,12 +168,60 @@ export const FreeItemSchema = z.strictObject({ type: z.literal("free"), from: Ti
  */
 export const OpenMealItemSchema = z.strictObject({ type: z.literal("openMeal"), time: TimeSchema, meal: MealSchema });
 
+/**
+ * Changement de ville, ligne « Vers {ville} » de la ligne du jour (décision 0148 § 1, T1 ; spécification M4 § 3.2).
+ * Ce n'est **pas une étape** : ni `Stop` ni `Segment` (`Day.travelMinutes` ne le compte pas), sans identifiant, donc
+ * jamais visé par un patch (`replace`, `move`, `lock`). **Aucun `placeId`, aucune donnée Google** : `from` et `to`
+ * sont les noms maison des villes (`Trip.cities`), `estimatedMinutes` est une estimation du modèle (0148 § 2), les
+ * heures saisies viennent de la personne. Absent de la vue partagée (liste blanche, `SharedDayItemSchema`).
+ *
+ * Raffinement : `source: "entered"` (billet ou vol saisi) exige `label` et interdit `estimatedMinutes` et `mode` ;
+ * `source: "estimated"` interdit `end` et `label` ; `end`, s'il est présent, est postérieur à `start`.
+ */
+export const TransferItemSchema = z
+  .strictObject({
+    type: z.literal("transfer"),
+    /** Nom maison de la ville quittée (celui de `Trip.cities`). */
+    from: TextSchema,
+    /** Nom maison de la ville d'arrivée. */
+    to: TextSchema,
+    source: z.enum(["entered", "estimated"]),
+    /** Départ : heure du billet ou du vol, sinon départ estimé (0148 § 5.2). */
+    start: TimeSchema,
+    /** Arrivée : seulement l'heure de fin saisie ; absente = « à confirmer ». */
+    end: TimeSchema.optional(),
+    /** Durée estimée, en minutes (0148 § 2) ; absente = « durée à confirmer ». */
+    estimatedMinutes: MinutesSchema.optional(),
+    /** Libellé saisi par la personne (« Train Rome–Florence »). */
+    label: TextSchema.optional(),
+    /** Mode d'un départ estimé (spécification M4 § 3.3) ; absent avec la marche seule. */
+    mode: z.enum(["car", "transit"]).optional(),
+  })
+  .superRefine((item, ctx) => {
+    if (item.source === "entered") {
+      if (item.label === undefined) ctx.addIssue({ code: "custom", message: "transfer saisi : label obligatoire", path: ["label"] });
+      if (item.estimatedMinutes !== undefined) {
+        ctx.addIssue({ code: "custom", message: "transfer saisi : estimatedMinutes interdit", path: ["estimatedMinutes"] });
+      }
+      if (item.mode !== undefined) ctx.addIssue({ code: "custom", message: "transfer saisi : mode interdit", path: ["mode"] });
+    } else {
+      if (item.end !== undefined) ctx.addIssue({ code: "custom", message: "transfer estimé : end interdit", path: ["end"] });
+      if (item.label !== undefined) ctx.addIssue({ code: "custom", message: "transfer estimé : label interdit", path: ["label"] });
+    }
+    // « HH:MM » : l'ordre des chaînes est celui des heures.
+    if (item.end !== undefined && item.end <= item.start) {
+      ctx.addIssue({ code: "custom", message: "transfer : end postérieur à start", path: ["end"] });
+    }
+  });
+export type TransferItem = z.infer<typeof TransferItemSchema>;
+
 export const DayLineItemSchema = z.discriminatedUnion("type", [
   TerminusItemSchema,
   StopItemSchema,
   SegmentItemSchema,
   FreeItemSchema,
   OpenMealItemSchema,
+  TransferItemSchema,
 ]);
 export type DayLineItem = z.infer<typeof DayLineItemSchema>;
 
@@ -285,6 +333,13 @@ export const StopReportSchema = z.strictObject({
 export type StopReport = z.infer<typeof StopReportSchema>;
 
 /**
+ * Ville d'un voyage à plusieurs villes (décision 0148 § 6) : nom maison et dates, `end` exclusif (date d'arrivée dans
+ * la ville suivante, ou fin du voyage), comme une ligne `stays`. Aucun `placeId`, aucune donnée Google.
+ */
+export const TripCitySchema = z.strictObject({ name: TextSchema, start: IsoDateSchema, end: IsoDateSchema });
+export type TripCity = z.infer<typeof TripCitySchema>;
+
+/**
  * Voyage, objet strict **non raffiné** : base des dérivations (`TripSummarySchema`, `TripSnapshotSchema`, forme
  * réduite du prototype), Zod 4 refusant `.pick()` et `.omit()` sur un objet raffiné. Le contrat public est
  * `TripSchema`.
@@ -310,6 +365,13 @@ export const TripBaseSchema = z.strictObject({
   checklist: z.array(ChecklistItemSchema),
   /** Voyage débloqué ou non. */
   unlocked: z.boolean(),
+  /**
+   * Villes du voyage, dans l'ordre (décision 0148 § 6, T6) : **absent pour un voyage à une seule ville**, de 2 à
+   * `MAX_CITIES` sinon. Lu depuis les lignes `stays` par la lecture des voyages, jamais depuis l'instantané ; `end`
+   * exclusif (date d'arrivée dans la ville suivante, ou fin du voyage), comme `stays`. Noms maison seulement. Absent de
+   * `SharedTripSchema` et de `TripSnapshotSchema`.
+   */
+  cities: z.array(TripCitySchema).min(2).max(MAX_CITIES).optional(),
 });
 
 /** Voyage : `TripBaseSchema` + raffinements du voyage entier (E4, E9). */

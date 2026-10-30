@@ -138,8 +138,8 @@ test("creation: villes, récapitulatif et maximums", async ({ page }) => {
   await expect(button(page, "Ajouter une ville")).toHaveAttribute("aria-disabled", "true");
   await button(page, "Ajouter une ville").focus();
   await page.keyboard.press("Enter");
-  await expect(field(page, "Nom de la ville")).toHaveCount(3);
-  await expect(page.getByText("Au plus 4 villes en tout, destination comprise.")).toBeVisible();
+  await expect(field(page, "Nom de la ville")).toHaveCount(2);
+  await expect(page.getByText("Au plus 3 villes en tout, destination comprise.")).toBeVisible();
   for (let i = 0; i < 10; i++) await button(page, "Ajouter une réservation").click();
   await expect(button(page, "Ajouter une réservation")).toHaveAttribute("aria-disabled", "true");
   await button(page, "Ajouter une réservation").focus();

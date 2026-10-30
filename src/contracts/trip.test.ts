@@ -3,6 +3,8 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import type { z } from "zod";
 
 import * as contracts from "./index";
+import { TransferItemSchema } from "./trip";
+import { MAX_CITIES } from "./values";
 import {
   ChangeSchema,
   DaySchema,
@@ -55,7 +57,19 @@ type HandoverDayLineItem =
   | { type: "segment"; segment: HandoverSegment }
   | { type: "free"; from: string; to: string }
   /** Ajout signalé (décision 0015, § 2) : créneau de repas pas encore choisi. */
-  | { type: "openMeal"; time: string; meal: "lunch" | "dinner" };
+  | { type: "openMeal"; time: string; meal: "lunch" | "dinner" }
+  /** Ajout signalé (décision 0148 § 1, M4-C) : changement de ville, sans identifiant ni donnée Google. */
+  | {
+      type: "transfer";
+      from: string;
+      to: string;
+      source: "entered" | "estimated";
+      start: string;
+      end?: string;
+      estimatedMinutes?: number;
+      label?: string;
+      mode?: "car" | "transit";
+    };
 interface HandoverDay {
   index: number;
   date: string;
@@ -111,6 +125,8 @@ interface HandoverTrip {
   days: HandoverDay[];
   checklist: HandoverChecklistItem[];
   unlocked: boolean;
+  /** Ajout signalé (décision 0148 § 6, M4-C) : villes du voyage, absent pour une seule ville. */
+  cities?: { name: string; start: string; end: string }[];
 }
 interface HandoverProposal {
   id: string;
@@ -541,5 +557,106 @@ describe("TripSchema, ChecklistItem et Change", () => {
     expect(
       ChangeSchema.safeParse({ type: "moved", label: "[A]", before: { day: 0, time: "13:25" }, after: { day: 4, time: "15:45" } }).success,
     ).toBe(false);
+  });
+});
+
+describe("DayLineItemSchema, variante transfer (décision 0148 § 1)", () => {
+  const saisi = { type: "transfer", from: "Rome", to: "Florence", source: "entered", start: "12:00", end: "13:40", label: "[Train Rome–Florence]" };
+  const estime = { type: "transfer", from: "Lisbonne", to: "Porto", source: "estimated", start: "11:30", estimatedMinutes: 180, mode: "transit" };
+
+  it("est exportée par trip.ts (comme les autres variantes) et reprise par DayLineItemSchema", () => {
+    expect(TransferItemSchema.safeParse(saisi).success).toBe(true);
+    expect(contracts.DayLineItemSchema.options).toContain(TransferItemSchema);
+  });
+
+  it.each([
+    ["saisi, départ et arrivée", saisi],
+    ["saisi sans arrivée (« à confirmer »)", { ...saisi, end: undefined }],
+    ["estimé, durée et mode", estime],
+    ["estimé sans durée (« durée à confirmer ») ni mode (marche seule)", { type: "transfer", from: "Lisbonne", to: "Porto", source: "estimated", start: "09:00" }],
+  ])("accepte un transfer %s", (_nom, item) => {
+    expect(contracts.DayLineItemSchema.safeParse(item).success).toBe(true);
+  });
+
+  it.each([
+    ["saisi sans label", { ...saisi, label: undefined }],
+    ["saisi avec estimatedMinutes", { ...saisi, estimatedMinutes: 100 }],
+    ["saisi avec mode", { ...saisi, mode: "transit" }],
+    ["estimé avec end", { ...estime, end: "14:30" }],
+    ["estimé avec label", { ...estime, label: "[Train]" }],
+    ["end égal à start", { ...saisi, end: "12:00" }],
+    ["end antérieur à start", { ...saisi, end: "11:00" }],
+    ["source inconnue", { ...estime, source: "google" }],
+    ["mode walk", { ...estime, mode: "walk" }],
+    ["durée négative", { ...estime, estimatedMinutes: -5 }],
+    ["durée non entière", { ...estime, estimatedMinutes: 90.5 }],
+    ["heure invalide", { ...estime, start: "11h30" }],
+    ["ville vide", { ...estime, to: "" }],
+    ["sans from", { ...estime, from: undefined }],
+  ])("refuse un transfer %s", (_nom, item) => {
+    expect(contracts.DayLineItemSchema.safeParse(item).success).toBe(false);
+  });
+
+  it.each([
+    ["placeId", "mock_place"],
+    ["id", "transfer-1"],
+    ["location", { lat: 41.9, lng: 12.5 }],
+    ["displayName", "Roma Termini"],
+    ["minutes", 95],
+  ])("refuse le champ %s (objet strict : aucun identifiant, aucune donnée Google)", (key, value) => {
+    expect(contracts.DayLineItemSchema.safeParse({ ...estime, [key]: value }).success).toBe(false);
+  });
+
+  it("est admis dans la ligne d'un jour", () => {
+    const day = {
+      index: 3,
+      date: "2027-04-12",
+      items: [{ type: "terminus", role: "start", time: "08:30", label: "[Hôtel]" }, saisi, { type: "terminus", role: "end", time: "16:40", label: "[Hôtel 2]" }],
+      events: [],
+      generating: false,
+      travelMinutes: 0,
+      travelBudgetMinutes: 90,
+    };
+    expect(DaySchema.safeParse(day).success).toBe(true);
+  });
+});
+
+describe("Trip.cities (décision 0148 § 6)", () => {
+  const base: Trip = {
+    id: "t1",
+    organizationId: "org1",
+    destination: "Rome",
+    destinationColor: "ocre",
+    start: "2027-04-10",
+    end: "2027-04-14",
+    timeZone: "Europe/Rome",
+    travellers: { adults: 2, children: 0 },
+    days: [],
+    checklist: [],
+    unlocked: false,
+  };
+  const ville = (name: string, start: string, end: string) => ({ name, start, end });
+
+  it("plusieurs-villes: Trip.cities absent pour une ville (facultatif)", () => {
+    expect(TripSchema.safeParse(base).success).toBe(true);
+    expect(TripSchema.shape.cities.safeParse(undefined).success).toBe(true);
+  });
+
+  it(`de 2 à MAX_CITIES (${MAX_CITIES}) villes`, () => {
+    const villes = [ville("Rome", "2027-04-10", "2027-04-12"), ville("Florence", "2027-04-12", "2027-04-13"), ville("Venise", "2027-04-13", "2027-04-14"), ville("Milan", "2027-04-14", "2027-04-15")];
+    expect(TripSchema.safeParse({ ...base, cities: villes.slice(0, 2) }).success).toBe(true);
+    expect(TripSchema.safeParse({ ...base, cities: villes.slice(0, MAX_CITIES) }).success).toBe(true);
+    expect(TripSchema.safeParse({ ...base, cities: villes.slice(0, MAX_CITIES + 1) }).success).toBe(false);
+    expect(TripSchema.safeParse({ ...base, cities: villes.slice(0, 1) }).success).toBe(false);
+    expect(TripSchema.safeParse({ ...base, cities: [] }).success).toBe(false);
+  });
+
+  it.each([
+    ["nom vide", { name: "", start: "2027-04-10", end: "2027-04-12" }],
+    ["date non ISO", { name: "Rome", start: "10.04.2027", end: "2027-04-12" }],
+    ["sans end", { name: "Rome", start: "2027-04-10" }],
+    ["placeId", { name: "Rome", start: "2027-04-10", end: "2027-04-12", placeId: "mock_place" }],
+  ])("refuse une ville %s", (_nom, premiere) => {
+    expect(TripSchema.safeParse({ ...base, cities: [premiere, ville("Florence", "2027-04-12", "2027-04-14")] }).success).toBe(false);
   });
 });

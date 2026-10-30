@@ -50,7 +50,16 @@ function bannerFor(error: RevisionError): "noOption" | "error" | "conflict" {
 export function insertionIndex(day: Day, time: string): number {
   let found = 0;
   day.items.forEach((item, index) => {
-    const at = item.type === "stop" ? item.stop.start : item.type === "free" ? item.from : item.type === "segment" ? null : item.time;
+    const at =
+      item.type === "stop" || item.type === "transfer"
+        ? item.type === "stop"
+          ? item.stop.start
+          : item.start
+        : item.type === "free"
+          ? item.from
+          : item.type === "segment"
+            ? null
+            : item.time;
     if (at !== null && at <= time && !(item.type === "terminus" && item.role === "end")) found = index;
   });
   return found;

@@ -329,8 +329,11 @@ export const STORY_LENGTH = { min: 20, max: 1000 } as const;
  * au-delà, et l'écran 1 du site d'essai le refuse au champ (spécification E2E-essai, lot 2, D1).
  */
 export const PROTOTYPE_STAY_DAYS_MAX = 15;
-/** Villes en tout, destination comprise (provisoire, F8-PO-3). */
-export const MAX_CITIES = 4;
+/**
+ * Villes en tout, destination comprise : 3 (M4-PO-2, décision 0148 § 4 point 1 ; remplace le « 4, provisoire » de
+ * F8-PO-3). Un seul plafond pour `mock`, l'ancienne chaîne et la chaîne inversée ; borne aussi `Trip.cities`.
+ */
+export const MAX_CITIES = 3;
 /** Engagements déjà pris (provisoire, F8-PO-3). */
 export const MAX_COMMITMENTS = 10;
 export const ADULTS = { min: 1, max: 9 } as const;

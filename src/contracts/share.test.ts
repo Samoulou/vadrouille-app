@@ -183,3 +183,15 @@ describe("actions : entrée et réponses", () => {
     expect(CreatedShareLinkSchema.safeParse({ ...created, token: "abc" }).success).toBe(false);
   });
 });
+
+describe("plusieurs-villes: transfer absent de la vue partagée (décision 0148 § 1 point 4, S-M4-4)", () => {
+  const transfer = { type: "transfer", from: "Rome", to: "Florence", source: "estimated", start: "11:30", estimatedMinutes: 180, mode: "transit" };
+
+  it("SharedDaySchema refuse un transfer (liste blanche, aucune nouvelle variante)", () => {
+    expect(SharedDaySchema.safeParse({ ...day2, items: [...day2.items, transfer] }).success).toBe(false);
+  });
+
+  it("SharedTripSchema refuse Trip.cities (0148 § 6 point 2)", () => {
+    expect(SharedTripSchema.safeParse({ ...trip, cities: [{ name: "Rome", start: "2027-04-10", end: "2027-04-12" }] }).success).toBe(false);
+  });
+});
