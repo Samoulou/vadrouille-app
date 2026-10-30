@@ -159,7 +159,9 @@ describe("lecture de api sous la chaîne inversée : journées servies avant le 
     const trip = await voyages.getTrip(ctx, TRIP);
     expect(trip?.unlocked).toBe(false);
     expect(trip?.days.map((d) => d.index)).toEqual([1, 2]);
-    expect(trip?.checklist.map((l) => l.id)).toEqual(["l1", "l2"]);
+    // Ordre de lecture (M5e, 0147 § 7.1 point 3) : `l2` (liée à l'étape `a`, journée 1) d'abord, puis `l1` (sans étape) ;
+    // `l3` (journée 3) et `l4` (étape `d`, journée 3) ne sont pas servies avant le déblocage.
+    expect(trip?.checklist.map((l) => l.id)).toEqual(["l2", "l1"]);
     expect(lieuxDemandes(demandes)).not.toContain("test_place_d");
   });
 
@@ -171,7 +173,9 @@ describe("lecture de api sous la chaîne inversée : journées servies avant le 
       const { voyages } = lecture(chaine, debloque);
       const trip = await voyages.getTrip(ctx, TRIP);
       expect(trip?.days.map((d) => d.index)).toEqual([1, 2, 3]);
-      expect(trip?.checklist.map((l) => l.id)).toEqual(["l1", "l2", "l3", "l4"]);
+      // Ordre de lecture (0147 § 7.1 point 3) : lignes liées par la position de leur étape (`l2` : `a`, journée 1 ; `l4` :
+      // `d`, journée 3), puis lignes sans étape par identifiant (`l1`, `l3`).
+      expect(trip?.checklist.map((l) => l.id)).toEqual(["l2", "l4", "l1", "l3"]);
     }
   });
 

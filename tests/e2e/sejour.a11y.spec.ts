@@ -64,7 +64,7 @@ test("sejour: aucune violation axe, Séjour (vue d'ensemble)", async ({ page }) 
 // F5c : contenu du Séjour (plaque, budget, liste à réserver cochée, événements, jours), à 92 % et à 25 %.
 test("sejour: aucune violation axe, Séjour à 92 % avec une ligne cochée et le compteur", async ({ page }) => {
   await openTrip(page, `/voyages/${TRIP}`);
-  await sheet(page).getByRole("button", { name: "[Château d'Édimbourg]", exact: true }).click();
+  await sheet(page).getByRole("button", { name: "Réserver : [Château d'Édimbourg]", exact: true }).click();
   await page.getByRole("button", { name: "Agrandir le panneau" }).click();
   await expectSheetAt(page, 0.92);
   await expectNoViolations(page);
@@ -76,7 +76,7 @@ test("sejour: aucune violation axe, Séjour à 92 % avec une ligne cochée et le
 
 test("sejour: aucune violation axe, Séjour à 25 %, toutes les lignes faites (compteur masqué)", async ({ page }) => {
   await openTrip(page, `/voyages/${TRIP}`);
-  for (const name of ["[Excursion dans les Highlands]", "[Château d'Édimbourg]", "[Visite de la distillerie]", "[Assurance voyage]"]) {
+  for (const name of ["Réserver : [Excursion dans les Highlands]", "Réserver : [Château d'Édimbourg]", "Réserver : [Visite de la distillerie]", "Réserver : [Assurance voyage]"]) {
     await sheet(page).getByRole("button", { name, exact: true }).click();
   }
   await page.getByRole("button", { name: "Agrandir le panneau" }).click();

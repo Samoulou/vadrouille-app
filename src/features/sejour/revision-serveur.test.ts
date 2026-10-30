@@ -6,8 +6,11 @@ vi.mock("@/server/actions/remplacement", () => ({
   applyReplacement: vi.fn(),
   undoReplacement: vi.fn(),
 }));
+vi.mock("@/server/actions/sejour", () => ({
+  toggleChecklistItem: vi.fn(),
+}));
 
-import { RevisionPreviewSchema, type Day, type ReplacementOffer, type ReplacementWrite, type Result, type Stop } from "@/contracts";
+import { RevisionPreviewSchema, type ChecklistItem, type Day, type ReplacementOffer, type ReplacementWrite, type Result, type Stop } from "@/contracts";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { applyProgramme, createMemoryProgramme, createMemoryProgrammeStore, programmeReducer, sendToMemoryStore, type ProgrammeState } from "./programme";
@@ -68,11 +71,21 @@ const OFFRE: ReplacementOffer = {
   },
 };
 
-function setup(reponses: { offer?: Result<ReplacementOffer>; apply?: Result<ReplacementWrite>; undo?: Result<ReplacementWrite> } = {}) {
+function setup(
+  reponses: { offer?: Result<ReplacementOffer>; apply?: Result<ReplacementWrite>; undo?: Result<ReplacementWrite>; toggle?: (input: unknown) => Promise<Result<ChecklistItem>> } = {},
+) {
   const calls = {
     previewReplacement: vi.fn<ServerRevisionCalls["previewReplacement"]>(async () => reponses.offer ?? ok(OFFRE)),
     applyReplacement: vi.fn<ServerRevisionCalls["applyReplacement"]>(async () => reponses.apply ?? ok({ status: "applied", version: 2 })),
     undoReplacement: vi.fn<ServerRevisionCalls["undoReplacement"]>(async () => reponses.undo ?? ok({ status: "undone", version: 3 })),
+    toggleChecklistItem: vi.fn<ServerRevisionCalls["toggleChecklistItem"]>(
+      reponses.toggle ??
+        (async (input) => {
+          const { itemId, done } = input as { itemId: string; done: boolean };
+          const item = edimbourg.checklist.find((ligne) => ligne.id === itemId)!;
+          return ok({ ...item, done });
+        }),
+    ),
   };
   let screen: ProgrammeState = createMemoryProgrammeStore().state;
   const memoryStore = createMemoryProgrammeStore();
@@ -239,5 +252,32 @@ describe("révision enregistrée : aperçu, application et annulation (PR 869)",
     const pending = actions.previewReplacement(REQUETE, { signal: controller.signal });
     controller.abort(raison);
     await expect(pending).rejects.toBe(raison);
+  });
+});
+
+describe("liste « À faire » enregistrée (M5e, spécification M5 § 7.3)", () => {
+  const CHATEAU = "check-chateau";
+  const fait = (shown: () => ReturnType<typeof applyProgramme>) => shown().checklist.find((ligne) => ligne.id === CHATEAU)?.done;
+
+  it("a-faire: cocher reste coché : l'état s'affiche, puis toggleChecklistItem l'enregistre (aucune version, aucun « Annuler »)", async () => {
+    const { actions, calls, afterWrite, shown, store } = setup();
+    expect(actions.checklistOnServer).toBe(true);
+    await actions.setChecklistItemDone(CHATEAU, true);
+    expect(calls.toggleChecklistItem).toHaveBeenCalledWith({ tripId: edimbourg.id, itemId: CHATEAU, done: true });
+    expect(fait(shown)).toBe(true);
+    expect(store.version).toBe(1);
+    expect(store.last).toBeNull();
+    expect(afterWrite).not.toHaveBeenCalled();
+    await actions.setChecklistItemDone(CHATEAU, false);
+    expect(calls.toggleChecklistItem).toHaveBeenLastCalledWith({ tripId: edimbourg.id, itemId: CHATEAU, done: false });
+    expect(fait(shown)).toBe(false);
+  });
+
+  it("a-faire: un échec (refus ou panne) rétablit la case et lève une erreur", async () => {
+    for (const toggle of [async () => ({ ok: false as const, error: { code: "not_found" as const, retryable: false } }), async () => Promise.reject(new Error("réseau"))]) {
+      const { actions, shown } = setup({ toggle });
+      await expect(actions.setChecklistItemDone(CHATEAU, true)).rejects.toThrow();
+      expect(fait(shown)).toBe(false);
+    }
   });
 });

@@ -483,7 +483,7 @@ async function publierLot(contexte: ContexteLot, donnees: DonneesLot): Promise<v
         }
         let derniere: number | null = null;
         if (publies.length > 0) {
-          const ecrite = await ecrireVersion(x, { organizationId, tripId, requestId: contexte.requestId, auteur: "workflow", instantane: { days: travail.days } });
+          const ecrite = await ecrireVersion(x, { organizationId, tripId, requestId: contexte.requestId, auteur: "workflow", instantane: { days: travail.days }, instantanePrecedent: instantane });
           derniere = ecrite.version;
           if (ecrite.creee && donnees.ecrirePositions !== undefined) {
             const positions = await donnees.ecrirePositions(x, new Set(publies.flatMap(lieuxDuJour)));

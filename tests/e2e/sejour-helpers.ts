@@ -74,7 +74,8 @@ export async function findChecklistToBook(page: Page, context: BrowserContext, p
   const rows = aFaire.getByRole("listitem");
   await expect(rows).toHaveCount(5);
   for (const [index, item] of edimbourg.checklist.entries()) {
-    await expect(rows.nth(index).getByRole("button")).toHaveAccessibleName(item.label);
+    // Réservation : le seul nom stocké, « Réserver : » composé à l'écran (M5e, décision 0147 § 7.1).
+    await expect(rows.nth(index).getByRole("button")).toHaveAccessibleName(item.kind === "reservation" ? `Réserver : ${item.label}` : item.label);
   }
   await expect(aFaire.getByRole("img", { name: "4 réservations à faire" })).toHaveText("4");
   // « [Billets du Tattoo] » : faite, barrée, en ink-soft, sans lien.
@@ -93,7 +94,7 @@ export async function findChecklistToBook(page: Page, context: BrowserContext, p
   expect(done.color).toBe(done.inkSoft);
   expect(done.decoration).toBe("line-through");
   // « Réserver » : nouvel onglet, rel="noopener noreferrer".
-  const reserver = row("[Château d'Édimbourg]").getByRole("link", { name: "Réserver" });
+  const reserver = row("Réserver : [Château d'Édimbourg]").getByRole("link", { name: "Réserver" });
   await expect(reserver).toHaveAttribute("href", "https://example.org/mock/chateau");
   await expect(reserver).toHaveAttribute("target", "_blank");
   await expect(reserver).toHaveAttribute("rel", "noopener noreferrer");
@@ -102,6 +103,6 @@ export async function findChecklistToBook(page: Page, context: BrowserContext, p
   expect(popup.url()).toBe("https://example.org/mock/chateau");
   await popup.close();
   // « [Assurance voyage] » : lien rémunéré.
-  await expect(row("[Assurance voyage]")).toContainText("Lien rémunéré");
-  await expect(row("[Château d'Édimbourg]")).not.toContainText("Lien rémunéré");
+  await expect(row("Réserver : [Assurance voyage]")).toContainText("Lien rémunéré");
+  await expect(row("Réserver : [Château d'Édimbourg]")).not.toContainText("Lien rémunéré");
 }

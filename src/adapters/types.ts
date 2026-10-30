@@ -21,6 +21,7 @@ import type {
   Receipt,
   ReplacementOffer,
   ReplacementWrite,
+  ChecklistItem,
   Result,
   RetryGenerationRequest,
   Session,
@@ -117,6 +118,11 @@ export interface RevisionAdapter {
   previewReplacement(ctx: AdapterContext | null, input: unknown): Promise<Result<ReplacementOffer>>;
   applyReplacement(ctx: AdapterContext | null, input: unknown): Promise<Result<ReplacementWrite>>;
   undoReplacement(ctx: AdapterContext | null, input: unknown): Promise<Result<ReplacementWrite>>;
+  /**
+   * Coche ou décoche une ligne « À faire » (`ChecklistUpdate` → `ChecklistItem`, B6b ; branchée sur l'écran 11 par M5e,
+   * spécification M5 § 7.3) : état final, idempotent, hors des versions.
+   */
+  toggleChecklistItem(ctx: AdapterContext | null, input: unknown): Promise<Result<ChecklistItem>>;
 }
 
 /**

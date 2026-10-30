@@ -735,7 +735,7 @@ async function publierJour(contexte: ContexteComplet, donnees: DonneesJour): Pro
           if (lieuxDuJour(publie).some((lieu) => ailleurs.has(lieu))) publie = donnees.replanifier(instantane, version);
         }
         const ecrite = sansEtape(courant)
-          ? await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: { days: instantane.days.map((jour) => (jour.index === donnees.index ? publie : jour)) } })
+          ? await ecrireVersion(x, { organizationId, tripId, requestId, auteur: "workflow", instantane: { days: instantane.days.map((jour) => (jour.index === donnees.index ? publie : jour)) }, instantanePrecedent: instantane })
           : { version, creee: false, instantane };
         if (sansEtape(courant) && donnees.ecrirePositions !== undefined) {
           const positions = await donnees.ecrirePositions(x, new Set(lieuxDuJour(publie)));

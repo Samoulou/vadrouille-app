@@ -86,13 +86,12 @@ const DEJA_LA = candidat(ID_A, "meal", "test_place_musee");
 const ACTIVITE = candidat(ID_B, "activity", "test_place_galerie", { durationMinutes: 60 });
 const REPAS = candidat(ID_C, "meal", "test_place_bistrot");
 
-const choisir = (stopId: string, propositions: readonly PropositionDuVoyage[], options: { etapesAFaire?: Set<string>; candidateId?: string } = {}) =>
+const choisir = (stopId: string, propositions: readonly PropositionDuVoyage[], options: { candidateId?: string } = {}) =>
   choisirRemplacement({
     instantane: INSTANTANE,
     baseVersion: 1,
     stopId,
     propositions,
-    etapesAFaire: options.etapesAFaire ?? new Set(),
     ...(options.candidateId ? { candidateId: options.candidateId } : {}),
   });
 
@@ -149,15 +148,16 @@ describe("remplacement : choix de la proposition (PR 869)", () => {
     expect(choisir("diner", [proposition(DEJA_LA), proposition(REPAS)], { candidateId: ID_B })).toEqual({ ok: false, refus: "no_option" });
   });
 
-  it("PR 869 : refus : étape inconnue, verrouillée, engagement, désignée par « À faire », aucune proposition compatible", () => {
+  // Le refus d'une étape désignée par une ligne « À faire » est levé par M5e (décision 0147 § 7.2 point 3, M5-PO-15,
+  // critère 30) : la liste suit la version ; voir « a-faire: une retouche met la liste à jour » (`src/domain/a-faire.test.ts`).
+  it("PR 869 : refus : étape inconnue, verrouillée, engagement, aucune proposition compatible", () => {
     expect(choisir("inconnue", [proposition(REPAS)])).toEqual({ ok: false, refus: "unknown_stop" });
     expect(choisir("concert", [proposition(ACTIVITE)])).toEqual({ ok: false, refus: "locked_stop" });
-    expect(choisir("diner", [proposition(REPAS)], { etapesAFaire: new Set(["diner"]) })).toEqual({ ok: false, refus: "no_option" });
     expect(choisir("diner", [proposition(DEJA_LA), proposition(ACTIVITE)])).toEqual({ ok: false, refus: "no_option" });
     const engagement = TripSnapshotSchema.parse({
       days: [{ ...INSTANTANE.days[0], items: [{ type: "stop", stop: etape("billet", "activity", "10:00", { commitment: "ticket" }) }] }],
     });
-    expect(choisirRemplacement({ instantane: engagement, baseVersion: 1, stopId: "billet", propositions: [proposition(ACTIVITE)], etapesAFaire: new Set() })).toEqual({
+    expect(choisirRemplacement({ instantane: engagement, baseVersion: 1, stopId: "billet", propositions: [proposition(ACTIVITE)] })).toEqual({
       ok: false,
       refus: "no_option",
     });
@@ -298,7 +298,7 @@ describe("remplacement : « Ce qui change » de l'aperçu M1g (décision 0147 §
   const CONTEXTE_IA: ContexteVoyage = { ...CONTEXTE, base: BASE_IA };
 
   it("changements: un remplacement ne produit aucun removed (aperçu M1g sur api, étape de l'IA à identifiant réutilisé)", () => {
-    const choix = choisirRemplacement({ instantane: V2, baseVersion: 2, stopId: "j1-2", propositions: [proposition(ACTIVITE)], etapesAFaire: new Set() });
+    const choix = choisirRemplacement({ instantane: V2, baseVersion: 2, stopId: "j1-2", propositions: [proposition(ACTIVITE)] });
     if (!choix.ok) throw new Error(choix.refus);
     const resultat = appliquerPatch({
       moteur: entreeMoteurDeRevision(CONTEXTE_IA, [choix.proposition.candidat], RELECTURES),
@@ -316,5 +316,29 @@ describe("remplacement : « Ce qui change » de l'aperçu M1g (décision 0147 §
     // Ni l'ancien lieu de `j1-2` (version 1), ni le musée remplacé n'apparaissent comme retirés ou ajoutés.
     expect(draft.changes).not.toContainEqual(expect.objectContaining({ label: "[Ancien lieu]" }));
     expect(draft.changes).not.toContainEqual(expect.objectContaining({ type: "added" }));
+  });
+
+  it("a-faire: l'aperçu d'un remplacement dit la ligne « À faire » retirée (M5e, 0147 § 7.2 point 2), sans removed", () => {
+    const choix = choisirRemplacement({ instantane: V2, baseVersion: 2, stopId: "j1-2", propositions: [proposition(ACTIVITE)] });
+    if (!choix.ok) throw new Error(choix.refus);
+    const resultat = appliquerPatch({
+      moteur: entreeMoteurDeRevision(CONTEXTE_IA, [choix.proposition.candidat], RELECTURES),
+      patch: patchDuRemplacement(DEMANDE, 2, choix),
+      versionCourante: 2,
+      base: V2,
+    });
+    if (!resultat.ok) throw new Error(resultat.code);
+    const cible = identifiantRemplacement(2, ID_B);
+    const lignes = [
+      { id: "00000000-0000-4000-8000-000000000001", stopId: "j1-2", kind: "reservation" as const, done: false, label: "[Musée]" },
+      { id: "00000000-0000-4000-8000-000000000002", stopId: "j1-2", kind: "ticket" as const, done: true, label: "[Billet du musée]" },
+      { id: "00000000-0000-4000-8000-000000000003", stopId: null, kind: "other" as const, done: false, label: "[Bon plan]" },
+    ];
+    const draft = brouillonDuRemplacement(CONTEXTE_IA, resultat, RELECTURES, cible, 2, lignes);
+    const checklist = draft.changes.filter((change) => change.type === "checklist");
+    expect(checklist).toEqual([{ type: "checklist", action: "removed", label: "[Musée]" }]);
+    expect(draft.changes.map((change) => change.type)).not.toContain("removed");
+    // Les changements du moteur d'abord, les lignes de la liste ensuite.
+    expect(draft.changes.at(-1)).toEqual(checklist[0]);
   });
 });

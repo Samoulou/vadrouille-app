@@ -38,8 +38,11 @@ import { lireTriClos } from "./signaux";
  *   version courante relue : toujours la version de base, sinon rien n'est écrit), nouvelle version par le module unique
  *   (`author_kind = 'workflow'`, `request_id` de la ligne), positions (variante réelle seulement), fin `ready`, aucune case.
  *
- * Ce que la révision ne réécrit pas (choix conservateurs, décrits dans la PR) : les cases de l'aperçu (`proposals`), les lignes
- * « À faire » (`checklist_items`, la personne a pu en cocher) et `stays.place_id` (écrits par la génération). Le récit n'est
+ * Ce que la révision ne réécrit pas (choix conservateurs, décrits dans la PR) : les cases de l'aperçu (`proposals`) et
+ * `stays.place_id` (écrits par la génération). Les lignes « À faire » suivent la version (décision 0147 § 7.2, qui amende 0142
+ * § 4 : M5-PO-15) : `ecrireVersion` reçoit la version de base en `instantanePrecedent` et, dans la même transaction, retire
+ * les lignes non faites des étapes écartées, délie leurs lignes faites et ajoute une ligne `reservation` par étape
+ * `toReserve` nouvelle ; une ligne cochée n'est jamais retirée ni décochée. Le récit n'est
  * jamais lu ni envoyé (`voyageEtBriefSansRecit`). Aucun journal propre : l'arrêt est connu par `generation_runs.stop_reason`.
  * État sérialisé inchangé (`EtatLotSchema`) : aucun choix, aucun nom ni `placeId` n'y entre.
  */
@@ -164,6 +167,8 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
     { organizationId, generationRunId, tripId, requestId: contexte.requestId, echeance: contexte.echeance, rang: contexte.rang },
     {
       instantane,
+      // Version remplacée : la version de base, seule version courante admise par `ecrireSi` (relue sous le verrou).
+      instantanePrecedent: base,
       cases: [],
       statut: "ready",
       ...(ecrirePositions === undefined ? {} : { ecrirePositions }),

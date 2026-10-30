@@ -348,11 +348,11 @@ test.describe("Séjour", () => {
   test("sejour: liste à réserver", async ({ page }) => {
     const events = collectEvents(page);
     await openTrip(page, SEJOUR);
-    const chateau = box(page, "[Château d'Édimbourg]");
+    const chateau = box(page, "Réserver : [Château d'Édimbourg]");
     await chateau.click();
     await expect(chateau).toHaveAttribute("aria-pressed", "true");
-    await expect(row(page, "[Château d'Édimbourg]").getByRole("link")).toHaveCount(0);
-    await expect(row(page, "[Château d'Édimbourg]").locator("[id]")).toHaveCSS("text-decoration-line", "line-through");
+    await expect(row(page, "Réserver : [Château d'Édimbourg]").getByRole("link")).toHaveCount(0);
+    await expect(row(page, "Réserver : [Château d'Édimbourg]").locator("[id]")).toHaveCSS("text-decoration-line", "line-through");
     await expect(aFaire(page).getByRole("img", { name: "3 réservations à faire" })).toBeVisible();
     await expect.poll(() => events).toEqual([{ name: "checklist_item_done", properties: {} }]);
     await expect(page.locator("[data-undo-toast]")).toHaveCount(0);
@@ -360,12 +360,12 @@ test.describe("Séjour", () => {
 
     await chateau.click();
     await expect(chateau).toHaveAttribute("aria-pressed", "false");
-    await expect(row(page, "[Château d'Édimbourg]").getByRole("link", { name: "Réserver" })).toBeVisible();
+    await expect(row(page, "Réserver : [Château d'Édimbourg]").getByRole("link", { name: "Réserver" })).toBeVisible();
     await expect(aFaire(page).getByRole("img", { name: "4 réservations à faire" })).toBeVisible();
     await page.waitForTimeout(300);
     expect(events).toHaveLength(1);
 
-    for (const name of ["[Excursion dans les Highlands]", "[Château d'Édimbourg]", "[Visite de la distillerie]", "[Assurance voyage]"]) {
+    for (const name of ["Réserver : [Excursion dans les Highlands]", "Réserver : [Château d'Édimbourg]", "Réserver : [Visite de la distillerie]", "Réserver : [Assurance voyage]"]) {
       await box(page, name).click();
     }
     await expect(aFaire(page).getByRole("img")).toHaveCount(0);
@@ -375,9 +375,9 @@ test.describe("Séjour", () => {
     await sheet(page).getByRole("link", { name: "Jour 2, dim." }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Dimanche 30 août");
     await sheet(page).getByRole("link", { name: "Séjour", exact: true }).click();
-    await expect(box(page, "[Château d'Édimbourg]")).toHaveAttribute("aria-pressed", "true");
+    await expect(box(page, "Réserver : [Château d'Édimbourg]")).toHaveAttribute("aria-pressed", "true");
     await page.reload();
-    await expect(box(page, "[Château d'Édimbourg]")).toHaveAttribute("aria-pressed", "false");
+    await expect(box(page, "Réserver : [Château d'Édimbourg]")).toHaveAttribute("aria-pressed", "false");
   });
 
   test("sejour: pendant ton séjour", async ({ page }) => {
@@ -467,7 +467,7 @@ test.describe("Séjour", () => {
     expect(names.slice(0, 3)).toEqual(["Retour", "Agrandir le panneau", "Séjour"]);
     expect(names.slice(3, 9)).toEqual(["Jour 1, sam.", "Jour 2, dim.", "Jour 3, lun.", "Jour 4, mar.", "Jour 5, mer.", "Jour 6, jeu."]);
     // Puis le contenu du panneau dans l'ordre de lecture : cases et liens « Réserver » de la liste.
-    expect(names.slice(9, 12)).toEqual(["[Billets du Tattoo]", "[Excursion dans les Highlands]", "Réserver"]);
+    expect(names.slice(9, 12)).toEqual(["[Billets du Tattoo]", "Réserver : [Excursion dans les Highlands]", "Réserver"]);
     // Les marqueurs de la vue d'ensemble ne sont pas focusables.
     const focusable = await page
       .getByRole("region", { name: "Carte du séjour" })
@@ -526,9 +526,9 @@ test.describe("transverses", () => {
   test("sejour: aucune donnée persistée côté client", async ({ page, context }) => {
     await openTrip(page, `/voyages/${TRIP}`);
     // Séjour (F5c) : cases cochées puis décochées.
-    const chateau = sheet(page).getByRole("button", { name: "[Château d'Édimbourg]", exact: true });
+    const chateau = sheet(page).getByRole("button", { name: "Réserver : [Château d'Édimbourg]", exact: true });
     await chateau.click();
-    await sheet(page).getByRole("button", { name: "[Assurance voyage]", exact: true }).click();
+    await sheet(page).getByRole("button", { name: "Réserver : [Assurance voyage]", exact: true }).click();
     await chateau.click();
     await expect(chateau).toHaveAttribute("aria-pressed", "false");
     await sheet(page).getByRole("link", { name: "Jour 2, dim." }).click();

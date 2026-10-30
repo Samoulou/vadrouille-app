@@ -2,6 +2,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 
 import { createApiCreationAdapter } from "@/adapters/api-creation";
 import { createApiTripAdapter } from "@/adapters/api";
+import { TripSnapshotSchema } from "@/contracts";
+import { identifiantLigneAFaire } from "@/domain/a-faire";
 import { INCONNU, type SourceRelectures } from "@/domain/relectures";
 import { composerSimuleeAvec, type CapaciteAncrage, type CapaciteRecherche, type FabriqueGeneration } from "@/server/composition/generation";
 import { EXPIRATION_EXECUTION_MS, PARTS_FORFAIT } from "@/server/config/generation";
@@ -210,6 +212,49 @@ describe("voyage complet (B9d) : démarrage une fois par droit, un jour publié 
     expect(await outils.adapter.getFullTripStatus(contexteDe(org), tripId)).toEqual({ ok: true, value: { phase: apres.complet[0]!.phase, tripId } });
     expect(outils.demarrerVoyageComplet).toHaveBeenCalledTimes(1);
     expect((await lignes(org, tripId)).complet).toHaveLength(1);
+  }, 120_000);
+
+  it("a-faire: M1c : une seule ligne par étape à réserver (publication réelle du voyage complet, décision 0147 § 7.1 et § 7.2)", async () => {
+    const org = await createOrg(auth);
+    const { adapter, tripId } = await voyageDebloque(org);
+    expect(await adapter.getFullTripStatus(contexteDe(org), tripId)).toMatchObject({ ok: true, value: { phase: "preparing" } });
+    const avant = await lignes(org, tripId);
+    const ligne = avant.complet[0]!;
+    const lignesAFaire = () =>
+      inTx(app, { org: org.org, user: org.owner }, async (c) =>
+        (await c.query("SELECT id, stop_id, kind, done FROM public.checklist_items WHERE trip_id = $1 ORDER BY id", [tripId])).rows as { id: string; stop_id: string | null; kind: string; done: boolean }[],
+      );
+    const lignesApercu = await lignesAFaire();
+
+    expect((await deroulerComplet({ generationRunId: ligne.id, organizationId: org.org, rang: 0 }, dependances())).fin.arret).toBeUndefined();
+    const apres = await lignes(org, tripId);
+    const nouvelles = apres.versions.slice(avant.versions.length);
+    expect(nouvelles.length).toBeGreaterThan(0);
+    const derniere = TripSnapshotSchema.parse(apres.versions.at(-1)!.snapshot);
+    const etapes = derniere.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" ? [{ stop: item.stop, jour: jour.index }] : [])));
+    const aReserver = etapes.filter(({ stop }) => stop.commitment === undefined && stop.exceptions.includes("toReserve"));
+    const publieesParLeComplet = aReserver.filter(({ jour }) => jour > 2);
+    expect(publieesParLeComplet.length).toBeGreaterThan(0);
+
+    const fin = await lignesAFaire();
+    const reservations = fin.filter((l) => l.kind === "reservation");
+    // Une ligne `reservation` par étape à réserver des journées publiées par le complet, ni plus ni moins ; aucune ligne de
+    // l'aperçu réécrite, aucune ligne orpheline.
+    for (const { stop } of publieesParLeComplet) expect(reservations.filter((l) => l.stop_id === stop.id)).toHaveLength(1);
+    const parEtape = new Map<string, number>();
+    for (const l of reservations) parEtape.set(l.stop_id!, (parEtape.get(l.stop_id!) ?? 0) + 1);
+    expect([...parEtape.values()].every((n) => n === 1)).toBe(true);
+    const ids = new Set(etapes.map(({ stop }) => stop.id));
+    expect(fin.every((l) => l.stop_id === null || ids.has(l.stop_id))).toBe(true);
+    expect(fin.filter((l) => lignesApercu.some((x) => x.id === l.id))).toEqual(lignesApercu);
+    // Identifiants dérivés du `request_id` de la version qui a publié le jour (rang 0, 1… dans cette version).
+    const parRequete = new Set(nouvelles.flatMap((v) => Array.from({ length: 20 }, (_, rang) => identifiantLigneAFaire(v.request_id, rang))));
+    for (const { stop } of publieesParLeComplet) expect(parRequete.has(reservations.find((l) => l.stop_id === stop.id)!.id)).toBe(true);
+    // La lecture sert le voyage (contrôle `checklist_orphan`), relectures permissives comme « Day.generating ».
+    const relectures: SourceRelectures = {
+      pour: async () => ({ ok: true, relectures: { validite: () => "valide", plages: () => INCONNU, duree: () => ({ minutes: 10, estimee: true }) } }),
+    };
+    expect((await createApiTripAdapter({ relectures, withOrg }).getTrip(contexteDe(org), tripId))?.checklist.length).toBe(fin.length);
   }, 120_000);
 
   it("profil complet par défaut (valeurs de test) : un voyage de six jours va au bout sans plafond atteint", async () => {

@@ -61,7 +61,7 @@ test("Séjour, vue d'ensemble (contenu du panneau livré par F5c)", async ({ pag
 // « Pendant ton séjour » et « Jour par jour ».
 test("Séjour à 92 %, ligne du château cochée", async ({ page }) => {
   await openTrip(page, `/dev/voyages/${TRIP}`);
-  await sheet(page).getByRole("button", { name: "[Château d'Édimbourg]", exact: true }).click();
+  await sheet(page).getByRole("button", { name: "Réserver : [Château d'Édimbourg]", exact: true }).click();
   await page.getByRole("button", { name: "Agrandir le panneau" }).click();
   await expectSheetAt(page, 0.92);
   await page.getByRole("button", { name: "Réduire le panneau" }).blur();
