@@ -44,6 +44,9 @@
     "signaler": "Signaler une erreur",
     "toastVerrouillee": "Étape verrouillée.",
     "toastDeverrouillee": "Verrou retiré.",
+    "dejaReserve": "Déjà réservé : cette étape ne bouge pas.",
+    "verrouConflit": "Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.",
+    "verrouEchec": "Impossible d'enregistrer. Réessaie.",
     "absente": "Cette étape n'est plus dans ce jour."
   },
   "signaler": {

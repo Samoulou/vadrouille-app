@@ -30,6 +30,18 @@ export interface ProgrammeActions {
   readonly checklistOnServer?: boolean;
 }
 
+/**
+ * Verrou refusé par le serveur (adaptateur `api`, M5a) : `conflict` si le programme a changé entre-temps (version dépassée,
+ * le voyage est relu), `error` pour tout autre refus ou une panne. Rien n'est affiché ; l'écran l'annonce.
+ */
+export class VerrouNonEnregistre extends Error {
+  override name = "VerrouNonEnregistre";
+
+  constructor(readonly raison: "conflict" | "error") {
+    super(raison);
+  }
+}
+
 /** Écarts aux données de l'adaptateur. */
 export interface ProgrammeState {
   /** Verrous modifiés, par identifiant d'étape ; une étape revenue à sa valeur d'origine n'y figure pas. */

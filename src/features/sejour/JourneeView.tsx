@@ -9,6 +9,7 @@ import { connexionRoute } from "@/features/compte/suite";
 import * as messages from "@/i18n/messages";
 
 import { JourneePanel } from "./JourneePanel";
+import { VerrouNonEnregistre } from "./programme";
 import { cleEtapeSignalee, proposeRemplacer } from "./signalement";
 import { StopSheet } from "./StopSheet";
 import { useTripShell } from "./TripShell";
@@ -49,6 +50,8 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
   const [reporting, setReporting] = useState<{ stopId: string; dayIndex: number; open: boolean } | null>(null);
   // Identité de l'étape : jour, identifiant et `placeId` (`cleEtapeSignalee`) ; vidé dès que la fiche se ferme ou change.
   const [reported, setReported] = useState<{ cle: string; reason: StopReportReason } | null>(null);
+  // Verrou non enregistré (adaptateur `api`, M5a) : message de la fiche, vidé dès que la fiche change.
+  const [lockFailure, setLockFailure] = useState<string | null>(null);
   const { day, fiche, etape, routes, closedFiche, consumeClosedFiche, reportMissingEtape, focusRequest, consumeFocusRequest } = shell;
   const contentRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -60,6 +63,7 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
   if (ficheVue !== ficheCle) {
     setFicheVue(ficheCle);
     setReported(null);
+    setLockFailure(null);
   }
 
   // `?etape=` absent des étapes et des événements du jour : journée sans fiche, adresse sans le paramètre, annonce.
@@ -110,7 +114,14 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
 
   const onToggleLock = async (locked: boolean) => {
     if (!fiche) return;
-    await shell.actions.setStopLocked(fiche.stop.id, locked);
+    setLockFailure(null);
+    try {
+      await shell.actions.setStopLocked(fiche.stop.id, locked);
+    } catch (erreur) {
+      // Rien n'est affiché : conflit de version (le voyage est relu) ou refus ; le message est annoncé sur la fiche.
+      setLockFailure(erreur instanceof VerrouNonEnregistre && erreur.raison === "conflict" ? t.verrouConflit : t.verrouEchec);
+      return;
+    }
     shell.notifyChange(locked ? t.toastVerrouillee : t.toastDeverrouillee, () => {
       contentRef.current?.querySelector<HTMLButtonElement>("[data-part='verrouiller']")?.focus();
     });
@@ -168,7 +179,8 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
           day={day}
           routes={routes}
           onClose={shell.closeFiche}
-          onToggleLock={onToggleLock}
+          {...(shell.lockable ? { onToggleLock } : {})}
+          lockFailure={lockFailure}
           onMove={() => setMoving({ stopId: fiche.stop.id, dayIndex: day.index, open: true })}
           onMoveIntent={preloadMoveSheet}
           {...(shell.reportable

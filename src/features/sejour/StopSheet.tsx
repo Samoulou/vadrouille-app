@@ -29,8 +29,16 @@ export interface StopSheetProps extends FicheTarget {
   routes: TripRoutes;
   /** « Fermer » et Échap (F5-PO-8). */
   onClose: () => void;
-  /** Bascule du verrou (F5-PO-10) ; reçoit la nouvelle valeur. */
-  onToggleLock: (locked: boolean) => void;
+  /**
+   * Bascule du verrou (F5-PO-10) ; reçoit la nouvelle valeur. Sans fonction, pas de bouton « Verrouiller » (adaptateur
+   * `api` : voyage non débloqué, M5-PO-1).
+   */
+  onToggleLock?: (locked: boolean) => void;
+  /**
+   * Verrou non enregistré (adaptateur `api`, M5a) : message annoncé (`role="alert"`) sous les actions, ou `null`. La
+   * région existe dès l'ouverture de la fiche quand le bouton « Verrouiller » est là.
+   */
+  lockFailure?: string | null;
   /** « Déplacer » (F7-PO-15) : ouvre la feuille « Déplacer » ; sans fonction, pas de bouton. */
   onMove?: () => void;
   /** Préchargement de la feuille « Déplacer » au survol ou au focus du bouton. */
@@ -69,6 +77,7 @@ export function StopSheet({
   routes,
   onClose,
   onToggleLock,
+  lockFailure = null,
   onMove,
   onMoveIntent,
   onReport,
@@ -110,7 +119,12 @@ export function StopSheet({
         <IconButton icon={<IconCroix />} label={t.fermer} onClick={onClose} data-part="fermer" />
       </header>
 
-      {inProgramme ? null : (
+      {inProgramme ? null : stop.commitment !== undefined ? (
+        // Engagement (sur `api`, un événement de `Day.events`) : déjà réservé, jamais verrouillé ni déplacé (M5-PO-3).
+        <p data-part="deja-reserve" className="text-corps-s text-ink-2">
+          {t.dejaReserve}
+        </p>
+      ) : (
         <p data-part="hors-programme" className="text-corps-s text-ink-2">
           {t.evenement}
         </p>
@@ -192,15 +206,17 @@ export function StopSheet({
               {t.deplacer}
             </Button>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-pressed={stop.locked}
-            data-part="verrouiller"
-            onClick={() => onToggleLock(!stop.locked)}
-          >
-            {t.verrouiller}
-          </Button>
+          {onToggleLock ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-pressed={stop.locked}
+              data-part="verrouiller"
+              onClick={() => onToggleLock(!stop.locked)}
+            >
+              {t.verrouiller}
+            </Button>
+          ) : null}
           {reportable ? (
             <Button
               variant="secondary"
@@ -215,6 +231,12 @@ export function StopSheet({
             </Button>
           ) : null}
         </section>
+      ) : null}
+
+      {inProgramme && onToggleLock ? (
+        <p role="alert" data-part="verrou-echec" className={lockFailure ? "text-corps-s font-semibold text-ink" : EMPTY_LIVE_REGION_CLASS}>
+          {lockFailure}
+        </p>
       ) : null}
 
       {reportable ? (
