@@ -126,6 +126,7 @@ function MoveContent({
   const applied = useRef(false);
 
   const [options, setOptions] = useState<MoveOptions | null>(null);
+  const [optionsFailed, setOptionsFailed] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [point, setPoint] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>({ type: "idle" });
@@ -142,7 +143,11 @@ function MoveContent({
         if ((loaded.days.find((day) => day.index === dayIndex)?.points.length ?? 0) > 0) setSelectedDay(dayIndex);
       },
       () => {
-        if (current) setOptions({ stopId: stop.id, days: [] });
+        // Points indisponibles (refus ou panne) : aucun jour proposé, et le bandeau d'erreur plutôt que « Aucun jour ».
+        if (!current) return;
+        setOptions({ stopId: stop.id, days: [] });
+        setOptionsFailed(true);
+        setPhase({ type: "banner", kind: "error" });
       },
     );
     return () => {
@@ -185,7 +190,7 @@ function MoveContent({
     day: day.index,
     disabled: (options?.days.find((candidate) => candidate.index === day.index)?.points.length ?? 0) === 0,
   }));
-  const allFull = options !== null && days.every((day) => day.disabled);
+  const allFull = options !== null && !optionsFailed && days.every((day) => day.disabled);
   const shownDay = selectedDay === null ? undefined : trip.days.find((day) => day.index === selectedDay);
   const points = options?.days.find((day) => day.index === selectedDay)?.points ?? [];
 

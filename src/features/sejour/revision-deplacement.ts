@@ -9,10 +9,11 @@ import { syncServerRevisionVersion, type ServerRevisionOptions } from "./revisio
  * par `createServerRevision` (`import()` au premier geste « Déplacer »), pour que ses actions serveur et sa logique
  * restent hors du JavaScript initial de la Journée (budget de 200 000 octets, décision 0016 § 3.1, Q95).
  *
- * - Points d'insertion (`getMoveOptions`), aperçu (`previewMove` : « Ce qui change », jours touchés **sans durée de
- *   trajet**, aucune relecture), « Appliquer » (`applyMove`, une version de plus) ; « Annuler » du toast est un retour à
- *   la version de base (`applyRevert`, M5b). Un point qui n'existe plus rend « aucune option » ; une version dépassée,
- *   « conflit ».
+ * - Points d'insertion (`getMoveOptions` ; un refus ou une panne **lève** : la feuille l'affiche comme une erreur, pas comme
+ *   des jours « complets »), aperçu (`previewMove` : « Ce qui change » et jours touchés calculés par le moteur avec les
+ *   durées relues, décision 0153, PR en cours), « Appliquer » (`applyMove`, une version de plus) ; « Annuler » du toast est
+ *   un retour à la version de base (`applyRevert`, M5b). Un point refusé par le moteur ou qui n'existe plus rend « aucune
+ *   option » ; une version dépassée, « conflit ».
  */
 
 /** Actions serveur du déplacement (injectées dans les tests par `ServerRevisionOptions.calls`). */
@@ -43,8 +44,9 @@ export function creerDeplacementServeur(options: ServerRevisionOptions, newReque
   return {
     async getMoveOptions(stopId: string): Promise<MoveOptions> {
       const result = await calls.getMoveOptions({ tripId, stopId });
-      // Refus ou panne : aucun point, tous les jours « complets » (rien n'est écrit).
-      return result.ok ? result.value : { stopId, days: [] };
+      // Refus ou panne : ce n'est pas « complet » ; la feuille affiche son bandeau d'erreur (rien n'est écrit).
+      if (!result.ok) throw new Error("points de déplacement indisponibles");
+      return result.value;
     },
 
     async previewMove(request: MoveRequest, signal: AbortSignal): Promise<RevisionResult> {

@@ -92,6 +92,26 @@ describe("déplacer: feuille", () => {
     expect(await axeViolations(baseElement)).toEqual([]);
   });
 
+  it("points indisponibles (refus ou panne, ticket 947) : bandeau d'erreur existant, sans « Aucun jour » ni « Réessayer » ; tous les jours désactivés", async () => {
+    const revision = {
+      version: () => 1,
+      previewReplacement: vi.fn(),
+      apply: vi.fn(),
+      getMoveOptions: vi.fn(async () => {
+        throw new Error("points indisponibles");
+      }),
+      previewMove: vi.fn(),
+    } as unknown as RevisionActions;
+    const { baseElement } = renderSheet(revision);
+    const alerte = await within(dialog()).findByRole("alert");
+    await waitFor(() => expect(alerte).toHaveTextContent("La proposition n'a pas pu être calculée. Ton programme est inchangé."));
+    expect(dialog().querySelector("[data-part='aucun-jour']")).toBeNull();
+    expect(within(alerte).queryByRole("button")).toBeNull();
+    for (const radio of within(days()).getAllByRole("radio")) expect(radio).toHaveAttribute("aria-disabled", "true");
+    expect(revision.previewMove).not.toHaveBeenCalled();
+    expect(await axeViolations(baseElement)).toEqual([]);
+  });
+
   it("J4 : ligne compacte sans lien, « Placer ici, vers 15:45 » ; aperçu « J2 13:25 → J4 15:45 » avec le focus ; « Appliquer »", async () => {
     const { recorder, onReturnFocus, baseElement } = renderSheet();
     await waitFor(() => expect(dayRadio("Jour 4")).not.toHaveAttribute("aria-disabled"));

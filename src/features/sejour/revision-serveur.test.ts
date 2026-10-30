@@ -403,15 +403,17 @@ describe("verrou enregistré sur api (M5a, ticket 919)", () => {
 describe("déplacement enregistré sur api (ticket 947)", () => {
   const DEMANDE = { stopId: JARDIN, pointId: "deplacer-j4-1545", baseVersion: 1 } as const;
 
-  it("deplacer: points lus par getMoveOptions ; refus ou panne : aucun point (tous les jours « complets »)", async () => {
+  it("deplacer: points lus par getMoveOptions ; refus ou panne : la promesse est rejetée (une erreur, pas des jours « complets »)", async () => {
     const { actions, calls } = setup();
     expect(await actions.getMoveOptions(JARDIN)).toEqual(OPTIONS);
     expect(calls.getMoveOptions).toHaveBeenCalledWith({ tripId: edimbourg.id, stopId: JARDIN });
     const refuse = setup({ options: { ok: false, error: { code: "not_unlocked", retryable: false } } });
-    expect(await refuse.actions.getMoveOptions(JARDIN)).toEqual({ stopId: JARDIN, days: [] });
+    await expect(refuse.actions.getMoveOptions(JARDIN)).rejects.toThrow();
+    const panne = setup({ options: { ok: false, error: { code: "provider_error" } } });
+    await expect(panne.actions.getMoveOptions(JARDIN)).rejects.toThrow();
   });
 
-  it("deplacer: aperçu repris du serveur (trajets sans durée), valide RevisionPreviewSchema, rien n'est affiché ni écrit", async () => {
+  it("deplacer: aperçu repris du serveur, valide RevisionPreviewSchema, rien n'est affiché ni écrit", async () => {
     const { actions, calls, afterWrite, shown } = setup();
     const result = await actions.previewMove(DEMANDE, { signal: signal() });
     expect(calls.previewMove).toHaveBeenCalledWith({ tripId: edimbourg.id, ...DEMANDE });

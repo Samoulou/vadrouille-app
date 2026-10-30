@@ -186,25 +186,16 @@ export function recomposerJour(
     readonly verification: DateDeVerification;
     /** Badge « à confirmer » d'une étape sans `placeId` (chaîne inversée, 0136 § 3.6) ; absent : faux. */
     readonly badgeSansLieu?: boolean;
-    /**
-     * Aperçu d'un déplacement sur `api` (ticket 947), **sans relecture** : chaque trajet sort sans durée (`minutes: null`,
-     * « temps indisponible » de `DayLine`), `travelMinutes` vaut 0, le budget est calculé ; jamais pour une lecture. Absent :
-     * faux, et une relecture absente reste `travel_unknown`.
-     */
-    readonly sansDurees?: boolean;
   },
 ): Assemblage<Day> {
   const relectures = contexte.generating ? undefined : contexte.relectures;
-  const sansDurees = contexte.sansDurees === true && !contexte.generating && relectures === undefined;
-  if (!contexte.generating && relectures === undefined && !sansDurees) return { ok: false, raison: "travel_unknown" };
+  if (!contexte.generating && relectures === undefined) return { ok: false, raison: "travel_unknown" };
   const couples = pointsDesSegments(jour, contexte.nombreDeNuits);
   const items: DayLineItem[] = [];
   for (const [rang, item] of jour.items.entries()) {
     if (item.type === "stop") {
       const ligne: DayLineItem = { type: "stop", stop: etapeLue(item.stop, "stop", jour, relectures, contexte.verification) };
       items.push(contexte.badgeSansLieu === true ? avecBadgeSansLieu(ligne) : ligne);
-    } else if (item.type === "segment" && sansDurees) {
-      items.push({ type: "segment", segment: { mode: item.segment.mode, minutes: null, estimated: item.segment.estimated } });
     } else if (item.type === "segment") {
       const couple = couples.get(rang);
       const duree = relectures === undefined || couple === undefined ? INCONNU : relectures.duree(couple.depuis, couple.vers, item.segment.mode);
@@ -228,8 +219,6 @@ export function recomposerJour(
     const minutes = minutesDeTrajet(jour, contexte.nombreDeNuits, relectures, contexte.modes);
     if (minutes === INCONNU) return { ok: false, raison: "travel_unknown" };
     travelMinutes = minutes;
-    budgetPerPerson = budgetParPersonne(jour);
-  } else if (sansDurees) {
     budgetPerPerson = budgetParPersonne(jour);
   }
   return {
