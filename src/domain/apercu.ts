@@ -74,6 +74,17 @@ export function selectionApercu<E extends EtapeLue = EtapeLue>(jours: readonly J
   return { etapes, jours: lisibles };
 }
 
+/**
+ * Journées candidates à l'aperçu de la chaîne inversée (décision 0148 § 10.1 point 1 ; spécification M4 § 7.3, M4-PO-9) :
+ * les journées d'un changement de ville (une ligne `transfer`) sont retirées **avant** `selectionApercu`, qui ne change pas ;
+ * J1 n'est jamais un changement de ville et, par défense, **n'est jamais retirée**, quels que soient ses éléments (mineur 11).
+ * Appliquée à l'écriture des cases (`cases-programme.ts`) et à la lecture avant le déblocage (`src/server/voyages/lecture.ts`).
+ * Une journée retirée reste « À débloquer » avant le déblocage.
+ */
+export function joursHorsChangement<J extends { readonly index: number; readonly items: readonly { readonly type: string }[] }>(jours: readonly J[]): J[] {
+  return jours.filter((jour) => jour.index === 1 || !jour.items.some((ligne) => ligne.type === "transfer"));
+}
+
 /** Étape retenue pour une case de la chaîne inversée : un `placeId` et une `reason` non vide (décision 0136 § 3.4). */
 export const etapeAncreeEtRedigee = (stop: { readonly placeId?: string; readonly reason?: string }): boolean =>
   stop.placeId !== undefined && stop.reason !== undefined && stop.reason.trim() !== "";

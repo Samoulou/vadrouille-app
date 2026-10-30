@@ -397,7 +397,13 @@ const TYPES_PROTOTYPE_SERVEUR_P0: readonly string[] = proto("ancrage", "brief", 
  * externe (ni `src/prototype`, ni `src/server/p0`). `brief.ts`, `sites.ts` et `apercu.ts` du même dossier ne sont chargés
  * que sous Next.js.
  */
-const MODULES_PROGRAMME_P0: readonly string[] = ["src/server/programme/forme.ts", "src/server/programme/entree.ts", "src/server/programme/assemblage.ts"];
+const MODULES_PROGRAMME_P0: readonly string[] = [
+  "src/server/programme/forme.ts",
+  "src/server/programme/entree.ts",
+  "src/server/programme/assemblage.ts",
+  // M4b (décision 0149 § 6) : importé par `assemblage.ts` pour le second contrôle du cadrage.
+  "src/server/programme/cadrage.ts",
+];
 
 type Regle = { projet: (chemin: string) => boolean; externes: readonly string[]; formes?: ReadonlyMap<string, string> };
 

@@ -211,7 +211,6 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B8a (ticket 462), décision 0085 § 1 ; verdict Sécurité à rendre",
   })),
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
-  { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage-zone.test.ts", specificateur: "@/prototype/brief", noms: ["BriefSchema", "type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/budget-routes.ts", specificateur: "@/prototype/ancrage", noms: ["type:Trajets"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/fiches-finales.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },

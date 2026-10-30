@@ -9,10 +9,12 @@ import {
   type StopSnapshot,
   type TripPatch,
   type TripPatchOperation,
+  type TransferItem,
   type TripSnapshot,
 } from "@/contracts";
 
 import { budgetParPersonne, changementDeBudget } from "@/domain/calculs";
+import { creneauOccupe } from "@/domain/changement-de-ville";
 import type { EntreeMoteur, EtatChoix } from "@/domain/entrees";
 import { modesAdmis, sourceDe } from "@/domain/generation";
 import { etapesDuJour } from "@/domain/programme";
@@ -84,8 +86,14 @@ const refus = <C extends Exclude<Refus["code"], "version_conflict">>(code: C) =>
 
 // --- Brouillon -------------------------------------------------------------------------------------------------
 
-/** Ligne déplaçable d'un jour : une étape (fixe si l'opération l'a posée à une heure demandée) ou un repas ouvert. */
-type Ligne = { genre: "etape"; stop: StopSnapshot; fixe: boolean } | { genre: "repas"; time: string; meal: Meal };
+/**
+ * Ligne d'un jour : une étape (fixe si l'opération l'a posée à une heure demandée), un repas ouvert, ou un changement de
+ * ville (`transfer`, toujours fixe, jamais visé par une opération : il n'a pas d'identifiant).
+ */
+type Ligne =
+  | { genre: "etape"; stop: StopSnapshot; fixe: boolean }
+  | { genre: "repas"; time: string; meal: Meal }
+  | { genre: "changement"; item: TransferItem };
 
 type JourBrouillon = { origine: DaySnapshot; lignes: Ligne[] };
 
@@ -96,13 +104,14 @@ type Cible =
   | { type: "moved"; id: string; avant: { day: number; time: string } };
 
 /**
- * Lignes déplaçables d'un jour. Un changement de ville (`transfer`, décision 0148 § 1) n'en est pas une : sans
- * identifiant, aucun patch ne le vise ; un jour qui en porte un n'est pas replanifié (`replanifierHoraires`).
+ * Lignes d'un jour. Un changement de ville (`transfer`, décision 0148 § 1) est une ligne **fixe** : sans identifiant, aucun
+ * patch ne le vise, et `replanifierHoraires` le pose à son heure avec son créneau occupé (`creneauOccupe`, 0151 § 5).
  */
 function lignesDe(jour: DaySnapshot): Ligne[] {
   return jour.items.flatMap((item): Ligne[] => {
     if (item.type === "stop") return [{ genre: "etape", stop: item.stop, fixe: false }];
     if (item.type === "openMeal") return [{ genre: "repas", time: item.time, meal: item.meal }];
+    if (item.type === "transfer") return [{ genre: "changement", item }];
     return [];
   });
 }
@@ -147,10 +156,10 @@ type ContextePatch = {
 };
 
 /**
- * Jour portant un `transfer` touché **seulement** par `lock` / `unlock` (réponse du Tech Lead à la revue de M4-C) :
- * rien ne bouge, le jour est recopié tel quel avec les nouveaux verrous, sans replanification. Toute autre
- * opération sur ce jour (lignes ajoutées, retirées, déplacées ou remplacées) : `undefined`, refus `no_option`
- * (règle provisoire jusqu'au domaine `changement-de-ville.ts` de M4b).
+ * Jour portant un `transfer` touché **seulement** par `lock` / `unlock` (décision 0151 § 5 point 3) : rien ne bouge, le
+ * jour est recopié tel quel avec les nouveaux verrous, `transfer` compris, sans replanification ; jamais `no_option`.
+ * Toute autre opération sur ce jour (lignes ajoutées, retirées, déplacées ou remplacées) : `undefined`, et le jour est
+ * replanifié par la règle du changement de ville (`replanifierHoraires`).
  */
 function verrousSeulement(jour: JourBrouillon): DaySnapshot | undefined {
   const sansVerrou = (lignes: readonly Ligne[]) =>
@@ -174,13 +183,19 @@ function verrousSeulement(jour: JourBrouillon): DaySnapshot | undefined {
  * terminus de fin sont réécrits comme à la génération. `undefined` : le jour ne peut pas être replanifié (trajet
  * inconnu vers une étape à décaler, chevauchement avec une étape fixe, fin du jour dépassée, changement de ville).
  *
- * Changement de ville (`transfer`, décision 0148 § 1 point 3, PR M4-C) : il n'est jamais réécrit ni déplacé. Son
- * créneau occupé et les règles de ce jour sont posés par le domaine `changement-de-ville.ts` (M4b) ; d'ici là, un
- * jour touché qui en porte un n'est **pas replanifié** (`undefined`, donc refus `no_option` sans écriture), plutôt
- * que d'être réécrit sans sa ligne « Vers {ville} ». Les jours non touchés et un `revert` le recopient tel quel.
+ * Changement de ville (`transfer`, décision 0151 § 5, qui remplace la règle provisoire `no_option` de M4-C) : un patch
+ * fait seulement de `lock` / `unlock` recopie le jour (`verrousSeulement`). Sinon le `transfer` est une ligne **fixe**,
+ * jamais réécrite ni déplacée, qui occupe son créneau (`creneauOccupe` de `changement-de-ville.ts`, 0148 § 5.3) : une
+ * ligne qui commence avant son départ doit finir (fin occupée) avant lui, sans quoi le jour n'est pas replanifiable
+ * (`undefined`, refus `no_option`) — une étape ne passe jamais d'une ville à l'autre ; aucune ligne ne commence dans le
+ * créneau ; la première étape après l'arrivée n'a pas de trajet avant elle (spécification M4 § 7.3) et le temps libre
+ * avant le départ suit la règle de tous les jours. Les marges de M4-suite § 3.3 s'y ajouteront.
  */
 function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DaySnapshot | undefined {
-  if (jour.origine.items.some((item) => item.type === "transfer")) return verrousSeulement(jour);
+  if (jour.origine.items.some((item) => item.type === "transfer")) {
+    const copie = verrousSeulement(jour);
+    if (copie !== undefined) return copie;
+  }
   const { configuration, nuits } = contexte.moteur;
   const marge = configuration.margeMinutes;
   const origine = jour.origine;
@@ -197,9 +212,9 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
   const finBase = dernier?.type === "terminus" && dernier.role === "end" ? versMinutes(dernier.time) : bornes.fin;
   const labelFin = dernier?.type === "terminus" && dernier.role === "end" ? dernier.label : etiquetteDe(logements.arrivee);
 
-  const debutDe = (ligne: Ligne) => versMinutes(ligne.genre === "etape" ? ligne.stop.start : ligne.time);
+  const debutDe = (ligne: Ligne) => versMinutes(ligne.genre === "etape" ? ligne.stop.start : ligne.genre === "repas" ? ligne.time : ligne.item.start);
   const parDebut = (a: Ligne, b: Ligne) => debutDe(a) - debutDe(b);
-  const estFixe = (ligne: Ligne) => ligne.genre === "etape" && (ligne.stop.locked || ligne.fixe);
+  const estFixe = (ligne: Ligne) => ligne.genre === "changement" || (ligne.genre === "etape" && (ligne.stop.locked || ligne.fixe));
   const fixes = jour.lignes.filter(estFixe).sort(parDebut);
   const mobiles = jour.lignes.filter((ligne) => !estFixe(ligne)).sort(parDebut);
 
@@ -209,6 +224,8 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
   /** L'élément précédent est-il verrouillé ? Le début du jour compte comme tel (un conflit entre verrous ne bloque pas, B5-PO-6). */
   let precedentVerrouille = true;
   let dernierVerrouille = false;
+  /** Juste après un changement de ville : la prochaine étape n'a pas de trajet avant elle (spécification M4 § 7.3). */
+  let apresChangement = false;
 
   /** Temps libre avant un élément (B5-PO-9), même règle que la génération (`journee.ts`). */
   const libreAvant = (debut: number, trajet: number | undefined) => {
@@ -229,32 +246,55 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
     items.push({ type: "stop", stop: ecrite });
     fin = Math.max(fin, occupee);
     if (stop.placeId !== undefined) position = { lieu: stop.placeId };
+    apresChangement = false;
     precedentVerrouille = stop.locked;
     dernierVerrouille = stop.locked;
     return true;
   };
 
+  /**
+   * Changement de ville : à son départ, jamais déplacé ; refusé si la ligne précédente finit après le départ. Après lui, la
+   * position est le logement d'arrivée (aucun trajet d'une ville à l'autre) et l'instant, la fin de son créneau occupé.
+   */
+  const poserChangement = (item: TransferItem): boolean => {
+    const creneau = creneauOccupe(item, configuration);
+    if (creneau.debut < fin) return false;
+    libreAvant(creneau.debut, undefined);
+    items.push(item);
+    fin = creneau.fin;
+    position = arrivee;
+    apresChangement = true;
+    // Le créneau occupé n'est jamais partagé, même avec une étape verrouillée (au contraire de deux verrous, B5-PO-6).
+    precedentVerrouille = false;
+    dernierVerrouille = false;
+    return true;
+  };
+
   /** Étape fixe : à son heure ; refusée si elle chevauche la précédente, sauf entre deux étapes verrouillées. */
   const poserFixe = (ligne: Ligne): boolean => {
+    if (ligne.genre === "changement") return poserChangement(ligne.item);
     if (ligne.genre !== "etape") return false;
     const { stop } = ligne;
     const debut = versMinutes(stop.start);
-    const trajet = stop.placeId === undefined ? undefined : contexte.trajet(position, { lieu: stop.placeId });
+    const trajet = stop.placeId === undefined || apresChangement ? undefined : contexte.trajet(position, { lieu: stop.placeId });
     const auPlusTot = fin + (trajet === undefined ? 0 : trajet.minutes + marge);
     if (debut < auPlusTot && !(precedentVerrouille && stop.locked)) return false;
     return poserEtape(stop, debut, trajet);
   };
 
-  /** Fin occupée d'une ligne mobile posée à `debut`, et son lieu. */
+  /** Fin occupée d'une ligne mobile posée à `debut`, et son lieu (un changement de ville n'est jamais mobile). */
   const occupation = (ligne: Ligne, debut: number): { fin: number; lieu?: string } =>
     ligne.genre === "repas"
       ? { fin: debut + lire(configuration.dureesParDefaut, ligne.meal) }
-      : {
-          fin: finOccupee(ligne.stop, configuration) + debut - versMinutes(ligne.stop.start),
-          ...(ligne.stop.placeId === undefined ? {} : { lieu: ligne.stop.placeId }),
-        };
+      : ligne.genre === "changement"
+        ? { fin: creneauOccupe(ligne.item, configuration).fin }
+        : {
+            fin: finOccupee(ligne.stop, configuration) + debut - versMinutes(ligne.stop.start),
+            ...(ligne.stop.placeId === undefined ? {} : { lieu: ligne.stop.placeId }),
+          };
 
   for (const ligne of mobiles) {
+    if (ligne.genre === "changement") return undefined;
     // Les étapes fixes qui commencent avant cette ligne passent d'abord.
     while (fixes.length > 0 && debutDe(fixes.at(0) ?? ligne) <= debutDe(ligne)) {
       const fixe = fixes.shift();
@@ -262,9 +302,10 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
     }
     for (;;) {
       const lieu = ligne.genre === "etape" ? ligne.stop.placeId : undefined;
-      const trajet = lieu === undefined ? undefined : contexte.trajet(position, { lieu });
-      // Trajet sans durée connue vers une étape à planifier : non planifiable (B5-PO-6).
-      if (lieu !== undefined && trajet === undefined) return undefined;
+      const trajet = lieu === undefined || apresChangement ? undefined : contexte.trajet(position, { lieu });
+      // Trajet sans durée connue vers une étape à planifier : non planifiable (B5-PO-6) ; juste après un changement de
+      // ville, aucun trajet n'est compté (spécification M4 § 7.3).
+      if (lieu !== undefined && trajet === undefined && !apresChangement) return undefined;
       const auPlusTot = arrondi5(fin + (trajet === undefined ? 0 : trajet.minutes) + marge);
       const debut = Math.max(debutDe(ligne), auPlusTot);
       const occupee = occupation(ligne, debut);
@@ -284,12 +325,16 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
           fin = Math.max(fin, occupee.fin);
           precedentVerrouille = false;
           dernierVerrouille = false;
+          // `apresChangement` reste vrai (choix voulu, R8) : un repas ouvert n'a pas de lieu, la position reste le logement
+          // d'arrivée et la première **étape** après le changement de ville n'a toujours pas de trajet avant elle (M4 § 7.3).
         } else if (!poserEtape(ligne.stop, debut, trajet)) {
           return undefined;
         }
         break;
       }
-      // La ligne ne tient plus avant la prochaine étape fixe : celle-ci passe d'abord, la ligne est retentée après.
+      // La ligne ne tient plus avant la prochaine étape fixe : celle-ci passe d'abord, la ligne est retentée après. Jamais
+      // à travers un changement de ville : une ligne de la ville quittée ne passe pas dans la ville d'arrivée (0151 § 5).
+      if (prochain.genre === "changement") return undefined;
       fixes.shift();
       if (!poserFixe(prochain)) return undefined;
     }

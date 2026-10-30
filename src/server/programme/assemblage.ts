@@ -1,10 +1,15 @@
 import { LONGUEURS_CONTRAT, TripSchema, texteMaison, type Day, type DayLineItem, type Pace, type Proposal, type Segment, type Stop, type Trip } from "@/contracts";
 import { budgetTrajetDuJour } from "@/domain/budget-trajet";
 import { destinationColor } from "@/domain/calculs";
+import { arriveeAffichee, elementDuChangement, themeDuChangement } from "@/domain/changement-de-ville";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { logementsDuJour } from "@/domain/relectures";
-import { joursEntre } from "@/domain/temps";
-import type { BriefEssai, RythmeEssai } from "@/server/programme/forme";
+import { joursEntre, versHeure } from "@/domain/temps";
+import { cadrerProgramme, FIN_DU_JOUR, finDeLEtape, finOccupeeDuCreneau, NATURES_REPAS, partageDuJour } from "@/server/programme/cadrage";
+import { briefAPlusieursVilles, type BriefEssai, type BriefProgramme, type RythmeEssai } from "@/server/programme/forme";
+
+/** `finDeLEtape` est écrite dans `cadrage.ts` (une seule définition) et réexportée ici (décision 0148 § 8 point 2). */
+export { finDeLEtape };
 
 /**
  * Assemblage du programme écrit par l'IA (décision 0115 ; décision 0116 § 1.7, § 1.8, § 4.1, § 5 et § 6), partagé par
@@ -75,15 +80,24 @@ export type CreneauAssemble = {
    * a répondu 2xx ; jamais l'adresse brute de l'IA ni une adresse de redirection (PPI-PO-7).
    */
   readonly site?: string;
+  /** Ville posée par le cadrage (0148 § 7.1 point 3) ; lue seulement par le second contrôle, jamais écrite dans le voyage. */
+  readonly ville?: string;
 };
 
 export type EntreeAssemblageIa = {
   tripId: string;
   /** Organisation du voyage (décision 0136 § 1.2) : `PROTOTYPE_ORG_ID` pour `p0Run`, celle de l'exécution pour la vraie app. */
   organizationId: string;
-  brief: BriefEssai;
-  /** Journées lues, rangées par date ; créneaux **dans l'ordre écrit** (`ordreEcrit`, 0116 § 1.7), jamais retriés ici. */
-  jours: readonly { readonly date: string; readonly titre?: string; readonly creneaux: readonly CreneauAssemble[] }[];
+  /**
+   * Brief de l'essai (`p0Run`), ou `BriefProgramme` de `api` (décision 0148 § 8 point 2) : ses `villes` et `changements`
+   * ne sont lus que s'ils sont présents ; sans eux, le comportement ne change pas.
+   */
+  brief: BriefEssai | BriefProgramme;
+  /**
+   * Journées lues, rangées par date ; créneaux **dans l'ordre écrit** (`ordreEcrit`, 0116 § 1.7), jamais retriés ici.
+   * `dureeEstimeeMinutes` : durée estimée d'une journée de changement de ville à départ estimé (cadrage, 0148 § 5.3).
+   */
+  jours: readonly { readonly date: string; readonly titre?: string; readonly dureeEstimeeMinutes?: number; readonly creneaux: readonly CreneauAssemble[] }[];
   /** Bons plans contrôlés (0117 § 1) : lignes « À faire » avant le départ (0116 § 6). */
   bonsPlans: readonly string[];
   /** Identifiant de chaque logement du brief, dans son ordre (logements vérifiés à l'ouverture de l'étape). */
@@ -101,11 +115,6 @@ export type ProgrammeCompletIa = {
   justifications: Map<string, string>;
   terminus: TerminusDuJour[];
 };
-
-const NATURES_REPAS: ReadonlySet<string> = new Set(["repas_midi", "repas_soir", "apero"]);
-
-/** Fin du jour : le contrat n'admet pas d'heure au-delà (0116 § 1.7). */
-const FIN_DU_JOUR = "23:59";
 
 /**
  * Texte de l'IA admis par la règle du contrat (`texteMaison`, `src/contracts/texte.ts`) à sa longueur, sinon `undefined` :
@@ -140,16 +149,6 @@ export function sourceDuSite(site: string | undefined): Stop["source"] {
 }
 
 /**
- * Fin d'une étape (0116 § 1.7) : `fin` postérieure à `debut` gardée ; `fin` antérieure ou égale à `debut` lue comme
- * passant minuit, **bornée à 23:59** ; absente (ou `debut` déjà à 23:59), pas de fin.
- */
-function finDeLEtape(debut: string, fin: string | undefined): string | undefined {
-  if (fin === undefined) return undefined;
-  if (minutesDe(fin) > minutesDe(debut)) return fin;
-  return minutesDe(debut) < minutesDe(FIN_DU_JOUR) ? FIN_DU_JOUR : undefined;
-}
-
-/**
  * Assemblage du programme écrit par l'IA en `Trip`, **sans replanifier** ni retirer (0115 § 3, 0116 § 1.6) :
  * - une journée par date lue, d'indice `date − arrivée + 1`, son titre en `Day.theme` (lot 1 bis, même règle) ;
  *   `arrivee` et `depart` donnent l'heure des lignes `terminus` (logement de la nuit, libellé maison), jamais une étape
@@ -174,7 +173,7 @@ function finDeLEtape(debut: string, fin: string | undefined): string | undefined
  * Logement de départ et d'arrivée du jour `index` (1 = J1) : règle unique `logementsDuJour` (`src/domain/relectures.ts`,
  * 0045 § 2.2 ; jour `index − 1`), nuits du brief dans l'ordre.
  */
-function logementsDeLaJournee(brief: BriefEssai, logements: readonly string[], index: number) {
+function logementsDeLaJournee(brief: Pick<BriefEssai, "logements">, logements: readonly string[], index: number) {
   const nuits = brief.logements.flatMap((logement, rang) => Array.from({ length: logement.nuits }, () => ({ texte: logement.texte, placeId: logements.at(rang) ?? "" })));
   const { depart, arrivee } = logementsDuJour(index - 1, nuits.length);
   const nuit = (rang: number) => nuits.at(rang) ?? { texte: "Logement", placeId: "" };
@@ -196,30 +195,95 @@ export function pointsDeTrajet(entree: Pick<EntreeAssemblageIa, "brief" | "jours
   });
 }
 
+/** Villes et changements du brief de `api` (`BriefProgramme`), ou `undefined` pour le brief de l'essai (`p0Run`). */
+function plusieursVilles(brief: BriefEssai | BriefProgramme): BriefProgramme | undefined {
+  return briefAPlusieursVilles(brief) ? brief : undefined;
+}
+
+/** Heure de fin d'un engagement du brief, si elle est saisie et postérieure à son début (`BriefProgramme` seulement). */
+function finDeLEngagement(engagement: { readonly heure: string; readonly fin?: string } | { readonly heure: string }): { end?: string } {
+  const fin = "fin" in engagement ? engagement.fin : undefined;
+  return fin !== undefined && minutesDe(fin) > minutesDe(engagement.heure) ? { end: fin } : {};
+}
+
 export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompletIa {
   const { brief } = entree;
+  const programme = plusieursVilles(brief);
+  // Second contrôle (0148 § 5.1 point 3 (b)) : `cadrerProgramme` est idempotente ; sur `api`, l'entrée sort déjà de l'étape
+  // 2 bis. Sans villes (brief de l'essai, `p0Run`) : rien ne change.
+  const joursLus = programme === undefined ? entree.jours : cadrerProgramme({ jours: entree.jours }, programme, entree.configuration).programme.jours;
   const dernierIndice = joursEntre(brief.arrivee, brief.depart) + 1;
   const terminus: TerminusDuJour[] = [];
 
-  const days: Day[] = entree.jours.map((jour) => {
+  const days: Day[] = joursLus.map((jour) => {
     const index = joursEntre(brief.arrivee, jour.date) + 1;
     const { depart: logementDepart, arrivee: logementArrivee } = logementsDeLaJournee(brief, entree.logements, index);
     const arrivee = jour.creneaux.find((creneau) => creneau.nature === "arrivee");
     const depart = jour.creneaux.find((creneau) => creneau.nature === "depart");
-    const contenu = jour.creneaux.filter((creneau) => creneau.nature !== "arrivee" && creneau.nature !== "depart");
-    const debutJour = arrivee?.debut ?? (index === 1 ? brief.heureArrivee : (contenu[0]?.debut ?? "09:00"));
+    // Jour d'un changement de ville (0148 § 5.1 point 3 (b)) : créneaux de la ville quittée, ligne « Vers {ville} », puis
+    // créneaux de la ville d'arrivée (partage du cadrage) ; thème écrit par le code.
+    const changement = programme?.changements.find((c) => c.date === jour.date);
+    const partage = changement === undefined || programme === undefined ? undefined : partageDuJour(jour, changement, entree.configuration);
+    const contenu = partage === undefined ? jour.creneaux.filter((creneau) => creneau.nature !== "arrivee" && creneau.nature !== "depart") : [...partage.avant, ...partage.apres];
+    const ligneChangement =
+      changement === undefined || programme === undefined
+        ? undefined
+        : elementDuChangement(changement, programme.billets.find((billet) => billet.date === changement.date)?.libelle, partage?.dureeEstimeeMinutes);
+    // Jour d'un changement de ville sans étape avant la ligne : le terminus `start` est à `fenetreJour.debut` (M4-suite § 3.4),
+    // ou au départ s'il le précède (train à 07:00 : ni étape ni « Temps libre » avant la ligne, § 3.8).
+    const debutFenetre = entree.configuration.fenetreJour.debut;
+    const premierDebut =
+      partage === undefined
+        ? contenu[0]?.debut
+        : (partage.avant[0]?.debut ?? (ligneChangement !== undefined && minutesDe(ligneChangement.start) < minutesDe(debutFenetre) ? ligneChangement.start : debutFenetre));
+    const debutJour = arrivee?.debut ?? (index === 1 ? brief.heureArrivee : (premierDebut ?? "09:00"));
     const items: DayLineItem[] = [{ type: "terminus", role: "start", time: debutJour, label: logementDepart.texte }];
     let precedent: string | undefined = logementDepart.placeId === "" ? undefined : logementDepart.placeId;
     let travelMinutes: number | null = 0;
     let derniere = debutJour;
+    /**
+     * Fin occupée de la dernière ligne posée, en minutes (`finOccupeeDuCreneau`, la règle de rangement du cadrage) : une
+     * étape sans `fin` occupe sa durée par défaut, que le « Temps libre » avant le départ ne recouvre jamais (revue de la PR 932,
+     * bloquant 2).
+     */
+    let occupeeJusqua = minutesDe(debutJour);
+    /** Ligne « Vers {ville} » posée et aucune étape avec lieu depuis : ni segment avant la suivante, ni retour depuis elle. */
+    let apresChangement = false;
     const segment = (vers: string | undefined): void => {
       const minutes = precedent !== undefined && vers !== undefined ? entree.trajets(precedent, vers) : undefined;
       const valeur = minutes !== undefined && Number.isInteger(minutes) && minutes >= 0 ? minutes : null;
       travelMinutes = travelMinutes === null || valeur === null ? null : travelMinutes + valeur;
       items.push({ type: "segment", segment: { mode: entree.mode, minutes: valeur, estimated: false } });
     };
+    /**
+     * Ligne « Vers {ville} » (M4-suite § 3.4, option (a) des marges) : « Temps libre » de la dernière ligne **jusqu'au
+     * départ** si l'écart atteint `seuilTempsLibreMinutes`, puis le `transfer`, puis, quand l'arrivée est connue et tient dans
+     * le jour (billet ou vol avec heure de fin, départ estimé avec durée), « Temps libre » **dès l'arrivée** jusqu'à la ligne
+     * suivante (`suivant` : première étape après la ligne ; sans étape, le terminus `end`, à `fenetreJour.fin` sauf départ du
+     * voyage) si l'écart atteint le seuil. Arrivée « à confirmer » : aucune ligne `free` après la ligne. Les marges ne sont
+     * jamais un trou : le « Temps libre » les couvre. Aucun segment à travers le `transfer` (§ 7.3).
+     */
+    const poserChangement = (ligne: NonNullable<typeof ligneChangement>, suivant: string | undefined): void => {
+      const seuil = entree.configuration.seuilTempsLibreMinutes;
+      // Seuil et `from` depuis la fin **occupée** de la dernière ligne (jamais son seul début, pour une étape sans `fin`).
+      const libreDepuis = Math.max(minutesDe(derniere), occupeeJusqua);
+      if (minutesDe(ligne.start) - libreDepuis >= seuil) items.push({ type: "free", from: versHeure(libreDepuis), to: ligne.start });
+      items.push(ligne);
+      precedent = undefined;
+      apresChangement = true;
+      derniere = ligne.start;
+      const arrivee = arriveeAffichee(ligne);
+      if (arrivee === undefined || arrivee > minutesDe(entree.configuration.fenetreJour.fin)) return;
+      derniere = versHeure(arrivee);
+      const jusqua = suivant ?? depart?.debut ?? (index === dernierIndice ? brief.heureDepart : entree.configuration.fenetreJour.fin);
+      if (minutesDe(jusqua) - arrivee >= seuil) {
+        items.push({ type: "free", from: derniere, to: jusqua });
+        derniere = jusqua;
+      }
+    };
     let rang = 0;
     for (const [position, creneau] of contenu.entries()) {
+      if (ligneChangement !== undefined && partage !== undefined && position === partage.avant.length) poserChangement(ligneChangement, creneau.debut);
       if (creneau.lieu === undefined) {
         // Pause sans lieu (seule nature de `contenu` admise sans lieu par la lecture) : ligne `free`, jamais retirée.
         // 0116 § 1.8 : la `fin` lue selon § 1.7 prévaut (≤ `debut` : bornée à 23:59) ; seulement sans `fin`, le
@@ -233,6 +297,7 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
               : FIN_DU_JOUR;
         items.push({ type: "free", from: creneau.debut, to: jusqua });
         derniere = jusqua;
+        occupeeJusqua = Math.max(occupeeJusqua, minutesDe(jusqua));
         continue;
       }
       rang += 1;
@@ -262,13 +327,18 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
         locked: false,
       };
       if (creneau.placeId !== undefined) {
-        segment(creneau.placeId);
+        // Première étape après la ligne « Vers {ville} » : aucun segment avant elle (`travelFromPrevious` absent, § 7.3).
+        if (!apresChangement) segment(creneau.placeId);
         precedent = creneau.placeId;
+        apresChangement = false;
       }
       items.push({ type: "stop", stop });
       derniere = fin ?? creneau.debut;
+      occupeeJusqua = Math.max(occupeeJusqua, finOccupeeDuCreneau(creneau, entree.configuration));
     }
-    segment(logementArrivee.placeId === "" ? undefined : logementArrivee.placeId);
+    if (ligneChangement !== undefined && partage !== undefined && partage.apres.length === 0) poserChangement(ligneChangement, undefined);
+    // Retour au logement : jamais depuis la ligne « Vers {ville} » elle-même (aucune étape avec lieu après elle).
+    if (!apresChangement) segment(logementArrivee.placeId === "" ? undefined : logementArrivee.placeId);
     const finJour = depart?.debut ?? (index === dernierIndice ? brief.heureDepart : derniere);
     items.push({ type: "terminus", role: "end", time: minutesDe(finJour) >= minutesDe(derniere) ? finJour : derniere, label: logementArrivee.texte });
     terminus.push({ jour: index, depart: logementDepart.placeId, arrivee: logementArrivee.placeId });
@@ -279,12 +349,17 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
         kind: "event",
         name: engagement.libelle,
         start: engagement.heure,
+        // Heure de fin saisie (`BriefProgramme` seulement : plusieurs villes) : lue par `chevauchementDuChangement` à
+        // l'affichage (M4-suite § 3.5 point 4 et § 5) ; une seule ville, sans `fin` : inchangé.
+        ...finDeLEngagement(engagement),
         facts: {},
         exceptions: [],
         locked: true,
         commitment: engagement.type,
       }));
-    const theme = texteAdmis(jour.titre, LONGUEURS_CONTRAT.theme);
+    // Thème : « De {ville} à {ville} » écrit par le code le jour d'un changement de ville (trop long : absent, l'écran nomme
+    // la journée depuis `Trip.cities`), le titre de l'IA sinon.
+    const theme = texteAdmis(changement === undefined ? jour.titre : themeDuChangement(changement), LONGUEURS_CONTRAT.theme);
     return {
       index,
       date: jour.date,

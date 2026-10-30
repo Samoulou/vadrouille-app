@@ -3,15 +3,15 @@ import "server-only";
 import type { TripSnapshot } from "@/contracts";
 import type { TriDuRecalcul } from "@/domain/recalcul";
 import { etapesVerrouilleesModifiees } from "@/domain/verrous";
-import type { ExecuteurPublication, OptionsEtape } from "@/server/composition/generation";
+import type { CapaciteProgramme, ExecuteurPublication, OptionsEtape } from "@/server/composition/generation";
 import { RANG_LOT } from "@/server/config/generation";
-import { entreeProgrammeDepuisBrief } from "@/server/programme/entree";
+import { entreeProgrammeDepuisBrief, entreeProgrammeV5DepuisBrief } from "@/server/programme/entree";
 import { entreeRevisionDepuisJours, nomsEcartesDesJours, retirerEtapesEcartees, type ChoixRevision } from "@/server/programme/revision";
 import { verrouillerVersions } from "@/server/versions/ecrire";
 
 import type { EtatBarriere } from "./barriere";
 import type { DependancesResolues } from "./dependances";
-import { compteursInitiaux, redigerEtVerifier, sql, voyageEtBriefSansRecit } from "./etapes-programme";
+import { briefAPlusieursVilles, compteursInitiaux, redigerEtVerifier, sql, voyageEtBriefSansRecit } from "./etapes-programme";
 import { cibleDuForfait, forfaitDeLaRevision } from "./forfait-etape";
 import { lireInstantane, lireVersion, type ExecuteurLecture } from "./lecture";
 import { publier } from "./publication";
@@ -32,7 +32,8 @@ import { lireTriClos } from "./signaux";
  *   forfait** du profil `revision` (décision 0142) sous l'identifiant de l'exécution (idempotente), comme la génération.
  * - **`e`** (rang 2, `maxRetries` 0) : mêmes relectures ; puis **le corps commun de l'étape « programme »**
  *   (`redigerEtVerifier`, `etapes-programme.ts`) : logements d'abord, **une** requête `revision` (entrée tirée des seuls
- *   textes de l'IA de la version de base et des choix, schéma strict, `zdr`), lecture tolérante, filet du code
+ *   textes de l'IA de la version de base et des choix, schéma strict, `zdr` ; prompt `revision` v3 sur le brief v5 sans
+ *   récit pour un voyage à plusieurs villes, M4b), lecture tolérante, filet du code
  *   (`retirerEtapesEcartees`), vérification de toute la version sous la part et l'échéance, **aucun appel Routes**,
  *   assemblage par le module partagé `assemblerProgrammeIa` ; enfin la publication par le **module commun** `publier`
  *   (`publication.ts`, même rejeu borné, confirmation perdue comprise) : garde au rang, puis `ecrireSi` (verrou des versions,
@@ -172,13 +173,22 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
   const fabrique = await contexte.dep.composer(contexte.barriere, { destination: voyage.draft.destination });
   const capacite = fabrique.programme(options);
   // Entrée de la requête `revision` : textes de l'IA de la version de base et choix (identifiants maison), jamais une donnée Google.
-  const entree = entreeRevisionDepuisJours(base.days, entreeProgrammeDepuisBrief(brief), choix);
-  const noms = nomsEcartesDesJours(base.days, entree.choix.pasPourMoi);
-  const { instantane, verifies, obtenuesA } = await redigerEtVerifier(
-    contexte,
-    { brief, capacite, forfait, registre, compteurs: compteursInitiaux() },
-    (c) => c.reviser(entree, { arrivee: brief.arrivee, depart: brief.depart }, (programme) => retirerEtapesEcartees(programme, noms)),
-  );
+  // Plusieurs villes (prédicat unique `briefAPlusieursVilles`) : prompt `revision` v3, brief v5 **sans récit** (villes,
+  // logements par ville, changements sans libellé de billet : `billets` n'est jamais lu) ; la durée estimée d'un changement
+  // de ville vient de la sortie v3. Une ville : prompt `revision` v2, entrée v4, inchangée.
+  const sejour = { arrivee: brief.arrivee, depart: brief.depart };
+  const reviser = briefAPlusieursVilles(brief)
+    ? (() => {
+        const entree = entreeRevisionDepuisJours(base.days, entreeProgrammeV5DepuisBrief(brief, { recit: false }), choix);
+        const noms = nomsEcartesDesJours(base.days, entree.choix.pasPourMoi);
+        return (c: CapaciteProgramme) => c.reviserV3(entree, sejour, (programme) => retirerEtapesEcartees(programme, noms));
+      })()
+    : (() => {
+        const entree = entreeRevisionDepuisJours(base.days, entreeProgrammeDepuisBrief(brief), choix);
+        const noms = nomsEcartesDesJours(base.days, entree.choix.pasPourMoi);
+        return (c: CapaciteProgramme) => c.reviser(entree, sejour, (programme) => retirerEtapesEcartees(programme, noms));
+      })();
+  const { instantane, verifies, obtenuesA } = await redigerEtVerifier(contexte, { brief, capacite, forfait, registre, compteurs: compteursInitiaux() }, reviser);
   // R3 (voir l'en-tête) : une version qui changerait une étape verrouillée n'est pas écrite.
   const tenue = verrousReportes(base, instantane);
   const publies = new Set(instantane.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));

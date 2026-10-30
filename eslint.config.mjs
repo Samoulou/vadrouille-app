@@ -691,6 +691,9 @@ export default defineConfig([
       "src/server/programme/forme.ts",
       "src/server/programme/entree.ts",
       "src/server/programme/assemblage.ts",
+      // M4b (décision 0148 § 5.1 point 3 (b), 0149 § 6) : cadrage de la sortie rédigée, importé par `assemblage.ts` pour son
+      // second contrôle, donc chargé par `pnpm p0` ; même régime (pur : `@/contracts`, `src/domain` et ces fichiers).
+      "src/server/programme/cadrage.ts",
     ],
     rules: { "ligne/require-server-only": "error" },
   },
