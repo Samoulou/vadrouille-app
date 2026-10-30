@@ -15,6 +15,9 @@ import type { EntreeProgramme } from "./entree";
  *   `placeId`, une position, un segment (temps de trajet), `exceptions` (badges), `source` (site vérifié), `locked`,
  *   `facts.durationMinutes`, les événements (engagements, déjà dans le brief), le terminus ni les propositions : ni donnée
  *   Google, ni verdict d'ancrage (0011 § 1, 0117 § 3). Les étapes sans `placeId` sont rendues exactement comme les autres.
+ *   **Lieu à soi** (décision 0147 § 12 S4 ; M5d-1, ticket 939) : une étape ajoutée par la personne (`addedBy: "person"`)
+ *   n'entre **jamais** dans l'entrée (ni son nom saisi, ni son identifiant `ajout-…`, que `ID_ETAPE_REVISION` refuserait) :
+ *   elle reste dans le programme, verrouillée, recopiée par le filet du code ; un choix qui la viserait est ignoré.
  * - `retirerEtapesEcartees` : filet du code après la lecture de la sortie (0126 § 4) : tout créneau dont le lieu, normalisé,
  *   est celui d'une étape écartée est retiré.
  */
@@ -44,6 +47,8 @@ export type EtapeRevisable = {
   readonly end?: string;
   readonly facts: { readonly area?: string };
   readonly reason?: string;
+  /** Lieu à soi (`Stop.addedBy`, décision 0147 § 6.1) : jamais transmis au modèle (§ 12 S4). */
+  readonly addedBy?: string;
 };
 
 /**
@@ -62,6 +67,11 @@ function etapesDuJour(jour: JourRevisable): EtapeRevisable[] {
   return jour.items.flatMap((ligne) => (ligne.type === "stop" && ligne.stop !== undefined ? [ligne.stop] : []));
 }
 
+/** Étapes d'une journée qu'une entrée de modèle peut lire : jamais un lieu à soi (`addedBy: "person"`, 0147 § 12 S4). */
+export function etapesPourLeModele(jour: JourRevisable): EtapeRevisable[] {
+  return etapesDuJour(jour).filter((etape) => etape.addedBy !== "person");
+}
+
 /**
  * Entrée de la révision : brief (même projection que `programme`, construite par l'appelant), textes de l'IA des journées et
  * choix. Seuls les choix portant sur une étape des journées sont gardés (un identifiant inconnu est ignoré, jamais transmis) ;
@@ -69,7 +79,7 @@ function etapesDuJour(jour: JourRevisable): EtapeRevisable[] {
  */
 export function entreeRevisionDepuisJours(journees: readonly JourRevisable[], brief: EntreeProgramme, choix: ChoixRevision): EntreeRevisionProgramme {
   const jours = [...journees].sort((a, b) => a.index - b.index);
-  const ids = new Set(jours.flatMap((jour) => etapesDuJour(jour).map((etape) => etape.id)));
+  const ids = new Set(jours.flatMap((jour) => etapesPourLeModele(jour).map((etape) => etape.id)));
   const pasPourMoi = [...new Set(choix.pasPourMoi)].filter((id) => ids.has(id));
   const ecartees = new Set(pasPourMoi);
   const jAime = [...new Set(choix.jAime)].filter((id) => ids.has(id) && !ecartees.has(id));
@@ -79,7 +89,7 @@ export function entreeRevisionDepuisJours(journees: readonly JourRevisable[], br
       jours: jours.map((jour) => ({
         date: jour.date,
         ...(jour.theme === undefined ? {} : { titre: jour.theme }),
-        etapes: etapesDuJour(jour).map((etape) => ({
+        etapes: etapesPourLeModele(jour).map((etape) => ({
           id: etape.id,
           debut: etape.start,
           ...(etape.end === undefined ? {} : { fin: etape.end }),

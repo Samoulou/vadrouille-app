@@ -14,7 +14,7 @@ import { EntreeRevisionV3Schema, type EntreeRevisionV3 } from "@/ai/entree-revis
 import { PROMPT_PROGRAMME, PROMPT_PROGRAMME_V5 } from "@/ai/prompts/programme";
 import { PROMPT_REVISION } from "@/ai/prompts/revision";
 import { creerRedigerProgramme, creerRedigerProgrammeV5 } from "@/ai/rediger-programme";
-import { creerRedigerRevisionV3 } from "@/ai/rediger-revision";
+import { creerRedigerRevision, creerRedigerRevisionV3 } from "@/ai/rediger-revision";
 import { requeteProgrammeV5, requeteRevisionV3 } from "@/ai/requetes";
 import { MAX_CITIES, type LodgingRequest } from "@/contracts";
 import { creerPlacesSimule } from "@/grounding/places.simule";
@@ -544,3 +544,48 @@ describe("signalement: jamais dans une entrée de modèle (valeurs sentinelles)"
   });
 });
 
+
+/**
+ * M5d-1 (ticket 939 ; décision 0147 § 12 S4) : un lieu ajouté par la personne n'entre jamais dans un prompt, ni par son nom
+ * saisi, ni par son `placeId`, ni par son identifiant `ajout-…` ; un choix qui le viserait est ignoré. La requête passe par la
+ * capacité de production de la révision (`creerRedigerRevision`), journalisée.
+ */
+describe("prompts: lieu à soi jamais dans une entrée de modèle (0147 § 12 S4)", () => {
+  it("entrée et requête de la révision sans le nom saisi, le placeId ni l'identifiant de l'étape ajoutée", async () => {
+    const NOM = "SENTINELLE-NOM-SAISI-M5D";
+    const PLACE = "SENTINELLE_PLACE_AJOUT_M5D";
+    const AJOUT = "ajout-0d000000-0000-4000-8000-0000000000cc";
+    const etape = (id: string, name: string, start: string, extra: Record<string, unknown> = {}) => ({
+      type: "stop" as const,
+      stop: { id, kind: "activity" as const, name, start, end: start.replace(/^(\d\d)/, (h) => String(Number(h) + 1).padStart(2, "0")), facts: { area: "Old Town" }, reason: "Parce que.", exceptions: [], locked: false, ...extra },
+    });
+    const jour = (items: ReturnType<typeof etape>[]) => ({ index: 1, date: "2027-05-04", theme: "Old Town", travelBudgetMinutes: 90, events: [], items });
+    const sans = [jour([etape("j1-1", "Château d'Édimbourg", "10:00"), etape("j1-2", "Royal Mile", "13:00")])];
+    const jours = [jour([etape("j1-1", "Château d'Édimbourg", "10:00"), etape("j1-2", "Royal Mile", "13:00"), etape(AJOUT, NOM, "16:00", { placeId: PLACE, locked: true, addedBy: "person" })])];
+    const brief: Parameters<typeof entreeRevisionDepuisJours>[1] = {
+      destination: "Édimbourg",
+      pays: "Royaume-Uni",
+      arrivee: "2027-05-04",
+      depart: "2027-05-07",
+      heureArrivee: "09:00",
+      heureDepart: "20:00",
+      voyageurs: { adultes: 2, enfants: 0 },
+      rythme: "equilibre",
+      envies: ["museum"],
+      deplacements: ["walk"],
+      logements: [{ texte: "Old Town, Édimbourg", nuits: 3 }],
+    };
+    const entree = entreeRevisionDepuisJours(jours, brief, { pasPourMoi: [AJOUT, "j1-2"], jAime: [AJOUT] });
+    // Même entrée que sans l'étape ajoutée.
+    expect(entree).toEqual(entreeRevisionDepuisJours(sans, brief, { pasPourMoi: ["j1-2"], jAime: [] }));
+    const texte = JSON.stringify(entree);
+    for (const sentinelle of [NOM, PLACE, AJOUT, "addedBy"]) expect(texte, sentinelle).not.toContain(sentinelle);
+
+    const modeles: ClientModeles = { envoyer: async () => ({ texte: "{}", coutUsd: 0 }) };
+    const journal = journalDePrompts(modeles);
+    const reviser = creerRedigerRevision(journal.client, { modele: "test/revision", routage: { data_collection: "allow", zdr: false } as unknown as ReglagesIa["plan"]["routage"] });
+    await reviser(entree);
+    expect(journal.requetes).toHaveLength(1);
+    for (const sentinelle of [NOM, PLACE, AJOUT]) expect(journal.texte(), sentinelle).not.toContain(sentinelle);
+  });
+});

@@ -3,6 +3,8 @@ import { APP_TRIAL_TRIP_ID_PATTERN, type RevisionFixtures, type Trip, type Trial
 import { unlockRoutes } from "@/features/presentation/routes";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR } from "@/server/config/lieux";
+import { RATE_LIMITS } from "@/server/config/limites";
+import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
 import { apiCreationAdapter } from "./api-creation-instance";
@@ -14,6 +16,7 @@ import { counterpartOf, getMockRevisionFixtures, mockTripAdapter } from "./mock"
 import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
+import { createMockPlaces } from "./mock-lieux";
 import { createMockStopReports } from "./mock-reports";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
 import {
@@ -43,11 +46,13 @@ import {
   type SimulationScope,
 } from "./simulation";
 import type {
+  AddPlaceAdapter,
   AdapterContext,
   AuthAdapter,
   CreationAdapter,
   PaymentAdapter,
   PaymentSimulator,
+  PlaceAdapter,
   RevisionAdapter,
   ShareAdapter,
   StopReportAdapter,
@@ -55,6 +60,7 @@ import type {
 } from "./types";
 
 export type {
+  AddPlaceAdapter,
   AdapterContext,
   AuthAdapter,
   AuthConfig,
@@ -62,6 +68,7 @@ export type {
   MemberRole,
   PaymentAdapter,
   PaymentSimulator,
+  PlaceAdapter,
   RevisionAdapter,
   ShareAdapter,
   TripAdapter,
@@ -498,6 +505,45 @@ export async function signalementsDuVoyage(
     plafond: SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR,
     max: MAX_STOP_REPORTS_PER_SCOPE,
   });
+}
+
+/** Recherches par voyage et par 24 heures sur `mock` : la règle `trip` de `lieu-recherche` (décision 0147 § 6.4 point 1). */
+function plafondRechercheParVoyage(): number {
+  return RATE_LIMITS["lieu-recherche"]?.find((regle) => regle.kind === "trip")?.threshold ?? 0;
+}
+
+/**
+ * Lieu à soi (tâche M5d-1, ticket 939 ; décision 0147 § 3) : `mock`, recherche et ajout simulés dans la portée de
+ * simulation (`options.scope`, sinon celle de la requête), voyages lus par `getTripReader()` de la même portée ; `null`
+ * pour `api` (recherche par le terminal de la composition, ajout par `ajoutDeLieu`) et pour `prototype` (le site d'essai
+ * n'a pas d'ajout). Lu par les actions serveur de `src/server/actions/lieux.ts`.
+ */
+export async function lieuxSimules(
+  value: string | undefined = process.env.DATA_ADAPTER,
+  options: { scope?: SimulationScope } = {},
+): Promise<PlaceAdapter | null> {
+  if (adapterChoice(value) !== "mock") return null;
+  const scope = options.scope ?? (await getSimulationScope());
+  const store = (scope.placeSearches ??= { records: [] });
+  const { activity, lunch, dinner } = CONFIGURATION_MOTEUR.dureesParDefaut;
+  return createMockPlaces({
+    trips: getTripReader({ scope }),
+    store,
+    now: () => scope.clock.now(),
+    plafond: plafondRechercheParVoyage(),
+    durees: { activity, lunch, dinner },
+    max: MAX_STOP_REPORTS_PER_SCOPE,
+  });
+}
+
+/**
+ * Aperçu et application d'un ajout (M5d-1) : `api`, cas d'usage de `src/server/lieux/ajout.ts` (`TripAdapter.places`) ;
+ * `mock`, l'ajout simulé de `lieuxSimules` ; `null` pour `prototype`.
+ */
+export async function ajoutDeLieu(value: string | undefined = process.env.DATA_ADAPTER, options: { scope?: SimulationScope } = {}): Promise<AddPlaceAdapter | null> {
+  const choice = adapterChoice(value);
+  if (choice === "api") return getTripAdapter(value).places ?? null;
+  return lieuxSimules(value, options);
 }
 
 /** Bouton « Signaler une erreur » de la fiche (M5c) : adaptateurs `mock` et `api` seulement, décidé côté serveur. */

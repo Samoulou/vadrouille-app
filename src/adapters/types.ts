@@ -17,11 +17,13 @@ import type {
   LodgingSuggestion,
   Offer,
   PatchResult,
+  PlaceSearchResult,
   PreviewSlot,
   Proposal,
   Receipt,
   ReplacementOffer,
   ReplacementWrite,
+  RevisionPreview,
   ChecklistItem,
   Result,
   RetryGenerationRequest,
@@ -98,6 +100,33 @@ export interface TripAdapter {
    * a pas. Entrée reçue en `unknown`, revalidée par le cas d'usage.
    */
   readonly reports?: StopReportAdapter;
+  /**
+   * Lieu à soi, aperçu et application d'un ajout `[add, lock]` (tâche M5d-1, ticket 939 ; décision 0147 § 3, § 4 et § 11) :
+   * présent sur `api` (`src/server/lieux/ajout.ts`, port de relectures de la lecture). La recherche de `api` ne passe pas par
+   * l'adaptateur : l'action serveur appelle le terminal `src/server/composition/lieux-api.ts` (seul chemin vers le client
+   * Places). `mock` tient les trois dans la portée de simulation (`lieuxDuVoyage` de `@/adapters`) ; `prototype` n'en a pas.
+   */
+  readonly places?: AddPlaceAdapter;
+}
+
+/**
+ * Ajout d'un lieu à soi (M5d-1 ; décision 0147 § 3 point 5 et § 11) : `AddPlaceRequest` → `RevisionPreview` (`kind:
+ * "add"`), `AddPlaceApply` → `PatchResult` (version nouvelle, auteur `user`, patch `[add, lock]`). Voyage débloqué seulement
+ * (`not_unlocked`), débit `retouche`, `version_conflict`, `no_option` (« Pas de place ce jour-là »), `provider_error`. Le
+ * contexte est celui **de la session** ; `null` : `unauthenticated`. Aucun nom ni adresse Google dans la demande.
+ */
+export interface AddPlaceAdapter {
+  previewAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<RevisionPreview>>;
+  applyAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+}
+
+/**
+ * Lieu à soi complet (M5d-1) : recherche (`PlaceSearchRequest` → `PlaceSearchResult[]`, 5 au plus ; noms et adresses
+ * affichés avec l'attribution, jamais stockés) et ajout. Implémenté par `mock` ; sur `api`, la recherche est celle du
+ * terminal de la composition.
+ */
+export interface PlaceAdapter extends AddPlaceAdapter {
+  searchPlaces(ctx: AdapterContext | null, input: unknown): Promise<Result<PlaceSearchResult[]>>;
 }
 
 /**

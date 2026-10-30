@@ -165,6 +165,11 @@ const COMPOSITION_VILLES_API =
   "`src/server/villes/recherche.ts`, garde des seuils non validés (§ 2.3), barrière B9-TL-8 et crochet `accesReelApi` fermé (§ 6.2), " +
   "limiteur `ville-recherche` (§ 4), compteurs du jour `autocomplete_daily_counts` (§ 5), table des 62 villes du MVP (§ 8.2), " +
   "fiche sans position (§ 6.3) ; aucune donnée Google conservée hors du `placeId` (0011, 0027) ; verdict Sécurité : attendu (S-859-3)";
+const COMPOSITION_LIEUX_API =
+  "recherche d'un lieu à soi de `api` (décision 0147 § 3, § 6.4 et § 12 S1 à S3 ; plan du MVP, ligne M5d-1, ticket 939) : terminal mince " +
+  "sur le cœur `src/server/lieux/recherche.ts`, sur le modèle de M1f (0141) : garde `SEUILS_LIEUX_VALIDES` non validée, barrière B9-TL-8 " +
+  "et crochet `accesReelApi` fermé, limiteur `lieu-recherche` (espèces `ip` et `trip`), compteur du jour `lieux` de " +
+  "`autocomplete_daily_counts` ; aucune donnée Google conservée hors du `placeId` (0011, 0027) ; verdict Sécurité : attendu";
 const SERVER_ONLY_P0R3C4 =
   "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
   "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
@@ -528,6 +533,16 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/rate-limit", noms: ["checkRateLimit"], motif: COMPOSITION_VILLES_API },
   { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/villes/compteurs", noms: ["purgerAutocompletion", "reserverAutocompletion"], motif: COMPOSITION_VILLES_API },
   { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/villes/recherche", noms: ["choisirVille", "suggererVilles", "type:PortsRecherche"], motif: COMPOSITION_VILLES_API },
+  // Recherche d'un lieu à soi de `api` (décision 0147 § 3 et § 14 ligne M5d-1, ticket 939) : les lignes que l'analyseur relève pour `lieux-api.ts`.
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/config/lieux", noms: ["SEUILS_LIEUX_VALIDES"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/config/usage", noms: ["PLAFONDS_USAGE"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/generation/acces-reel", noms: ["accesReelApi"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/generation/barriere", noms: ["evaluerBarriere", "plafondsDeGenerationPoses", "type:EtatBarriere"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/log", noms: ["errorNameOf", "logEvent", "type:LogLieuReason"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/rate-limit", noms: ["verdictRateLimit"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/villes/compteurs", noms: ["purgerAutocompletion", "reserverAutocompletion"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/lieux/recherche", noms: ["rechercherLieux", "type:DependancesRechercheLieux", "type:PortsRechercheLieux"], motif: COMPOSITION_LIEUX_API },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.
   ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/workflows/apercu.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({

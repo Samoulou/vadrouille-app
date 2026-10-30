@@ -14,6 +14,7 @@ import * as p0 from "@/server/p0/revision";
 import type { EntreeProgramme } from "@/server/programme/entree";
 import {
   entreeRevisionDepuisJours,
+  etapesPourLeModele,
   nomNormalise,
   nomsEcartesDesJours,
   retirerEtapesEcartees,
@@ -91,6 +92,19 @@ describe("révision partagée (PR 868 ; décision 0126 § 3)", () => {
     expect(entree.choix).toEqual({ pasPourMoi: ["j1-1"], jAime: ["j2-1"] });
     const texte = JSON.stringify(entree);
     for (const sentinelle of [PLACE, SITE, "SENTINELLE_TERMINUS", "toReserve", "segment", "locked", "commitment", "placeId", "source"]) expect(texte).not.toContain(sentinelle);
+  });
+
+  it("M5d-1 (0147 § 12 S4) : une étape ajoutée par la personne n'entre pas dans l'entrée ; un choix qui la vise est ignoré", () => {
+    const AJOUT = "ajout-0d000000-0000-4000-8000-0000000000cc";
+    const NOM = "SENTINELLE-NOM-SAISI-M5D";
+    const jours = INSTANTANE.days.map((jour) =>
+      jour.index === 1 ? { ...jour, items: [...jour.items, etape(AJOUT, NOM, { placeId: "SENTINELLE_PLACE_AJOUT", locked: true, addedBy: "person" })] } : jour,
+    );
+    const avec = entreeRevisionDepuisJours(TripSnapshotSchema.parse({ days: jours }).days, BRIEF, { pasPourMoi: [AJOUT, "j1-1"], jAime: [AJOUT] });
+    expect(avec).toEqual(entreeRevisionDepuisJours(INSTANTANE.days, BRIEF, { pasPourMoi: ["j1-1"], jAime: [] }));
+    expect(etapesPourLeModele(jours.find((j) => j.index === 1)!).map((e) => e.id)).toEqual(["j1-1", "j1-2", "j1-3"]);
+    const texte = JSON.stringify(avec);
+    for (const sentinelle of [AJOUT, NOM, "SENTINELLE_PLACE_AJOUT", "addedBy"]) expect(texte).not.toContain(sentinelle);
   });
 
   it("PR 868 : EntreeRevisionProgramme a la forme de EntreeRevision, celle que reçoit la capacité reviser", () => {

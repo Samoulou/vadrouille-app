@@ -7,6 +7,7 @@ import {
   ErreurAncrage,
   type AuteurPhotoLieu,
   type ClientPhotosLieu,
+  type ClientLieux,
   type ClientPlacesMvp,
   type ClientVilles,
   type Coordonnees,
@@ -15,6 +16,7 @@ import {
   type PhotoLieu,
   type RectangleZone,
   type RequeteTextSearch,
+  type ResultatLieu,
 } from "@/grounding/interfaces";
 import { lireCleGoogle } from "@/server/env/grounding";
 import {
@@ -52,6 +54,9 @@ import {
  * - Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129) : Autocomplete (New) filtré sur `(cities)`, en français, avec un jeton de session (`suggererVilles`), puis
  *   la fiche de la ville choisie dans la même session (`ficheVille`, masque fermé `id,addressComponents,location`, SKU
  *   Essentials) : seuls le code ISO du pays et la position en sont lus.
+ * - Recherche d'un lieu à soi (M5d-1, décision 0147 § 3 point 1) : Text Search (New) par le texte saisi, suivi du nom maison
+ *   de la ville de la journée, masque fermé `places.id,places.displayName,places.shortFormattedAddress` (SKU Pro), 5
+ *   résultats, en français, **sans position** (ni biais ni restriction) ; aucune fiche ensuite (`rechercherLieux`).
  * Tout ce qui sort est une donnée Google : il reste en mémoire et n'atteint jamais un prompt.
  */
 
@@ -76,6 +81,21 @@ export const MASQUE_FICHE_VILLE = "id,addressComponents,location";
 export const MASQUE_FICHE_VILLE_SANS_POSITION = "id,addressComponents";
 
 export const SKU_TEXT_SEARCH = "places_text_search_essentials_ids_only";
+/**
+ * Masque de la recherche d'un lieu à soi (décision 0147 § 3 point 1) : identifiant, nom affiché et adresse courte, rien
+ * d'autre (ni position, ni horaires, ni note). Nom et adresse sont du contenu Google **affiché**, jamais stocké.
+ */
+export const MASQUE_RECHERCHE_LIEU = "places.id,places.displayName,places.shortFormattedAddress";
+/** SKU de la recherche d'un lieu à soi : « Text Search Pro » (32 USD les 1 000, 5 000 gratuites par mois, table de prix). */
+export const SKU_RECHERCHE_LIEU = "places_text_search_pro";
+/** Résultats demandés et rendus au plus par la recherche d'un lieu à soi (0147 § 3 point 1). */
+export const RESULTATS_RECHERCHE_LIEU_MAX = 5;
+/** Texte saisi de la recherche d'un lieu à soi : 2 à 80 caractères après retrait des espaces (`PlaceSearchRequest.query`). */
+const SAISIE_LIEU = { min: 2, max: 80 } as const;
+/** Nom maison de la ville qui oriente la requête : une ligne, 120 caractères au plus. */
+const VILLE_LIEU_MAX = 120;
+/** Longueur au-delà de laquelle un nom ou une adresse Google n'est pas rendu (`GooglePlaceLabel`, 200 caractères au plus). */
+const LIBELLE_LIEU_MAX = 200;
 /**
  * SKU des suggestions : « Autocomplete Requests » (les 12 premières d'une session close par une fiche Essentials ; au-delà,
  * « Autocomplete Session Usage », gratuit). Réservé au prix plein de chaque requête : estimation haute.
@@ -110,7 +130,18 @@ export const LARGEUR_PHOTO_MAX_GOOGLE = 4800;
 const PHOTOS_LUES_MAX = 10;
 
 /** Coûts estimés par requête, en micro-USD, au prix plein (Q329) : table `prototype/config/prix-google.json`. */
-export const COUT_ESTIME_MICROS = { textSearch: 0, details: 20_000, position: 5_000, identifiant: 0, suggestions: 2_830, ficheVille: 5_000, photos: 0, mediaPhoto: 7_000 } as const;
+export const COUT_ESTIME_MICROS = {
+  textSearch: 0,
+  details: 20_000,
+  position: 5_000,
+  identifiant: 0,
+  suggestions: 2_830,
+  ficheVille: 5_000,
+  photos: 0,
+  mediaPhoto: 7_000,
+  // M5d-1 (décision 0147 § 3 point 1) : `places_text_search_pro`, 32 USD les 1 000.
+  rechercheLieu: 32_000,
+} as const;
 
 /** Identifiant de lieu Google : jamais interpolé dans un chemin sans ce contrôle. */
 const PLACE_ID = PLACE_ID_GOOGLE;
@@ -213,6 +244,29 @@ const FicheVilleSchema = z.object({
 /** Fiche sans position (0141 § 6.3 point 3) : une position renvoyée malgré le masque n'est pas lue. */
 const FicheVilleSansPositionSchema = z.object({ id: z.string().regex(PLACE_ID), addressComponents: ComposantesSchema });
 
+/** Réponse de la recherche d'un lieu à soi : identifiant, nom affiché et adresse courte ; tout autre champ est ignoré. */
+const RechercheLieuSchema = z.object({
+  places: z
+    .array(
+      z.object({
+        id: z.string().regex(PLACE_ID),
+        displayName: z.object({ text: z.string() }).optional(),
+        shortFormattedAddress: z.string().optional(),
+      }),
+    )
+    .max(20)
+    .optional(),
+});
+
+/** Caractères de contrôle (C0, DEL, C1) : refusés dans le texte saisi et dans le nom de la ville avant tout envoi. */
+const CONTROLE = /[\u0000-\u001f\u007f-\u009f]/;
+
+/** Libellé Google rendu : texte d'une ligne, sans contrôle, de 1 à 200 caractères après retrait des espaces ; sinon `null`. */
+function libelleLieu(brut: string | undefined): string | null {
+  const texte = brut?.trim() ?? "";
+  return texte.length === 0 || texte.length > LIBELLE_LIEU_MAX || CONTROLE.test(texte) ? null : texte;
+}
+
 /** Nom de ressource d'une photo du lieu demandé (`places/<placeId>/photos/<référence>`) ; jamais gardé. */
 const REFERENCE_PHOTO = /^[A-Za-z0-9_-]{1,1024}$/;
 
@@ -281,7 +335,7 @@ type Noyau = {
 };
 const NOYAUX = new WeakMap<ClientPlacesMvp, Noyau>();
 
-export function createPlacesClient(options: OptionsPlaces, transport: Transport = fetch): ClientPlacesMvp & ClientVilles {
+export function createPlacesClient(options: OptionsPlaces, transport: Transport = fetch): ClientPlacesMvp & ClientVilles & ClientLieux {
   const cle = lireCleGoogle(options.environnement, options.execArgv);
   if (!cle.ok) throw new ErreurClientGoogle(cle.code);
   const parametres = { origine: ORIGINE_PLACES, cle: cle.cle, transport };
@@ -299,7 +353,7 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
     throw erreurGoogleDe(issue);
   }
 
-  const client: ClientPlacesMvp & ClientVilles = {
+  const client: ClientPlacesMvp & ClientVilles & ClientLieux = {
     async textSearch(requete: RequeteTextSearch) {
       const corps: Record<string, unknown> = { textQuery: requete.texte, pageSize: 5 };
       if (requete.restriction !== undefined) {
@@ -403,6 +457,32 @@ export function createPlacesClient(options: OptionsPlaces, transport: Transport 
       const lu = FicheVilleSchema.safeParse(brut);
       if (!lu.success || lu.data.id !== placeId) throw new ErreurClientGoogle("invalid_response");
       return { placeId: lu.data.id, pays: paysDe(lu.data.addressComponents), position: { lat: lu.data.location.latitude, lng: lu.data.location.longitude } };
+    },
+    async rechercherLieux(saisie: string, ville: string | null): Promise<readonly ResultatLieu[]> {
+      const texte = saisie.trim();
+      const suffixe = ville?.trim() ?? "";
+      if (texte.length < SAISIE_LIEU.min || texte.length > SAISIE_LIEU.max || CONTROLE.test(texte) || suffixe.length > VILLE_LIEU_MAX || CONTROLE.test(suffixe)) {
+        throw new ErreurClientGoogle("invalid_request");
+      }
+      // 0147 § 3 point 2 : le texte saisi, puis le nom maison de la ville ; sans ville, le texte seul. Aucune position.
+      const corps = { textQuery: suffixe === "" ? texte : `${texte}, ${suffixe}`, pageSize: RESULTATS_RECHERCHE_LIEU_MAX, languageCode: "fr" };
+      const brut = await appeler(
+        { chemin: "/v1/places:searchText", methode: "POST", masque: MASQUE_RECHERCHE_LIEU, corps: JSON.stringify(corps) },
+        demande("places_text_search", SKU_RECHERCHE_LIEU, COUT_ESTIME_MICROS.rechercheLieu),
+      );
+      const lu = RechercheLieuSchema.safeParse(brut);
+      if (!lu.success) throw new ErreurClientGoogle("invalid_response");
+      const vus = new Set<string>();
+      const resultats: ResultatLieu[] = [];
+      for (const lieu of lu.data.places ?? []) {
+        const nom = libelleLieu(lieu.displayName?.text);
+        // Sans nom affichable, le résultat n'est pas rendu (rien ne le désignerait à l'écran).
+        if (nom === null || vus.has(lieu.id)) continue;
+        vus.add(lieu.id);
+        resultats.push({ placeId: lieu.id, nom, adresse: libelleLieu(lieu.shortFormattedAddress) });
+        if (resultats.length >= RESULTATS_RECHERCHE_LIEU_MAX) break;
+      }
+      return resultats;
     },
   };
   NOYAUX.set(client, { appeler, demande });
