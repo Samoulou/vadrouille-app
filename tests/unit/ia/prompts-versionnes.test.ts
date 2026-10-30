@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
-import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
+import { PROMPT_PROGRAMME, PROMPT_PROGRAMME_V5 } from "@/ai/prompts/programme";
 import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
@@ -43,6 +43,9 @@ const EMPREINTES: Record<string, Record<number, string>> = {
     3: "413eb5e8aacf8c0b3408e2549c7c83668aeaa337548663903c60431143579b59",
     // Ticket #800 (amendement 4) : site pour chaque lieu dès qu'un site officiel existe, journées sans allers-retours.
     4: "851f7045685335f9269630cb8e959d3ec5b12c392e8e0385af5b61c1cfa7831d",
+    // M4a (ticket #920, décision 0148) : plusieurs villes, cadre des journées de changement de ville, durée estimée ;
+    // coexiste avec la v4 (site d'essai et `p0Run`).
+    5: "d9e2ec9bdd95066ffeea8a8cda1a378ff04da2c50ea1ab0199dc1ccef01630b2",
   },
   // E2E-essai, lot 4 (décision 0126) : révision du programme après le tri « J'aime / Pas pour moi ».
   // v2 (ticket #800, amendement 4 de P0-programme-par-ia) : mêmes règles de site et de parcours que `programme` v4.
@@ -130,6 +133,47 @@ describe("prompts: versionnés", () => {
     expect(texte).toMatch(/Les étapes d'un même quartier se suivent/);
     expect(texte).toMatch(/La première étape part du logement quand le brief le donne ; la dernière finit près de lui ou dans le quartier du dîner/);
     expect(texte).not.toMatch(/latitude|longitude|coordonn|\blat\b|\blng\b|minutes de trajet|google|placeId|place_id/i);
+  });
+
+  // M4a (ticket #920) : la v5 coexiste avec la v4 sous le même identifiant ; elle n'est pas dans `PROMPTS` (une ligne par
+  // identifiant), son empreinte est tenue ici.
+  it("programme v5 : empreinte égale à la table, même identifiant que la v4", () => {
+    expect(PROMPT_PROGRAMME_V5.id).toBe(PROMPT_PROGRAMME.id);
+    expect(PROMPT_PROGRAMME_V5.version).toBe(5);
+    expect(empreinte(PROMPT_PROGRAMME_V5.texte)).toBe(EMPREINTES.programme?.[5]);
+  });
+
+  it("programme v5 : cadre des journées de changement de ville, durée estimée entière, aucune ville par créneau (0148, 0149)", () => {
+    const texte = PROMPT_PROGRAMME_V5.texte;
+    // Villes dans l'ordre et cadre de chaque changement de ville (0148 § 5.1 point 2).
+    for (const champ of ['"villes"', '"changements"', '"de"', '"vers"', '"depart"', '"arrivee"', '"source"', '"saisi"', '"estime"', '"activitesMax"']) expect(texte).toContain(champ);
+    expect(texte).toMatch(/Les journées d'une ville ne contiennent que des lieux de cette ville ou de ses environs/);
+    expect(texte).toMatch(/toutes finies à l'heure de départ ; pendant le trajet, rien/);
+    expect(texte).toMatch(/aucune étape à réserver/);
+    expect(texte).toMatch(/N'écris ni le trajet, ni un créneau pour lui, ni le titre de ce jour/);
+    // Durée estimée : au niveau du jour, entière, seulement pour un départ estimé (0148 § 2 ; 0149 S-M4-2).
+    expect(texte).toContain('"dureeEstimeeMinutes" (nombre entier, seulement pour un changement "estime")');
+    expect(texte).toMatch(/un nombre entier \(jamais un texte\)/);
+    expect(texte).toMatch(/Omets ce champ si tu ne sais pas l'estimer, pour un changement "saisi" et pour toute autre journée/);
+    // Sans estimation, le code réserve 180 minutes (0148 § 5.3) : le prompt le dit (revue de la PR #921, mineur 4).
+    expect(texte).toMatch(/Sans estimation, laisse au moins trois heures entre le départ et la première étape de la ville d'arrivée/);
+    // Aucun champ `ville` par créneau (0148 § 7.1 point 3) : ni dans la forme du créneau, ni dans les longueurs.
+    const creneau = texte.split("\n").find((ligne) => ligne.startsWith("Chaque créneau"));
+    expect(creneau).toBeDefined();
+    expect(creneau).not.toContain('"ville"');
+    expect(texte).not.toContain('"ville"');
+    expect(texte).not.toMatch(/ville et quartier 60/);
+    expect(texte).toMatch(/N'écris pas la ville d'un créneau/);
+    // Mêmes règles que la v4 : site officiel, parcours, « à éviter » ; aucune donnée Google, aucune adresse.
+    expect(texte).toMatch(/pour chaque créneau avec un lieu, donne l'adresse du site officiel dès qu'il en existe un/);
+    expect(texte).toMatch(/Jamais un moteur de recherche, une carte, un réseau social, un site d'avis ou de réservation tiers/);
+    expect(texte).toMatch(/Les étapes d'un même quartier se suivent/);
+    expect(texte).toContain('Si le brief porte "aEviter"');
+    expect(texte).toContain('"quartier" (pour chaque lieu)');
+    expect(texte).not.toMatch(/https?:\/\//);
+    expect(texte).not.toMatch(/google|placeId|place_id|latitude|longitude|coordonn|\blat\b|\blng\b/i);
+    // Aucun libellé de billet n'est attendu dans l'entrée (0149 S-M4-1).
+    expect(texte).not.toMatch(/libellé du billet|"libelle" du changement/);
   });
 
   it("un texte changé sans nouvelle version fait échouer la comparaison", () => {

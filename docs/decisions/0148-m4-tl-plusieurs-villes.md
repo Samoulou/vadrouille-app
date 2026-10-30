@@ -2,6 +2,8 @@
 
 Statut : **proposée, à confirmer par la revue** (forme de 0114 et 0147). Décision déléguée du **Tech Lead** (architecture, contrats, bibliothèques, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`). Définitive dès sa fusion, **sans délai de veto** (décision 0093). À lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment par une nouvelle décision. Les questions S-M4-1 à S-M4-5 sont posées à la Sécurité (§ 13 ; S-M4-5 non bloquante) : elle répond dans la revue de cette PR ou par une décision à part (spécification, « Prérequis ») ; un refus ultérieur d'un point du § 13 ne rouvre pas la décision d'office, il l'amende par une décision de la Sécurité qui remplace ce seul point.
 
+**Complément** (2026-10-30) : la décision [0151](0151-m4-tl-complements-contrat.md) complète et, sur ses points, remplace le § 1 point 3 (liste des parcours de `Day.items`), le § 2 (borne du contrat de `estimatedMinutes`), le § 10.1 point 3 (paramètre de `voisins` levé) et le § 10.2 point 3 (trois attentes de plus, dont la boucle e2e à deux clics).
+
 **Correction 2** (revue consolidée du head `a5f1cb1`, Tech Lead ; arbitrages du CEO) :
 - bloquant 1 : `verifierLieuxDuProgramme` reçoit une zone par lieu, choisie par la ville que pose le cadrage ; liste des signatures changées complétée (§ 7.1 point 6, § 8 point 2) ;
 - mineurs 2 à 7 : natures et convention 23:59 du rangement, `apero` avec les repas, fin occupée des engagements, passage de la durée estimée, « le cadrage et l'assemblage », nom `villesDeLaDate` (§ 5.1, § 5.2, § 5.3, § 6, § 9, « Conséquences »).

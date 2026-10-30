@@ -23,6 +23,7 @@ export {
   TimeSchema,
   TimeZoneSchema,
   TripBaseSchema,
+  TripCitySchema,
   TripSchema,
   WeekdaySchema,
 } from "./trip";
@@ -46,7 +47,9 @@ export type {
   StopFacts,
   StopReport,
   SurpriseIdea,
+  TransferItem,
   Trip,
+  TripCity,
   Weekday,
 } from "./trip";
 export {

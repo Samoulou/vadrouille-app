@@ -54,6 +54,10 @@ export const SharedStopItemSchema = z.strictObject({ type: z.literal("stop"), st
  * documenté plutôt qu'une restriction : le prototype n'est jamais partagé et le MVP ne produit jamais `null` ; si un
  * `null` arrivait, la vue partagée le rendrait comme la vue de la personne (« durée à confirmer », décision 0095),
  * jamais une durée. Testé dans `share.test.ts`.
+ *
+ * Liste blanche : le changement de ville (`transfer`, décision 0148 § 1 point 4, S-M4-4) n'y est **pas** ; la
+ * projection le retire (`share-projection.ts`), comme `public.shared_line_item` rend `NULL` pour tout type qu'elle ne
+ * nomme pas (aucune migration). `SharedTripSchema` ne reprend pas `Trip.cities` (0148 § 6 point 2).
  */
 export const SharedDayItemSchema = z.discriminatedUnion("type", [
   SharedTerminusItemSchema,

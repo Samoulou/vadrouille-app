@@ -1,4 +1,4 @@
-import type { DayLineItem, Meal, Segment, Stop, Trip } from "@/contracts";
+import type { DayLineItem, Meal, Segment, Stop, TransferItem, Trip } from "@/contracts";
 
 /**
  * Date et heure de la destination (décision 0021 § 3) : seul calcul de « aujourd'hui » dans l'application,
@@ -76,7 +76,9 @@ export type TodayItem =
   | { type: "stop"; stop: TodayStop }
   | { type: "segment"; segment: Segment }
   | { type: "free"; from: LocalTime; to: LocalTime }
-  | { type: "openMeal"; time: LocalTime; meal: Meal };
+  | { type: "openMeal"; time: LocalTime; meal: Meal }
+  /** Changement de ville (décision 0148 § 1) : recopié champ par champ ; son rendu est à M4c. */
+  | TransferItem;
 
 export interface TodayDay {
   index: number;
@@ -110,6 +112,15 @@ function projectTodayItem(item: DayLineItem): TodayItem {
       return { type: "free", from: item.from, to: item.to };
     case "openMeal":
       return { type: "openMeal", time: item.time, meal: item.meal };
+    case "transfer": {
+      const { from, to, source, start, end, estimatedMinutes, label, mode } = item;
+      const transfer: TransferItem = { type: "transfer", from, to, source, start };
+      if (end !== undefined) transfer.end = end;
+      if (estimatedMinutes !== undefined) transfer.estimatedMinutes = estimatedMinutes;
+      if (label !== undefined) transfer.label = label;
+      if (mode !== undefined) transfer.mode = mode;
+      return transfer;
+    }
     case "stop": {
       const { id, kind, name, start, end, facts, exceptions, placeId } = item.stop;
       const stop: TodayStop = { id, kind, name, start, facts: { ...facts }, exceptions: [...exceptions] };

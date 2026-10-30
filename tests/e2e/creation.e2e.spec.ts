@@ -133,13 +133,14 @@ test("creation: villes, récapitulatif et maximums", async ({ page }) => {
   await expect(recap).toHaveCount(0);
   await expect(button(page, "Ajouter une ville")).toBeFocused();
 
-  for (let i = 0; i < 3; i++) await button(page, "Ajouter une ville").click();
-  // Au plafond : `aria-disabled` (atteignable au clavier, comme les `Chip`), un clic de plus n'ajoute rien.
+  for (let i = 0; i < 2; i++) await button(page, "Ajouter une ville").click();
+  // Au plafond (MAX_CITIES = 3, 2 autres villes) : `aria-disabled` (atteignable au clavier, comme les `Chip`) ;
+  // Playwright refuse de cliquer un bouton `aria-disabled`, le « un de plus » passe donc par Entrée et n'ajoute rien.
   await expect(button(page, "Ajouter une ville")).toHaveAttribute("aria-disabled", "true");
   await button(page, "Ajouter une ville").focus();
   await page.keyboard.press("Enter");
-  await expect(field(page, "Nom de la ville")).toHaveCount(3);
-  await expect(page.getByText("Au plus 4 villes en tout, destination comprise.")).toBeVisible();
+  await expect(field(page, "Nom de la ville")).toHaveCount(2);
+  await expect(page.getByText("Au plus 3 villes en tout, destination comprise.")).toBeVisible();
   for (let i = 0; i < 10; i++) await button(page, "Ajouter une réservation").click();
   await expect(button(page, "Ajouter une réservation")).toHaveAttribute("aria-disabled", "true");
   await button(page, "Ajouter une réservation").focus();

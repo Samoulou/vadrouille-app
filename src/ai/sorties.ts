@@ -663,7 +663,41 @@ export const CreneauIaSchema = CreneauIaObjet
   .refine((creneau) => creneau.lieu === undefined || creneau.pourquoi !== undefined, "pourquoi obligatoire dès qu'il y a un lieu");
 export type CreneauIa = z.infer<typeof CreneauIaSchema>;
 
-export type JourIa = { readonly date: string; readonly titre?: string; readonly creneaux: readonly CreneauIa[] };
+/**
+ * Journée lue. `dureeEstimeeMinutes` (prompt `programme` v5, décision 0148 § 2 et § 5.3 ; verdict de la Sécurité 0149
+ * S-M4-2) : durée estimée par l'IA du trajet d'une journée de changement de ville à **départ estimé**, en minutes,
+ * présente seulement si elle a passé `lireDureeEstimee`. Elle n'est qu'une donnée du modèle (jamais une donnée Google),
+ * passe telle quelle jusqu'à `cadrerProgramme` (M4b), qui la reborne, et s'affiche toujours comme estimation.
+ */
+export type JourIa = { readonly date: string; readonly titre?: string; readonly dureeEstimeeMinutes?: number; readonly creneaux: readonly CreneauIa[] };
+
+/**
+ * Bornes de la durée estimée d'un changement de ville, en minutes, inclusives (décision 0148 § 2 point 2 ; 0149 S-M4-2
+ * point 1). Ce sont celles de `changementDeVille.dureeEstimeeMinutes` de `moteur.json` (M4b), que `src/ai` ne peut pas
+ * importer : l'égalité des deux est à tenir par un test de M4b. Multiples de 5 : l'arrondi ne sort jamais des bornes.
+ */
+export const DUREE_ESTIMEE_MINUTES = { min: 20, max: 600 } as const;
+
+/**
+ * Durée estimée lue **sans conversion** (0149 S-M4-2 point 1), dans cet ordre : nombre JSON, puis entier fini
+ * (`Number.isSafeInteger`, qui refuse aussi `NaN` et les infinis : `120.5` est refusé, jamais arrondi), puis bornes `DUREE_ESTIMEE_MINUTES`, puis arrondi au
+ * multiple de 5 le plus proche (93 → 95). Une chaîne (`"120"`, `"2 h"`), un booléen, un objet ou `null` sont refusés.
+ * Rend `undefined` pour toute valeur refusée : l'appelant retire le champ et le compte, jamais une valeur par défaut.
+ */
+export function lireDureeEstimee(brut: unknown): number | undefined {
+  // `Number.isSafeInteger` refuse aussi `NaN` et les infinis : il couvre le contrôle « nombre fini ».
+  if (typeof brut !== "number" || !Number.isSafeInteger(brut)) return undefined;
+  if (brut < DUREE_ESTIMEE_MINUTES.min || brut > DUREE_ESTIMEE_MINUTES.max) return undefined;
+  return Math.round(brut / 5) * 5;
+}
+
+/**
+ * Cadre de lecture d'une sortie du prompt `programme` v5 : `joursDureeEstimee`, les dates des journées de changement de
+ * ville à **départ estimé** (`changements` de source `estime` de l'entrée v5), seules journées où `dureeEstimeeMinutes`
+ * est lue (0149 S-M4-2 point 2). Ailleurs (journée ordinaire, départ saisi), le champ est ignoré et compté, comme toute
+ * clé inconnue ; sans cadre (prompts v4 et `revision`), il l'est partout.
+ */
+export type CadreLectureProgramme = { readonly joursDureeEstimee?: readonly string[] };
 export type ProgrammeIa = {
   readonly titre?: string;
   readonly jours: readonly JourIa[];
@@ -697,11 +731,14 @@ const coupe = (brut: unknown, garde: unknown, max: number) => typeof brut === "s
  * - champ facultatif invalide ou clé inconnue : retiré ou ignoré, `champsRetires` ; texte trop long : coupé,
  *   `textesCoupes` ; bons plans au-delà de `ELEMENTS_LISTE_PROGRAMME_MAX` : ignorés,
  *   `champsRetires` ;
- * - aucune journée restante : `valeur: null`.
+ * - aucune journée restante : `valeur: null` ;
+ * - `dureeEstimeeMinutes` d'une journée (prompt v5) : lue seulement aux dates `cadre.joursDureeEstimee`, par
+ *   `lireDureeEstimee` ; refusée, ou hors de ces dates : retirée, `champsRetires` (0149 S-M4-2).
  * Journées rangées par date ; l'ordre des créneaux est celui de l'IA, que `ordreEcrit` met ensuite en ordre écrit.
  * Aucune règle de nombre de lieux, de durée, de distance ni de cohérence des horaires.
  */
-export function lireProgramme(texte: string, sejour: { readonly arrivee: string; readonly depart: string }): LectureProgramme {
+export function lireProgramme(texte: string, sejour: { readonly arrivee: string; readonly depart: string }, cadre: CadreLectureProgramme = {}): LectureProgramme {
+  const joursDureeEstimee = new Set(cadre.joursDureeEstimee ?? []);
   let joursRetires = 0;
   let creneauxRetires = 0;
   let champsRetires = 0;
@@ -759,7 +796,15 @@ export function lireProgramme(texte: string, sejour: { readonly arrivee: string;
       continue;
     }
     dates.add(date.data);
-    champsRetires += Object.keys(objet).filter((cle) => !["date", "titre", "creneaux"].includes(cle)).length;
+    // `dureeEstimeeMinutes` n'est une clé connue que pour une journée de changement de ville à départ estimé (cadre v5).
+    const dureeLue = joursDureeEstimee.has(date.data);
+    const connuesJour = dureeLue ? ["date", "titre", "dureeEstimeeMinutes", "creneaux"] : ["date", "titre", "creneaux"];
+    champsRetires += Object.keys(objet).filter((cle) => !connuesJour.includes(cle)).length;
+    let dureeEstimeeMinutes: number | undefined;
+    if (dureeLue && objet.dureeEstimeeMinutes !== undefined) {
+      dureeEstimeeMinutes = lireDureeEstimee(objet.dureeEstimeeMinutes);
+      if (dureeEstimeeMinutes === undefined) champsRetires += 1;
+    }
     let titreJour: string | undefined;
     if (objet.titre !== undefined) {
       const lu = texteCoupe(LONGUEURS_TEXTE.titreJour).safeParse(objet.titre);
@@ -791,7 +836,12 @@ export function lireProgramme(texte: string, sejour: { readonly arrivee: string;
       textesCoupes += Object.entries(TEXTES_CRENEAU).filter(([champ, max]) => coupe(lus.get(champ), gardes.get(champ), max)).length;
       creneaux.push(creneau);
     }
-    jours.push({ date: date.data, ...(titreJour === undefined ? {} : { titre: titreJour }), creneaux });
+    jours.push({
+      date: date.data,
+      ...(titreJour === undefined ? {} : { titre: titreJour }),
+      ...(dureeEstimeeMinutes === undefined ? {} : { dureeEstimeeMinutes }),
+      creneaux,
+    });
   }
   jours.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const valeur = jours.length === 0 ? null : { ...(titre === undefined ? {} : { titre }), jours, bonsPlans };

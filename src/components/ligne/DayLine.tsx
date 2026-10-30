@@ -115,7 +115,12 @@ export type DayLineViewItem<S extends DayLineViewStop = DayLineViewStop> =
   | { type: "stop"; stop: S }
   | { type: "segment"; segment: Segment }
   | { type: "free"; from: string; to: string }
-  | { type: "openMeal"; time: string; meal: Meal };
+  | { type: "openMeal"; time: string; meal: Meal }
+  /**
+   * Changement de ville (décision 0148 § 1) : accepté pour que `DayLineItem` reste un sous-type ; la ligne
+   * « Vers {ville} » est rendue par M4c (0148 § 12). D'ici là, rien n'est rendu.
+   */
+  | { type: "transfer" };
 
 /** État d'une étape sur l'écran 15 : en cours (`aria-current="step"`) ou passée. */
 export type DayLineStopState = "current" | "past";
@@ -410,6 +415,9 @@ function DayLineRoot<S extends DayLineViewStop = Stop>({
         );
       case "openMeal":
         return <OpenMeal key={`openMeal-${index}`} time={item.time} meal={item.meal} />;
+      case "transfer":
+        // Rendu de la ligne « Vers {ville} » : M4c (décision 0148 § 1 point 3, § 12).
+        return null;
     }
   }
 }

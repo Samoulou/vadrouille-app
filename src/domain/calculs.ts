@@ -69,7 +69,10 @@ function voisinDe(item: DayLineItemSnapshot, configuration: ConfigurationMoteur)
         return { type: "meal", meal };
       }
       return { type: "stop", stopId: item.stop.id };
-    default:
+    case "transfer":
+      // Le changement de ville n'est jamais un voisin : il arrête la recherche de ce côté (`voisins`, décision 0148 § 1).
+      return undefined;
+    case "segment":
       return undefined;
   }
 }
@@ -79,6 +82,12 @@ function voisinDe(item: DayLineItemSnapshot, configuration: ConfigurationMoteur)
  * avant `time`) et celui qui le suit (premier qui commence à `time` ou après), en ignorant les trajets et l'étape
  * de la proposition. Jour en préparation, ou sans élément d'un côté : clé absente. Validé par
  * `ProposalNeighboursSchema`.
+ *
+ * Changement de ville (`transfer`, décision 0148 § 1 point 3 ; spécification M4 § 7.3) : il n'est jamais un voisin et
+ * **arrête la recherche** de son côté, rangé par son départ `start` comme les autres éléments. Le plus proche élément
+ * avant la proposition est le `transfer` : `before` absent ; le plus proche après : `after` absent. Un élément situé
+ * au-delà du `transfer` n'est jamais un voisin. (Le repas de midi compté comme absent le jour d'un changement de ville,
+ * 0148 § 10.1 point 3, est à M4b.)
  */
 export function voisins(
   jour: Pick<JourProgramme, "items" | "generating">,
@@ -89,8 +98,16 @@ export function voisins(
   const instant = versMinutes(proposition.time);
   let before: ProposalNeighbour | undefined;
   let after: ProposalNeighbour | undefined;
+  /** Un `transfer` rencontré après le créneau : plus aucun voisin `after` de ce côté. */
+  let apresArrete = false;
   for (const item of jour.items) {
     if (item.type === "stop" && item.stop.id === proposition.stopId) continue;
+    if (item.type === "transfer") {
+      if (versMinutes(item.start) < instant) before = undefined;
+      else apresArrete = true;
+      continue;
+    }
+    if (apresArrete) continue;
     const debut = debutDeLigne(item);
     const voisin = voisinDe(item, configuration);
     if (debut === undefined || voisin === undefined) continue;
@@ -127,14 +144,23 @@ export function changementDeBudget(avant: number | undefined, apres: number | un
 
 // --- Day.travelMinutes (B5-PO-2) -------------------------------------------------------------------------
 
-/** Points successifs d'un jour : logement de départ, étapes qui ont un lieu, logement d'arrivée. */
-export function pointsDuJour(jour: Pick<JourProgramme, "index" | "items">, nombreDeNuits: number): Point[] {
+/**
+ * Points successifs d'un jour, par tronçon : logement de départ, étapes qui ont un lieu, logement d'arrivée. Un jour
+ * sans changement de ville a **un seul** tronçon (forme d'avant M4). Chaque `transfer` (décision 0148 § 1 point 3)
+ * coupe la ligne : le tronçon d'avant finit à la dernière étape avant lui (aucun trajet vers la gare), celui d'après
+ * commence à la première étape après lui (aucun trajet avant elle, spécification M4 § 7.3). Le changement de ville
+ * n'est jamais un trajet : `Day.travelMinutes` ne le compte pas (M4-PO-11). Les trajets se lisent entre deux points
+ * successifs **d'un même tronçon**.
+ */
+export function pointsDuJour(jour: Pick<JourProgramme, "index" | "items">, nombreDeNuits: number): Point[][] {
   const logements = logementsDuJour(jour.index - 1, nombreDeNuits);
-  return [
-    { logement: logements.depart },
-    ...etapesDuJour(jour).flatMap((stop) => (stop.placeId === undefined ? [] : [{ lieu: stop.placeId }])),
-    { logement: logements.arrivee },
-  ];
+  const troncons: Point[][] = [[{ logement: logements.depart }]];
+  for (const item of jour.items) {
+    if (item.type === "transfer") troncons.push([]);
+    else if (item.type === "stop" && item.stop.placeId !== undefined) troncons.at(-1)?.push({ lieu: item.stop.placeId });
+  }
+  troncons.at(-1)?.push({ logement: logements.arrivee });
+  return troncons;
 }
 
 /**
@@ -148,15 +174,16 @@ export function minutesDeTrajet(
   relectures: Relectures,
   modes: readonly ModeTrajet[],
 ): number | Inconnu {
-  const points = pointsDuJour(jour, nombreDeNuits);
   let total = 0;
-  for (let rang = 1; rang < points.length; rang += 1) {
-    const depuis = points.at(rang - 1);
-    const vers = points.at(rang);
-    if (depuis === undefined || vers === undefined) continue;
-    const trajet = trajetLePlusRapide(relectures, depuis, vers, modes);
-    if (trajet === INCONNU) return INCONNU;
-    total += trajet.minutes;
+  for (const points of pointsDuJour(jour, nombreDeNuits)) {
+    for (let rang = 1; rang < points.length; rang += 1) {
+      const depuis = points.at(rang - 1);
+      const vers = points.at(rang);
+      if (depuis === undefined || vers === undefined) continue;
+      const trajet = trajetLePlusRapide(relectures, depuis, vers, modes);
+      if (trajet === INCONNU) return INCONNU;
+      total += trajet.minutes;
+    }
   }
   return total;
 }
