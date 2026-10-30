@@ -346,7 +346,7 @@ describe("plusieurs-villes : deux villes sur api (critères 1 à 12)", () => {
     const espion = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const espionWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const draft: TripDraft = { ...DEUX_VILLES, commitments: [{ kind: "ticket", label: "Train LIBELLE_BILLET_M4B", date: "2027-05-05", start: "10:12", end: "11:50" }] };
-    const c = composition({ ...PROGRAMME_DEUX_VILLES, jours: PROGRAMME_DEUX_VILLES.jours.map(({ dureeEstimeeMinutes: _d, ...j }) => j) }, PLACES_DEUX_VILLES());
+    const c = composition({ ...PROGRAMME_DEUX_VILLES, jours: PROGRAMME_DEUX_VILLES.jours.map((j) => ({ date: j.date, ...(j.titre === undefined ? {} : { titre: j.titre }), creneaux: j.creneaux })) }, PLACES_DEUX_VILLES());
     const { tripId, sorties, fin } = await generer(org, draft, c.fabrique);
     expect(fin.arret).toBeUndefined();
     const v1 = await version(org, tripId, 1);
