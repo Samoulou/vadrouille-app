@@ -48,6 +48,7 @@
   },
   "signaler": {
     "titre": "Signaler une erreur",
+    "groupe": "Ce qui ne va pas",
     "motifs": {
       "closed": "Fermé ou n'existe plus",
       "hours": "Horaires faux",
@@ -60,8 +61,11 @@
     "sansMotif": "Choisis ce qui ne va pas.",
     "merci": "Merci, c'est noté.",
     "remplacer": "Remplacer cette étape",
-    "plafond": "Tu as déjà beaucoup signalé aujourd'hui. Réessaie demain.",
-    "erreur": "Le signalement n'est pas parti. Réessaie."
+    "plafond": "Trop de signalements pour le moment. Réessaie plus tard.",
+    "erreur": "Le signalement n'a pas pu être envoyé. Réessaie.",
+    "introuvable": "Cette étape n'existe plus.",
+    "nonSignalable": "Cette étape ne peut pas être signalée.",
+    "envoi": "Envoi…"
   },
   "sejour": {
     "budget": "Budget estimé : environ {montant} CHF par personne",

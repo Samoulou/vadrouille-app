@@ -1,12 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { lazy, Suspense, useEffect, useRef, useState, type MouseEvent } from "react";
 
 import type { RecorderKind } from "@/analytics/track";
 import type { StopReportReason } from "@/contracts/values";
+import { connexionRoute } from "@/features/compte/suite";
 import * as messages from "@/i18n/messages";
 
 import { JourneePanel } from "./JourneePanel";
+import { cleEtapeSignalee, proposeRemplacer } from "./signalement";
 import { StopSheet } from "./StopSheet";
 import { useTripShell } from "./TripShell";
 
@@ -44,9 +47,20 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
   const [moving, setMoving] = useState<{ stopId: string; dayIndex: number; open: boolean } | null>(null);
   // Feuille « Signaler une erreur » (M5c) : étape visée, et dernier signalement enregistré (confirmation de la fiche).
   const [reporting, setReporting] = useState<{ stopId: string; dayIndex: number; open: boolean } | null>(null);
-  const [reported, setReported] = useState<{ stopId: string; dayIndex: number; reason: StopReportReason } | null>(null);
+  // Identité de l'étape : jour, identifiant et `placeId` (`cleEtapeSignalee`) ; vidé dès que la fiche se ferme ou change.
+  const [reported, setReported] = useState<{ cle: string; reason: StopReportReason } | null>(null);
   const { day, fiche, etape, routes, closedFiche, consumeClosedFiche, reportMissingEtape, focusRequest, consumeFocusRequest } = shell;
   const contentRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const ficheCle = day && fiche ? cleEtapeSignalee(day.index, fiche.stop) : null;
+
+  // Confirmation d'un signalement : propre à la fiche affichée. Fermée, ou remplacée par une autre étape (même après un
+  // remplacement qui garde l'identifiant), la confirmation disparaît. Ajustement pendant le rendu, sans effet.
+  const [ficheVue, setFicheVue] = useState(ficheCle);
+  if (ficheVue !== ficheCle) {
+    setFicheVue(ficheCle);
+    setReported(null);
+  }
 
   // `?etape=` absent des étapes et des événements du jour : journée sans fiche, adresse sans le paramètre, annonce.
   const missing = Boolean(day && etape && !fiche);
@@ -109,10 +123,11 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
   const reportingStop =
     reporting && fiche && fiche.inProgramme && fiche.stop.id === reporting.stopId && reporting.dayIndex === day.index ? fiche.stop : null;
   // Confirmation (spécification M5 § 5) : « Remplacer cette étape » pour un motif `closed`, étape non verrouillée et voyage débloqué.
-  const reportedHere = fiche && reported && reported.stopId === fiche.stop.id && reported.dayIndex === day.index ? reported : null;
-  const reportConfirmation = reportedHere
-    ? { replaceHref: reportedHere.reason === "closed" && !fiche?.stop.locked && shell.trip.unlocked ? routes.remplacer(day.index, reportedHere.stopId) : null }
-    : null;
+  const reportedHere = fiche && reported && reported.cle === ficheCle ? reported : null;
+  const reportConfirmation =
+    fiche && reportedHere
+      ? { replaceHref: proposeRemplacer(reportedHere.reason, fiche.stop, shell.trip.unlocked) ? routes.remplacer(day.index, fiche.stop.id) : null }
+      : null;
   const focusReportButton = () => contentRef.current?.querySelector<HTMLButtonElement>("[data-part='signaler']")?.focus();
 
   return (
@@ -136,8 +151,9 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
             onOpenChange={(open) => setReporting((current) => (current ? { ...current, open } : current))}
             tripId={shell.trip.id}
             stop={reportingStop}
-            onReported={(reason) => setReported({ stopId: reportingStop.id, dayIndex: day.index, reason })}
+            onReported={(reason) => setReported({ cle: cleEtapeSignalee(day.index, reportingStop), reason })}
             onReturnFocus={focusReportButton}
+            onUnauthenticated={() => router.replace(connexionRoute(routes.etape(day.index, reportingStop.id)))}
           />
         </Suspense>
       ) : null}

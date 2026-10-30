@@ -19,6 +19,7 @@ import { formatFaits } from "@/lib/faits";
 import { PLACES_FROM_GOOGLE } from "./constants";
 import { ficheMoment, type FicheTarget } from "./fiche";
 import type { TripRoutes } from "./routes";
+import { etapeSignalableSurFiche } from "./signalement";
 import { pathTo, pathToLabel } from "./travel";
 
 const t = messages.sejour.fiche;
@@ -92,9 +93,8 @@ export function StopSheet({
   const path = inProgramme ? pathTo(day.items, stop.id) : null;
   const titleId = `fiche-${stop.id}`;
   const faits = formatFaits(stop.facts);
-  // Même règle que `etapeSignalable` de `src/domain/signalement.ts` (que le navigateur n'importe pas, décision 0112 § 2) :
-  // ni engagement, ni lieu à soi ; le serveur la refait (`validation_failed`).
-  const reportable = inProgramme && onReport !== undefined && stop.commitment === undefined && stop.addedBy !== "person";
+  // Ni engagement, ni lieu à soi (`etapeSignalableSurFiche`, équivalente à la règle du serveur) ; le serveur la refait.
+  const reportable = inProgramme && onReport !== undefined && etapeSignalableSurFiche(stop);
 
   return (
     <div data-part="fiche" data-stop-id={stop.id} onKeyDown={onKeyDown} className="flex flex-col gap-4 px-5 pt-2 pb-8">

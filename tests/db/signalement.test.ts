@@ -1,12 +1,15 @@
 import { randomUUID } from "node:crypto";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import type { AdapterContext } from "@/adapters/types";
+import { createApiTripAdapter } from "@/adapters/api";
+import type { AdapterContext, TripAdapter } from "@/adapters/types";
 import { ok, type DaySnapshot } from "@/contracts";
 import { SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR } from "@/server/config/lieux";
 import { signalerEtape, type DependancesSignalement } from "@/server/voyages/signalement";
 import { creerWithOrg, executeurSql } from "@/server/with-org";
+
+import { creerRelecturesVoyages, type DoubleRelectures } from "@/mocks/relectures-voyages";
 
 import { createDatabase } from "../../db/index";
 import { convertirVoyagesSimules, ecrireVoyage } from "../support/voyages-en-base";
@@ -26,6 +29,8 @@ let app: DbClient;
 let auth: DbClient;
 let a: Org;
 let b: Org;
+let relectures: DoubleRelectures;
+let lecture: TripAdapter;
 
 const contexte = (org: Org): AdapterContext => ({ organizationId: org.org, userId: org.owner, role: "owner" });
 const EDIMBOURG_DEBLOQUE = "mock_trip_edimbourg_debloque";
@@ -65,6 +70,10 @@ const signalements = (org: Org, tripId: string): Promise<Ligne[]> =>
       )
     ).rows,
   );
+const listeAFaire = (org: Org, tripId: string): Promise<Ligne[]> =>
+  inTx(app, { org: org.org, user: org.owner }, async (c) =>
+    (await c.query("SELECT * FROM public.checklist_items WHERE organization_id = $1 AND trip_id = $2 ORDER BY id", [org.org, tripId])).rows,
+  );
 const versions = (org: Org, tripId: string): Promise<Ligne[]> =>
   inTx(app, { org: org.org, user: org.owner }, async (c) =>
     (await c.query("SELECT version, snapshot FROM public.trip_versions WHERE organization_id = $1 AND trip_id = $2 ORDER BY version", [org.org, tripId])).rows,
@@ -87,8 +96,12 @@ beforeAll(async () => {
   auth = await connect("auth");
   a = await createOrg(auth);
   b = await createOrg(auth);
+  // Lecture du programme par l'adaptateur `api`, avec le double compté du port de relectures (Google, Routes).
+  relectures = creerRelecturesVoyages();
+  lecture = createApiTripAdapter({ relectures, withOrg });
 });
 
+afterEach(() => vi.restoreAllMocks());
 afterAll(closeAll);
 
 describe("signalement sur api (M5c, ticket 904)", () => {
@@ -97,8 +110,18 @@ describe("signalement sur api (M5c, ticket 904)", () => {
     const [etape] = etapesSignalables();
     if (!etape) throw new Error("aucune étape signalable");
     const avant = await versions(a, tripId);
+    const listeAvant = await listeAFaire(a, tripId);
+    const programmeAvant = await lecture.getTrip(contexte(a), tripId);
+    expect(listeAvant.length).toBeGreaterThan(0);
     const requestId = randomUUID();
+    // Doubles comptés autour du signalement seul : aucun appel de modèle ni de Google (réseau) ni du port de relectures.
+    const reseau = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("réseau interdit pendant un signalement"));
+    const relecturesAvant = relectures.appels();
     expect(await signaler(a, { tripId, stopId: etape.id, reason: "closed", requestId })).toEqual(ok(null));
+    expect(reseau).not.toHaveBeenCalled();
+    expect(relectures.appels()).toBe(relecturesAvant);
+    expect(await listeAFaire(a, tripId)).toEqual(listeAvant);
+    expect(await lecture.getTrip(contexte(a), tripId)).toEqual(programmeAvant);
     expect(await signalements(a, tripId)).toEqual([
       { target_stop_id: etape.id, place_id: etape.placeId ?? null, reason: "closed", text: null, scope: "stop", created_by: a.owner, request_id: requestId },
     ]);

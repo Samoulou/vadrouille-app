@@ -163,9 +163,12 @@ describe("signalement: ordre des refus (0147 § 1 point 4)", () => {
 describe("signalement: idempotent, doublon avant le plafond, plafonds", () => {
   it("nouveau : une écriture (étape, placeId de la version courante, auteur de la session, request_id), un événement au motif seul", async () => {
     const lignes = journal();
+    const reseau = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("réseau interdit pendant un signalement"));
     const b = banc({ compte: SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR - 1 });
     expect(await signalerEtape(b.dependances, entree({ reason: "hours" }))).toEqual({ ok: true, value: null });
+    // Rien d'autre que ces cinq requêtes : ni version, ni liste « À faire », ni appel de modèle ou de Google (réseau).
     expect(b.textes()).toEqual([SQL_VOYAGE, SQL_VERROU_VERSIONS, SQL_DOUBLON_SIGNALEMENT, SQL_SIGNALEMENTS_DU_JOUR, SQL_INSERTION_SIGNALEMENT]);
+    expect(reseau).not.toHaveBeenCalled();
     expect(b.requetes[2]?.valeurs).toEqual([CTX.organizationId, TRIP, REQUETE, "j2-dean-village", "hours", "mock_place_dean_village"]);
     expect(b.requetes[4]?.valeurs).toEqual([CTX.organizationId, TRIP, "j2-dean-village", "mock_place_dean_village", "hours", CTX.userId, REQUETE]);
     expect(b.limiteur).toHaveBeenCalledTimes(1);

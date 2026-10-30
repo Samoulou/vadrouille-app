@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, MOCK_USER_ID } from "@/mocks/edimbourg";
 
@@ -80,4 +80,39 @@ describe("signalement simulé", () => {
     expect(await reports.reportStop(CTX, entree({ stopId: "j2-dean-village", reason: "other", requestId: uuid(999) }))).toEqual({ ok: true, value: null });
     expect(store.records).toHaveLength(21);
   });
+
+  it("journée que le lecteur ne sert pas (avant le déblocage) : not_found, même pour un engagement, jamais validation_failed", async () => {
+    // Le mock lit les jours servis par le lecteur de la portée (`getTripReader`) ; un lecteur qui ne sert pas le J1 (journée
+    // cachée avant le déblocage, 0136 § 3.5) rend l'engagement `j1-tattoo` introuvable, comme `api` (0147 § 1 point 4 d).
+    const lecteur = createMockTripAdapter();
+    const store: StopReportStore = { records: [] };
+    const reports = createMockStopReports({
+      trips: {
+        getTrip: async (ctx, tripId) => {
+          const trip = await lecteur.getTrip(ctx, tripId);
+          return trip === null ? null : { ...trip, days: trip.days.filter((jour) => jour.index !== 1) };
+        },
+      },
+      store,
+      now: () => Date.parse("2026-10-29T10:00:00Z"),
+      plafond: 20,
+      max: 200,
+    });
+    expect(await reports.reportStop(CTX, entree({ stopId: "j1-tattoo" }))).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await reports.reportStop(CTX, entree({ stopId: "j1-chateau" }))).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(store.records).toEqual([]);
+  });
+
+  it("signalement: rien ne change : programme et liste « À faire » identiques, aucun appel réseau (modèle, Google)", async () => {
+    const lecteur = createMockTripAdapter();
+    const reseau = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("réseau interdit pendant un signalement"));
+    const { reports } = banc();
+    const avant = structuredClone(await lecteur.getTrip(CTX, EDIMBOURG_TRIP_ID));
+    expect(await reports.reportStop(CTX, entree())).toEqual({ ok: true, value: null });
+    expect(await lecteur.getTrip(CTX, EDIMBOURG_TRIP_ID)).toEqual(avant);
+    expect(avant?.checklist.length).toBeGreaterThan(0);
+    expect(reseau).not.toHaveBeenCalled();
+  });
 });
+
+afterEach(() => vi.restoreAllMocks());

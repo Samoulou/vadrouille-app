@@ -92,6 +92,10 @@ export async function signalerEtape(dependances: DependancesSignalement, entree:
     const org = ctx.organizationId;
     const doublon = await executeur.query(SQL_DOUBLON_SIGNALEMENT, [org, demande.tripId, demande.requestId, demande.stopId, demande.reason, placeId]);
     if (doublon.rows.length > 0) return { type: "deja" };
+    // Le limiteur écrit dans sa table par une **autre** connexion du pool de `vadrouille_app` (`checkRateLimit`), pendant que
+    // cette transaction tient le verrou des versions du voyage : ordre de 0147 § 2, acceptable en préversion (revue de la
+    // PR 909, mineur 14). Une transaction tient donc deux connexions un instant : à revoir si le pool devenait étroit, ou si
+    // le limiteur venait à partager la connexion ou à attendre ce verrou.
     const debit = await limiteur();
     if (!debit.ok) return { type: "refus", erreur: debit };
     const n = Number((await executeur.query(SQL_SIGNALEMENTS_DU_JOUR, [org, demande.tripId])).rows[0]?.n);

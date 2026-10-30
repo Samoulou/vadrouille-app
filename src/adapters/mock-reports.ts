@@ -5,10 +5,11 @@ import type { StopReportStore } from "./simulation";
 import type { AdapterContext, StopReportAdapter, TripAdapter } from "./types";
 
 /**
- * Signalement d'une erreur sur une étape, simulé (tâche M5c, ticket 904 ; décision 0147 § 1 et § 2) : mêmes règles et même
- * ordre des refus que le cas d'usage de `api` (`src/server/voyages/signalement.ts`), sur l'état de la portée de simulation.
+ * Signalement d'une erreur sur une étape, simulé (tâche M5c, ticket 904 ; décision 0147 § 1 et § 2) : mêmes refus, dans le
+ * même ordre, que le cas d'usage de `api` (`src/server/voyages/signalement.ts`), sur l'état de la portée de simulation.
  * Entrée stricte (`StopReportSchema`) ; voyage lu par le lecteur de la portée (`not_found` hors organisation) ; étape
- * absente des jours servis : `not_found` ; événement, engagement ou lieu à soi : `validation_failed` (`field: "stopId"`) ;
+ * absente des jours que **ce lecteur** sert : `not_found` (le contrôle (d) de 0147 § 1 point 4 dépend donc du lecteur : le
+ * jeu simulé de l'app sert toutes ses journées, la sélection avant le déblocage n'est faite que par `api`) ; événement, engagement ou lieu à soi : `validation_failed` (`field: "stopId"`) ;
  * doublon (même `requestId`, ou même motif sur la même étape du même lieu) : `ok(null)` sans rien compter, même plafond
  * atteint ; au-delà de `plafond` signalements du voyage depuis minuit UTC de l'horloge de la portée : `rate_limited`.
  * Le débit par adresse IP (`signalement`) n'existe que sur `api` (limiteur en base). Rien d'autre n'est gardé : aucun texte.

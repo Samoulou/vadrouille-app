@@ -21,8 +21,19 @@ const t = messages.sejour.signaler;
 /** Les cinq motifs fermés, dans l'ordre de `STOP_REPORT_REASONS` (décision 0147 § 1 point 1, M5-PO-8). */
 const MOTIFS = STOP_REPORT_REASONS.map((value) => ({ value, label: t.motifs[value] }));
 
-/** Message de la feuille : motif manquant, plafond du jour, ou envoi échoué. */
-type Erreur = "sansMotif" | "plafond" | "erreur";
+/** Message de la feuille : motif manquant, trop de signalements, étape disparue ou non signalable, ou envoi échoué. */
+type Erreur = "sansMotif" | "plafond" | "introuvable" | "nonSignalable" | "erreur";
+
+/**
+ * Texte d'un refus du serveur (arbitrage du CEO, revue de la PR 909, bloquant 5) : `rate_limited` couvre le débit par
+ * adresse IP et le plafond du jour, d'où un texte neutre ; `unauthenticated` ne s'affiche pas (redirection).
+ */
+function erreurDuCode(code: string): Erreur {
+  if (code === "rate_limited") return "plafond";
+  if (code === "not_found") return "introuvable";
+  if (code === "validation_failed") return "nonSignalable";
+  return "erreur";
+}
 
 /** Action d'envoi : `reportStop` de `@/server/actions/retouches` par défaut (injectée par les tests). */
 export type EnvoiSignalement = (input: unknown) => Promise<Result<null>>;
@@ -37,6 +48,8 @@ export interface ReportSheetProps {
   onReported: (reason: StopReportReason) => void;
   /** Rend le focus à « Signaler une erreur » quand la feuille se ferme. */
   onReturnFocus: () => void;
+  /** Session expirée (`unauthenticated`) : redirection vers la connexion, comme les autres écrans. */
+  onUnauthenticated: () => void;
   report?: EnvoiSignalement;
   /** Identifiant de demande (tests) ; `crypto.randomUUID` par défaut. */
   newRequestId?: () => string;
@@ -63,6 +76,7 @@ function ReportContent({
   stop,
   onReported,
   onReturnFocus,
+  onUnauthenticated,
   report = reportStop,
   newRequestId = () => crypto.randomUUID(),
   close,
@@ -116,7 +130,11 @@ function ReportContent({
       onReported(reason);
       return;
     }
-    setErreur(result.error.code === "rate_limited" ? "plafond" : "erreur");
+    if (result.error.code === "unauthenticated") {
+      onUnauthenticated();
+      return;
+    }
+    setErreur(erreurDuCode(result.error.code));
   };
 
   return (
@@ -165,7 +183,7 @@ function ReportContent({
               setReason(value);
               setErreur(null);
             }}
-            label={t.titre}
+            label={t.groupe}
             orientation="vertical"
             invalid={erreur === "sansMotif"}
             describedBy={errorId}
@@ -175,6 +193,11 @@ function ReportContent({
             {erreur === null ? null : t[erreur]}
           </p>
         </div>
+
+        {/* Envoi en cours, annoncé sans déplacer le focus (0018, « Message d'erreur et annonces »). */}
+        <p role="status" data-part="envoi-signalement" className={busy ? "text-corps-s text-ink-2" : EMPTY_LIVE_REGION_CLASS}>
+          {busy ? t.envoi : null}
+        </p>
 
         <div className="flex flex-col gap-3">
           <Button type="submit" className={cn("w-full", ARIA_DISABLED)} aria-disabled={busy ? true : undefined} data-part="envoyer">

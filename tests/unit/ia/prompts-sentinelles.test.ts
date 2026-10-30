@@ -4,6 +4,9 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { createMockTripAdapter } from "@/adapters/mock";
+import { createMockStopReports } from "@/adapters/mock-reports";
+
 import type { ClientModeles, EtapeRequete } from "@/ai/client";
 import { creerCoucheIa, type ReglagesIa } from "@/ai/couche";
 import { versEntreeQuartier, type EntreeModeles } from "@/ai/entrees";
@@ -12,6 +15,8 @@ import { creerRedigerProgramme } from "@/ai/rediger-programme";
 import type { LodgingRequest } from "@/contracts";
 import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
+import { EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, MOCK_USER_ID } from "@/mocks/edimbourg";
+import { entreeRevisionDepuisJours } from "@/server/programme/revision";
 import { candidatPourModele, entreeModelesDepuisBrief, entreeProgrammeDepuisBrief, lieuRetenuDepuisCandidat } from "@/server/p0/vers-couche-ia";
 
 import { journalDePrompts } from "../../support/journal-prompts";
@@ -174,3 +179,35 @@ describe("signalement: jamais dans un prompt", () => {
     expect(fautifs).toEqual([]);
   });
 });
+
+/**
+ * Critère 15 par valeurs sentinelles (revue de la PR 909, mineur 11) : un voyage portant des signalements (identifiant de
+ * demande sentinelle, chaque motif) donne exactement la même entrée de révision qu'avant ; ni l'identifiant, ni un code de
+ * motif de plus n'y entre.
+ */
+describe("signalement: jamais dans une entrée de modèle (valeurs sentinelles)", () => {
+  it("entrée de la révision identique avant et après des signalements de chaque motif, sans la sentinelle", async () => {
+    const SENTINELLE = "5e471e11-0000-4000-8000-00000000c0de";
+    const ctx = { organizationId: MOCK_ORGANIZATION_ID, userId: MOCK_USER_ID, role: "owner" as const };
+    const trips = createMockTripAdapter();
+    const store = { records: [] as { requestId: string }[] } as Parameters<typeof createMockStopReports>[0]["store"];
+    const reports = createMockStopReports({ trips, store, now: () => Date.parse("2026-10-29T10:00:00Z"), plafond: 20, max: 200 });
+    const entree = async () => {
+      const trip = await trips.getTrip(ctx, EDIMBOURG_TRIP_ID);
+      if (trip === null) throw new Error("voyage simulé absent");
+      return JSON.stringify(entreeRevisionDepuisJours(trip.days, { destination: "Édimbourg" } as Parameters<typeof entreeRevisionDepuisJours>[1], { pasPourMoi: [], jAime: [] }));
+    };
+    const avant = await entree();
+    const motifs = ["closed", "hours", "wrongPlace", "price", "other"] as const;
+    for (const [i, reason] of motifs.entries()) {
+      const requestId = i === 0 ? SENTINELLE : `5e471e11-0000-4000-8000-00000000000${i}`;
+      expect(await reports.reportStop(ctx, { tripId: EDIMBOURG_TRIP_ID, stopId: "j2-dean-village", reason, requestId })).toEqual({ ok: true, value: null });
+    }
+    expect(store.records).toHaveLength(motifs.length);
+    const apres = await entree();
+    expect(apres).toBe(avant);
+    expect(apres).not.toContain(SENTINELLE);
+    expect(apres).not.toContain("wrongPlace");
+  });
+});
+

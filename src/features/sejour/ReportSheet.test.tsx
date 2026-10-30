@@ -10,6 +10,7 @@ import { axeViolations } from "../../../tests/unit/axe";
 import { findFicheTarget } from "./fiche";
 import { ReportSheet, type EnvoiSignalement } from "./ReportSheet";
 import { tripRoutes } from "./routes";
+import { cleEtapeSignalee, proposeRemplacer } from "./signalement";
 import { StopSheet } from "./StopSheet";
 
 vi.mock("@/server/actions/retouches", () => ({ reportStop: vi.fn(async () => ({ ok: true, value: null })) }));
@@ -30,6 +31,7 @@ function renderSheet(report: EnvoiSignalement = vi.fn(async (): Promise<Result<n
   const onReported = vi.fn();
   const onReturnFocus = vi.fn();
   const onOpenChange = vi.fn();
+  const onUnauthenticated = vi.fn();
   const result = render(
     <ReportSheet
       open
@@ -38,15 +40,16 @@ function renderSheet(report: EnvoiSignalement = vi.fn(async (): Promise<Result<n
       stop={etape(2, "j2-dean-village")}
       onReported={onReported}
       onReturnFocus={onReturnFocus}
+      onUnauthenticated={onUnauthenticated}
       report={report}
       newRequestId={() => REQUETE}
     />,
   );
-  return { ...result, report, onReported, onReturnFocus, onOpenChange };
+  return { ...result, report, onReported, onReturnFocus, onOpenChange, onUnauthenticated };
 }
 
 const dialog = () => screen.getByRole("dialog");
-const motifs = () => within(dialog()).getByRole("radiogroup", { name: t.titre });
+const motifs = () => within(dialog()).getByRole("radiogroup", { name: t.groupe });
 
 describe("signalement: feuille", () => {
   it("signalement: motifs fermés, aucun texte : titre de niveau 1 avec le focus, cinq motifs dans l'ordre, aucun champ de texte", async () => {
@@ -87,7 +90,7 @@ describe("signalement: feuille", () => {
     expect(onReported).toHaveBeenCalledWith("hours");
   });
 
-  it("plafond du jour : texte du § 9 (role alert), feuille ouverte ; autre échec : texte d'erreur", async () => {
+  it("rate_limited (débit ou plafond du jour) : texte neutre (role alert), feuille ouverte ; autre échec : texte d'erreur", async () => {
     const report = vi
       .fn<EnvoiSignalement>()
       .mockResolvedValueOnce({ ok: false, error: { code: "rate_limited" } })
@@ -105,6 +108,65 @@ describe("signalement: feuille", () => {
     // Même motif, même identifiant de demande : un nouvel essai est idempotent côté serveur.
     expect(report.mock.calls.map((appel) => (appel[0] as { requestId: string }).requestId)).toEqual([REQUETE, REQUETE]);
     expect(onReported).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["not_found", t.introuvable],
+    ["validation_failed", t.nonSignalable],
+    ["internal", t.erreur],
+  ] as const)("refus %s : texte propre (role alert), feuille ouverte", async (code, texte) => {
+    const { onReported, onUnauthenticated } = renderSheet(vi.fn<EnvoiSignalement>().mockResolvedValue({ ok: false, error: { code } }));
+    fireEvent.click(within(motifs()).getByRole("radio", { name: "Prix faux" }));
+    await act(async () => {
+      fireEvent.click(within(dialog()).getByRole("button", { name: t.envoyer }));
+    });
+    expect(within(dialog()).getByRole("alert")).toHaveTextContent(texte);
+    expect(onReported).not.toHaveBeenCalled();
+    expect(onUnauthenticated).not.toHaveBeenCalled();
+  });
+
+  it("unauthenticated : redirection vers la connexion, aucun texte d'erreur", async () => {
+    const { onReported, onUnauthenticated } = renderSheet(vi.fn<EnvoiSignalement>().mockResolvedValue({ ok: false, error: { code: "unauthenticated" } }));
+    fireEvent.click(within(motifs()).getByRole("radio", { name: "Autre erreur" }));
+    await act(async () => {
+      fireEvent.click(within(dialog()).getByRole("button", { name: t.envoyer }));
+    });
+    expect(onUnauthenticated).toHaveBeenCalledTimes(1);
+    expect(onReported).not.toHaveBeenCalled();
+    expect(within(dialog()).getByRole("alert")).toBeEmptyDOMElement();
+  });
+
+  it("pendant l'envoi : « Envoi… » annoncé (role status), puis effacé", async () => {
+    let repondre: (valeur: Result<null>) => void = () => {};
+    const report = vi.fn<EnvoiSignalement>(() => new Promise((resolve) => (repondre = resolve)));
+    renderSheet(report);
+    const envoi = dialog().querySelector("[data-part='envoi-signalement']")!;
+    expect(envoi).toHaveAttribute("role", "status");
+    expect(envoi).toBeEmptyDOMElement();
+    fireEvent.click(within(motifs()).getByRole("radio", { name: "Horaires faux" }));
+    await act(async () => {
+      fireEvent.click(within(dialog()).getByRole("button", { name: t.envoyer }));
+    });
+    expect(envoi).toHaveTextContent(t.envoi);
+    await act(async () => repondre({ ok: false, error: { code: "internal" } }));
+    expect(envoi).toBeEmptyDOMElement();
+  });
+});
+
+describe("signalement: règles d'écran", () => {
+  it("signalement: motif closed propose Remplacer : seulement closed, étape non verrouillée, voyage débloqué", () => {
+    expect(proposeRemplacer("closed", { locked: false }, true)).toBe(true);
+    expect(proposeRemplacer("closed", { locked: true }, true)).toBe(false);
+    expect(proposeRemplacer("closed", { locked: false }, false)).toBe(false);
+    for (const reason of ["hours", "wrongPlace", "price", "other"] as const) expect(proposeRemplacer(reason, { locked: false }, true)).toBe(false);
+  });
+
+  it("identité d'une confirmation : jour, étape et placeId (identifiants réutilisés d'une version à l'autre)", () => {
+    const stop = etape(2, "j2-dean-village");
+    expect(cleEtapeSignalee(2, stop)).toBe(cleEtapeSignalee(2, { ...stop }));
+    expect(cleEtapeSignalee(2, stop)).not.toBe(cleEtapeSignalee(2, { ...stop, placeId: "mock_place_autre" }));
+    expect(cleEtapeSignalee(2, stop)).not.toBe(cleEtapeSignalee(3, stop));
+    expect(cleEtapeSignalee(2, { id: stop.id })).not.toBe(cleEtapeSignalee(2, stop));
   });
 });
 
