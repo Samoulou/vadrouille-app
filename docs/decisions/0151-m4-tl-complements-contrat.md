@@ -25,7 +25,8 @@ Ajouts au § 10.2 point 3 de 0148, **par M4-C** :
 
 1. `tests/e2e/creation.e2e.spec.ts` (l. 136-143 de la branche M4-C) : la boucle passe de **3 à 2 clics** sur « Ajouter une ville ». Playwright refuse de cliquer un bouton `aria-disabled` ; le « un de plus » passe par le focus et Entrée, et le test vérifie ensuite qu'il n'ajoute rien. Ceci **remplace** la phrase de 0148 « la boucle de trois clics peut rester », qui était inexacte.
 2. `tests/unit/contracts/derived-storage.test.ts` (l. 49-50 de la branche M4-C) : `"cities"` ajouté à `TripSnapshot.omitted` (0148 § 6 point 2 : `Trip.cities` est lu depuis `stays`, jamais depuis l'instantané). L'attente « `transfer` repris par référence » (l. 87-88) est une extension, déjà permise.
-3. `src/prototype/programme-reduit.ts` (`VoyageReduitSchema`, l. 140-146 de `main`) : `cities: true` ajouté à l'`omit`. `TripBaseSchema` étant strict (`src/contracts/trip.ts`, l. 292), un programme réduit qui porte `cities` est alors **refusé** (le site d'essai n'a qu'une ville, 0148 § 4). Un test nouveau le prouve (nom suggéré : `programme réduit: cities refusé`).
+3. `src/prototype/programme-reduit.ts` (`VoyageReduitSchema`, l. 140-146 de `main`) : `cities: true` ajouté à l'`omit`. `TripBaseSchema` étant strict (`src/contracts/trip.ts`, l. 292), un programme réduit qui porte `cities` est alors **refusé** (le site d'essai n'a qu'une ville, 0148 § 4). Un test nouveau le prouve : `plusieurs-villes: le voyage réduit refuse Trip.cities (une seule ville au site d'essai, décision 0148 § 4)` (`src/prototype/programme-reduit.test.ts`, l. 317-325 de la branche M4-C à `f885d74`).
+4. `src/prototype/programme-reduit.test.ts`, test « garde des clés qui restent un sous-ensemble des contrats » (l. 305-316 de la branche M4-C à `f885d74`) : la comparaison des clés du voyage réduit à celles de `TripSchema` (l. 309-314 ; avant : égalité stricte des deux listes, l. 309 de `main`) **exclut maintenant `cities`**, conséquence directe du point 3.
 
 ## 3. Paramètre « jour de changement de ville » de `voisins` levé ; liste fermée du § 9.1 de M4-suite validée (bloquant 1 et mineur 3 de #916)
 
@@ -83,7 +84,7 @@ La fonction de détection du départ saisi de `src/domain/changement-de-ville.ts
 ## Conséquences
 
 - Le contrat borne `transfer.estimatedMinutes` à 600 ; la configuration ne peut pas aller au-delà sans changer la constante (test de M4b).
-- 0148 § 10.2 compte trois attentes de plus, toutes de M4-C ; la liste du § 9.1 de M4-suite est la liste fermée de ses tâches.
+- 0148 § 10.2 compte quatre attentes de plus, toutes de M4-C ; la liste du § 9.1 de M4-suite est la liste fermée de ses tâches.
 - `voisins` ne reçoit aucun paramètre ; le jour d'un changement de ville suit la règle de tous les jours, avec le `transfer` comme butée.
 - M4b porte, en plus de 0148 § 12, le tableau du § 4, la règle du § 5 et la condition du § 6.
 
