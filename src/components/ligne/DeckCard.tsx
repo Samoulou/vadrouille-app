@@ -67,6 +67,11 @@ export interface DeckCardProps {
    * et le jour du voyage (évolution E2 de B2) ; absent ou `null` : aucune ligne.
    */
   context?: string | null;
+  /**
+   * Jour et ville de la carte (« Jour 2 · Rome », « Jour 3 · De Rome à Florence »), composés par l'écran pour un voyage à
+   * plusieurs villes (spécification M4 § 7.3) ; absent ou `null` : aucune ligne.
+   */
+  ville?: string | null;
   /** Repas : dernière option du créneau (F6-PO-7). */
   isLastOption?: boolean;
   /**
@@ -94,6 +99,7 @@ export interface DeckCardProps {
 export function DeckCard({
   proposal,
   context = null,
+  ville = null,
   isLastOption = false,
   photo = null,
   photoEnAttente = false,
@@ -110,6 +116,7 @@ export function DeckCard({
         key={proposal.id}
         proposal={proposal}
         context={context}
+        ville={ville}
         photo={photo}
         photoEnAttente={photoEnAttente}
         labels={labels}
@@ -173,6 +180,7 @@ function prefersReducedMotion(): boolean {
 function SwipeCard({
   proposal,
   context,
+  ville,
   photo,
   photoEnAttente,
   labels,
@@ -182,6 +190,7 @@ function SwipeCard({
 }: {
   proposal: Proposal;
   context: string | null;
+  ville: string | null;
   photo: PlacePhoto | null;
   photoEnAttente: boolean;
   labels: Record<Decision, string>;
@@ -212,6 +221,7 @@ function SwipeCard({
   const id = (part: string) => `${ids}-${part}`;
   const describedBy = [
     id("moment"),
+    ville ? id("ville") : null,
     proposal.option ? id("option") : null,
     faits ? id("faits") : null,
     context ? id("contexte") : null,
@@ -387,6 +397,12 @@ function SwipeCard({
             </span>
           ) : null}
         </span>
+        {ville ? (
+          // Voyage à plusieurs villes (spécification M4 § 7.3) : sous le moment, passe à la ligne, jamais tronqué.
+          <span id={id("ville")} data-part="ville" className="text-corps-s font-semibold break-words text-ink-2">
+            {ville}
+          </span>
+        ) : null}
         <span className="text-(length:--ligne-deck-nom) leading-(--ligne-deck-nom-interligne) font-extrabold tracking-(--ligne-deck-nom-approche)">
           {stop.name}
         </span>

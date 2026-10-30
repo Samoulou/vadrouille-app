@@ -23,7 +23,8 @@ import { DeckCard } from "@/components/ligne/DeckCard";
 import { DeckProgress } from "@/components/ligne/DeckProgress";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
-import type { DeckSession, PreferenceAnswer, PreferencePrompt, Proposal, TrialRevisionResult } from "@/contracts";
+import type { DeckSession, PreferenceAnswer, PreferencePrompt, Proposal, TrialRevisionResult, TripCity } from "@/contracts";
+import { aPlusieursVilles, dateDuJour, texteDeVille, villeDeLaDate } from "@/features/voyage/villes";
 import { weekdayOf } from "@/contracts/values";
 import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
 import { format } from "@/i18n";
@@ -65,6 +66,16 @@ function preloadDeferred() {
 }
 
 const t = messages.presentation;
+
+/**
+ * Ville d'une carte (spécification M4 § 7.3 et § 8) : « Jour 2 · Rome », ou « Jour 3 · De Rome à Florence » pour toutes les
+ * cartes d'une journée de changement de ville ; `null` pour un voyage à une seule ville.
+ */
+export function villeDeLaCarte(cities: readonly TripCity[] | undefined, day: number): string | null {
+  if (!aPlusieursVilles(cities)) return null;
+  const ville = villeDeLaDate(cities, dateDuJour(cities, day));
+  return ville === undefined ? null : format(t.carte.jourVille, { n: day, ville: texteDeVille(ville, t.carte.changement) });
+}
 
 export interface PresentationScreenProps {
   tripId: string;
@@ -125,6 +136,11 @@ export interface PresentationScreenProps {
    * ouvert (F6-PO-16). `null` ou absent : session en mémoire de F6 (`mock`, `prototype`).
    */
   deck?: DeckSession | null;
+  /**
+   * Villes du voyage (`Trip.cities`, spécification M4 § 7.3) : dès 2 villes, chaque carte affiche « Jour {n} · {ville} »,
+   * ou « Jour {n} · De {ville} à {ville} » le jour d'un changement de ville. Absent : cartes inchangées.
+   */
+  cities?: readonly TripCity[];
 }
 
 /**
@@ -179,6 +195,7 @@ function Deck({
   demanderPhoto,
   actions: injected,
   deck = null,
+  cities,
   track,
 }: DeckProps) {
   const [state, dispatch] = useReducer(deckReducer, proposals, (initial) => ({ ...initDeck(initial), prompt: deck?.openPrompt ?? null }));
@@ -480,6 +497,7 @@ function Deck({
             photo={photoCarte.photo}
             photoEnAttente={photoCarte.attente}
             context={formatContexte(card.neighbours, dayOf(card.day)?.stops ?? [])}
+            ville={villeDeLaCarte(cities, card.day)}
             isLastOption={isLastOption(state)}
             cardRef={cardRef}
             onLike={(gesture) => decide("like", gesture, gesture === "button" ? "keep" : "card")}

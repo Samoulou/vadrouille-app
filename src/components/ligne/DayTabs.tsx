@@ -16,6 +16,8 @@ export interface DayTabsDay {
   index: number;
   href: string;
   weekday?: Weekday;
+  /** Ville du jour pour le nom accessible de la pastille (`DayBadge`, spécification M4 § 7.7) ; absente : aucun effet. */
+  ville?: string;
   disabled?: boolean;
 }
 
@@ -79,6 +81,7 @@ export function DayTabs({ days, current, sejourHref, label = t.navigation, class
             <DayBadge
               day={day.index}
               weekday={day.weekday}
+              ville={day.ville}
               disabled={day.disabled}
               href={day.href}
               active={current === day.index}
