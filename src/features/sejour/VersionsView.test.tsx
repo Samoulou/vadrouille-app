@@ -216,11 +216,16 @@ describe("versions: appliquer", () => {
     await act(async () => resoudre({ ok: true, value: { version: 5, touchedDays: [], changes: [] } }));
   });
 
-  it("borne du nombre de versions (`validation_failed` sur `baseVersion`) : « Tu as fait beaucoup de retouches sur ce voyage. », aucune navigation", async () => {
-    renderVersions(fakeCalls({ applyRevert: vi.fn(async () => fail("validation_failed", "baseVersion")) }));
+  it("borne du nombre de versions (`validation_failed` sur `baseVersion`) : bandeau `trop`, retour à la liste sans « Appliquer », focus sur la ligne, aucune navigation", async () => {
+    const calls = fakeCalls({ applyRevert: vi.fn(async () => fail("validation_failed", "baseVersion")) });
+    renderVersions(calls);
     fireEvent.click(revenir(3));
     fireEvent.click(await screen.findByRole("button", { name: "Appliquer" }));
     expect(await screen.findByText("Tu as fait beaucoup de retouches sur ce voyage : le retour à une version n'est plus possible.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Appliquer" })).toBeNull();
+    await waitFor(() => expect(revenir(3)).toHaveFocus());
+    // Refus permanent : pas de relecture de la liste (seul le conflit relit).
+    expect(calls.listTripVersions).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
   });
 
@@ -287,5 +292,36 @@ describe("versions: correction 1 de la revue de la PR 938", () => {
     fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
     await waitFor(() => expect(listTripVersions).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText("Les versions n'ont pas pu être chargées. Réessaie.")).toBeNull());
+  });
+
+  it("revenir pendant la lecture des versions plus anciennes, puis « Annuler » : « Voir les versions plus anciennes » redevient actif, sans annonce d'attente", async () => {
+    let resoudre: (r: Result<TripVersionPage>) => void = () => undefined;
+    const listTripVersions = vi.fn(() => new Promise<Result<TripVersionPage>>((resolve) => (resoudre = resolve)));
+    renderVersions(fakeCalls({ listTripVersions }), { items: PAGE.items.slice(0, 3), nextBefore: 2 });
+    const plus = screen.getByRole("button", { name: "Voir les versions plus anciennes" });
+    fireEvent.click(plus);
+    expect(plus).toBeDisabled();
+    fireEvent.click(revenir(3));
+    fireEvent.click(await screen.findByRole("button", { name: "Annuler" }));
+    // La page arrive après le geste : ignorée (jeton dépassé), mais la lecture est terminée.
+    await act(async () => resoudre({ ok: true, value: { items: [v(1, { kind: "prepared", revertible: false })], nextBefore: null } }));
+    const encore = screen.getByRole("button", { name: "Voir les versions plus anciennes" });
+    expect(encore).toBeEnabled();
+    expect(document.querySelector("[data-part='versions-statut']")).not.toHaveTextContent("Chargement des versions.");
+    expect(screen.queryByText("Programme préparé")).toBeNull();
+  });
+
+  it("échec réseau à « Appliquer » (`erreurRetour`) : l'aperçu et « Appliquer » restent, pour réessayer", async () => {
+    const applyRevert = vi
+      .fn<VersionCalls["applyRevert"]>()
+      .mockResolvedValueOnce(fail("internal"))
+      .mockResolvedValue({ ok: true, value: { version: 5, touchedDays: [], changes: [] } });
+    renderVersions(fakeCalls({ applyRevert }));
+    fireEvent.click(revenir(3));
+    fireEvent.click(await screen.findByRole("button", { name: "Appliquer" }));
+    expect(await screen.findByText("Le retour n'a pas pu être appliqué. Ton programme est inchangé. Réessaie.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(`/voyages/${TRIP}`));
+    expect(applyRevert).toHaveBeenCalledTimes(2);
   });
 });

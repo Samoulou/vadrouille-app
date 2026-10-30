@@ -164,9 +164,11 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
     } catch {
       result = null;
     }
-    if (token.current !== current) return;
+    // Lecture terminée, même dépassée par un autre geste (aperçu, relecture) : le bouton redevient actif et l'annonce
+    // d'attente est retirée avant le contrôle du jeton (revue du head 5cca917, bloquant tardif 1).
     setChargement(false);
-    setStatut(null);
+    setStatut((avant) => (avant === t.chargement ? null : avant));
+    if (token.current !== current) return;
     if (result === null || !result.ok) {
       setBandeau("erreurListe");
       return;
@@ -228,12 +230,14 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
       applying.current = false;
       const kind = bandeauDe(result?.ok === false ? result.error : null, "erreurRetour");
       setBandeau(kind);
-      if (kind === "conflit") {
-        // Le programme a changé : retour à la liste relue, la version actuelle sert de base au prochain geste.
+      if (kind === "conflit" || kind === "trop") {
+        // Conflit : le programme a changé, retour à la liste relue ; la version actuelle sert de base au prochain geste.
+        // Borne du nombre de versions (refus permanent) : retour à la liste, sans « Appliquer » qui relancerait le même
+        // refus (revue du head 5cca917, bloquant tardif 2). Une autre erreur (`erreurRetour`) garde l'aperçu et « Appliquer ».
         retourFocus.current = cible.version;
         setStatut(null);
         setPhase({ type: "liste" });
-        await relire();
+        if (kind === "conflit") await relire();
       }
       return;
     }
