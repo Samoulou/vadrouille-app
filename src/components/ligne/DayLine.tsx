@@ -1,7 +1,7 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
-import type { Meal, Segment, Stop } from "@/contracts";
+import type { Meal, Segment, Stop, TransferItem } from "@/contracts";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { formatDuree } from "@/lib/duree";
@@ -117,10 +117,10 @@ export type DayLineViewItem<S extends DayLineViewStop = DayLineViewStop> =
   | { type: "free"; from: string; to: string }
   | { type: "openMeal"; time: string; meal: Meal }
   /**
-   * Changement de ville (décision 0148 § 1) : accepté pour que `DayLineItem` reste un sous-type ; la ligne
-   * « Vers {ville} » est rendue par M4c (0148 § 12). D'ici là, rien n'est rendu.
+   * Changement de ville (décision 0148 § 1) : ligne « Vers {ville} », rendue seulement par l'écran qui la demande
+   * (`renderTransfer`, spécification M4 § 7.6) ; sans elle (vue partagée, écran 15), rien n'est rendu.
    */
-  | { type: "transfer" };
+  | TransferItem;
 
 /** État d'une étape sur l'écran 15 : en cours (`aria-current="step"`) ou passée. */
 export type DayLineStopState = "current" | "past";
@@ -254,6 +254,40 @@ function SegmentRow({ segment }: DayLineSegmentProps) {
   );
 }
 
+/** Textes de la ligne « Vers {ville} », composés par l'écran (textes de `sejour.json`, spécification M4 § 8). */
+export interface DayLineTransferText {
+  /** « Vers Florence ». */
+  title: string;
+  /** « [Train Rome–Florence], 12:00 – 13:40 », « En voiture, départ vers 10:00 (estimation), durée à confirmer ». */
+  detail: string;
+  /** Nom accessible de la ligne : « Vers Florence, {détail} ». */
+  name: string;
+  /** Heure de la colonne des heures : le départ d'un billet ou d'un vol saisi ; absente pour un départ estimé. */
+  time?: string;
+}
+
+export interface DayLineTransferProps {
+  text: DayLineTransferText;
+}
+
+/**
+ * Changement de ville (spécification M4 § 7.6) : gabarit d'une ligne de segment (heure, rail plein, texte), « Vers {ville} »
+ * en `corps` gras puis le détail en `legende`. Ni lien, ni focus, ni marqueur : ce n'est pas une étape (ni fiche, ni
+ * « Remplacer », « Déplacer » ou « Verrouiller »). Nom accessible de l'élément de liste : « Vers {ville}, {détail} ».
+ */
+function TransferRow({ text }: DayLineTransferProps) {
+  return (
+    <li data-type="transfer" aria-label={text.name} className={ROW}>
+      <Heure className="pt-2">{text.time}</Heure>
+      <Rail texture="plein" />
+      <p className="flex min-h-10 flex-col justify-center py-2 break-words">
+        <span className="text-corps font-bold text-ink">{text.title}</span>
+        <span className="text-legende text-ink-soft tabular-nums">{text.detail}</span>
+      </p>
+    </li>
+  );
+}
+
 export interface DayLineFreeTimeProps {
   from: string;
   to: string;
@@ -343,6 +377,11 @@ export interface DayLineProps<S extends DayLineViewStop = Stop> {
   highlightedStopIds?: readonly string[];
   /** Lignes insérées entre les éléments (points d'insertion de « Déplacer », F7b) ; sans la prop, rien ne change. */
   insertions?: readonly DayLineInsertion[];
+  /**
+   * Ligne « Vers {ville} » d'un changement de ville (spécification M4 § 7.6, § 8) : l'écran rend `DayLine.Transfer` avec
+   * ses textes ; sans la fonction, le changement de ville n'est pas rendu (vue partagée, écran 15 : spécification M4 § 7.8).
+   */
+  renderTransfer?: (transfer: TransferItem) => ReactNode;
   className?: string;
 }
 
@@ -365,6 +404,7 @@ function DayLineRoot<S extends DayLineViewStop = Stop>({
   isPast,
   highlightedStopIds,
   insertions,
+  renderTransfer,
   className,
 }: DayLineProps<S>) {
   return (
@@ -416,8 +456,8 @@ function DayLineRoot<S extends DayLineViewStop = Stop>({
       case "openMeal":
         return <OpenMeal key={`openMeal-${index}`} time={item.time} meal={item.meal} />;
       case "transfer":
-        // Rendu de la ligne « Vers {ville} » : M4c (décision 0148 § 1 point 3, § 12).
-        return null;
+        // Ligne « Vers {ville} » (décision 0148 § 1 point 3) : seulement avec les textes de l'écran.
+        return renderTransfer ? <Fragment key={`transfer-${index}`}>{renderTransfer(item)}</Fragment> : null;
     }
   }
 }
@@ -427,6 +467,7 @@ export const DayLine = Object.assign(DayLineRoot, {
   Terminus,
   Stop: StopRow,
   Segment: SegmentRow,
+  Transfer: TransferRow,
   FreeTime,
   OpenMeal,
 });

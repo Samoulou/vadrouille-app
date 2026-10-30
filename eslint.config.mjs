@@ -145,11 +145,14 @@ const F11C_FILES = [
 
 /**
  * B10a (décision 0112 § 2 point 2, amendement de 0016 § 3.1 règle 4) : depuis le code chargé par le navigateur, seul
- * `@/domain/preferences` (règles du tri, sans `zod`) s'importe de `src/domain`.
+ * `@/domain/preferences` (règles du tri, sans `zod`) s'importe de `src/domain`. M4c (décision 0148 § 6 point 3 : la ville
+ * d'un jour est une fonction pure **unique**, « appelée par le serveur et par les écrans ») : `@/domain/villes-du-voyage`
+ * aussi, module pur qui n'importe que des types de @/contracts.
  */
 const CLIENT_DOMAIN_PATTERN = {
-  regex: "^(@/domain/(?!preferences$)|(\\.{1,2}/)+(.*/)?domain/(?!preferences$))",
-  message: "Depuis le code chargé par le navigateur, seul @/domain/preferences s'importe de src/domain (décision 0112 § 2 point 2).",
+  regex: "^(@/domain/(?!(preferences|villes-du-voyage)$)|(\\.{1,2}/)+(.*/)?domain/(?!(preferences|villes-du-voyage)$))",
+  message:
+    "Depuis le code chargé par le navigateur, seuls @/domain/preferences et @/domain/villes-du-voyage s'importent de src/domain (décisions 0112 § 2 point 2 et 0148 § 6 point 3).",
 };
 
 /** Imports interdits : en configuration plate, le dernier bloc remplace les précédents, d'où une seule fonction. */

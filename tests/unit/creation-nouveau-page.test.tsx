@@ -28,7 +28,8 @@ describe("R1 : aiguillage de la recherche de ville", () => {
     vi.mocked(rechercheVilleApiOuverte).mockResolvedValueOnce(true);
     const element = await NouveauVoyagePage();
     expect(element.type).toBe(CreateTripForm);
-    expect(element.props).toEqual({ recherche: "api" });
+    // M4c (spécification M4 § 7.1) : sur `api`, les autres villes sont contrôlées à « Continuer » (`controleVilles`).
+    expect(element.props).toEqual({ recherche: "api", controleVilles: true });
     expect(rechercheVilleApiOuverte).toHaveBeenCalledTimes(1);
     expect(rechercheVilleApiOuverte).toHaveBeenCalledWith();
   });
@@ -37,7 +38,7 @@ describe("R1 : aiguillage de la recherche de ville", () => {
     vi.stubEnv("DATA_ADAPTER", "api");
     const element = await NouveauVoyagePage();
     expect(element.type).toBe(CreateTripForm);
-    expect(element.props).toEqual({});
+    expect(element.props).toEqual({ controleVilles: true });
   });
 
   it.each(["mock", ""])("adaptateur %j : le champ d'aujourd'hui, le prédicat de api n'est pas lu", async (adaptateur) => {

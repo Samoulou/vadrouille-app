@@ -77,7 +77,11 @@ function messageFor(field: string, code: FieldError, motif: MotifIndisponible = 
   }
   if (last === "lodging") return err.logement;
   if (inCity && last === "name") {
-    return code === "length" ? length(CITY_NAME_LENGTH) : code === "singleCity" ? err.uneSeuleVille : err.villeNom;
+    if (code === "length") return length(CITY_NAME_LENGTH);
+    if (code === "singleCity") return err.uneSeuleVille;
+    if (code === "cityUnknown") return err.villeInconnue;
+    if (code === "cityRepeated") return err.villeRepetee;
+    return err.villeNom;
   }
   if (inCity && last === "arrival") {
     return code === "cityOrder" ? err.villeOrdre : code === "cityBeforeEnd" ? err.villeAvantDepart : err.villeArrivee;
@@ -106,7 +110,15 @@ export interface CreateTripFormProps {
   recherche?: "api";
   /** Actions de la recherche de ville (doubles des tests et des captures, décision 0129 § 5) ; par défaut les actions serveur. */
   villes?: ActionsVilles;
+  /**
+   * Adaptateur `api` (spécification M4 § 7.1) : chaque autre ville est contrôlée à « Continuer » comme le fera `createTrip`
+   * (ville inconnue, même ville que la précédente, autre décalage horaire), avec l'erreur sous son nom.
+   */
+  controleVilles?: boolean;
 }
+
+/** Identifiant de l'aide du billet de trajet (spécification M4 § 7.1 et § 8), sous « Autres villes ». */
+const AIDE_BILLET_ID = "villes-aide-billet";
 
 const sansAbonnement = () => () => {};
 /**
@@ -133,7 +145,7 @@ function useEssaiDepuisAdresse(): boolean {
  * décision 0129, qui y lève F8-PO-14). Ailleurs, destination, logement, villes et engagements restent saisis en texte
  * libre, sans autocomplétion (aucune donnée Google, F8-PO-14).
  */
-export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTripFormProps = {}) {
+export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVilles = false }: CreateTripFormProps = {}) {
   const essaiAdresse = useEssaiDepuisAdresse();
   const essai = essaiProp ?? essaiAdresse;
   // Recherche de ville montée : site d'essai, ou `api` (0141 § 6.4) ; ailleurs, le champ texte d'aujourd'hui.
@@ -154,6 +166,10 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
   const addCityButton = useRef<HTMLButtonElement>(null);
   const addCommitmentButton = useRef<HTMLButtonElement>(null);
   const focusAfterAdd = useRef<string | null>(null);
+  // Ajout et retrait d'une ville, annoncés dans une région `status` (spécification M4 § 7.1 et § 8) ; le compteur rend
+  // chaque annonce nouvelle, même quand le texte se répète.
+  const [annonceVille, setAnnonceVille] = useState<{ texte: string; n: number } | null>(null);
+  const annoncerVille = (texte: string) => setAnnonceVille((precedente) => ({ texte, n: (precedente?.n ?? 0) + 1 }));
 
   // Brouillon perdu : le texte est écrit après le premier rendu, dans une région déjà présente (0018 § 14).
   useEffect(() => {
@@ -171,6 +187,10 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
     const found = errors.find((error) => error.field === field);
     if (!found) return null;
     // Le message du libellé du logement dépend de la réponse (« Oui » : 2 à 120 caractères ; « Un quartier » : 2 à 80).
+    if (found.code === "cityTimeZone") {
+      const city = trip.otherCities[Number(/^otherCities\.(\d+)\./.exec(field)?.[1])];
+      return format(err.villeDecalage, { ville: city?.name.trim() ?? "", destination: trip.destination.trim() });
+    }
     if (field.endsWith("lodging.label")) {
       const lodging = lodgingAt(field);
       if (found.code === "length") return length(lodging?.answer === "known" ? KNOWN_LODGING_LENGTH : AREA_LENGTH);
@@ -191,6 +211,7 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
       rechercheApi: rechercheVille === "api",
       // Comparaison aux espaces près (revue du head `bc43913`, mineur 4) : la saisie exacte n'est pas redemandée à la recherche.
       horsTable: horsTableSaisie !== null && horsTableSaisie.trim() === trip.destination.trim(),
+      controleVilles,
     });
     setErrors(found);
     const first = found[0];
@@ -247,13 +268,23 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
   }
 
   const citiesFull = trip.otherCities.length >= MAX_CITIES - 1;
+  // Aide du billet de trajet : dès qu'une autre ville est ajoutée, reliée au « Type de réservation » de chaque engagement.
+  const aideBillet = trip.otherCities.length > 0;
   const commitmentsFull = trip.commitments.length >= MAX_COMMITMENTS;
 
   return (
     <CreationShell backHref={creationRoutes.mesVoyages()} step={{ current: 1, total: stepTotal(trip) }}>
       {/* Bloc `muted` du brouillon perdu : région présente dès le chargement, texte écrit ensuite (0018 § 14). */}
+      {/* Même région, unique sur l'écran : l'ajout et le retrait d'une ville y sont annoncés, pour les lecteurs d'écran
+          seulement (spécification M4 § 7.1) ; le brouillon perdu, visible, passe avant. */}
       <div role="status" className={state.noticeVisible ? "rounded-block bg-muted p-4 text-corps-s text-ink-2" : EMPTY_LIVE_REGION_CLASS}>
-        {state.noticeVisible ? t.brouillonPerdu : null}
+        {state.noticeVisible ? (
+          t.brouillonPerdu
+        ) : annonceVille ? (
+          <span key={annonceVille.n} data-part="annonce-villes" className="sr-only">
+            {annonceVille.texte}
+          </span>
+        ) : null}
       </div>
       <div role="alert" className={EMPTY_LIVE_REGION_CLASS} />
       <h1 className={TITLE_CLASS}>{e1.titre}</h1>
@@ -356,6 +387,7 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
               {e1.villes.titre}
             </h2>
             <FieldHelp id="villes-aide">{e1.villes.aide}</FieldHelp>
+            {aideBillet ? <FieldHelp id={AIDE_BILLET_ID}>{e1.villes.aideBillet}</FieldHelp> : null}
             {trip.otherCities.map((city, index) => {
               const base = `otherCities.${index}`;
               const title = city.name.trim() || format(e1.villes.ville, { n: index + 2 });
@@ -376,6 +408,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
                       onClick={() => {
                         dispatch({ type: "removeCity", index });
                         setErrors([]);
+                        const nom = city.name.trim();
+                        annoncerVille(nom ? format(e1.villes.retiree, { ville: nom }) : format(e1.villes.retireeSansNom, { n: index + 2 }));
                         // Site d'essai : la section disparaît avec la dernière ville ; le focus va alors au champ « Départ ».
                         requestAnimationFrame(() => (addCityButton.current ? addCityButton.current.focus() : focusField("end")));
                       }}
@@ -383,14 +417,38 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
                       {e1.retirer}
                     </Button>
                   </div>
-                  <TextField
-                    field={`${base}.name`}
-                    label={e1.villes.nom}
-                    value={city.name}
-                    maxLength={CITY_NAME_LENGTH.max}
-                    onChange={(name) => dispatch({ type: "city", index, patch: { name } })}
-                    error={errorOf(`${base}.name`)}
-                  />
+                  {rechercheVille === "api" ? (
+                    // Recherche de ville de `api` pour chaque autre ville (verdict 0149 § 3) : mêmes actions et même
+                    // terminal que la destination ; seul le nom maison entre dans le brouillon, sans `placeId`. Un refus
+                    // (`limite`, `indisponible`) laisse ce champ en saisie libre (repli sur les 62 villes).
+                    <DestinationVille
+                      champ={`${base}.name`}
+                      libelle={e1.villes.nom}
+                      maxLength={CITY_NAME_LENGTH.max}
+                      value={city.name}
+                      choisie={null}
+                      error={errorOf(`${base}.name`)}
+                      onSaisie={(name) => dispatch({ type: "city", index, patch: { name } })}
+                      onChoix={(choix) => {
+                        dispatch({ type: "city", index, patch: { name: choix.destination } });
+                        setErrors((precedentes) => precedentes.filter((erreur) => erreur.field !== `${base}.name`));
+                      }}
+                      onDisponibilite={() => {}}
+                      onAcces={() => {}}
+                      relance={0}
+                      recherche="api"
+                      {...(villes ? { actions: villes } : {})}
+                    />
+                  ) : (
+                    <TextField
+                      field={`${base}.name`}
+                      label={e1.villes.nom}
+                      value={city.name}
+                      maxLength={CITY_NAME_LENGTH.max}
+                      onChange={(name) => dispatch({ type: "city", index, patch: { name } })}
+                      error={errorOf(`${base}.name`)}
+                    />
+                  )}
                   <TextField
                     field={`${base}.arrival`}
                     type="date"
@@ -429,6 +487,7 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
                 if (citiesFull) return;
                 focusAfterAdd.current = `otherCities.${trip.otherCities.length}.name`;
                 dispatch({ type: "addCity" });
+                annoncerVille(format(e1.villes.ajoutee, { n: trip.otherCities.length + 2 }));
               }}
             >
               <IconPlus className="size-(--ligne-icone-petite)" />
@@ -484,7 +543,7 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes }: CreateTr
                     value={commitment.kind}
                     onChange={(kind) => dispatch({ type: "commitment", index, patch: { kind } })}
                     invalid={kindError !== null}
-                    describedBy={kindError ? errorId(fieldId(`${base}.kind`)) : undefined}
+                    describedBy={describedBy(aideBillet && AIDE_BILLET_ID, kindError && errorId(fieldId(`${base}.kind`)))}
                     id={fieldId(`${base}.kind`)}
                   />
                   <FieldMessage id={errorId(fieldId(`${base}.kind`))} message={kindError} />

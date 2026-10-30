@@ -56,6 +56,7 @@ const TEXT_PAIRS: [ColorToken, ColorToken][] = [
   ["line", "muted"], // lien « Itinéraire » dans le bloc « Prochaine étape » de l'écran 15 (F10a)
   // ActionBanner (bandeau « À réserver » de l'écran 15, F10a) : `ink` sur `quai`, déjà dans la liste.
   ["ink-2", "raised"], // vignette opaque du crédit d'une photo sur la carte du tri (décision 0128) : jamais sur la photo
+  ["ink-2", "page"], // M4c : villes du voyage (Séjour), légende de ville (écran 5), ligne de ville (carte de l'écran 6)
 ];
 
 describe("contrastes des paires de tokens (WCAG 2.2 AA)", () => {

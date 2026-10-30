@@ -1,5 +1,5 @@
 import { isTrialTrip, voyageEssaiRevisable, type AdapterContext, type TripAdapter } from "@/adapters";
-import type { DeckSession, PreviewSlot, Proposal, Trip } from "@/contracts";
+import type { DeckSession, PreviewSlot, Proposal, Trip, TripCity } from "@/contracts";
 
 /**
  * Jour du voyage tel que l'écran le reçoit (B2-PO-14) : de quoi composer le jour de la semaine (depuis `date`) et le
@@ -45,6 +45,11 @@ export interface PresentationData {
    * brief commité (`/prototype/executions`) gardent la phrase « choix sans effet ».
    */
   revisable: boolean;
+  /**
+   * Villes du voyage (`Trip.cities`, spécification M4 § 7.3) : chaque carte nomme sa ville. Absent pour une seule ville :
+   * les cartes ne changent pas (critère 25).
+   */
+  cities?: TripCity[];
 }
 
 /** Projection d'un jour : étapes de la ligne et événements, `{ id, name }` seulement. */
@@ -96,5 +101,6 @@ export async function loadPresentation(adapter: TripAdapter, ctx: AdapterContext
     deck,
     essai,
     revisable: essai && voyageEssaiRevisable(trip.id),
+    ...(trip.cities ? { cities: trip.cities } : {}),
   };
 }

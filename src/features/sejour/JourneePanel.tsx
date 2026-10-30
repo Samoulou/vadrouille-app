@@ -1,3 +1,5 @@
+import { Suspense, lazy } from "react";
+
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { DayLine } from "@/components/ligne/DayLine";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
@@ -13,6 +15,9 @@ import { SurpriseBlock } from "./SurpriseBlock";
 import { dayTravelLine, travelBannerMessage } from "./travel";
 
 const t = messages.sejour;
+
+/** Ligne « Vers {ville} » : chargée à la demande, le jour d'un changement de ville seulement (handover front § 14). */
+const VersVille = lazy(() => import("./VersVille").then((loaded) => ({ default: loaded.VersVille })));
 
 export interface JourneePanelProps {
   day: Day;
@@ -67,6 +72,11 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
             getStopHref={(stop) => routes.etape(day.index, stop.id)}
             getIdeasHref={(free) => routes.ajouter(day.index, free)}
             highlightedStopIds={highlightedStopIds}
+            renderTransfer={(transfer) => (
+              <Suspense fallback={null}>
+                <VersVille transfer={transfer} />
+              </Suspense>
+            )}
           />
         </div>
       )}
