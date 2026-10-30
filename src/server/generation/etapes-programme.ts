@@ -19,7 +19,7 @@ import { assemblerProgrammeIa, modeDeTrajet } from "@/server/programme/assemblag
 import { briefDepuisFormulaire, briefProgrammeDepuisFormulaire, type BriefEssai } from "@/server/programme/brief";
 import { cadrerProgramme } from "@/server/programme/cadrage";
 import { entreeProgrammeDepuisBrief, entreeProgrammeV5DepuisBrief } from "@/server/programme/entree";
-import type { BriefProgramme } from "@/server/programme/forme";
+import { briefAPlusieursVilles, type BriefProgramme } from "@/server/programme/forme";
 import { instantaneDuProgramme } from "@/server/programme/instantane";
 import { avecSiteGarde, compteursNonSoumis, SITES_DUREE_MAX_MS, sitesDuProgramme, verifierSites, type CompteursSites, type ResultatSites } from "@/server/programme/sites";
 import { DELAI_REQUETE_MS } from "@/server/usage/port";
@@ -150,13 +150,14 @@ async function recitDuVoyage(x: Executeur, contexte: Pick<Contexte, "organizatio
  */
 export type BriefDuVoyage = BriefEssai | BriefProgramme;
 
-/** Le brief porte-t-il plusieurs villes (`BriefProgramme` à deux villes ou plus) ? */
-export function briefAPlusieursVilles(brief: BriefDuVoyage): brief is BriefProgramme {
-  return "villes" in brief && brief.villes.length > 1;
-}
+/** Le brief porte-t-il plusieurs villes ? Prédicat unique de `forme.ts`, réexporté pour la révision et les tests. */
+export { briefAPlusieursVilles };
 
 function convertir(voyage: VoyageLu, recit: string | undefined): BriefDuVoyage {
-  const conversion = voyage.draft.otherCities.length === 0 ? briefDepuisFormulaire(voyage.draft, voyage.brief, recit) : briefProgrammeDepuisFormulaire(voyage.draft, voyage.brief, recit);
+  // Bascule une ville / plusieurs villes : le prédicat unique, lu ici sur la liste des villes du brouillon (le brief
+  // n'existe pas encore), puis sur le brief rendu par les autres étapes.
+  const villes = [voyage.draft.destination, ...voyage.draft.otherCities.map((ville) => ville.name)];
+  const conversion = briefAPlusieursVilles({ villes }) ? briefProgrammeDepuisFormulaire(voyage.draft, voyage.brief, recit) : briefDepuisFormulaire(voyage.draft, voyage.brief, recit);
   if (!conversion.ok) throw new ArretEtape("invalid_input");
   return conversion.brief;
 }
@@ -316,7 +317,7 @@ export async function redigerEtVerifier(
   // Instant pris **avant** les fiches qui rendent les positions (0060 § 1.3 point 2).
   const obtenuesA = contexte.dep.maintenant();
   // 1. Logements d'abord : introuvable, `lodging_unresolved` avant toute requête de modèle (0136 § 2.3.2).
-  const logements = await capacite.logements(brief);
+  const logements = await capacite.logements(brief, briefAPlusieursVilles(brief));
 
   // 2. Rédaction : une requête de modèle, lecture tolérante et ordre écrit, une seule fois.
   compteurs.modelCalls += 1;

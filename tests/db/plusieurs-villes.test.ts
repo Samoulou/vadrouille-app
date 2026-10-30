@@ -243,6 +243,37 @@ const RELECTURES: SourceRelectures = {
   pour: async () => ({ ok: true, relectures: { validite: () => "valide", plages: () => INCONNU, duree: () => ({ minutes: 10, estimee: true }) } }),
 };
 
+/** Révision M1b ouverte sur la version 1 : déblocage, un « Pas pour moi » sur la deuxième case, tri clos, ligne `batch`. */
+async function ouvrirRevision(org: Org, tripId: string, apercu: string) {
+  await admin.query("INSERT INTO public.entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [org.org, tripId]);
+  const cases = await lire<{ id: string; content: { stop: { name: string }; category: string } }>(
+    org,
+    "SELECT id, content FROM public.proposals WHERE trip_id = $1 AND phase = 'preview' ORDER BY position",
+    [tripId],
+  );
+  const ecartee = cases[1]!;
+  await admin.query(
+    `INSERT INTO public.preference_signals (organization_id, trip_id, request_id, signal, origin, category, proposal_id)
+     VALUES ($1, $2, gen_random_uuid(), 'dislike', 'gesture', $3, $4)`,
+    [org.org, tripId, ecartee.content.category, ecartee.id],
+  );
+  const lot = await inTx(app, { org: org.org, user: org.owner }, async (cl) => {
+    const cloture = (
+      await cl.query(
+        "INSERT INTO public.deck_closures (organization_id, trip_id, generation_run_id, phase, through_position, request_id) VALUES ($1, $2, $3, 'preview', $4, gen_random_uuid()) RETURNING id",
+        [org.org, tripId, apercu, cases.length],
+      )
+    ).rows[0].id as string;
+    return (
+      await cl.query(
+        "INSERT INTO public.generation_runs (organization_id, trip_id, kind, phase, base_version, deck_closure_id, request_id) VALUES ($1, $2, 'batch', 'queued', 1, $3, gen_random_uuid()) RETURNING id",
+        [org.org, tripId, cloture],
+      )
+    ).rows[0].id as string;
+  });
+  return { lot, ecartee };
+}
+
 // --- Tests ------------------------------------------------------------------------------------------------------------
 
 describe("plusieurs-villes : deux villes sur api (critères 1 à 12)", () => {
@@ -425,32 +456,7 @@ describe("plusieurs-villes : révision M1b (0148 § 8 point 2)", () => {
     const org = await createOrg(auth);
     const c = composition(PROGRAMME_DEUX_VILLES, PLACES_DEUX_VILLES());
     const { tripId, apercu } = await generer(org, DEUX_VILLES, c.fabrique);
-    await admin.query("INSERT INTO public.entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [org.org, tripId]);
-    const cases = await lire<{ id: string; content: { stop: { name: string }; category: string } }>(
-      org,
-      "SELECT id, content FROM public.proposals WHERE trip_id = $1 AND phase = 'preview' ORDER BY position",
-      [tripId],
-    );
-    const ecartee = cases[1]!;
-    await admin.query(
-      `INSERT INTO public.preference_signals (organization_id, trip_id, request_id, signal, origin, category, proposal_id)
-       VALUES ($1, $2, gen_random_uuid(), 'dislike', 'gesture', $3, $4)`,
-      [org.org, tripId, ecartee.content.category, ecartee.id],
-    );
-    const lot = await inTx(app, { org: org.org, user: org.owner }, async (cl) => {
-      const cloture = (
-        await cl.query(
-          "INSERT INTO public.deck_closures (organization_id, trip_id, generation_run_id, phase, through_position, request_id) VALUES ($1, $2, $3, 'preview', $4, gen_random_uuid()) RETURNING id",
-          [org.org, tripId, apercu, cases.length],
-        )
-      ).rows[0].id as string;
-      return (
-        await cl.query(
-          "INSERT INTO public.generation_runs (organization_id, trip_id, kind, phase, base_version, deck_closure_id, request_id) VALUES ($1, $2, 'batch', 'queued', 1, $3, gen_random_uuid()) RETURNING id",
-          [org.org, tripId, cloture],
-        )
-      ).rows[0].id as string;
-    });
+    const { lot, ecartee } = await ouvrirRevision(org, tripId, apercu);
     const revision = composition(PROGRAMME_DEUX_VILLES, PLACES_DEUX_VILLES());
     const etat: EtatLot = { generationRunId: lot, organizationId: org.org, rang: 0 };
     const apresA = await etapeLotDebut(etat, dependances(revision.fabrique));
@@ -459,14 +465,48 @@ describe("plusieurs-villes : révision M1b (0148 § 8 point 2)", () => {
     expect(fin.arret).toBeUndefined();
     const v1 = await version(org, tripId, 1);
     const v2 = await version(org, tripId, 2);
-    // Le transfer est recopié tel quel (durée de la version de base), le thème aussi ; l'étape écartée a disparu.
+    // Le transfer est reconstruit par le code depuis la sortie v3 (durée estimée de la sortie, 150 minutes, comme à la
+    // génération) : identique à celui de la version de base ; le thème aussi ; l'étape écartée a disparu.
     const transfer = (instantane: TripSnapshot) => jour(instantane, "2027-05-05").items.filter((item) => item.type === "transfer");
     expect(transfer(v2)).toEqual(transfer(v1));
+    expect(transfer(v2)).toEqual([expect.objectContaining({ source: "estimated", estimatedMinutes: 150 })]);
     expect(jour(v2, "2027-05-05").theme).toBe("De Rome à Florence");
     expect(v2.days.flatMap((d) => nomsDesEtapes(d.items))).not.toContain(ecartee.content.stop.name);
-    // Requête de révision : aucune donnée Google, aucun libellé de billet, aucun récit.
+    // Requête de révision : une seule, prompt `revision` v3, `zdr` et `deny` imposés, brief v5 (villes, changements) ;
+    // aucune donnée Google, aucun libellé de billet, aucun récit.
     expect(revision.requetes()).toHaveLength(1);
-    expect(revision.texte()).not.toMatch(/SENTINELLE|recit/);
+    const [requete] = revision.requetes();
+    expect(requete!.prompt).toEqual({ id: "revision", version: 3 });
+    expect(requete!.routage).toEqual(expect.objectContaining({ zdr: true, data_collection: "deny" }));
+    const donnees = requete!.messages.find((m) => m.role === "user")!.contenu;
+    expect(donnees).toMatch(/"villes"/);
+    expect(donnees).toMatch(/"changements"/);
+    expect(revision.texte()).not.toMatch(/SENTINELLE|recit|placeId/);
+  });
+});
+
+describe("plusieurs-villes : isolation entre organisations (Sécurité, revue de la PR 932, M4)", () => {
+  it("plusieurs-villes: une autre organisation ne lit ni Trip.cities ni les séjours, et ne révise pas le voyage", async () => {
+    const org = await createOrg(auth);
+    const autre = await createOrg(auth);
+    const c = composition(PROGRAMME_DEUX_VILLES, PLACES_DEUX_VILLES());
+    const { tripId, apercu } = await generer(org, DEUX_VILLES, c.fabrique);
+    // Lecture : le voyage (et ses villes) n'existe pas pour l'autre organisation, ni par l'adaptateur ni en SQL (RLS).
+    const voyages = createApiTripAdapter({ relectures: RELECTURES, withOrg, chaine: "inversee" });
+    expect((await voyages.getTrip(contexteDe(org), tripId))?.cities).toHaveLength(2);
+    expect(await voyages.getTrip(contexteDe(autre), tripId)).toBeNull();
+    expect(await lire(autre, "SELECT 1 FROM public.stays WHERE trip_id = $1", [tripId])).toEqual([]);
+    expect(await lire(autre, "SELECT 1 FROM public.trip_versions WHERE trip_id = $1", [tripId])).toEqual([]);
+    // Révision : la ligne `batch` du voyage, déroulée sous l'autre organisation, ne lit rien et n'envoie aucune requête.
+    const { lot } = await ouvrirRevision(org, tripId, apercu);
+    const revision = composition(PROGRAMME_DEUX_VILLES, PLACES_DEUX_VILLES());
+    const etat: EtatLot = { generationRunId: lot, organizationId: autre.org, rang: 0 };
+    // La garde du lot ne trouve pas la ligne sous l'autre organisation (RLS) : arrêt, sans relecture ni forfait.
+    const sortie = await etapeLotDebut(etat, dependances(revision.fabrique));
+    expect(sortie.arret).toBe("step_expired");
+    expect(revision.requetes()).toHaveLength(0);
+    expect(await lire(org, "SELECT version FROM public.trip_versions WHERE trip_id = $1 ORDER BY version", [tripId])).toEqual([{ version: 1 }]);
+    expect(await lire(org, "SELECT phase FROM public.generation_runs WHERE id = $1", [lot])).toEqual([{ phase: "queued" }]);
   });
 });
 

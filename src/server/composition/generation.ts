@@ -4,8 +4,8 @@ import type { ClientModeles, RequeteModele } from "@/ai/client";
 import { usdEnMicros } from "@/ai/client";
 import { creerCoucheIa, type CoucheIa } from "@/ai/couche";
 import { creerRedigerProgramme, creerRedigerProgrammeV5 } from "@/ai/rediger-programme";
-import { creerRedigerRevision } from "@/ai/rediger-revision";
-import { lieuxDuProgramme, lireProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
+import { creerRedigerRevision, creerRedigerRevisionV3 } from "@/ai/rediger-revision";
+import { cadreLectureChangements, lieuxDuProgramme, lireProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
 import type { EntreeModeles } from "@/ai/entrees";
 import { ErreurOpenRouter, createOpenRouterClient } from "@/ai/openrouter-client";
 import type { ClientRechercheWeb } from "@/ai/recherche-web";
@@ -220,6 +220,13 @@ export type EntreeRedactionV5 = Parameters<ReturnType<typeof creerRedigerProgram
 export type EntreeRevisionDuProgramme = Parameters<ReturnType<typeof creerRedigerRevision>>[0];
 
 /**
+ * Entrée de la requête `revision` **v3** (M4a-2 ; voyage à plusieurs villes, M4b) : brief v5 **sans récit**, programme et choix
+ * de la v2 ; validée par son schéma strict `EntreeRevisionV3Schema` dans `creerRedigerRevisionV3` (aucune clé en trop, aucun
+ * libellé de billet ni donnée Google).
+ */
+export type EntreeRevisionV3DuProgramme = Parameters<ReturnType<typeof creerRedigerRevisionV3>>[0];
+
+/**
  * Filet du code de la révision (décision 0126 § 4), passé par l'étape (`retirerEtapesEcartees` de `src/server/programme/`, que
  * ce pont n'importe pas) : appliqué à la sortie relue **avant** l'ordre écrit et la vérification, il rend la sortie filtrée et
  * le nombre de créneaux retirés.
@@ -281,8 +288,13 @@ export type LieuxVerifies = { readonly placeIdDe: (jour: number, rang: number) =
  * `placeId` sortent de Google, jamais un nom, une position ni un verdict ; les noms vérifiés sont ceux de l'IA (0139 § 5.2).
  */
 export interface CapaciteProgramme {
-  /** `placeId` de chaque logement du brief, dans son ordre ; un logement introuvable ou fermé lève `lodging_unresolved`. */
-  logements(brief: BriefDuProgramme): Promise<readonly string[]>;
+  /**
+   * `placeId` de chaque logement du brief, dans son ordre ; un logement introuvable ou fermé lève `lodging_unresolved`.
+   * `plusieursVilles` : le seul prédicat de bascule (`briefAPlusieursVilles`, lu par l'étape sur son brief ; revue de la PR
+   * 932, Sécurité M2), passé ici parce que ce pont n'importe pas `src/server/programme/` (confinement) ; il fixe la zone
+   * de vérification des lieux (`zoneDe`).
+   */
+  logements(brief: BriefDuProgramme, plusieursVilles: boolean): Promise<readonly string[]>;
   /** Une requête `programme` (entrée validée par son schéma strict), lecture tolérante et ordre écrit. */
   rediger(entree: EntreeRedaction, sejour: { readonly arrivee: string; readonly depart: string }): Promise<RedactionProgramme>;
   /**
@@ -298,6 +310,12 @@ export interface CapaciteProgramme {
    * rend `programme: null` (sortie illisible, 0126 § 4). Se substitue à `rediger` : `lieux` lit ensuite la sortie filtrée.
    */
   reviser(entree: EntreeRevisionDuProgramme, sejour: { readonly arrivee: string; readonly depart: string }, filtrer: FiltreRevision): Promise<RedactionProgramme>;
+  /**
+   * Même chose avec le prompt `revision` **v3** (voyage à plusieurs villes, M4a-2 ; décision 0148 § 8 point 2) : `zdr` et
+   * `data_collection: "deny"` imposés par `creerRedigerRevisionV3` ; la durée estimée n'est lue qu'aux dates des changements
+   * de ville à départ estimé (`cadreLectureChangements`).
+   */
+  reviserV3(entree: EntreeRevisionV3DuProgramme, sejour: { readonly arrivee: string; readonly depart: string }, filtrer: FiltreRevision): Promise<RedactionProgramme>;
   /**
    * Lieux distincts du programme **cadré** reçu (ordre écrit ; décision 0148 § 5.1 point 3 et § 8 point 2 : les indices
    * `(jour, rang)` de `placeIdDe` sont ceux de ce programme) : leur nombre, et leur vérification sous `controle` (part et
@@ -663,8 +681,12 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
   // Révision (0126 ; M1b) : même réglage que `programme`, comme le site d'essai (`composerP0Reel`) ; `zdr` et
   // `data_collection: "deny"` imposés par `creerRedigerRevision` quel que soit le réglage reçu.
   const redigerRevision = creerRedigerRevision(modeles, CONFIGURATION_IA.programme);
+  // Révision v3 (plusieurs villes, M4a-2) : même réglage ; `zdr` et `data_collection: "deny"` imposés par la fabrique.
+  const redigerRevisionV3 = creerRedigerRevisionV3(modeles, CONFIGURATION_IA.programme);
   // Zones des logements (0148 § 7.1 point 6) : la zone commune et une zone par ville ; destination du brief ancré.
-  let zones: { readonly commune: RectangleZone; readonly parVille: ReadonlyMap<string, RectangleZone>; readonly destination: string } | undefined;
+  let zones:
+    | { readonly commune: RectangleZone; readonly parVille: ReadonlyMap<string, RectangleZone>; readonly destination: string; readonly plusieursVilles: boolean }
+    | undefined;
   let lu: ProgrammeIa | undefined;
   // Positions lues d'une fiche Google de cette étape (logements ancrés, lieux vérifiés), en mémoire ; marquées pour l'écriture
   // au cache par `positionsFraiches` (`@/grounding/fiches`) au moment d'écrire, et seules celles de la version publiée.
@@ -695,12 +717,12 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
     };
   }
   return {
-    async logements(brief) {
+    async logements(brief, plusieursVilles) {
       // L'étape passe le `BriefEssai` entier, forme structurelle de `Brief` (`src/prototype/brief.ts`), que ce pont n'importe pas
       // (zone sensible). Cast gardé : `BriefEssai` est en lecture seule (listes `readonly`), `Brief` ne l'est pas, et l'ancrage
       // ne modifie rien ; un type commun demanderait d'importer `src/server/programme/` ici (revue du head 3536d13, mineur 2).
       const issue = await ancrerLogementsDuSejour(brief, { detailsLogement: ancrage.detailsLogement });
-      zones = { commune: issue.zone, parVille: issue.zonesParVille, destination: brief.destination };
+      zones = { commune: issue.zone, parVille: issue.zonesParVille, destination: brief.destination, plusieursVilles };
       for (const logement of issue.logements) retenir(logement.placeId, logement.position);
       return issue.logements.map((logement) => logement.placeId);
     },
@@ -710,9 +732,11 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
         () => redigerV5(entree),
         sejour,
         undefined,
-        entree.changements.flatMap((changement) => (changement.source === "estime" ? [changement.date] : [])),
+        cadreLectureChangements(entree.changements).joursDureeEstimee ?? [],
       ),
     reviser: (entree, sejour, filtrer) => lireRedaction(() => redigerRevision(entree), sejour, filtrer),
+    reviserV3: (entree, sejour, filtrer) =>
+      lireRedaction(() => redigerRevisionV3(entree), sejour, filtrer, cadreLectureChangements(entree.brief.changements).joursDureeEstimee ?? []),
     lieux(programme) {
       if (lu === undefined) throw new RangeError("programme : aucun programme rédigé");
       const destination = zones?.destination ?? "";
@@ -721,11 +745,13 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
         nombre: lieux.length,
         async verifier(controle) {
           if (zones === undefined) throw new RangeError("programme : logements non ancrés");
-          const { commune, parVille } = zones;
+          const { commune, parVille, plusieursVilles } = zones;
           // Zone de la ville du lieu, posée par le cadrage (0148 § 7.1 point 6 ; 0149 § 1.3 point 5) : jamais la zone commune
-          // d'un voyage à plusieurs villes. Une seule ville (logements sans ville, `parVille` vide) : la zone du séjour, inchangée.
+          // d'un voyage à plusieurs villes. Le choix suit le seul prédicat de bascule (`briefAPlusieursVilles`, revue de la PR 932,
+          // Sécurité M2), jamais la taille de `parVille` : plusieurs villes sans zone pour la ville du lieu lève (échec fermé).
+          // Une seule ville : la zone du séjour, inchangée.
           const zoneDe = (lieu: { readonly ville?: string }) => {
-            if (parVille.size === 0) return commune;
+            if (!plusieursVilles) return commune;
             const zone = lieu.ville === undefined ? undefined : parVille.get(lieu.ville);
             if (zone === undefined) throw new RangeError("programme : zone de la ville introuvable");
             return zone;

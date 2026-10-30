@@ -1,12 +1,11 @@
 import "server-only";
 
 import type { TripSnapshot } from "@/contracts";
-import type { RedactionProgramme } from "@/server/composition/generation";
 import type { TriDuRecalcul } from "@/domain/recalcul";
 import { etapesVerrouilleesModifiees } from "@/domain/verrous";
-import type { ExecuteurPublication, OptionsEtape } from "@/server/composition/generation";
+import type { CapaciteProgramme, ExecuteurPublication, OptionsEtape } from "@/server/composition/generation";
 import { RANG_LOT } from "@/server/config/generation";
-import { entreeProgrammeDepuisBrief } from "@/server/programme/entree";
+import { entreeProgrammeDepuisBrief, entreeProgrammeV5DepuisBrief } from "@/server/programme/entree";
 import { entreeRevisionDepuisJours, nomsEcartesDesJours, retirerEtapesEcartees, type ChoixRevision } from "@/server/programme/revision";
 import { verrouillerVersions } from "@/server/versions/ecrire";
 
@@ -33,7 +32,8 @@ import { lireTriClos } from "./signaux";
  *   forfait** du profil `revision` (décision 0142) sous l'identifiant de l'exécution (idempotente), comme la génération.
  * - **`e`** (rang 2, `maxRetries` 0) : mêmes relectures ; puis **le corps commun de l'étape « programme »**
  *   (`redigerEtVerifier`, `etapes-programme.ts`) : logements d'abord, **une** requête `revision` (entrée tirée des seuls
- *   textes de l'IA de la version de base et des choix, schéma strict, `zdr`), lecture tolérante, filet du code
+ *   textes de l'IA de la version de base et des choix, schéma strict, `zdr` ; prompt `revision` v3 sur le brief v5 sans
+ *   récit pour un voyage à plusieurs villes, M4b), lecture tolérante, filet du code
  *   (`retirerEtapesEcartees`), vérification de toute la version sous la part et l'échéance, **aucun appel Routes**,
  *   assemblage par le module partagé `assemblerProgrammeIa` ; enfin la publication par le **module commun** `publier`
  *   (`publication.ts`, même rejeu borné, confirmation perdue comprise) : garde au rang, puis `ecrireSi` (verrou des versions,
@@ -54,24 +54,6 @@ import { lireTriClos } from "./signaux";
  * jamais lu ni envoyé (`voyageEtBriefSansRecit`). Aucun journal propre : l'arrêt est connu par `generation_runs.stop_reason`.
  * État sérialisé inchangé (`EtatLotSchema`) : aucun choix, aucun nom ni `placeId` n'y entre.
  */
-
-/**
- * Voyage à plusieurs villes (M4b ; décision 0148 § 5.4 et § 7.1 point 3) : la requête `revision` ne rend pas de durée estimée
- * (prompt `revision` v2 tant que M4a-2 n'est pas fusionnée). La durée d'un changement de ville à départ estimé est celle de
- * la version de base (`transfer.estimatedMinutes`, déjà bornée par le cadrage de la génération), reposée sur la journée
- * avant le cadrage ; absente, le cadrage prend le créneau sans durée de la configuration. Fonction pure, exportée pour les tests.
- */
-export function avecDureesDeLaBase(redaction: RedactionProgramme, base: TripSnapshot): RedactionProgramme {
-  if (redaction.programme === null) return redaction;
-  const durees = new Map(
-    base.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "transfer" && item.source === "estimated" && item.estimatedMinutes !== undefined ? [[jour.date, item.estimatedMinutes] as const] : []))),
-  );
-  const jours = redaction.programme.jours.map((jour) => {
-    const duree = durees.get(jour.date);
-    return duree === undefined ? jour : { ...jour, dureeEstimeeMinutes: duree };
-  });
-  return { ...redaction, programme: { ...redaction.programme, jours } };
-}
 
 /** Exécution `batch` ouverte par la garde du lot (champs de `ContexteLot`, `etapes-lot.ts`). */
 export type ContexteRevision = {
@@ -191,18 +173,22 @@ export async function ecritureRevision(contexte: ContexteRevision, fin: FinDuLot
   const fabrique = await contexte.dep.composer(contexte.barriere, { destination: voyage.draft.destination });
   const capacite = fabrique.programme(options);
   // Entrée de la requête `revision` : textes de l'IA de la version de base et choix (identifiants maison), jamais une donnée Google.
-  // Plusieurs villes : entrée v4 tirée du brief (logements de toutes les villes, jamais un libellé de billet) jusqu'à la
-  // projection v5 de M4a-2 (prompt `revision` v3), prérequis de fusion de M4b.
-  const entree = entreeRevisionDepuisJours(base.days, entreeProgrammeDepuisBrief(brief), choix);
-  const noms = nomsEcartesDesJours(base.days, entree.choix.pasPourMoi);
-  const { instantane, verifies, obtenuesA } = await redigerEtVerifier(
-    contexte,
-    { brief, capacite, forfait, registre, compteurs: compteursInitiaux() },
-    async (c) => {
-      const redaction = await c.reviser(entree, { arrivee: brief.arrivee, depart: brief.depart }, (programme) => retirerEtapesEcartees(programme, noms));
-      return briefAPlusieursVilles(brief) ? avecDureesDeLaBase(redaction, base) : redaction;
-    },
-  );
+  // Plusieurs villes (prédicat unique `briefAPlusieursVilles`) : prompt `revision` v3, brief v5 **sans récit** (villes,
+  // logements par ville, changements sans libellé de billet : `billets` n'est jamais lu) ; la durée estimée d'un changement
+  // de ville vient de la sortie v3. Une ville : prompt `revision` v2, entrée v4, inchangée.
+  const sejour = { arrivee: brief.arrivee, depart: brief.depart };
+  const reviser = briefAPlusieursVilles(brief)
+    ? (() => {
+        const entree = entreeRevisionDepuisJours(base.days, entreeProgrammeV5DepuisBrief(brief, { recit: false }), choix);
+        const noms = nomsEcartesDesJours(base.days, entree.choix.pasPourMoi);
+        return (c: CapaciteProgramme) => c.reviserV3(entree, sejour, (programme) => retirerEtapesEcartees(programme, noms));
+      })()
+    : (() => {
+        const entree = entreeRevisionDepuisJours(base.days, entreeProgrammeDepuisBrief(brief), choix);
+        const noms = nomsEcartesDesJours(base.days, entree.choix.pasPourMoi);
+        return (c: CapaciteProgramme) => c.reviser(entree, sejour, (programme) => retirerEtapesEcartees(programme, noms));
+      })();
+  const { instantane, verifies, obtenuesA } = await redigerEtVerifier(contexte, { brief, capacite, forfait, registre, compteurs: compteursInitiaux() }, reviser);
   // R3 (voir l'en-tête) : une version qui changerait une étape verrouillée n'est pas écrite.
   const tenue = verrousReportes(base, instantane);
   const publies = new Set(instantane.days.flatMap((jour) => jour.items.flatMap((item) => (item.type === "stop" && item.stop.placeId !== undefined ? [item.stop.placeId] : []))));

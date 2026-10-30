@@ -81,3 +81,15 @@ export type BriefProgramme = Omit<BriefEssai, "logements" | "engagements"> & {
     readonly type: "reservation" | "ticket";
   }[];
 };
+
+/**
+ * **Seul prédicat de bascule** une ville / plusieurs villes de la chaîne inversée (revue de la PR 932, condition du choix 1 ;
+ * amendement de 0148, ticket #935) : un objet porte plusieurs villes s'il a une liste `villes` d'au moins deux entrées.
+ * Lu par la conversion (`convertir`, `etapes-programme.ts`, sur la liste des villes du brouillon, avant que le brief
+ * existe), l'étape « programme » (prompt v5, cadrage de l'étape 2 bis), la révision (prompt `revision` v3), l'assemblage
+ * et la zone de vérification de la composition (`zoneDe`). Réexporté par `etapes-programme.ts` sous le même nom.
+ * Invariant : un `BriefProgramme` de la chaîne n'est construit que pour deux villes ou plus (`convertir`).
+ */
+export function briefAPlusieursVilles<B extends object>(brief: B): brief is Extract<B, { readonly villes: readonly unknown[] }> & B {
+  return "villes" in brief && Array.isArray(brief.villes) && brief.villes.length > 1;
+}

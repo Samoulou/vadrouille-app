@@ -73,9 +73,10 @@ export type EntreeProgrammeV5 = Omit<EntreeProgramme, "logements" | "engagements
  * § 1.2) : copie **champ par champ**, construite depuis la **table des villes** (`villes`, noms maison posés par
  * `briefProgrammeDepuisFormulaire`) et les changements du domaine. **Jamais** un libellé de billet devenu changement de
  * ville (`billets` n'est pas lu), jamais une ville par créneau, jamais une donnée Google ; ni fuseau, ni `schema`, ni mode.
- * Le récit n'y entre que s'il est dans le brief, c'est-à-dire si la garde `RECIT_API_AUTORISE` l'a laissé lire (0139 § 1.2).
+ * Le récit n'y entre que s'il est dans le brief, c'est-à-dire si la garde `RECIT_API_AUTORISE` l'a laissé lire (0139 § 1.2),
+ * et jamais avec `{ recit: false }` : brief de la requête `revision` v3 (garde du récit, 0149 § 1.3 point 7).
  */
-export function entreeProgrammeV5DepuisBrief(brief: BriefProgramme): EntreeProgrammeV5 {
+export function entreeProgrammeV5DepuisBrief(brief: BriefProgramme, options: { readonly recit: boolean } = { recit: true }): EntreeProgrammeV5 {
   return {
     destination: brief.destination,
     pays: brief.pays,
@@ -110,6 +111,6 @@ export function entreeProgrammeV5DepuisBrief(brief: BriefProgramme): EntreeProgr
             type: engagement.type,
           })),
         }),
-    ...(brief.recit === undefined ? {} : { recit: brief.recit }),
+    ...(brief.recit === undefined || !options.recit ? {} : { recit: brief.recit }),
   };
 }
