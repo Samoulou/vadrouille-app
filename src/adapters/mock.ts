@@ -29,6 +29,7 @@ import {
 } from "@/mocks/edimbourg";
 import { deriveEdimbourgCarte, edimbourgCarte } from "@/mocks/edimbourg-carte";
 import { edimbourgRevision } from "@/mocks/edimbourg-revision";
+import { chevauchement } from "@/mocks/chevauchement";
 import { compostelleFlorence, propositionsRomeFlorence, romeFlorence } from "@/mocks/rome-florence";
 
 import type { AdapterContext, TripAdapter } from "./types";
@@ -58,6 +59,9 @@ const DEFAULT_ENTRIES: MockEntry[] = [
   { trip: romeFlorence, proposals: propositionsRomeFlorence, unlisted: true },
   // Même voyage, première ville au nom long (« Saint-Jacques-de-Compostelle », hors des 62) : mesures à 390 px.
   { trip: compostelleFlorence, proposals: [], unlisted: true },
+  // M4-suite (critère 17) : trois villes, un engagement qui chevauche chaque ligne « Vers {ville} » ; bandeau de
+  // chevauchement de la Journée, axe et mesures à 390 px. Servi à son adresse seulement.
+  { trip: chevauchement, proposals: [], unlisted: true },
 ];
 
 /**
