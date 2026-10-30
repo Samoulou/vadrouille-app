@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { TripVersionSummary } from "@/contracts";
 
-import { avantLeDeblocage, formatMomentVersion, libelleVersion } from "./versions";
+import { avantLeDeblocage, formatMomentPhrase, formatMomentVersion, libelleVersion } from "./versions";
 
 /** Libellés de « Versions du programme » (M5b ; spécification M5 § 4) : composés à l'affichage, jamais stockés. */
 
@@ -17,8 +17,9 @@ const v = (extra: Partial<TripVersionSummary>): TripVersionSummary => ({
 });
 
 describe("versions: libellés", () => {
-  it("date et heure de l'appareil : « mer. 28.10, 14:05 »", () => {
+  it("date et heure de l'appareil : « mer. 28.10, 14:05 » ; dans une phrase : « mer. 28.10 à 14:05 »", () => {
     expect(formatMomentVersion("2026-10-28T13:05:00.000Z", ZONE)).toBe("mer. 28.10, 14:05");
+    expect(formatMomentPhrase("2026-10-28T13:05:00.000Z", ZONE)).toBe("mer. 28.10 à 14:05");
   });
 
   it("une phrase par sorte, avec les noms du programme", () => {
@@ -31,7 +32,7 @@ describe("versions: libellés", () => {
     expect(libelleVersion(v({ kind: "locked", subject: "Château" }), ZONE)).toBe("Château verrouillé");
     expect(libelleVersion(v({ kind: "unlocked", subject: "Château" }), ZONE)).toBe("Verrou retiré : Château");
     expect(libelleVersion(v({ kind: "reverted", revertedTo: { version: 1, createdAt: "2026-10-27T08:30:00.000Z" } }), ZONE)).toBe(
-      "Retour à la version du mar. 27.10, 09:30",
+      "Retour à la version du mar. 27.10 à 09:30",
     );
   });
 

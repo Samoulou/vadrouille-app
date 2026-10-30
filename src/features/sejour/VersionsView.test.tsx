@@ -73,7 +73,7 @@ function renderVersions(calls: VersionCalls, initial: TripVersionPage | null = P
 }
 
 const liste = () => document.querySelector<HTMLElement>("[data-part='liste-versions']")!;
-const revenir = (version: number) => within(document.querySelector<HTMLElement>(`[data-version="${version}"]`)!).getByRole("button", { name: "Revenir à cette version" });
+const revenir = (version: number) => within(document.querySelector<HTMLElement>(`[data-version="${version}"]`)!).getByRole("button", { name: /^Revenir à cette version : / });
 
 function setOnline(value: boolean) {
   Object.defineProperty(navigator, "onLine", { configurable: true, get: () => value });
@@ -100,7 +100,9 @@ describe("versions: liste", () => {
     ]);
     expect(within(lignes[0]!).getByText("Version actuelle")).toBeInTheDocument();
     expect(within(lignes[0]!).queryByRole("button")).toBeNull();
-    expect(within(lignes[1]!).getByRole("button", { name: "Revenir à cette version" })).toHaveAccessibleDescription("Verrou retiré : Château d'Édimbourg");
+    // Boutons nommés par leur version (WCAG 2.4.6) ; texte visible « Revenir à cette version ».
+    const bouton = within(lignes[1]!).getByRole("button", { name: "Revenir à cette version : Verrou retiré : Château d'Édimbourg" });
+    expect(bouton).toHaveTextContent("Revenir à cette version");
     expect(lignes[0]!.querySelector("[data-part='moment']")).toHaveTextContent("sam. 24.10, 14:05");
     expect(await axeViolations(container)).toEqual([]);
   });
@@ -118,7 +120,9 @@ describe("versions: liste", () => {
     renderVersions(calls, { items: PAGE.items.slice(0, 3), nextBefore: 2 });
     expect(screen.queryByText("Programme préparé")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Voir les versions plus anciennes" }));
+    expect(document.querySelector("[data-part='versions-statut']")).toHaveTextContent("Chargement des versions.");
     await waitFor(() => expect(screen.getByText("Programme préparé")).toBeInTheDocument());
+    expect(document.querySelector("[data-part='versions-statut']")).toHaveTextContent("");
     expect(calls.listTripVersions).toHaveBeenCalledWith({ tripId: TRIP, before: 2 });
     await waitFor(() => expect(document.querySelector("[data-version='1']")).toHaveFocus());
     expect(screen.queryByRole("button", { name: "Voir les versions plus anciennes" })).toBeNull();
@@ -142,7 +146,7 @@ describe("versions: aperçu", () => {
     const calls = fakeCalls();
     const { container } = renderVersions(calls);
     fireEvent.click(revenir(3));
-    const titre = await screen.findByRole("heading", { level: 2, name: "Revenir à la version du ven. 23.10, 14:05" });
+    const titre = await screen.findByRole("heading", { level: 2, name: "Revenir à la version du ven. 23.10 à 14:05" });
     await waitFor(() => expect(titre).toHaveFocus());
     expect(calls.previewRevert).toHaveBeenCalledWith({ tripId: TRIP, baseVersion: 4, toVersion: 3 });
     expect(screen.getByText("Ce retour peut toucher des étapes verrouillées.")).toBeInTheDocument();
@@ -178,7 +182,7 @@ describe("versions: aperçu", () => {
   it("aperçu en échec : « Ce qui change n'a pas pu être calculé… », liste conservée", async () => {
     renderVersions(fakeCalls({ previewRevert: vi.fn(async () => fail("internal")) }));
     fireEvent.click(revenir(3));
-    expect(await screen.findByText("Ce qui change n'a pas pu être calculé. Ton programme est inchangé.")).toBeInTheDocument();
+    expect(await screen.findByText("Les changements n'ont pas pu être calculés. Ton programme est inchangé. Réessaie.")).toBeInTheDocument();
     expect(revenir(3)).toBeInTheDocument();
   });
 });
@@ -216,7 +220,7 @@ describe("versions: appliquer", () => {
     renderVersions(fakeCalls({ applyRevert: vi.fn(async () => fail("validation_failed", "baseVersion")) }));
     fireEvent.click(revenir(3));
     fireEvent.click(await screen.findByRole("button", { name: "Appliquer" }));
-    expect(await screen.findByText("Tu as fait beaucoup de retouches sur ce voyage.")).toBeInTheDocument();
+    expect(await screen.findByText("Tu as fait beaucoup de retouches sur ce voyage : le retour à une version n'est plus possible.")).toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();
   });
 
@@ -234,7 +238,7 @@ describe("versions: appliquer", () => {
     renderVersions(fakeCalls({ applyRevert: vi.fn(async () => Promise.reject(new Error("réseau"))) }));
     fireEvent.click(revenir(3));
     fireEvent.click(await screen.findByRole("button", { name: "Appliquer" }));
-    expect(await screen.findByText("Le retour n'a pas pu être appliqué. Ton programme est inchangé.")).toBeInTheDocument();
+    expect(await screen.findByText("Le retour n'a pas pu être appliqué. Ton programme est inchangé. Réessaie.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Appliquer" })).toBeInTheDocument();
   });
 
@@ -250,5 +254,38 @@ describe("versions: appliquer", () => {
     expect(calls.applyRevert).not.toHaveBeenCalled();
     setOnline(true);
     expect(appliquer).not.toHaveAttribute("aria-disabled");
+  });
+});
+
+describe("versions: correction 1 de la revue de la PR 938", () => {
+  it("hors ligne, dans la liste : bandeau `offline`, « Revenir à cette version » en `aria-disabled` décrit par le bandeau, sans aperçu", () => {
+    const calls = fakeCalls();
+    renderVersions(calls);
+    setOnline(false);
+    const bandeau = screen.getByText("Tu es hors ligne. Modifier ton programme demande une connexion.");
+    const bouton = revenir(3);
+    expect(bouton).toHaveAttribute("aria-disabled", "true");
+    expect(bandeau.closest("[id]")?.id).toBe(bouton.getAttribute("aria-describedby"));
+    fireEvent.click(bouton);
+    expect(calls.previewRevert).not.toHaveBeenCalled();
+    setOnline(true);
+    expect(revenir(3)).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("conflit puis relecture en échec : « Les versions n'ont pas pu être chargées. Réessaie. » avec « Réessayer », qui relit la liste", async () => {
+    const listTripVersions = vi
+      .fn<VersionCalls["listTripVersions"]>()
+      .mockResolvedValueOnce(fail("internal"))
+      .mockResolvedValue({ ok: true, value: PAGE });
+    const calls = fakeCalls({
+      listTripVersions,
+      previewRevert: vi.fn(async () => ({ ok: false as const, error: { code: "version_conflict" as const, retryable: true, currentVersion: 5 } })),
+    });
+    renderVersions(calls);
+    fireEvent.click(revenir(3));
+    expect(await screen.findByText("Les versions n'ont pas pu être chargées. Réessaie.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    await waitFor(() => expect(listTripVersions).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText("Les versions n'ont pas pu être chargées. Réessaie.")).toBeNull());
   });
 });

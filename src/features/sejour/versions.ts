@@ -14,9 +14,18 @@ const t = messages.sejour.versions;
  * serveur ne connaît pas le fuseau de l'appareil) ; `timeZone` : tests seulement.
  */
 export function formatMomentVersion(iso: string, timeZone?: string): string {
+  return formatMoment(t.moment, iso, timeZone);
+}
+
+/** Même instant **dans une phrase** (« Retour à la version du mer. 28.10 à 14:05 ») : sans virgule (revue de la PR 938, mineur 4). */
+export function formatMomentPhrase(iso: string, timeZone?: string): string {
+  return formatMoment(t.momentPhrase, iso, timeZone);
+}
+
+function formatMoment(gabarit: string, iso: string, timeZone?: string): string {
   const date = new Date(iso);
   const options = timeZone === undefined ? {} : { timeZone };
-  return format(t.moment, {
+  return format(gabarit, {
     jour: new Intl.DateTimeFormat("fr-CH", { weekday: "short", ...options }).format(date),
     date: new Intl.DateTimeFormat("fr-CH", { day: "2-digit", month: "2-digit", ...options }).format(date),
     heure: new Intl.DateTimeFormat("fr-CH", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", ...options }).format(date),
@@ -43,7 +52,7 @@ export function libelleVersion(version: TripVersionSummary, timeZone?: string): 
     case "unlocked":
       return format(l.unlocked, { nom });
     case "reverted":
-      return format(l.reverted, { date: version.revertedTo ? formatMomentVersion(version.revertedTo.createdAt, timeZone) : "" });
+      return format(l.reverted, { date: version.revertedTo ? formatMomentPhrase(version.revertedTo.createdAt, timeZone) : "" });
   }
 }
 

@@ -19,7 +19,7 @@ import { applyRevert, listTripVersions, previewRevert } from "@/server/actions/r
 
 import { ARIA_DISABLED } from "./RevisionPreview";
 import { useTripShell } from "./TripShell";
-import { avantLeDeblocage, formatMomentVersion, libelleVersion } from "./versions";
+import { avantLeDeblocage, formatMomentPhrase, formatMomentVersion, libelleVersion } from "./versions";
 
 const t = messages.sejour.versions;
 const r = messages.revision;
@@ -77,6 +77,7 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
   const monte = useClientNow() !== null;
   const ids = useId();
   const offlineId = `${ids}-hors-ligne`;
+  const listeHorsLigneId = `${ids}-liste-hors-ligne`;
 
   const [items, setItems] = useState<readonly TripVersionSummary[]>(initial?.items ?? []);
   const [nextBefore, setNextBefore] = useState<number | null>(initial?.nextBefore ?? null);
@@ -154,6 +155,8 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
   const plusAnciennes = async () => {
     if (nextBefore === null || chargement) return;
     setChargement(true);
+    // Bouton inactif pendant la lecture : l'attente est annoncée (revue de la PR 938, mineur 6).
+    setStatut(t.chargement);
     const current = ++token.current;
     let result: Result<TripVersionPage> | null;
     try {
@@ -163,6 +166,7 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
     }
     if (token.current !== current) return;
     setChargement(false);
+    setStatut(null);
     if (result === null || !result.ok) {
       setBandeau("erreurListe");
       return;
@@ -175,7 +179,8 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
   };
 
   const revenir = async (cible: TripVersionSummary) => {
-    if (actuelle === null) return;
+    // Hors ligne, « Revenir à cette version » est inactif (`aria-disabled`, décrit par le bandeau hors ligne).
+    if (actuelle === null || !online) return;
     const current = ++token.current;
     setBandeau(null);
     setPhase({ type: "attente", cible });
@@ -251,7 +256,8 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
         kind={bandeau === "conflit" ? "conflict" : "error"}
         message={t[bandeau]}
         action={
-          lue ? undefined : (
+          // « Réessayer » relit la première page, aussi après un conflit dont la relecture a échoué (mineur 13).
+          bandeau !== "erreurListe" ? undefined : (
             <Button variant="text" onClick={() => void relire()}>
               {r.reessayer}
             </Button>
@@ -261,10 +267,9 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
     );
 
   const ligne = (version: TripVersionSummary) => {
-    const labelId = `${ids}-v${version.version}`;
     return (
       <li key={version.version} data-version={version.version} tabIndex={-1} className="flex flex-col items-start gap-1 border-b border-hairline py-3 last:border-b-0">
-        <span id={labelId} data-part="libelle" className="text-corps font-bold text-ink">
+        <span data-part="libelle" className="text-corps font-bold text-ink">
           {libelleVersion(version, timeZone)}
         </span>
         <span data-part="moment" className="text-corps-s text-ink-soft tabular-nums">
@@ -276,7 +281,16 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
           </span>
         ) : null}
         {version.revertible ? (
-          <Button variant="secondary" size="sm" className="mt-1" data-part="revenir" aria-describedby={labelId} onClick={() => void revenir(version)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className={cn("mt-1", ARIA_DISABLED)}
+            data-part="revenir"
+            aria-label={format(t.revenirNomme, { libelle: libelleVersion(version, timeZone) })}
+            aria-disabled={online ? undefined : true}
+            aria-describedby={online ? undefined : listeHorsLigneId}
+            onClick={() => void revenir(version)}
+          >
             {t.revenir}
           </Button>
         ) : null}
@@ -309,7 +323,7 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
         <section aria-labelledby={apercuTitreId} data-part="apercu-retour" className="flex flex-col gap-5">
           <div className="flex flex-col gap-1">
             <h2 id={apercuTitreId} ref={apercuRef} tabIndex={-1} className="text-section font-extrabold text-ink">
-              {format(t.apercuTitre, { date: formatMomentVersion(phase.cible.createdAt, timeZone) })}
+              {format(t.apercuTitre, { date: formatMomentPhrase(phase.cible.createdAt, timeZone) })}
             </h2>
             <p className="text-corps-s text-ink-soft">{libelleVersion(phase.cible, timeZone)}</p>
           </div>
@@ -351,8 +365,23 @@ export function VersionsView({ tripId, initial, calls = APPELS, newRequestId = (
             </Button>
           </div>
         </section>
-      ) : monte && lue ? (
+      ) : lue && !monte ? (
+        // Avant le montage (dates de l'appareil inconnues du serveur) : squelette `muted`, sans contenu lu (mineur 6).
+        <div data-part="squelette-versions" aria-hidden="true" className="flex flex-col gap-4">
+          {[0, 1, 2].map((n) => (
+            <span key={n} className="flex flex-col gap-2">
+              <span className="h-5 w-3/4 rounded-block bg-muted" />
+              <span className="h-4 w-1/3 rounded-block bg-muted" />
+            </span>
+          ))}
+        </div>
+      ) : lue ? (
         <>
+          {!online ? (
+            <div id={listeHorsLigneId}>
+              <StatusBanner kind="offline" message={r.horsLigne} />
+            </div>
+          ) : null}
           <ul data-part="liste-versions" className="flex flex-col">
             {principales.map(ligne)}
           </ul>

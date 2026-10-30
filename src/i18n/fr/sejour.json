@@ -113,7 +113,9 @@
     "avantDeblocage": "Avant le déblocage",
     "plusAnciennes": "Voir les versions plus anciennes",
     "revenir": "Revenir à cette version",
+    "revenirNomme": "Revenir à cette version : {libelle}",
     "moment": "{jour} {date}, {heure}",
+    "momentPhrase": "{jour} {date} à {heure}",
     "libelles": {
       "prepared": "Programme préparé",
       "adjusted": "Programme ajusté après ton tri",
@@ -129,12 +131,13 @@
     "verrouillees": "Ce retour peut toucher des étapes verrouillées.",
     "rienNeChange": "Rien ne change dans ton programme.",
     "calcul": "Calcul de ce qui change.",
+    "chargement": "Chargement des versions.",
     "pret": "Ce qui change est prêt.",
     "retabli": "Programme rétabli.",
     "conflit": "Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.",
-    "trop": "Tu as fait beaucoup de retouches sur ce voyage.",
-    "erreurApercu": "Ce qui change n'a pas pu être calculé. Ton programme est inchangé.",
-    "erreurRetour": "Le retour n'a pas pu être appliqué. Ton programme est inchangé.",
+    "trop": "Tu as fait beaucoup de retouches sur ce voyage : le retour à une version n'est plus possible.",
+    "erreurApercu": "Les changements n'ont pas pu être calculés. Ton programme est inchangé. Réessaie.",
+    "erreurRetour": "Le retour n'a pas pu être appliqué. Ton programme est inchangé. Réessaie.",
     "erreurListe": "Les versions n'ont pas pu être chargées. Réessaie."
   }
 }
