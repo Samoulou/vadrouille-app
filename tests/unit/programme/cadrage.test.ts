@@ -76,6 +76,27 @@ describe("conversion du brouillon à plusieurs villes (briefProgrammeDepuisFormu
     expect(EntreeProgrammeV5Schema.safeParse(entreeProgrammeV5DepuisBrief(brief())).success).toBe(true);
   });
 
+  // Critère 11 (revue de la PR 932, bloquant 3) : un « Vol » daté du jour de changement devient le `transfer` (départ saisi),
+  // sans toucher l'heure d'arrivée du premier jour ni l'heure de départ du dernier.
+  it("changement de ville: un vol du jour de changement devient le transfer, heureArrivee et heureDepart inchangées", () => {
+    const sans = brief();
+    const draft: TripDraft = { ...DEUX_VILLES, commitments: [{ kind: "flight", label: "Vol LIBELLE_VOL_M4B", date: "2027-05-07", start: "13:05", end: "14:10" }] };
+    const b = brief(draft);
+    expect(b.changements).toEqual([{ date: "2027-05-07", de: "Rome", vers: "Florence", source: "entered", depart: "13:05", arrivee: "14:10", activitesMax: 2 }]);
+    expect(b.billets).toEqual([{ date: "2027-05-07", libelle: "Vol LIBELLE_VOL_M4B" }]);
+    expect(b.engagements ?? []).toEqual([]);
+    expect([b.heureArrivee, b.heureDepart]).toEqual([sans.heureArrivee, sans.heureDepart]);
+    expect(JSON.stringify(entreeProgrammeV5DepuisBrief(b))).not.toContain("LIBELLE_VOL_M4B");
+  });
+
+  it("changement de ville: départ estimé en voiture si la voiture est cochée avec les transports publics", () => {
+    const b = brief();
+    const conversion = briefProgrammeDepuisFormulaire(DEUX_VILLES, { ...BRIEF, mobility: ["walk", "car", "transit"] }, undefined);
+    if (!conversion.ok) throw new Error(conversion.champ);
+    expect(b.changements[0]?.mode).toBe("transit");
+    expect(conversion.brief.changements[0]?.mode).toBe("car");
+  });
+
   it("entrée v5 : même forme que celle du prompt (M4a)", () => {
     // Le type structurel est une intersection (`Omit<…> & {…}`) : aplati avant la comparaison, champ par champ.
     type Aplati<T> = { [K in keyof T]: T[K] };
@@ -121,6 +142,15 @@ describe("changement de ville: cadrage (cadrerProgramme, 0148 § 5.1)", () => {
     ]);
     expect(cadre.retires).toBe(3);
     expect(cadre.programme.jours[1]?.dureeEstimeeMinutes).toBe(120);
+  });
+
+  // Critère 9 (revue de la PR 932, bloquant 3) : rythme tranquille, une seule activité le jour du changement (repas non comptés).
+  it("changement de ville: rythme tranquille, une seule activité gardée", () => {
+    const conversion = briefProgrammeDepuisFormulaire(DEUX_VILLES, { ...BRIEF, pace: "relaxed" }, undefined);
+    if (!conversion.ok) throw new Error(conversion.champ);
+    expect(conversion.brief.changements[0]?.activitesMax).toBe(1);
+    const tranquille = cadrerProgramme(programme, conversion.brief, C);
+    expect(tranquille.programme.jours.find((jour) => jour.date === "2027-05-07")?.creneaux.map((c) => c.lieu)).toEqual(["Panthéon", "Trattoria"]);
   });
 
   it("changement de ville: aucun toReserve ce jour-là", () => {
@@ -186,5 +216,82 @@ describe("changement de ville: assemblage (assemblerProgrammeIa, 0148 § 5.1 poi
     // Aucune autre journée ne porte de transfer ; aucune donnée Google dans la ligne.
     expect(complet.trip.days.filter((d) => d.items.some((item) => item.type === "transfer")).map((d) => d.date)).toEqual(["2027-05-07"]);
     expect(JSON.stringify(items[rang])).not.toContain("SENT_");
+  });
+});
+
+describe("changement de ville: assemblage, temps libre et terminus (revue de la PR 932)", () => {
+  const assembler = (b: BriefProgramme, jours: Parameters<typeof assemblerProgrammeIa>[0]["jours"], logements: string[]) =>
+    assemblerProgrammeIa({
+      tripId: "00000000-0000-4000-8000-0000000000cc",
+      organizationId: "00000000-0000-4000-8000-0000000000dd",
+      brief: b,
+      jours,
+      bonsPlans: [],
+      logements,
+      configuration: C,
+      mode: modeDeTrajet(b),
+      trajets: () => undefined,
+    });
+
+  // Bloquant 2 : une étape sans `fin` occupe sa durée par défaut ; le « Temps libre » avant le départ part de sa fin occupée.
+  it("changement de ville: temps libre avant le départ depuis la fin occupée d'une étape sans fin", () => {
+    const base = brief();
+    const b: BriefProgramme = { ...base, changements: [{ ...base.changements[0]!, depart: "11:00" }] };
+    const jours = ["2027-05-04", "2027-05-05", "2027-05-06", "2027-05-07", "2027-05-08", "2027-05-09"].map((date) => ({
+      date,
+      ...(date === "2027-05-07" ? { dureeEstimeeMinutes: 120 } : {}),
+      creneaux:
+        date === "2027-05-07"
+          ? [creneau("09:00", "visite", { lieu: "Panthéon", placeId: "SENT_PANTHEON" }), creneau("14:00", "visite", { lieu: "Offices", placeId: "SENT_OFFICES" })]
+          : [creneau("10:00", "visite", { lieu: `Lieu ${date}`, placeId: `SENT_${date}` })],
+    }));
+    const complet = assembler(b, jours, ["SENT_LOGEMENT_ROME", "SENT_LOGEMENT_FLORENCE"]);
+    expect(TripSchema.parse(complet.trip)).toEqual(complet.trip);
+    const items = complet.trip.days.find((d) => d.date === "2027-05-07")?.items ?? [];
+    const rang = items.findIndex((item) => item.type === "transfer");
+    expect(items.slice(0, rang).flatMap((item) => (item.type === "stop" ? [item.stop.name] : []))).toEqual(["Panthéon"]);
+    // Visite de 09:00 sans fin : occupée 90 minutes (jusqu'à 10:30) ; départ 11:00, écart de 30 minutes (seuil atteint).
+    expect(C.dureesParDefaut.activity).toBe(90);
+    expect(items.slice(0, rang).filter((item) => item.type === "free")).toEqual([{ type: "free", from: "10:30", to: "11:00" }]);
+    expect(items).not.toContainEqual(expect.objectContaining({ type: "free", from: "09:00" }));
+  });
+
+  it("changement de ville: écart sous le seuil depuis la fin occupée, aucun temps libre avant le départ", () => {
+    const base = brief();
+    const b: BriefProgramme = { ...base, changements: [{ ...base.changements[0]!, depart: "10:45" }] };
+    const jours = [{ date: "2027-05-07", dureeEstimeeMinutes: 120, creneaux: [creneau("09:00", "visite", { lieu: "Panthéon", placeId: "SENT_PANTHEON" })] }];
+    const items = assembler(b, jours, ["SENT_LOGEMENT_ROME", "SENT_LOGEMENT_FLORENCE"]).trip.days.find((d) => d.date === "2027-05-07")?.items ?? [];
+    const rang = items.findIndex((item) => item.type === "transfer");
+    expect(items.slice(0, rang).some((item) => item.type === "free")).toBe(false);
+  });
+
+  // Critère 6 : trois villes ; chaque jour de changement commence au logement de la ville quittée et finit à celui de la
+  // ville d'arrivée, avec le thème écrit par le code.
+  it("plusieurs-villes: trois villes, terminus et thème des deux jours de changement", () => {
+    const draft: TripDraft = {
+      ...DEUX_VILLES,
+      end: "2027-05-11",
+      otherCities: [...DEUX_VILLES.otherCities, { name: "Venise", arrival: "2027-05-09", lodging: { kind: "area", label: "Cannaregio" } }],
+    };
+    const b = brief(draft);
+    expect(b.villes.map((ville) => ville.nom)).toEqual(["Rome", "Florence", "Venise"]);
+    const dates = ["2027-05-04", "2027-05-05", "2027-05-06", "2027-05-07", "2027-05-08", "2027-05-09", "2027-05-10", "2027-05-11"];
+    const jours = dates.map((date) => ({
+      date,
+      ...(date === "2027-05-07" || date === "2027-05-09" ? { dureeEstimeeMinutes: 120 } : {}),
+      creneaux: [creneau("15:00", "visite", { lieu: `Lieu ${date}`, fin: "16:00", placeId: `SENT_${date}` })],
+    }));
+    const complet = assembler(b, jours, ["SENT_LOGEMENT_ROME", "SENT_LOGEMENT_FLORENCE", "SENT_LOGEMENT_VENISE"]);
+    expect(TripSchema.parse(complet.trip)).toEqual(complet.trip);
+    const logement = (nom: string) => b.logements.find((l) => l.ville === nom)!.texte;
+    const terminus = (date: string) => {
+      const items = complet.trip.days.find((d) => d.date === date)?.items ?? [];
+      return [items.at(0), items.at(-1)].map((item) => (item?.type === "terminus" ? [item.role, item.label] : undefined));
+    };
+    expect(terminus("2027-05-07")).toEqual([["start", logement("Rome")], ["end", logement("Florence")]]);
+    expect(terminus("2027-05-09")).toEqual([["start", logement("Florence")], ["end", logement("Venise")]]);
+    expect(complet.trip.days.find((d) => d.date === "2027-05-07")?.theme).toBe("De Rome à Florence");
+    expect(complet.trip.days.find((d) => d.date === "2027-05-09")?.theme).toBe("De Florence à Venise");
+    expect(complet.trip.days.filter((d) => d.items.some((item) => item.type === "transfer")).map((d) => d.date)).toEqual(["2027-05-07", "2027-05-09"]);
   });
 });

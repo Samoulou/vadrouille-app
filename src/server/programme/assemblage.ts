@@ -4,9 +4,9 @@ import { destinationColor } from "@/domain/calculs";
 import { elementDuChangement, themeDuChangement } from "@/domain/changement-de-ville";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { logementsDuJour } from "@/domain/relectures";
-import { joursEntre } from "@/domain/temps";
-import { cadrerProgramme, FIN_DU_JOUR, finDeLEtape, NATURES_REPAS, partageDuJour } from "@/server/programme/cadrage";
-import type { BriefEssai, BriefProgramme, RythmeEssai } from "@/server/programme/forme";
+import { joursEntre, versHeure } from "@/domain/temps";
+import { cadrerProgramme, FIN_DU_JOUR, finDeLEtape, finOccupeeDuCreneau, NATURES_REPAS, partageDuJour } from "@/server/programme/cadrage";
+import { briefAPlusieursVilles, type BriefEssai, type BriefProgramme, type RythmeEssai } from "@/server/programme/forme";
 
 /** `finDeLEtape` est écrite dans `cadrage.ts` (une seule définition) et réexportée ici (décision 0148 § 8 point 2). */
 export { finDeLEtape };
@@ -197,7 +197,7 @@ export function pointsDeTrajet(entree: Pick<EntreeAssemblageIa, "brief" | "jours
 
 /** Villes et changements du brief de `api` (`BriefProgramme`), ou `undefined` pour le brief de l'essai (`p0Run`). */
 function plusieursVilles(brief: BriefEssai | BriefProgramme): BriefProgramme | undefined {
-  return "villes" in brief && "changements" in brief ? brief : undefined;
+  return briefAPlusieursVilles(brief) ? brief : undefined;
 }
 
 export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompletIa {
@@ -229,6 +229,12 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
     let precedent: string | undefined = logementDepart.placeId === "" ? undefined : logementDepart.placeId;
     let travelMinutes: number | null = 0;
     let derniere = debutJour;
+    /**
+     * Fin occupée de la dernière ligne posée, en minutes (`finOccupeeDuCreneau`, la règle de rangement du cadrage) : une
+     * étape sans `fin` occupe sa durée par défaut, que le « Temps libre » avant le départ ne recouvre jamais (revue de la PR 932,
+     * bloquant 2).
+     */
+    let occupeeJusqua = minutesDe(debutJour);
     /** Ligne « Vers {ville} » posée et aucune étape avec lieu depuis : ni segment avant la suivante, ni retour depuis elle. */
     let apresChangement = false;
     const segment = (vers: string | undefined): void => {
@@ -244,7 +250,9 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
      */
     const poserChangement = (ligne: NonNullable<typeof ligneChangement>, suivant: string | undefined): void => {
       const seuil = entree.configuration.seuilTempsLibreMinutes;
-      if (minutesDe(ligne.start) - minutesDe(derniere) >= seuil) items.push({ type: "free", from: derniere, to: ligne.start });
+      // Seuil et `from` depuis la fin **occupée** de la dernière ligne (jamais son seul début, pour une étape sans `fin`).
+      const libreDepuis = Math.max(minutesDe(derniere), occupeeJusqua);
+      if (minutesDe(ligne.start) - libreDepuis >= seuil) items.push({ type: "free", from: versHeure(libreDepuis), to: ligne.start });
       items.push(ligne);
       precedent = undefined;
       apresChangement = true;
@@ -271,6 +279,7 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
               : FIN_DU_JOUR;
         items.push({ type: "free", from: creneau.debut, to: jusqua });
         derniere = jusqua;
+        occupeeJusqua = Math.max(occupeeJusqua, minutesDe(jusqua));
         continue;
       }
       rang += 1;
@@ -307,6 +316,7 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
       }
       items.push({ type: "stop", stop });
       derniere = fin ?? creneau.debut;
+      occupeeJusqua = Math.max(occupeeJusqua, finOccupeeDuCreneau(creneau, entree.configuration));
     }
     if (ligneChangement !== undefined && partage !== undefined && partage.apres.length === 0) poserChangement(ligneChangement, undefined);
     // Retour au logement : jamais depuis la ligne « Vers {ville} » elle-même (aucune étape avec lieu après elle).

@@ -887,6 +887,30 @@ describe("plusieurs-villes: appliquerPatch recopie le transfer tel quel (décisi
     expect(verrouillee).toEqual(gelee);
   });
 
+  // 0151 § 5 (revue de la PR 932, bloquant 3) : une étape d'avant le départ ne déborde jamais sur le créneau occupé ; une opération
+  // qui la décale ou l'allonge jusque dans le créneau refuse le patch en entier (`no_option`), base intacte.
+  it("plusieurs-villes: move qui décale une étape d'avant le départ dans le créneau occupé → no_option, base intacte", () => {
+    const base = avecTransfer(version2(), 2);
+    const gelee = structuredClone(base);
+    const avant = etapes(jourN(base, 2)).filter((stop) => !stop.locked && stop.commitment === undefined && stop.start < "11:30");
+    const cible = avant.at(0);
+    if (cible === undefined) throw new Error("étape d'avant le départ absente");
+    // Décalée à 11:15 (fixe, par l'opération) : sa fin occupée dépasse le départ de 11:30, le transfer ne se pose pas.
+    const resultat = appliquerPatch(entree(base, patch(2, [{ op: "move", stopId: cible.id, day: 2, time: "11:15" }])));
+    expect(resultat).toEqual({ ok: false, code: "no_option" });
+    expect(base).toEqual(gelee);
+  });
+
+  // Une étape fixe posée à 11:00 repousse les étapes mobiles d'avant le départ : elles ne passent jamais après le transfer.
+  it("plusieurs-villes: move d'une étape d'un autre jour qui repousse les étapes d'avant le départ au-delà de lui → no_option, base intacte", () => {
+    const base = avecTransfer(version2(), 2);
+    const gelee = structuredClone(base);
+    const venue = activiteDuJour(base, 3);
+    const resultat = appliquerPatch(entree(base, patch(2, [{ op: "move", stopId: venue.id, day: 2, time: "11:00" }])));
+    expect(resultat).toEqual({ ok: false, code: "no_option" });
+    expect(base).toEqual(gelee);
+  });
+
   it("plusieurs-villes: verrouiller une étape un jour de changement de ville", () => {
     const base = avecTransfer(version2(), 2);
     const gelee = structuredClone(base);

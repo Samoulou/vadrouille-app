@@ -163,7 +163,7 @@ export function partageDuJour<C extends CreneauCadrable>(
       }
       activites += 1;
     }
-    const cadre = { ...sansCle(lu, "aReserver"), ville: cote === "avant" ? changement.de : changement.vers } as unknown as C;
+    const cadre = { ...sansCle(lu, "aReserver"), ville: cote === "avant" ? changement.de : changement.vers } as C;
     if (cote === "avant") avant.push(cadre);
     else apres.push(cadre);
   }
@@ -182,6 +182,8 @@ export function cadrerProgramme<C extends CreneauCadrable, J extends JourCadrabl
 ): { readonly programme: P; readonly retires: number } {
   const plages = plagesDesVilles(brief.villes);
   let retires = 0;
+  // Les deux `as unknown as J` restent (revue de la PR 932, mineur) : TypeScript ne prouve pas qu'un `J` générique privé de
+  // `dureeEstimeeMinutes` puis complété redevient `J` ; seules `dureeEstimeeMinutes`, `creneaux` et `ville` changent.
   const jours = programme.jours.map((jour): J => {
     const sansDuree = sansCle(jour, "dureeEstimeeMinutes");
     const changement = brief.changements.find((c) => c.date === jour.date);
@@ -190,7 +192,7 @@ export function cadrerProgramme<C extends CreneauCadrable, J extends JourCadrabl
       const ville = villes !== undefined && "ville" in villes ? villes.ville : undefined;
       const creneaux = jour.creneaux.map((creneau) => {
         const sansVille = sansCle(creneau, "ville");
-        return (ville === undefined ? sansVille : { ...sansVille, ville }) as unknown as C;
+        return (ville === undefined ? sansVille : { ...sansVille, ville }) as C;
       });
       // Durée estimée : ignorée un jour ordinaire (0149 S-M4-2 point 2).
       return { ...sansDuree, creneaux } as unknown as J;

@@ -325,6 +325,8 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
           fin = Math.max(fin, occupee.fin);
           precedentVerrouille = false;
           dernierVerrouille = false;
+          // `apresChangement` reste vrai (choix voulu, R8) : un repas ouvert n'a pas de lieu, la position reste le logement
+          // d'arrivée et la première **étape** après le changement de ville n'a toujours pas de trajet avant elle (M4 § 7.3).
         } else if (!poserEtape(ligne.stop, debut, trajet)) {
           return undefined;
         }
