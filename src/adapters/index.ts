@@ -2,6 +2,7 @@ import type { PlacePhoto } from "@/contracts/photo";
 import { APP_TRIAL_TRIP_ID_PATTERN, type RevisionFixtures, type Trip, type TrialRevisionRequest, type TrialRevisionResult } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
+import { SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR } from "@/server/config/lieux";
 import { OFFER_CONFIG } from "@/server/config/offer";
 
 import { apiCreationAdapter } from "./api-creation-instance";
@@ -13,6 +14,7 @@ import { counterpartOf, getMockRevisionFixtures, mockTripAdapter } from "./mock"
 import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
+import { createMockStopReports } from "./mock-reports";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
 import {
   assertPrototypeAllowedOnProcess,
@@ -31,8 +33,26 @@ import { realShareAvailable, shareAvailable } from "./share-guard";
 import { createSignedShareAdapter } from "./signed-share";
 import { paiementSimule } from "./simulated-payment-instance";
 import { paiementStripe } from "./stripe-payment-instance";
-import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
-import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, RevisionAdapter, ShareAdapter, TripAdapter } from "./types";
+import {
+  authHmacKey,
+  defaultScope,
+  getSimulationScope,
+  MAX_AUTH_ADDRESSES_PER_SCOPE,
+  MAX_LAUNCHES_PER_SCOPE,
+  MAX_STOP_REPORTS_PER_SCOPE,
+  type SimulationScope,
+} from "./simulation";
+import type {
+  AdapterContext,
+  AuthAdapter,
+  CreationAdapter,
+  PaymentAdapter,
+  PaymentSimulator,
+  RevisionAdapter,
+  ShareAdapter,
+  StopReportAdapter,
+  TripAdapter,
+} from "./types";
 
 export type {
   AdapterContext,
@@ -454,6 +474,36 @@ export async function getRevisionFixtures(
 export function revisionEnregistree(value: string | undefined = process.env.DATA_ADAPTER): RevisionAdapter | null {
   if (adapterChoice(value) !== "api") return null;
   return getTripAdapter(value).revision ?? null;
+}
+
+/**
+ * Signalement d'une erreur sur une étape (tâche M5c, ticket 904 ; décision 0147 § 1) : `mock`, dans la portée de simulation
+ * (`options.scope`, sinon celle de la requête), voyages lus par `getTripReader()` de la même portée ; `api`, la table
+ * `feedback` (`TripAdapter.reports`) ; `null` pour `prototype` (le site d'essai n'a pas de signalement : la fiche ne montre
+ * pas le bouton, `signalementDisponible`). Lu par l'action serveur `reportStop` (`src/server/actions/retouches.ts`).
+ */
+export async function signalementsDuVoyage(
+  value: string | undefined = process.env.DATA_ADAPTER,
+  options: { scope?: SimulationScope } = {},
+): Promise<StopReportAdapter | null> {
+  const choice = adapterChoice(value);
+  if (choice === "api") return getTripAdapter(value).reports ?? null;
+  if (choice !== "mock") return null;
+  const scope = options.scope ?? (await getSimulationScope());
+  const store = (scope.reports ??= { records: [] });
+  return createMockStopReports({
+    trips: getTripReader({ scope }),
+    store,
+    now: () => scope.clock.now(),
+    plafond: SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR,
+    max: MAX_STOP_REPORTS_PER_SCOPE,
+  });
+}
+
+/** Bouton « Signaler une erreur » de la fiche (M5c) : adaptateurs `mock` et `api` seulement, décidé côté serveur. */
+export function signalementDisponible(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  const choice = adapterChoice(value);
+  return choice === "mock" || choice === "api";
 }
 
 /**

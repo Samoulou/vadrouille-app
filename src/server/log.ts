@@ -1,7 +1,7 @@
 import "server-only";
 
 import { CODE_CLE_ABSENTE } from "@/ai/erreurs";
-import { API_ERROR_CODES } from "@/contracts/values";
+import { API_ERROR_CODES, STOP_REPORT_REASONS } from "@/contracts/values";
 import { CODES_ARRET_JOURNAL_SANS_CLE } from "@/server/log-codes-arret";
 
 /**
@@ -151,6 +151,11 @@ export const LOG_EVENTS = [
   "recalcul.not_created",
   "recalcul.start_failed",
   "recalcul.unlock_failed",
+  // M5c (décision 0147 § 12 S1 point 4) : signalement d'une erreur sur une étape **nouvellement enregistré** dans `feedback`
+  // (ni rejeu, ni doublon, ni refus), une fois, par `reportStop` seul ; niveau `info`. **Champ unique `reason`** (motif fermé
+  // `STOP_REPORT_REASONS`, `CHAMPS_ADMIS_PAR_EVENEMENT`) : ni texte, ni `placeId`, ni identifiant de voyage, d'étape,
+  // d'organisation ou de personne. L'enregistrement est en base ; le journal ne sert qu'à compter.
+  "voyages.stop_reported",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -594,6 +599,8 @@ const RAISONS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map(
   ["ville.refusee", RAISONS_VILLE_API],
   ["email.provider_refused", new Set(LOG_EMAIL_PROVIDER_REASONS)],
   ["email.transport_refused", new Set(LOG_EMAIL_TRANSPORT_REASONS)],
+  // M5c (0147 § 12 S1 point 4) : liste fermée importée de sa définition unique, aucune copie.
+  ["voyages.stop_reported", new Set<string>(STOP_REPORT_REASONS)],
 ]);
 /**
  * Phases admises dans `phase` (`p0.step_failed`, ticket 493, décision 0090 § 3 point 4) : celles de
@@ -847,6 +854,8 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   // Décision 0141 § 6.3 point 4 (Sécurité, mineur 6) : recherche de ville de `api`, champs fermés seulement.
   ["ville.refusee", new Set(["reason", "action", "errorName", "googleCode", "httpStatus"])],
   ["ville.purge_failed", new Set(["errorName"])],
+  // Décision 0147 § 12 S1 point 4 : motif seul ; `tripId`, `organizationId`, `placeId`, `stopId` ou un texte sont retirés.
+  ["voyages.stop_reported", new Set(["reason"])],
   [
     "generation.programme_written",
     new Set([

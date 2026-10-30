@@ -582,6 +582,7 @@ describe("module de journal", () => {
       "recalcul.not_created",
       "recalcul.start_failed",
       "recalcul.unlock_failed",
+      "voyages.stop_reported",
       "log.unknown_event",
     ]);
   });

@@ -145,6 +145,8 @@ export interface TripShellValue {
   placesFromGoogle: boolean;
   /** Adresse de l'écran 9 « Débloquer » pour un voyage non débloqué, paiement simulé disponible ; sinon `null`. */
   unlockHref: string | null;
+  /** « Signaler une erreur » sur la fiche (M5c) : adaptateurs `mock` et `api`, routes `/voyages`, décidé côté serveur. */
+  reportable: boolean;
   /** Retire `etape` inconnu de l'adresse et annonce l'absence (F5-PO-8). */
   reportMissingEtape: () => void;
 }
@@ -217,6 +219,11 @@ export interface TripShellProps {
    * (voyage non débloqué, paiement simulé disponible, base `/voyages`) ; absente par défaut.
    */
   unlockHref?: string | null;
+  /**
+   * « Signaler une erreur » sur la fiche d'une étape (tâche M5c ; spécification M5 § 5) : décidé côté serveur par la mise en
+   * page (adaptateur `mock` ou `api`, base `/voyages`) ; absent par défaut.
+   */
+  reportable?: boolean;
   children: ReactNode;
 }
 
@@ -239,6 +246,7 @@ export function TripShell({
   placesFromGoogle = PLACES_FROM_GOOGLE,
   shareable = false,
   unlockHref = null,
+  reportable = false,
   children,
 }: TripShellProps) {
   const routes = useMemo(() => tripRoutes(base, sourceTrip.id), [base, sourceTrip.id]);
@@ -548,6 +556,7 @@ export function TripShell({
       reportMissingEtape,
       placesFromGoogle,
       unlockHref,
+      reportable,
     }),
     [
       routes,
@@ -573,6 +582,7 @@ export function TripShell({
       reportMissingEtape,
       placesFromGoogle,
       unlockHref,
+      reportable,
     ],
   );
 

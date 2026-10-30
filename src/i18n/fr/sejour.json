@@ -41,9 +41,31 @@
     "remplacer": "Remplacer",
     "deplacer": "Déplacer",
     "verrouiller": "Verrouiller",
+    "signaler": "Signaler une erreur",
     "toastVerrouillee": "Étape verrouillée.",
     "toastDeverrouillee": "Verrou retiré.",
     "absente": "Cette étape n'est plus dans ce jour."
+  },
+  "signaler": {
+    "titre": "Signaler une erreur",
+    "groupe": "Ce qui ne va pas",
+    "motifs": {
+      "closed": "Fermé ou n'existe plus",
+      "hours": "Horaires faux",
+      "wrongPlace": "Mauvais lieu ou mauvaise adresse",
+      "price": "Prix faux",
+      "other": "Autre erreur"
+    },
+    "envoyer": "Envoyer",
+    "annuler": "Annuler",
+    "sansMotif": "Choisis ce qui ne va pas.",
+    "merci": "Merci, c'est noté.",
+    "remplacer": "Remplacer cette étape",
+    "plafond": "Trop de signalements pour le moment. Réessaie plus tard.",
+    "erreur": "Le signalement n'a pas pu être envoyé. Réessaie.",
+    "introuvable": "Cette étape n'existe plus.",
+    "nonSignalable": "Cette étape ne peut pas être signalée.",
+    "envoi": "Envoi…"
   },
   "sejour": {
     "budget": "Budget estimé : environ {montant} CHF par personne",
