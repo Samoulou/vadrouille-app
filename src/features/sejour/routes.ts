@@ -37,6 +37,11 @@ export interface TripRoutes {
    * `R15` (F10-PO-7) : aucun lien ne mène alors à une 404.
    */
   aujourdhui(): string | null;
+  /**
+   * « Versions du programme » (M5b, spécification M5 § 4 ; décision 0147 § 5.3 point 3) ; `null` avec la base
+   * `/dev/voyages`, qui n'a pas de page des versions : aucun lien ne mène alors à une 404.
+   */
+  versions(): string | null;
 }
 
 /** `R17` « Mes voyages » : seul endroit qui écrit cette adresse (décision 0021 § 6). */
@@ -55,5 +60,6 @@ export function tripRoutes(base: TripRoutesBase, tripId: string): TripRoutes {
     ajouter: (n, free) => (free ? `${jour(n)}/ajouter?de=${free.from}&a=${free.to}` : `${jour(n)}/ajouter`),
     mesVoyages: mesVoyagesRoute,
     aujourdhui: () => (base === "/voyages" ? `${trip}/aujourdhui` : null),
+    versions: () => (base === "/voyages" ? `${trip}/versions` : null),
   };
 }

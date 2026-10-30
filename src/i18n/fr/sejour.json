@@ -2,7 +2,8 @@
   "titreDocument": {
     "sejour": "{destination} · Séjour",
     "jour": "{destination} · Jour {n}",
-    "etape": "{name} · Jour {n}"
+    "etape": "{name} · Jour {n}",
+    "versions": "{destination} · Versions du programme"
   },
   "region": "Programme",
   "retour": "Retour",
@@ -103,5 +104,37 @@
   },
   "aujourdhui": {
     "lien": "Aujourd'hui · Jour {n}"
+  },
+  "versions": {
+    "lien": "Versions du programme",
+    "titre": "Versions du programme",
+    "retourSejour": "Retour au Séjour",
+    "actuelle": "Version actuelle",
+    "avantDeblocage": "Avant le déblocage",
+    "plusAnciennes": "Voir les versions plus anciennes",
+    "revenir": "Revenir à cette version",
+    "moment": "{jour} {date}, {heure}",
+    "libelles": {
+      "prepared": "Programme préparé",
+      "adjusted": "Programme ajusté après ton tri",
+      "complete": "Voyage complet",
+      "replaced": "{ancien} remplacé par {nouveau}",
+      "added": "{nom} ajouté",
+      "moved": "{nom} déplacé au jour {n}",
+      "locked": "{nom} verrouillé",
+      "unlocked": "Verrou retiré : {nom}",
+      "reverted": "Retour à la version du {date}"
+    },
+    "apercuTitre": "Revenir à la version du {date}",
+    "verrouillees": "Ce retour peut toucher des étapes verrouillées.",
+    "rienNeChange": "Rien ne change dans ton programme.",
+    "calcul": "Calcul de ce qui change.",
+    "pret": "Ce qui change est prêt.",
+    "retabli": "Programme rétabli.",
+    "conflit": "Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.",
+    "trop": "Tu as fait beaucoup de retouches sur ce voyage.",
+    "erreurApercu": "Ce qui change n'a pas pu être calculé. Ton programme est inchangé.",
+    "erreurRetour": "Le retour n'a pas pu être appliqué. Ton programme est inchangé.",
+    "erreurListe": "Les versions n'ont pas pu être chargées. Réessaie."
   }
 }

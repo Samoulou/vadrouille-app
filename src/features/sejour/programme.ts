@@ -69,7 +69,13 @@ export type ProgrammeEvent =
    * Données de l'adaptateur relues après une révision enregistrée (adaptateur `api`, M1g) : les jours affichés en attendant
    * la relecture sont retirés, les verrous et la liste locale restent.
    */
-  | { type: "rebase" };
+  | { type: "rebase" }
+  /**
+   * Retour à une version enregistré (M5b) : le programme vient tout entier du serveur, relu ensuite ; verrous et jours
+   * affichés en attendant sont retirés, sans modification annulable (le retour a son propre « Annuler »). La liste locale
+   * reste.
+   */
+  | { type: "reset" };
 
 export const INITIAL_PROGRAMME: ProgrammeState = { locks: {}, days: {}, previous: null, checklist: {} };
 
@@ -92,6 +98,9 @@ export function programmeReducer(state: ProgrammeState, event: ProgrammeEvent): 
     }
     case "undo":
       return state.previous ? { ...state, locks: state.previous.locks, days: state.previous.days, previous: null } : state;
+    case "reset":
+      if (Object.keys(state.locks).length === 0 && Object.keys(state.days).length === 0 && state.previous === null) return state;
+      return { ...state, locks: {}, days: {}, previous: null };
     case "rebase":
       if (Object.keys(state.days).length === 0 && (state.previous === null || Object.keys(state.previous.days).length === 0)) return state;
       return { ...state, days: {}, previous: state.previous ? { locks: state.previous.locks, days: {} } : null };
