@@ -27,6 +27,12 @@ describe("tripRoutes (décision 0015 § 1)", () => {
     expect(tripRoutes("/dev/voyages", "mock_trip_edimbourg").aujourdhui()).toBeNull();
   });
 
+  it("« Versions du programme » (M5b) : `/voyages/{id}/versions` ; aucune adresse avec la base `/dev/voyages`", () => {
+    expect(routes.versions()).toBe("/voyages/mock_trip_edimbourg/versions");
+    expect(tripRoutes("/voyages", "a b/c").versions()).toBe("/voyages/a%20b%2Fc/versions");
+    expect(tripRoutes("/dev/voyages", "mock_trip_edimbourg").versions()).toBeNull();
+  });
+
   it("« Mes voyages » : une seule adresse, `/voyages` (décision 0021 § 6)", () => {
     expect(mesVoyagesRoute()).toBe("/voyages");
     expect(tripRoutes("/voyages", "a b").mesVoyages()).toBe(mesVoyagesRoute());

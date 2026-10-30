@@ -28,9 +28,9 @@ beforeEach(() => {
   recorder = createMemoryRecorder();
 });
 
-function renderSejour(trip: Trip = edimbourg, unlockHref: string | null = null) {
+function renderSejour(trip: Trip = edimbourg, unlockHref: string | null = null, versionable = false) {
   return render(
-    <TripShell trip={trip} maps={[]} base="/voyages" unlockHref={unlockHref}>
+    <TripShell trip={trip} maps={[]} base="/voyages" unlockHref={unlockHref} versionable={versionable}>
       <SejourOriginProvider>
         <SejourPanel recorder={recorder} />
       </SejourOriginProvider>
@@ -342,5 +342,23 @@ describe("SejourPanel : journées « À débloquer » (spécification E2E-essai,
     renderSejour(edimbourg, "/voyages/x/debloquer");
     expect(document.querySelector("[data-part='jour-a-debloquer']")).toBeNull();
     expect(document.querySelector("[data-part='debloquer']")).toBeNull();
+  });
+});
+
+describe("SejourPanel : « Versions du programme » (M5b, ticket 934 ; spécification M5 § 4)", () => {
+  it("voyage débloqué, versions disponibles : lien vers `/voyages/{id}/versions`, sans violation", async () => {
+    const { container } = renderSejour(edimbourgDebloque, null, true);
+    expect(within(panel()).getByRole("link", { name: "Versions du programme" })).toHaveAttribute("href", `/voyages/${edimbourgDebloque.id}/versions`);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("voyage non débloqué, ou versions indisponibles : aucun lien", () => {
+    renderSejour(edimbourg, null, true);
+    expect(within(panel()).queryByRole("link", { name: "Versions du programme" })).toBeNull();
+  });
+
+  it("versions indisponibles (site d'essai) : aucun lien, même débloqué", () => {
+    renderSejour(edimbourgDebloque, null, false);
+    expect(within(panel()).queryByRole("link", { name: "Versions du programme" })).toBeNull();
   });
 });

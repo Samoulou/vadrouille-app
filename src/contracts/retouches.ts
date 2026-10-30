@@ -83,6 +83,32 @@ export const TripVersionPageSchema = z.strictObject({
 export type TripVersionPage = z.infer<typeof TripVersionPageSchema>;
 
 /**
+ * Demande de `listTripVersions` (tâche M5b ; 0147 § 5.3 point 2) : voyage et, pour une page suivante, `before` (le
+ * `nextBefore` de la page précédente, exclusif) ; absent pour la première page.
+ */
+export const TripVersionsRequestSchema = z.strictObject({
+  tripId: TripIdSchema,
+  before: VersionSchema.optional(),
+});
+export type TripVersionsRequest = z.infer<typeof TripVersionsRequestSchema>;
+
+/**
+ * Demande de `previewRevert` (tâche M5b ; 0147 § 5.3 point 5) : version courante vue par l'écran (`baseVersion`) et
+ * version visée (`toVersion`). Le serveur refuse une version visée non proposée au retour (`validation_failed`, `field:
+ * "toVersion"`), après le contrôle de `baseVersion` (`version_conflict`).
+ */
+export const RevertPreviewRequestSchema = z.strictObject({
+  tripId: TripIdSchema,
+  baseVersion: VersionSchema,
+  toVersion: VersionSchema,
+});
+export type RevertPreviewRequest = z.infer<typeof RevertPreviewRequestSchema>;
+
+/** Demande d'`applyRevert` : celle de l'aperçu et son `requestId` (idempotence). « Annuler » d'un retour en est une aussi. */
+export const RevertApplySchema = RevertPreviewRequestSchema.extend({ requestId: z.uuid() });
+export type RevertApply = z.infer<typeof RevertApplySchema>;
+
+/**
  * Aperçu d'un retour à une version (0147 § 5.3 point 5) : changements entre la version courante (`baseVersion`) et la
  * version visée (`toVersion`), calculés côté serveur par `appliquerPatch` sur `[revert]` à blanc, plus les lignes
  * `checklist` de la liste « À faire » (§ 7). Un retour ne produit **jamais** `replaced` (M5-PO-2, critère 8), ni de
