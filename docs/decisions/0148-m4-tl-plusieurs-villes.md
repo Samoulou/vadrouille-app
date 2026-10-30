@@ -22,6 +22,25 @@ Numérotation (relue le 2026-10-29) : `main` porte 0001 à 0147 ; 0148 est rése
 
 **Ce que cette décision n'engage pas.** Aucun argent : aucune barrière ouverte, aucun plafond réel (`PLAFONDS_USAGE` reste `null`) ; les valeurs du § 9 sont des valeurs de test de la variante simulée et une estimation de coût pour la question Samuel 4. Aucun compte externe, aucune variable d'environnement. Aucune migration. Aucun test supprimé ni désactivé (liste fermée des attentes modifiées au § 10). Aucune règle de produit n'est créée : là où le Product Owner a posé une valeur provisoire, cette décision la remplace par un **défaut technique** que M4-suite révise (§ 5), comme le report du CEO l'y autorise.
 
+## Amendements
+
+### Amendements du 2026-10-30 (PR #932, M4b, ticket #928 ; ticket #935)
+
+Décideur : **Tech Lead** (même délégation que cette décision). Source : revue consolidée de la PR #932 au head `8a4fef7` (réponse à la question TL 1, mineurs « deux prédicats » et « `moteur.json` »). Définitifs à la fusion de la PR qui les écrit, sans délai de veto (décision 0093). Ils n'engagent ni argent, ni compte externe, ni migration, ni donnée nouvelle envoyée au fournisseur de modèles, et ne suppriment ni ne désactivent aucun test. Le texte des sections amendées n'est pas réécrit : un lecteur les lit avec ces amendements, qui priment sur elles.
+
+1. **Prompt `programme` v5 réservé aux voyages à deux villes ou plus** (écart assumé de § 8 point 2 et point 3).
+   - Un voyage à **deux ou trois villes** suit ce que fixe cette décision : `briefProgrammeDepuisFormulaire`, `BriefProgramme`, entrée `EntreeProgrammeV5`, prompt `programme` v5, étape 2 bis (`cadrerProgramme`) et assemblage du § 5.1.
+   - Un voyage à **une seule ville** garde, sur `api` aussi, la chaîne d'avant M4 **sans changement** : `briefDepuisFormulaire`, `BriefEssai`, entrée et prompt `programme` v4, sans étape 2 bis. Le § 8 point 2 disait que `api` passait toujours par `briefProgrammeDepuisFormulaire` ; il ne vaut plus que pour deux villes ou plus.
+   - **Un seul prédicat de bascule** : `briefAPlusieursVilles(brief)` (`src/server/generation/etapes-programme.ts`, vrai quand le brief porte `villes` avec plus d'une entrée). Toute bascule entre les deux chemins lit ce prédicat, ou une fonction dont il est lui-même tiré : choix de la conversion, étape 2 bis, choix du prompt de rédaction, révision M1b, zone de vérification. Aucun second critère n'est admis (par exemple `draft.otherCities.length === 0` à côté de `villes.length > 1`). La correction 1 de #932 unifie ainsi le prédicat ; si elle le renomme, le nouveau nom remplace celui-ci sans autre amendement, et la revue de #932 le vérifie.
+   - Raison : le prompt v4 et son jeu d'évaluation couvrent déjà le voyage à une ville, et la Conséquence « le prompt v4 ne change pas » est gardée. Le changement de prompt reste limité aux voyages qui en ont besoin.
+2. **Départ par défaut du jour de changement de ville : 10:00** au lieu de 09:00 (§ 5.1 point 5, § 5.2, § 14 point 1).
+   - `changementDeVille.departEstime.heureParDefaut` vaut **`"10:00"`** dans `moteur.json`, comme dans la PR #932, le ticket #928 et `specs/M4-suite-changement-de-ville.md` (§ 2 et § 3.1, Q710). `limite` reste 18:00.
+   - Règle du § 5.2 : la plus tardive des fins occupées qui ne dépassent pas `limite` (18:00), sans descendre sous **10:00** ; sans telle fin, **10:00**. Le départ estimé tombe donc à **10:00 au plus tôt**.
+   - Variantes du critère 8 (§ 5.2) : aucun engagement → **10:00** ; Sortie de 10:00 à 11:30 → 11:30 ; Sortie de 17:00 à 19:00 → **10:00** ; dîner à 20:00 sans fin → **10:00**. Variantes ajoutées : inchangées (11:30).
+   - Le test du § 5.1 point 5 (`heureParDefaut` dans `fenetreJour`) reste vrai : 10:00 est entre 09:00 et 22:30.
+   - La marge avant le départ et l'arrondi au quart d'heure de M4-suite (§ 3.1) ne sont **pas** repris ici : ils restent à la tâche de code de M4-suite.
+   - Le critère 8 de `specs/M4-plusieurs-villes.md` est aligné dans la même PR (09:00 → 10:00), accepté par le Product Owner à la revue de #932.
+
 ## Contexte : ce que le code permet déjà, et ce qui manque
 
 Relevé sur `c96f3cd` :

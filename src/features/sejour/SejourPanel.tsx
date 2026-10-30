@@ -72,7 +72,7 @@ export function joursADebloquer(trip: { unlocked: boolean; start: string; end: s
  * (`createLazyTrack`), hors du JavaScript initial du Séjour.
  */
 export function SejourPanel({ recorderKind = "none", recorder, now: clock }: SejourPanelProps) {
-  const { trip, routes, actions, placesFromGoogle, unlockHref } = useTripShell();
+  const { trip, routes, actions, placesFromGoogle, unlockHref, versionsHref } = useTripShell();
   // Journées « À débloquer » seulement avec un lien de déblocage (voyage non débloqué, routes `/voyages`, paiement simulé
   // disponible) : sans lui, la liste ne montre que les journées servies, comme avant.
   const verrouilles = unlockHref ? joursADebloquer(trip) : [];
@@ -162,7 +162,7 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
           </div>
         ) : null}
         <p key={echecs} role="alert" data-part="a-faire-echec" className={cn("text-corps-s font-semibold text-ink", toggleFailed ? undefined : EMPTY_LIVE_REGION_CLASS)}>
-          {toggleFailed ? ts.aFaire.echec : null}
+          {toggleFailed ? t.echecEnregistrement : null}
         </p>
         <ul>
           {trip.checklist.map((item) => (
@@ -262,6 +262,17 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
           </Button>
         ) : null}
       </section>
+
+      {versionsHref ? (
+        // « Versions du programme » (M5b ; spécification M5 § 4) : en bas du Séjour, voyage débloqué seulement (M5-PO-1).
+        <Link
+          href={versionsHref}
+          data-part="versions"
+          className="inline-flex min-h-(--touch-target) items-center self-start rounded-control text-corps font-bold text-line underline underline-offset-2"
+        >
+          {t.versions.lien}
+        </Link>
+      ) : null}
 
       <PlacesAttribution placesFromGoogle={placesFromGoogle} />
     </div>

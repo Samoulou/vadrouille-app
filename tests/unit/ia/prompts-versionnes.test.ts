@@ -10,7 +10,7 @@ import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
 import { PROMPT_RECHERCHE_WEB } from "@/ai/prompts/recherche-web";
-import { PROMPT_REVISION } from "@/ai/prompts/revision";
+import { PROMPT_REVISION, PROMPT_REVISION_V3 } from "@/ai/prompts/revision";
 import { PROMPT_STRUCTURATION } from "@/ai/prompts/structuration";
 
 /**
@@ -52,6 +52,9 @@ const EMPREINTES: Record<string, Record<number, string>> = {
   revision: {
     1: "bf5355ef97edba46b6961a113476e73ae232c22399c1eed0a54501345b071fc1",
     2: "674314914e797f7e2f937b01e00fbfa1db26cf2dbb59bef09b13b371549b2254",
+    // M4a-2 (ticket #926, décision 0148 § 8 point 2) : plusieurs villes, même cadre des journées que `programme` v5 ;
+    // coexiste avec la v2 (site d'essai).
+    3: "1da7e1f5fa483d51f4fb221cf45cca7cc2dd37d66c344db8e2e19e83d94eec8d",
   },
 };
 
@@ -174,6 +177,60 @@ describe("prompts: versionnés", () => {
     expect(texte).not.toMatch(/google|placeId|place_id|latitude|longitude|coordonn|\blat\b|\blng\b/i);
     // Aucun libellé de billet n'est attendu dans l'entrée (0149 S-M4-1).
     expect(texte).not.toMatch(/libellé du billet|"libelle" du changement/);
+  });
+
+  // M4a-2 (ticket #926) : la v3 coexiste avec la v2 sous le même identifiant ; elle n'est pas dans `PROMPTS` (une ligne par
+  // identifiant), son empreinte est tenue ici. La v2 garde la sienne (test de `PROMPTS` ci-dessus).
+  it("revision v3 : empreinte égale à la table, même identifiant que la v2, v2 inchangée", () => {
+    expect(PROMPT_REVISION_V3.id).toBe(PROMPT_REVISION.id);
+    expect(PROMPT_REVISION_V3.version).toBe(3);
+    expect(empreinte(PROMPT_REVISION_V3.texte)).toBe(EMPREINTES.revision?.[3]);
+    expect(PROMPT_REVISION.version).toBe(2);
+    expect(empreinte(PROMPT_REVISION.texte)).toBe(EMPREINTES.revision?.[2]);
+  });
+
+  it("revision v3 : règles de la v2, cadre des journées de la v5, aucune ville par créneau ni trajet (0148, 0149)", () => {
+    const texte = PROMPT_REVISION_V3.texte;
+    // Règles de la v2 : étapes écartées retirées, aimées gardées, site officiel, parcours, « à éviter ».
+    expect(texte).toContain('"pasPourMoi"');
+    expect(texte).toContain('"jAime"');
+    expect(texte).toMatch(/Retire chaque étape écartée : ni ce lieu ni un lieu équivalent/);
+    expect(texte).toMatch(/Garde les étapes aimées/);
+    expect(texte).toMatch(/pour chaque créneau avec un lieu, donne l'adresse du site officiel dès qu'il en existe un/);
+    expect(texte).toMatch(/Jamais un moteur de recherche, une carte, un réseau social, un site d'avis ou de réservation tiers/);
+    expect(texte).toMatch(/Les étapes d'un même quartier se suivent/);
+    expect(texte).toContain('Si le brief porte "aEviter"');
+    expect(texte).toContain('"quartier" (pour chaque lieu)');
+    // Remplaçant dans la ville de l'étape écartée, du même côté du trajet le jour du changement de ville.
+    expect(texte).toMatch(/dans la ville de l'étape écartée/);
+    expect(texte).toMatch(/un remplaçant de ce jour-là reste du même côté du trajet que l'étape écartée/);
+    // Cadre des journées : les mêmes phrases que la v5 (0148 § 5.1 point 2).
+    for (const champ of ['"villes"', '"changements"', '"de"', '"vers"', '"depart"', '"arrivee"', '"source"', '"saisi"', '"estime"', '"activitesMax"']) expect(texte).toContain(champ);
+    const lignesV5 = PROMPT_PROGRAMME_V5.texte.split("\n");
+    for (const debut of ["Pour un changement \"estime\" seulement", "Si le brief porte \"aEviter\"", "Le champ \"site\"", "Chaque créneau :", "Longueurs :", "Réponds uniquement"]) {
+      const ligne = lignesV5.find((l) => l.startsWith(debut));
+      expect(ligne, debut).toBeDefined();
+      expect(texte, debut).toContain(ligne);
+    }
+    expect(texte).toMatch(/Les journées d'une ville ne contiennent que des lieux de cette ville ou de ses environs/);
+    expect(texte).toMatch(/toutes finies à l'heure de départ ; pendant le trajet, rien/);
+    expect(texte).toMatch(/aucune étape à réserver/);
+    expect(texte).toMatch(/N'écris ni le trajet, ni un créneau pour lui, ni le titre de ce jour/);
+    // Durée estimée entière au niveau du jour, seulement pour un départ estimé (0149 S-M4-2).
+    expect(texte).toContain('"dureeEstimeeMinutes" (nombre entier, seulement pour un changement "estime")');
+    expect(texte).toMatch(/un nombre entier \(jamais un texte\)/);
+    // Aucun champ `ville` par créneau (0148 § 7.1 point 3), aucun `transfer` demandé.
+    const creneau = texte.split("\n").find((ligne) => ligne.startsWith("Chaque créneau"));
+    expect(creneau).toBeDefined();
+    expect(creneau).not.toContain('"ville"');
+    expect(texte).not.toContain('"ville"');
+    expect(texte).not.toMatch(/ville et quartier 60|"transfer"|"trajet"/);
+    expect(texte).toMatch(/N'écris pas la ville d'un créneau/);
+    // Ni récit (garde du récit, 0139 § 1.2), ni libellé de billet, ni donnée Google, ni adresse.
+    expect(texte).not.toMatch(/récit/);
+    expect(texte).not.toMatch(/libellé du billet|"libelle" du changement/);
+    expect(texte).not.toMatch(/https?:\/\//);
+    expect(texte).not.toMatch(/google|placeId|place_id|latitude|longitude|coordonn|\blat\b|\blng\b|minutes de trajet/i);
   });
 
   it("un texte changé sans nouvelle version fait échouer la comparaison", () => {

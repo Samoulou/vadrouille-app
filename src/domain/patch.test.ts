@@ -41,6 +41,14 @@ const CONFIG: ConfigurationMoteur = {
   dureesParDefaut: { activity: 90, lunch: 75, dinner: 90, evening: 90 },
   margeMinutes: 5,
   seuilTempsLibreMinutes: 30,
+  changementDeVille: {
+    activitesParRythme: { relaxed: 1, balanced: 2, intense: 2 },
+    departEstime: { heureParDefaut: "10:00", limite: "18:00", arrondiMinutes: 15 },
+    creneauSansDureeMinutes: 180,
+    dureeEstimeeMinutes: { min: 20, max: 600 },
+    margesMinutes: { avantDepart: { ticket: 45, flight: 120, estimated: 30 }, apresArrivee: { ticket: 30, flight: 60, estimated: 30 } },
+    long: { seuilMinutes: 240, activitesMax: 1 },
+  },
 };
 
 const FORMULE: ConfigClassement = {
@@ -536,15 +544,112 @@ describe("patch: entrée bloquante nouvelle (validation des jours touchés)", ()
     jour.items = jour.items.map((item) => (item.type === "stop" && item.stop.id === ancienne.id ? { ...item, stop: { ...item.stop, placeId: place("ferme") } } : item));
     const gelee = structuredClone(fermee);
 
-    const { instantane, resultat, rapport } = reussi(appliquerPatch(entree(fermee, patch(2, [{ op: "lock", stopId: autre.id }]))));
+    // Patch `[add, lock]` (lieu à soi verrouillé, décision 0147 § 11) : il replanifie et valide le J2. Un `lock` seul ne
+    // revalide plus rien depuis la décision 0147 § 9 (M5a) : il ne peut plus servir à éprouver l'écart 1.
+    const { instantane, resultat, rapport } = reussi(
+      appliquerPatch(
+        entree(fermee, patch(2, [
+          { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time: "21:00", name: "Mon lieu à moi", placeId: place("proche") },
+          { op: "lock", stopId: "ajout-1" },
+        ])),
+      ),
+    );
     expect(resultat.touchedDays).toEqual([2]);
-    expect(etape(instantane, (stop) => stop.id === autre.id).locked).toBe(true);
+    expect(etape(instantane, (stop) => stop.id === "ajout-1").locked).toBe(true);
+    expect(etape(instantane, (stop) => stop.id === autre.id).locked).toBe(false);
     // L'entrée bloquante R1 du lieu fermé est toujours dans le rapport du jour touché : elle n'a pas été créée par ce
     // patch, qui n'est donc pas refusé (écart 1).
     const bloquantes = rapport.filter((e) => estBloquante(e, instantane.days));
     expect(bloquantes.length).toBeGreaterThan(0);
     expect(bloquantes).toContainEqual(expect.objectContaining({ regle: "R1", etape: ancienne.id }));
     expect(fermee).toEqual(gelee);
+  });
+});
+
+/**
+ * Verrou seul (décision 0147 § 9, M5a) : un patch fait seulement de `lock` et d'`unlock` ne replanifie ni ne revalide ;
+ * aucune interface de relectures n'est appelée (sur `api` : aucun appel Google ni Routes pour verrouiller).
+ */
+describe("verrou: verrou seul, aucune replanification ni relecture", () => {
+  /** Relectures qui ne connaissent rien : sans § 9, la replanification d'un jour touché rendait `no_option`. */
+  function muettes(appels: { nombre: number }): Relectures {
+    return {
+      validite() {
+        appels.nombre += 1;
+        return INCONNU;
+      },
+      plages() {
+        appels.nombre += 1;
+        return INCONNU;
+      },
+      duree() {
+        appels.nombre += 1;
+        return INCONNU;
+      },
+    };
+  }
+
+  it("verrou: verrou seul, aucune replanification ni relecture (instantané égal à la base hors locked, aucun appel du port)", () => {
+    const base = version2();
+    const gelee = structuredClone(base);
+    const activite = activiteDuJour(base, 2);
+    const ticket = billet(base);
+    for (const operations of [
+      [{ op: "lock", stopId: activite.id }],
+      [{ op: "unlock", stopId: ticket.id }],
+      [{ op: "lock", stopId: activite.id }, { op: "unlock", stopId: ticket.id }],
+    ] satisfies TripPatchOperation[][]) {
+      const appels = { nombre: 0 };
+      const { instantane, resultat, rapport } = reussi(appliquerPatch({ ...entree(base, patch(2, operations)), moteur: { ...moteur(), relectures: muettes(appels) } }));
+      expect(appels.nombre, JSON.stringify(operations)).toBe(0);
+      const attendu = structuredClone(base);
+      for (const operation of operations) {
+        for (const jour of attendu.days) {
+          jour.items = jour.items.map((item) => (item.type === "stop" && item.stop.id === operation.stopId ? { ...item, stop: { ...item.stop, locked: operation.op === "lock" } } : item));
+        }
+      }
+      expect(instantane).toEqual(attendu);
+      expect(rapport).toEqual([]);
+      expect(PatchResultSchema.parse(resultat)).toEqual(resultat);
+      // Aucun trajet ni budget ne change : seulement `locked`, `unlocked` et `unchanged`.
+      expect(resultat.changes.every((change) => ["locked", "unlocked", "unchanged"].includes(change.type))).toBe(true);
+    }
+    expect(base).toEqual(gelee);
+  });
+
+  it("verrou: les refus du moteur restent (étape inconnue, verrou sans effet), sans relecture", () => {
+    const base = version2();
+    const appels = { nombre: 0 };
+    const avec = (operations: TripPatchOperation[]) => appliquerPatch({ ...entree(base, patch(2, operations)), moteur: { ...moteur(), relectures: muettes(appels) } });
+    expect(avec([{ op: "lock", stopId: "absente" }])).toEqual({ ok: false, code: "unknown_stop" });
+    expect(avec([{ op: "lock", stopId: billet(base).id }])).toEqual({ ok: false, code: "no_effect" });
+    expect(avec([{ op: "unlock", stopId: activiteDuJour(base, 2).id }])).toEqual({ ok: false, code: "no_effect" });
+    expect(appels.nombre).toBe(0);
+  });
+
+  it("verrou: [add, lock] garde la replanification et la validation de l'ajout (relectures appelées)", () => {
+    const base = version2();
+    const appels = { nombre: 0 };
+    const { instantane } = reussi(
+      appliquerPatch({
+        ...entree(base, patch(2, [
+          { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time: "21:00", name: "Mon lieu à moi", placeId: place("proche") },
+          { op: "lock", stopId: "ajout-1" },
+        ])),
+        moteur: { ...moteur(), relectures: relectures(appels) },
+      }),
+    );
+    expect(appels.nombre).toBeGreaterThan(0);
+    expect(etape(instantane, (stop) => stop.id === "ajout-1")).toMatchObject({ addedBy: "person", locked: true });
+    // Sans relecture, l'ajout n'est pas replanifiable : le verrou ne l'en dispense pas.
+    const sans = appliquerPatch({
+      ...entree(base, patch(2, [
+        { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time: "21:00", name: "Mon lieu à moi", placeId: place("proche") },
+        { op: "lock", stopId: "ajout-1" },
+      ])),
+      moteur: { ...moteur(), relectures: muettes({ nombre: 0 }) },
+    });
+    expect(sans).toEqual({ ok: false, code: "no_option" });
   });
 });
 
@@ -743,12 +848,90 @@ describe("plusieurs-villes: appliquerPatch recopie le transfer tel quel (décisi
     expect(base).toEqual(gelee);
   });
 
-  it("un jour touché qui porte un transfer n'est pas replanifié sans lui : no_option, base intacte (domaine à M4b)", () => {
+  // 0151 § 5.2 : la règle provisoire `no_option` est remplacée par M4b (créneau occupé de 0148 § 5.3). Titre et attente
+  // changés en conséquence (écart déclaré dans la PR M4b) ; le cas reste couvert.
+  it("plusieurs-villes: patch sur un jour de changement de ville", () => {
     const base = avecTransfer(version2(), 2);
     const gelee = structuredClone(base);
     const cible = activiteDuJour(base, 2);
-    const resultat = appliquerPatch(entree(base, patch(2, [{ op: "replace", stopId: cible.id, candidateId: RESERVE.proche.id, newStopId: "v3-remplace" }])));
+    const v3 = reussi(appliquerPatch(entree(base, patch(2, [{ op: "replace", stopId: cible.id, candidateId: RESERVE.proche.id, newStopId: "v3-remplace" }]))));
+    expect(v3.resultat.touchedDays).toEqual([2]);
+    const items = jourN(v3.instantane, 2).items;
+    // Le transfer est recopié tel quel, à son heure ; rien ne commence dans son créneau occupé (11:30 + 120 minutes).
+    expect(items.filter((item) => item.type === "transfer")).toEqual([TRANSFER]);
+    const rang = items.findIndex((item) => item.type === "transfer");
+    const avant = items.slice(0, rang).flatMap((item) => (item.type === "stop" ? [item.stop] : []));
+    const apres = items.slice(rang + 1).flatMap((item) => (item.type === "stop" ? [item.stop] : []));
+    expect(avant.map((stop) => stop.id)).toContain("v3-remplace");
+    for (const stop of avant) expect((stop.end ?? stop.start) <= "11:30").toBe(true);
+    for (const stop of apres) expect(stop.start >= "13:30").toBe(true);
+    // Aucun trajet d'une ville à l'autre : la première étape après la ligne n'a pas de segment avant elle.
+    expect(items.slice(rang + 1).findIndex((item) => item.type === "segment")).not.toBe(0);
+    expect(TripSnapshotSchema.parse(v3.instantane)).toEqual(v3.instantane);
+    expect(base).toEqual(gelee);
+  });
+
+  it("plusieurs-villes: patch sur un jour de changement de ville : une étape fixe dans le créneau occupé → no_option", () => {
+    const base = avecTransfer(version2(), 2);
+    const jour = jourN(base, 2);
+    // Une étape verrouillée à 12:00, dans le créneau occupé : le jour n'est pas replanifiable.
+    const verrouillee = {
+      ...base,
+      days: base.days.map((j) =>
+        j.index === 2 ? { ...j, items: j.items.map((item) => (item.type === "stop" && item.stop.id === "v2-j2-2" ? { ...item, stop: { ...item.stop, locked: true } } : item)) } : j,
+      ),
+    };
+    expect(etapes(jour).some((stop) => stop.id === "v2-j2-2")).toBe(true);
+    const gelee = structuredClone(verrouillee);
+    const cible = activiteDuJour(verrouillee, 2);
+    const resultat = appliquerPatch(entree(verrouillee, patch(2, [{ op: "replace", stopId: cible.id, candidateId: RESERVE.proche.id, newStopId: "v3-remplace" }])));
     expect(resultat).toEqual({ ok: false, code: "no_option" });
+    expect(verrouillee).toEqual(gelee);
+  });
+
+  // 0151 § 5 (revue de la PR 932, bloquant 3) : une étape d'avant le départ ne déborde jamais sur le créneau occupé ; une opération
+  // qui la décale ou l'allonge jusque dans le créneau refuse le patch en entier (`no_option`), base intacte.
+  it("plusieurs-villes: move qui décale une étape d'avant le départ dans le créneau occupé → no_option, base intacte", () => {
+    const base = avecTransfer(version2(), 2);
+    const gelee = structuredClone(base);
+    const avant = etapes(jourN(base, 2)).filter((stop) => !stop.locked && stop.commitment === undefined && stop.start < "11:30");
+    const cible = avant.at(0);
+    if (cible === undefined) throw new Error("étape d'avant le départ absente");
+    // Décalée à 11:15 (fixe, par l'opération) : sa fin occupée dépasse le départ de 11:30, le transfer ne se pose pas.
+    const resultat = appliquerPatch(entree(base, patch(2, [{ op: "move", stopId: cible.id, day: 2, time: "11:15" }])));
+    expect(resultat).toEqual({ ok: false, code: "no_option" });
+    expect(base).toEqual(gelee);
+  });
+
+  // Une étape fixe posée à 11:00 repousse les étapes mobiles d'avant le départ : elles ne passent jamais après le transfer.
+  it("plusieurs-villes: move d'une étape d'un autre jour qui repousse les étapes d'avant le départ au-delà de lui → no_option, base intacte", () => {
+    const base = avecTransfer(version2(), 2);
+    const gelee = structuredClone(base);
+    const venue = activiteDuJour(base, 3);
+    const resultat = appliquerPatch(entree(base, patch(2, [{ op: "move", stopId: venue.id, day: 2, time: "11:00" }])));
+    expect(resultat).toEqual({ ok: false, code: "no_option" });
+    expect(base).toEqual(gelee);
+  });
+
+  it("plusieurs-villes: verrouiller une étape un jour de changement de ville", () => {
+    const base = avecTransfer(version2(), 2);
+    const gelee = structuredClone(base);
+    // Déverrouiller l'étape verrouillée (16:00) puis verrouiller une autre : seuls les verrous changent, transfer compris.
+    const verrouillee = etapes(jourN(base, 2)).find((stop) => stop.locked);
+    const libre = etapes(jourN(base, 2)).find((stop) => !stop.locked && stop.commitment === undefined);
+    if (verrouillee === undefined || libre === undefined) throw new Error("étapes absentes");
+    const v3 = reussi(appliquerPatch(entree(base, patch(2, [{ op: "unlock", stopId: verrouillee.id }, { op: "lock", stopId: libre.id }]))));
+    const attendu = {
+      ...jourN(base, 2),
+      items: jourN(base, 2).items.map((item) =>
+        item.type === "stop" && item.stop.id === verrouillee.id
+          ? { ...item, stop: { ...item.stop, locked: false } }
+          : item.type === "stop" && item.stop.id === libre.id
+            ? { ...item, stop: { ...item.stop, locked: true } }
+            : item,
+      ),
+    };
+    expect(jourN(v3.instantane, 2)).toEqual(attendu);
     expect(base).toEqual(gelee);
   });
 
@@ -767,7 +950,8 @@ describe("plusieurs-villes: appliquerPatch recopie le transfer tel quel (décisi
     expect(jourN(v3.instantane, 2).items).toContainEqual(TRANSFER);
     expect(TripSnapshotSchema.parse(v3.instantane)).toEqual(v3.instantane);
     expect(base).toEqual(gelee);
-    // Le verrou et un déplacement ensemble : le jour serait replanifié, refus provisoire (M4b).
+    // Le verrou et un déplacement ensemble : le jour est replanifié par la règle du créneau occupé (0151 § 5.2, M4b) ; l'étape
+    // verrouillée ici commence dans le créneau occupé du transfer (11:30 + 120 minutes) : refus, attente inchangée.
     const autre = etapes(jourN(base, 2)).find((stop) => stop.id !== cible.id && !stop.locked && stop.commitment === undefined);
     if (autre === undefined) throw new Error("seconde étape absente");
     const mixte = appliquerPatch(

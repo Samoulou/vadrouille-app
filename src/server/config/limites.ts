@@ -45,6 +45,11 @@ export const RATE_LIMITS: RateLimitConfig = {
   // par adresse IP (proposition). Vérifié après le doublon, avant le plafond par voyage et par jour UTC
   // (`SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR`, `src/server/config/lieux.ts`) : un signalement rejoué n'est jamais refusé.
   signalement: [{ kind: "ip", windowSeconds: 60, threshold: 10 }],
+  // M5a (décision 0147 § 6.4 point 4 et § 12 S5, mineur 11 de sa revue, arbitrage du CEO) : retouches de la personne,
+  // 60 gestes par heure et par adresse IP (proposition), communs à `lockStop`, `unlockStop`, à l'aperçu et à l'application
+  // d'un ajout, à `listTripVersions`, `previewRevert`, `applyRevert` (et au déplacement quand il viendra sur `api`).
+  // Vérifié après le contrôle du voyage dans l'organisation et du déblocage, avant toute relecture ou écriture.
+  retouche: [{ kind: "ip", windowSeconds: 3600, threshold: 60 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

@@ -494,10 +494,10 @@ Les tests de base de données tournent en CI (`pnpm test:db`), en composition si
    - La ligne « Vers Florence » va de 15:05 à 16:40 et porte ce libellé, sans « (estimation) ».
    - Variante : le même « Billet » saisi de 15:05 sans heure de fin. Le détail est « Train Rome–Florence, départ à 15:05, arrivée à confirmer ». Aucun créneau n'est fixé ici : l'intervalle est renvoyé à M4-suite (§ 3.4).
 8. `changement de ville: départ estimé`.
-   - Contexte : sans billet, sans vol, et sans engagement le 2027-05-06. La ligne affiche « départ vers 09:00 (estimation) ».
+   - Contexte : sans billet, sans vol, et sans engagement le 2027-05-06. La ligne affiche « départ vers 10:00 (estimation) » (0148, amendement 2 du 2026-10-30).
    - Variante : une « Sortie » le 2027-05-06 de 10:00 à 11:30. La ligne affiche « départ vers 11:30 (estimation) ».
-   - Variante : une « Sortie » le 2027-05-06 de 17:00 à 19:00. Elle finit après 18:00 : la ligne affiche « départ vers 09:00 (estimation) », et l'engagement garde son heure (chevauchement toléré jusqu'à M4-suite, § 3.4).
-   - Variante : un dîner réservé (« Sortie ») le 2027-05-06 à 20:00. Il finit après 18:00 : la ligne affiche « départ vers 09:00 (estimation) ».
+   - Variante : une « Sortie » le 2027-05-06 de 17:00 à 19:00. Elle finit après 18:00 : la ligne affiche « départ vers 10:00 (estimation) », et l'engagement garde son heure (chevauchement toléré jusqu'à M4-suite, § 3.4).
+   - Variante : un dîner réservé (« Sortie ») le 2027-05-06 à 20:00. Il finit après 18:00 : la ligne affiche « départ vers 10:00 (estimation) ».
    - Sans durée estimée, la ligne affiche « durée à confirmer » et occupe un créneau de 3 heures.
    - Si M4-TL remplace ces valeurs (§ 3.4), ce critère suit sa décision.
    - Dans tous les cas, la ligne affiche « départ vers {heure} (estimation) », puis « environ {durée} (estimation) », ou « durée à confirmer » sans estimation. Aucune heure de départ n'est affichée sans « vers » et « (estimation) ».

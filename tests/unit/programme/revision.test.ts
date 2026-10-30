@@ -9,7 +9,7 @@ import { composerSimuleeAvec, type EntreeRevisionDuProgramme, type FiltreRevisio
 import { ArretEtape } from "@/server/generation/codes";
 import { resoudre } from "@/server/generation/dependances";
 import { forfaitDeLaRevision } from "@/server/generation/forfait-etape";
-import { choixDuTri } from "@/server/generation/etapes-revision";
+import { choixDuTri, verrousReportes } from "@/server/generation/etapes-revision";
 import * as p0 from "@/server/p0/revision";
 import type { EntreeProgramme } from "@/server/programme/entree";
 import {
@@ -211,10 +211,37 @@ async function capaciteRome(transformer: (programme: ProgrammeLu) => ProgrammeLu
 const lieux = (programme: { readonly jours: readonly { readonly creneaux: readonly { readonly lieu?: string }[] }[] } | null) =>
   (programme?.jours ?? []).flatMap((jour) => jour.creneaux.flatMap((c) => (c.lieu === undefined ? [] : [nomNormalise(c.lieu)])));
 
+describe("R3 sur la version révisée (spécification M5 § 3, critère 2 ; revue de la PR 923, bloquant 1)", () => {
+  // Base : `j1-2` verrouillée (« Forum romain », 10:00-11:00, sans `placeId`).
+  const revisee = (j1: unknown[]): TripSnapshot =>
+    TripSnapshotSchema.parse({ days: INSTANTANE.days.map((jour) => (jour.index === 1 ? { ...jour, items: j1 } : jour)) });
+
+  it("verrou: révision : étape verrouillée gardée telle quelle, son verrou est reporté (l'assemblage la rend déverrouillée)", () => {
+    const sortie = revisee([etape("j1-1", "Panthéon"), etape("j1-2", "Forum romain", { kind: "meal" })]);
+    const tenue = verrousReportes(INSTANTANE, sortie);
+    expect(tenue).not.toBeNull();
+    const j1 = tenue!.days.find((jour) => jour.index === 1)!.items.flatMap((l) => (l.type === "stop" ? [l.stop] : []));
+    expect(j1.map((s) => [s.id, s.name, s.locked])).toEqual([
+      ["j1-1", "Panthéon", false],
+      ["j1-2", "Forum romain", true],
+    ]);
+    // Sans étape verrouillée dans la base : sortie rendue telle quelle.
+    const sansVerrou = TripSnapshotSchema.parse({ days: INSTANTANE.days.map((jour) => ({ ...jour, items: jour.items.map((l) => (l.type === "stop" ? { ...l, stop: { ...l.stop, locked: false } } : l)) })) });
+    expect(verrousReportes(sansVerrou, sortie)).toBe(sortie);
+  });
+
+  it("verrou: révision : étape verrouillée déplacée, renommée, d'un autre lieu ou retirée : écriture refusée (null)", () => {
+    expect(verrousReportes(INSTANTANE, revisee([etape("j1-2", "Forum romain", { start: "12:00", end: "13:00" })]))).toBeNull();
+    expect(verrousReportes(INSTANTANE, revisee([etape("j1-2", "Trevi")]))).toBeNull();
+    expect(verrousReportes(INSTANTANE, revisee([etape("j1-2", "Forum romain", { placeId: `${PLACE}_9` })]))).toBeNull();
+    expect(verrousReportes(INSTANTANE, revisee([etape("j1-1", "Colisée")]))).toBeNull();
+  });
+});
+
 describe("capacité reviser et filet du code (PR 868 ; revue de la PR 875, bloquant 2)", () => {
   it("PR 868 : profil de forfait `revision` (décision 0142) : même valeurs de test partout, aucune requête Routes", async () => {
     expect(PROFILS_FORFAIT).toContain("revision");
-    const attendu = { coutModelesMicros: 700_000, placesTextSearch: 90, placesDetails: 90, routesRequetes: 0, routesElements: 0 };
+    const attendu = { coutModelesMicros: 700_000, placesTextSearch: 100, placesDetails: 100, routesRequetes: 0, routesElements: 0 };
     expect(PLAFONDS_VARIANTE_SIMULEE.generations.revision).toEqual(attendu);
     expect(PLAFONDS_USAGE_TEST.generations.revision).toEqual(attendu);
     expect(PLAFONDS_LARGES.generations.revision).toEqual(attendu);
@@ -250,7 +277,7 @@ describe("capacité reviser et filet du code (PR 868 ; revue de la PR 875, bloqu
     const capacite = await capaciteRome(seulEcarte);
     await capacite.reviser(ENTREE, SEJOUR_ROME, (p) => retirerEtapesEcartees(p, ["Colisée"]));
     // Rien n'a été lu : la suite de l'étape (lieux, vérification) n'a aucun programme.
-    expect(() => capacite.lieux("Rome")).toThrow(RangeError);
+    expect(() => capacite.lieux({ jours: [], bonsPlans: [] })).toThrow(RangeError);
   });
 
   it("PR 868 (c) : une seule journée vidée par le filtre : les autres journées sont gardées", async () => {

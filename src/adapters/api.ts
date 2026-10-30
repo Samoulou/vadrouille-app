@@ -3,21 +3,26 @@ import {
   DayMapSchema,
   DaySchema,
   DeckSessionSchema,
+  PatchResultSchema,
   PreviewSlotsSchema,
   ProposalSchema,
   ReplacementOfferSchema,
   ReplacementWriteSchema,
+  RevertPreviewSchema,
   TripSchema,
   TripSummarySchema,
+  TripVersionPageSchema,
   type Result,
 } from "@/contracts";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
 import { annulerRemplacement, appliquerRemplacement, proposerRemplacement, versionDuVoyage, type DependancesRemplacement } from "@/server/versions/remplacement";
+import { appliquerRetour, listerVersions, proposerRetour } from "@/server/versions/historique";
+import { deverrouillerEtape, verrouillerEtape, type DependancesRetouche } from "@/server/versions/retouches";
 import { basculerAFaire } from "@/server/voyages/a-faire";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
 import { signalerEtape } from "@/server/voyages/signalement";
 
-import type { AdapterContext, RevisionAdapter, StopReportAdapter, TripAdapter } from "./types";
+import type { AdapterContext, RevisionAdapter, StopReportAdapter, TripAdapter, TripVersionsAdapter } from "./types";
 
 /**
  * Adaptateur `api` (spécification B6, B6a point 5 ; handover § 11 : aucun appel HTTP vers soi-même) : implémente
@@ -36,7 +41,8 @@ export type OptionsAdaptateurApi = DependancesLecture;
  * Révision enregistrée (M1g, ticket 869) : cas d'usage de `src/server/versions/remplacement.ts`, dans le même processus,
  * avec le contexte de la session reçu de l'action serveur et **le même port de relectures** que la lecture (un appel par
  * aperçu ou application, hors transaction). Chaque réponse est validée par son contrat. Le cochage d'une ligne « À faire »
- * (`toggleChecklistItem`, B6b, branché sur l'écran 11 par M5e) passe par le même adaptateur.
+ * (`toggleChecklistItem`, B6b, branché sur l'écran 11 par M5e) et le verrou de la fiche (`lockStop`, `unlockStop`, M5a,
+ * `src/server/versions/retouches.ts`, sans relecture) passent par le même adaptateur.
  */
 function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
   const { withOrg, relectures } = options;
@@ -49,6 +55,9 @@ function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
     undoReplacement: async (ctx, input) => valide(ReplacementWriteSchema)(await annulerRemplacement(dependances(ctx), input)),
     toggleChecklistItem: async (ctx, input) =>
       valide(ChecklistItemSchema)(await basculerAFaire({ contexte: async () => ctx, ...(withOrg === undefined ? {} : { withOrg }) }, input)),
+    // M5a (ticket 919) : verrou de la fiche ; aucun appel du port de relectures (décision 0147 § 9).
+    lockStop: async (ctx, input) => valide(PatchResultSchema)(await verrouillerEtape(dependances(ctx), input)),
+    unlockStop: async (ctx, input) => valide(PatchResultSchema)(await deverrouillerEtape(dependances(ctx), input)),
   };
 }
 
@@ -64,12 +73,29 @@ function signalementsApi(options: OptionsAdaptateurApi): StopReportAdapter {
   };
 }
 
+/**
+ * Versions du programme et retour à une version (M5b, ticket 934) : cas d'usage de `src/server/versions/historique.ts`, dans
+ * le même processus, avec le contexte de la session reçu de l'action serveur. Aucun appel du port de relectures (un retour
+ * recopie un instantané). Chaque réponse est validée par son contrat.
+ */
+function versionsApi(options: OptionsAdaptateurApi): TripVersionsAdapter {
+  const { withOrg } = options;
+  const dependances = (ctx: AdapterContext | null): DependancesRetouche => ({ contexte: async () => ctx, ...(withOrg === undefined ? {} : { withOrg }) });
+  const valide = <T>(schema: { parse(valeur: unknown): T }) => (resultat: Result<T>): Result<T> => (resultat.ok ? { ok: true, value: schema.parse(resultat.value) } : resultat);
+  return {
+    listTripVersions: async (ctx, input) => valide(TripVersionPageSchema)(await listerVersions(dependances(ctx), input)),
+    previewRevert: async (ctx, input) => valide(RevertPreviewSchema)(await proposerRetour(dependances(ctx), input)),
+    applyRevert: async (ctx, input) => valide(PatchResultSchema)(await appliquerRetour(dependances(ctx), input)),
+  };
+}
+
 export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter {
   const lecture = creerLectureVoyages(options);
   const getDeckSession = creerLectureDuTri(options.withOrg === undefined ? {} : { withOrg: options.withOrg });
   return {
     revision: revisionApi(options),
     reports: signalementsApi(options),
+    versions: versionsApi(options),
     async listTrips(ctx) {
       return TripSummarySchema.array().parse(await lecture.listTrips(ctx));
     },

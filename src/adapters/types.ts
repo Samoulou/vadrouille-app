@@ -16,6 +16,7 @@ import type {
   LodgingRequest,
   LodgingSuggestion,
   Offer,
+  PatchResult,
   PreviewSlot,
   Proposal,
   Receipt,
@@ -23,6 +24,8 @@ import type {
   ReplacementWrite,
   ChecklistItem,
   Result,
+  RevertPreview,
+  TripVersionPage,
   RetryGenerationRequest,
   Session,
   ShareStatus,
@@ -97,6 +100,27 @@ export interface TripAdapter {
    * a pas. Entrée reçue en `unknown`, revalidée par le cas d'usage.
    */
   readonly reports?: StopReportAdapter;
+  /**
+   * Versions du programme et retour à une version (tâche M5b, ticket 934 ; décision 0147 § 5.3) : présent sur `api`
+   * (`trip_versions`). `mock` tient un historique simulé dans la portée de simulation (`versionsDuVoyage` de
+   * `@/adapters`) ; `prototype` n'en a pas. Entrées reçues en `unknown`, revalidées par le cas d'usage.
+   */
+  readonly versions?: TripVersionsAdapter;
+}
+
+/**
+ * Versions du programme (M5b ; décision 0147 § 5.3 et § 8) : voyage débloqué seulement (`not_unlocked`), débit `retouche`.
+ * Le contexte est celui **de la session** ; `null` : sans session (`unauthenticated`).
+ *
+ * - `listTripVersions` (`TripVersionsRequest` → `TripVersionPage`) : 20 par page, de la plus récente à la plus ancienne ;
+ * - `previewRevert` (`RevertPreviewRequest` → `RevertPreview`) : « Ce qui change », rien n'est écrit ;
+ * - `applyRevert` (`RevertApply` → `PatchResult`) : version nouvelle, copie identique de la version visée, idempotente par
+ *   `requestId` ; refus `validation_failed` (`field: "toVersion"`) d'une version non proposée au retour.
+ */
+export interface TripVersionsAdapter {
+  listTripVersions(ctx: AdapterContext | null, input: unknown): Promise<Result<TripVersionPage>>;
+  previewRevert(ctx: AdapterContext | null, input: unknown): Promise<Result<RevertPreview>>;
+  applyRevert(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
 }
 
 /**
@@ -123,6 +147,13 @@ export interface RevisionAdapter {
    * spécification M5 § 7.3) : état final, idempotent, hors des versions.
    */
   toggleChecklistItem(ctx: AdapterContext | null, input: unknown): Promise<Result<ChecklistItem>>;
+  /**
+   * Verrouiller ou déverrouiller une étape (M5a, ticket 919 ; décision 0147 § 8 et § 9) : `{ tripId, requestId, stopId,
+   * baseVersion }` → `PatchResult` (version nouvelle, auteur `user`). Voyage débloqué seulement (`not_unlocked`), jamais un
+   * événement ni un engagement (`validation_failed`, `stopId`), débit `retouche` ; aucun appel du port de relectures.
+   */
+  lockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+  unlockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
 }
 
 /**

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { DUREE_ESTIMEE_MINUTES, lireBriefDeduit, lireDureeEstimee, lireNotes, lireProgramme, lireQuartier, lireRaisons, ordreEcrit, racineLisible, retoursDeQuartier } from "@/ai/sorties";
+import { cadreLectureChangements, DUREE_ESTIMEE_MINUTES, lireBriefDeduit, lireDureeEstimee, lireNotes, lireProgramme, lireQuartier, lireRaisons, ordreEcrit, racineLisible, retoursDeQuartier } from "@/ai/sorties";
 
 /**
  * Spécification B7a, critère `sorties: schémas stricts` : les cas existants de P0 restent dans `src/ai/ai.test.ts`
@@ -253,5 +253,107 @@ describe("sorties: durée estimée du programme v5 (0149 S-M4-2)", () => {
     expect(lireDureeEstimee(600)).toBe(600);
     expect(lireDureeEstimee(137)).toBe(135);
     expect(lireDureeEstimee(138)).toBe(140);
+  });
+});
+
+/**
+ * M4a-2 (ticket #926) : lecture tolérante de la sortie du prompt `revision` v3, par la même lecture que la v5 et le même
+ * cadre, dérivé des `changements` de l'entrée (`cadreLectureChangements`) : durée estimée lue seulement sur une journée
+ * de changement de ville à départ estimé, nombre JSON entier de 20 à 600, arrondi à 5, retirée sinon ; un `transfer`
+ * écrit par le modèle n'est jamais lu (le code le recopie, 0148 § 8 point 2) ; la ville d'un créneau reste facultative
+ * (le cadrage de M4b l'écrase).
+ */
+describe("sorties: lecture de la sortie revision v3 (mêmes contrôles que la v5)", () => {
+  const SEJOUR = { arrivee: "2027-06-10", depart: "2027-06-15" };
+  const CHANGEMENTS = [
+    { date: "2027-06-12", source: "saisi" as const },
+    { date: "2027-06-13", source: "estime" as const },
+  ];
+  const CADRE = cadreLectureChangements(CHANGEMENTS);
+  const creneau = { debut: "09:30", fin: "10:30", nature: "visite", lieu: "Musée maison", quartier: "Centre", pourquoi: "Pour commencer la journée." };
+  const sortie = (jourEstime: Record<string, unknown>, jourSaisi: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      jours: [
+        { date: "2027-06-11", titre: "Centre", creneaux: [creneau] },
+        { date: "2027-06-12", ...jourSaisi, creneaux: [creneau] },
+        { date: "2027-06-13", ...jourEstime, creneaux: [creneau] },
+      ],
+      bonsPlans: [],
+    });
+  const jour = (lecture: ReturnType<typeof lireProgramme>, date: string) => lecture.valeur?.jours.find((j) => j.date === date);
+
+  it("cadreLectureChangements : seules les dates des départs estimés", () => {
+    expect(CADRE).toEqual({ joursDureeEstimee: ["2027-06-13"] });
+    expect(cadreLectureChangements([])).toEqual({ joursDureeEstimee: [] });
+  });
+
+  it.each([
+    [93, 95],
+    [20, 20],
+    [600, 600],
+  ])("revision v3: durée estimée entière lue et arrondie aux 5 minutes (%s → %s)", (duree, attendue) => {
+    const lecture = lireProgramme(sortie({ dureeEstimeeMinutes: duree }), SEJOUR, CADRE);
+    expect(jour(lecture, "2027-06-13")?.dureeEstimeeMinutes).toBe(attendue);
+    expect(lecture.champsRetires).toBe(0);
+  });
+
+  it.each([["texte", "120"], ["non entière", 120.5], ["sous la borne", 19], ["au-dessus de la borne", 601], ["null", null]])(
+    "revision v3: durée estimée refusée (%s) retirée et comptée, jamais convertie",
+    (_nom, duree) => {
+      const lecture = lireProgramme(sortie({ dureeEstimeeMinutes: duree }), SEJOUR, CADRE);
+      expect(jour(lecture, "2027-06-13")).not.toHaveProperty("dureeEstimeeMinutes");
+      expect(lecture.champsRetires).toBe(1);
+    },
+  );
+
+  it("revision v3: durée estimée sur un départ saisi ou un jour ordinaire ignorée et comptée", () => {
+    const lecture = lireProgramme(
+      JSON.stringify({
+        jours: [
+          { date: "2027-06-11", dureeEstimeeMinutes: 90, creneaux: [creneau] },
+          { date: "2027-06-12", dureeEstimeeMinutes: 90, creneaux: [creneau] },
+        ],
+        bonsPlans: [],
+      }),
+      SEJOUR,
+      CADRE,
+    );
+    for (const j of lecture.valeur!.jours) expect(j).not.toHaveProperty("dureeEstimeeMinutes");
+    expect(lecture.champsRetires).toBe(2);
+  });
+
+  it("revision v3: un transfer écrit par le modèle n'est jamais lu (racine, journée, créneau, nature), compté", () => {
+    const transfer = { label: "Train", start: "12:10", end: "13:45" };
+    const texte = JSON.stringify({
+      transfer,
+      jours: [
+        { date: "2027-06-11", titre: "Centre", creneaux: [creneau] },
+        {
+          date: "2027-06-13",
+          transfer,
+          dureeEstimeeMinutes: 180,
+          creneaux: [
+            { ...creneau, transfer },
+            { debut: "11:30", fin: "14:30", nature: "transfer", lieu: "Gare", pourquoi: "Le train." },
+            { debut: "11:30", fin: "14:30", nature: "trajet", pourquoi: "Le train." },
+          ],
+        },
+      ],
+      bonsPlans: [],
+    });
+    const lecture = lireProgramme(texte, SEJOUR, CADRE);
+    expect(lecture.valeur).not.toBeNull();
+    expect(JSON.stringify(lecture.valeur)).not.toMatch(/transfer|trajet|Train|Gare/);
+    const changement = jour(lecture, "2027-06-13");
+    expect(changement?.dureeEstimeeMinutes).toBe(180);
+    expect(changement?.creneaux).toHaveLength(1);
+    // Clés `transfer` de la racine, de la journée et du créneau : comptées ; créneaux de nature hors liste : retirés.
+    expect(lecture.champsRetires).toBe(3);
+    expect(lecture.creneauxRetires).toBe(2);
+  });
+
+  it("revision v3: une ville écrite par créneau reste facultative (le cadrage de M4b l'écrase), jamais un refus", () => {
+    const lecture = lireProgramme(sortie({}, {}).replace('"quartier":"Centre"', '"quartier":"Centre","ville":"Porto"'), SEJOUR, CADRE);
+    expect(lecture).toMatchObject({ illisible: false, joursRetires: 0, creneauxRetires: 0, champsRetires: 0 });
   });
 });

@@ -32,6 +32,14 @@ const CONFIG: ConfigurationMoteur = {
   dureesParDefaut: { activity: 90, lunch: 75, dinner: 90, evening: 90 },
   margeMinutes: 5,
   seuilTempsLibreMinutes: 30,
+  changementDeVille: {
+    activitesParRythme: { relaxed: 1, balanced: 2, intense: 2 },
+    departEstime: { heureParDefaut: "10:00", limite: "18:00", arrondiMinutes: 15 },
+    creneauSansDureeMinutes: 180,
+    dureeEstimeeMinutes: { min: 20, max: 600 },
+    margesMinutes: { avantDepart: { ticket: 45, flight: 120, estimated: 30 }, apresArrivee: { ticket: 30, flight: 60, estimated: 30 } },
+    long: { seuilMinutes: 240, activitesMax: 1 },
+  },
 };
 
 const FORMULE: ConfigClassement = {
@@ -714,6 +722,22 @@ describe("moteur: jours à planifier (B9-TL-13)", () => {
     expect([...dates]).toEqual(["2026-11-25"]);
     expect(nuits.has(0)).toBe(false);
     expect(TripSnapshotSchema.safeParse({ days: [jour] }).success).toBe(true);
+  });
+
+  it("plusieurs-villes: replanifierJour recopie tel quel un jour qui porte un transfer (décision 0151 § 4)", () => {
+    const base = reussi(generer(entree4({ jours: [1, 2, 3], version: 1 })));
+    const transfer = { type: "transfer" as const, from: "Ville 1", to: "Ville 2", source: "estimated" as const, start: "11:30", estimatedMinutes: 120 };
+    const avec: TripSnapshot = {
+      ...base,
+      days: base.days.map((jour) => (jour.index === 3 ? { ...jour, items: [...jour.items.slice(0, -1), transfer, ...jour.items.slice(-1)] } : jour)),
+    };
+    const gele = structuredClone(avec);
+    const resultat = replanifierJour(entree4({ version: 2 }), avec, 3);
+    if (!resultat.ok) throw new Error(resultat.code);
+    expect(resultat.jour).toEqual(jourN(avec, 3));
+    expect(resultat.jour.items).toContainEqual(transfer);
+    expect(resultat.rapport).toEqual([]);
+    expect(avec).toEqual(gele);
   });
 
   it("replanifierJour pose l'engagement d'un jour de base non planifié, verrouillé (B5-PO-12)", () => {

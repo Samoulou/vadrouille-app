@@ -52,7 +52,14 @@ export type NomAction =
   | "undo-replacement"
   | "revision-version"
   // M5c (ticket 904) : signaler une erreur sur une étape (`src/server/voyages/signalement.ts`).
-  | "report-stop";
+  | "report-stop"
+  // M5a (ticket 919) : verrouiller ou déverrouiller une étape sur `api` (`src/server/versions/retouches.ts`).
+  | "lock-stop"
+  | "unlock-stop"
+  // M5b (ticket 934) : versions du programme et retour à une version sur `api` (`src/server/versions/historique.ts`).
+  | "list-versions"
+  | "preview-revert"
+  | "apply-revert";
 
 type EntreeVoyage = { readonly tripId: string };
 
@@ -93,8 +100,11 @@ export async function executerActionVoyage<S extends z.ZodType<EntreeVoyage>, T>
     return resultat === null ? fail("not_found") : ok(resultat);
   } catch (erreur) {
     if (erreur instanceof RefusAction) {
-      // `generation_in_progress` exige `retryable: true` (`ApiErrorSchema`, décision 0112 § 1.6) : jamais `fail(code)` seul.
-      return erreur.code === "generation_in_progress" ? { ok: false, error: { code: erreur.code, retryable: true } } : fail(erreur.code);
+      // `generation_in_progress` exige `retryable: true` (`ApiErrorSchema`, décision 0112 § 1.6) : jamais `fail(code)` seul ;
+      // `not_unlocked` exige `retryable: false` (décision 0147 § 8).
+      if (erreur.code === "generation_in_progress") return { ok: false, error: { code: erreur.code, retryable: true } };
+      if (erreur.code === "not_unlocked") return { ok: false, error: { code: erreur.code, retryable: false } };
+      return fail(erreur.code);
     }
     const errorName = errorNameOf(erreur);
     logEvent("voyages.action_failed", { action: nom, ...(errorName === undefined ? {} : { errorName }), ...(tripId === undefined ? {} : { tripId }) }, "error");
