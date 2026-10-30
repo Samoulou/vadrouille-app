@@ -17,4 +17,9 @@ servis à leur adresse seulement : « Mes voyages » ne change pas. Sans configu
 | `m4c-7-journee-vers-florence-390.png` | Journée J3 : ligne « Vers Florence », « [Train Rome–Florence], 12:00 – 13:40 », sans numéro ni lien |
 | `m4c-8-sejour-compostelle-390.png` | Séjour au nom long : titres de ville qui passent à la ligne, aucun débordement |
 
-Références visuelles de la CI : inchangées (les écrans à une ville ne changent pas).
+Références visuelles de la CI : une seule change, `tests/visual/__screenshots__/creation-ecran1-ville-engagement.png`
+(écran 1 avec une autre ville et un engagement : l'aide du billet de trajet s'affiche sous « Autres villes », hauteur de
+1910 à 2022 px), régénérée par l'automate `update-snapshots` (commit `0a78444`). Les six autres références que ce
+passage avait aussi régénérées (`connexion-code-faux`, `connexion-code`, `dev-composants-jours-focus-complet`,
+`lancement-conflit`, `lancement-erreur`, `revision-deplacer-jours` : quelques pixels, sans lien avec M4c) sont remises à
+leur état précédent. Les autres écrans à une ville ne changent pas.
