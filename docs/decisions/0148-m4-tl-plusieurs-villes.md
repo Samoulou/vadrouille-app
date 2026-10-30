@@ -1,8 +1,14 @@
 # 0148 — Plusieurs villes sur la chaîne inversée (M4-TL) : forme `transfer`, durée estimée, couche des règles du changement de ville, ville d'un engagement, forfait ; réponses T1 à T12
 
-Statut : **proposée, à confirmer par la revue** (forme de 0114 et 0147). Décision déléguée du **Tech Lead** (architecture, contrats, bibliothèques, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`). Définitive dès sa fusion, **sans délai de veto** (décision 0093). À lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment par une nouvelle décision. Les questions S-M4-1 à S-M4-4 sont posées à la Sécurité (§ 13) : elle répond dans la revue de cette PR ou par une décision à part (spécification, « Prérequis ») ; un refus ultérieur d'un point du § 13 ne rouvre pas la décision d'office, il l'amende par une décision de la Sécurité qui remplace ce seul point.
+Statut : **proposée, à confirmer par la revue** (forme de 0114 et 0147). Décision déléguée du **Tech Lead** (architecture, contrats, bibliothèques, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`). Définitive dès sa fusion, **sans délai de veto** (décision 0093). À lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment par une nouvelle décision. Les questions S-M4-1 à S-M4-5 sont posées à la Sécurité (§ 13 ; S-M4-5 non bloquante) : elle répond dans la revue de cette PR ou par une décision à part (spécification, « Prérequis ») ; un refus ultérieur d'un point du § 13 ne rouvre pas la décision d'office, il l'amende par une décision de la Sécurité qui remplace ce seul point.
 
-Date : 2026-10-29 · Décideur : Tech Lead · Ticket : #905 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 4, ligne M4-TL (l. 146), cycle 221 · Spécification : `specs/M4-plusieurs-villes.md` (fusionnée par #876 ; § 3.4, § 5, § 9 T1 à T12, § 10, § 12, § 15), avec le « Report du CEO (Q703) » de la description de #876 et les questions Q703, Q712 et Q718 de `QUESTIONS.md` · Revue de reprise : mineurs 1 à 5 de la dernière revue de #876, « à reporter à M4-TL ou M4-suite » (§ 11) · `main` relu : `c96f3cd` · Décisions lues : 0011, 0027 § 2, 0045 § 2.2, 0092, 0093, 0103, 0113 § 3 bis, 0114 (forme), 0115, 0116 (§ 1.6 à § 1.8, § 4, § 5.1), 0117, 0129 § 4 et § 8, 0136 (§ 1 à § 6, § 9, § 12), 0139, 0141 (§ 2.3, § 4, § 6), 0147 (forme).
+**Correction 1** (revue consolidée du head `55182c6`, Tech Lead ; arbitrages du CEO) :
+- bloquant 1 : cadrage de la sortie rédigée **avant** la vérification, par une étape 2 bis (§ 5.1 point 3, § 8 point 2) ;
+- bloquant 2 : champ `ville` de l'IA ignoré et écrasé par la ville du code (§ 7.1 points 3 et 4) ;
+- bloquant 3 : deux attentes de `MAX_CITIES` écrites en dur, rattachées à M4-C (§ 10.2 point 3) ;
+- mineurs 4 à 12 (en-tête, § 3, § 4, § 5, § 7.1, § 8, § 9, § 10, § 14).
+
+Date : 2026-10-29 (correction 1 le 2026-10-30) · Décideur : Tech Lead · Ticket : #905 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 4, ligne M4-TL (l. 146), cycle 221 · Spécification : `specs/M4-plusieurs-villes.md` (fusionnée par #876 ; § 3.4, § 5, § 9 T1 à T12, § 10, § 12, § 15), avec le « Report du CEO (Q703) » de la description de #876 et les questions Q703, Q712 et Q718 de `QUESTIONS.md` · Revue de reprise : mineurs 1 à 5 de la dernière revue de #876, « à reporter à M4-TL ou M4-suite » (§ 11) · `main` relu : `c96f3cd` · Décisions lues : 0011, 0027 § 2, 0045 § 2.2, 0092, 0093, 0103, 0113 § 3 bis, 0114 (forme), 0115, 0116 (§ 1.6 à § 1.8, § 4, § 5.1), 0117, 0129 § 4 et § 8, 0136 (§ 1 à § 6, § 9, § 12), 0139, 0141 (§ 2.3, § 4, § 6), 0147 (forme).
 
 Numérotation (relue le 2026-10-29) : `main` porte 0001 à 0147 ; 0148 est réservée par le CEO pour cette décision (#905).
 
@@ -65,7 +71,11 @@ La proposition du Product Owner est retenue, avec des noms anglais comme le rest
    - Une part par jour suivrait le coût, mais changerait la forme de `PlafondsUsageSchema` (profils fixes, `forfaitEntierReserve`) que la PR des plafonds réels (M1h) remplira avec les montants de Samuel. Elle est reportée (« Quand revoir »).
    - Le prix d'un forfait unique : un voyage court réserve plus qu'il ne consomme, comme aujourd'hui pour une ville.
 2. **Valeurs de test de la variante simulée** (`PLAFONDS_VARIANTE_SIMULEE`, `src/server/config/usage.ts`, et `tests/support/plafonds-usage.ts`, alignés par `usage.test.ts`) : `programme` passe à **100 Text Search et 100 fiches** (au lieu de 90), `coutModelesMicros` inchangé (600 000), Routes à 0 ; `revision` passe aussi à **100 et 100** (toute la version est revérifiée, 0142). Base : environ 6 lieux distincts par jour (Rome, 30 lieux pour 5 jours), au plus 4 lieux un jour de changement de ville, 3 logements ; 15 jours et 3 villes : 13 × 6 + 2 × 4 + 3 = **89**, arrondi avec marge. Ce ne sont pas des montants : la barrière ne les lit jamais.
-3. **Coût estimé au prix plein** (`prototype/config/prix-google.json`, relevé du 2026-10-23 ; avant les 1 000 fiches Enterprise gratuites du mois), pour la question Samuel 4 :
+3. **Coût estimé au prix plein**, pour la question Samuel 4. Les prix sont recoupés avec `prototype/config/prix-google.json` (relevé du 2026-10-23, mineur 12) :
+   - `places_text_search_essentials_ids_only` : `prixPour1000: 0`, donc 0 USD par recherche ;
+   - `places_details_enterprise` : `prixPour1000: 20`, donc **0,02 USD par fiche**, avec `gratuitParMois: 1000`.
+
+   Les montants ci-dessous sont comptés avant cette tranche gratuite :
 
    | Voyage de référence | Lieux (estimés) | Logements | Text Search « IDs only » | Fiches Enterprise (0,02 USD) | Google | Modèle |
    |---|---|---|---|---|---|---|
@@ -79,7 +89,7 @@ La proposition du Product Owner est retenue, avec des noms anglais comme le rest
 
 1. **`MAX_CITIES` passe à 3** dans `src/contracts/values.ts` (PR M4-C), comme proposé : F8-PO-3 disait « 4, provisoire », et M4-PO-2 fixe 3. Un seul plafond pour `mock`, l'ancienne chaîne et la chaîne inversée ; le site d'essai refuse déjà toute autre ville. Une 4e ville est refusée par `TripDraftSchema` (`.max(MAX_CITIES - 1)`) sur le champ **`draft.otherCities`** (chemin rendu par `parseInput`), sans écriture (critère 2). Les tests de B9 et F8 citent `MAX_CITIES` par son nom et passent tels quels (relevé : `src/contracts/creation.test.ts`, l. 105 ; `src/features/creation/draft.test.ts`, l. 41 ; les brouillons « à trois villes » de `tests/db/creation.test.ts`, `generation-modules.test.ts` et `voyage-complet.test.ts` restent valides). C'est l'exception prévue par le critère 20.
 2. **Même ville deux fois de suite** : une fonction pure unique `memeVilleQueLaPrecedente(villes)` dans `src/lib/fuseaux/index.ts`, qui compare les **clés** (`cleVille`, l. 59 : accents, casse et tirets ignorés), rend l'indice de la seconde ville. Deux appelants :
-   - `controlerVilles` (l. 209), pour `createTrip` de `api` (les deux chaînes), avec une raison nouvelle `"repetee"`, testée après `"inconnue"` et avant `"decalage"` ; refus **`draft.otherCities.{i}.name`** (`champVille`), sans écriture (critère 4) ;
+   - `controlerVilles` (l. 209), pour `createTrip` de `api` (les deux chaînes), avec une raison nouvelle `"repetee"`. `controlerVilles` fait deux boucles : la première rend `"inconnue"`, la seconde `"decalage"`. Le contrôle `"repetee"` est un **passage nouveau entre les deux boucles**, sur les clés de villes toutes connues (mineur 10). Le refus porte sur **`draft.otherCities.{i}.name`** (`champVille`), sans écriture (critère 4). Seul appelant hors tests : `creer-voyage.ts` (l. 93), qui ne lit que `indice` ; aucun `switch` exhaustif sur `raison` n'existe (relevé sur `c96f3cd`) ;
    - `src/features/creation/validation.ts`, pour l'erreur sous le champ de l'écran 1 (§ 8 de la spécification).
 
    Pas dans `checkCities` du contrat : `src/contracts` n'importe pas `src/lib/fuseaux`, et une seconde normalisation serait une copie de `cleVille`.
@@ -92,22 +102,35 @@ Combinaison des trois, avec **une seule source de vérité, le code** (principe 
 
 1. **Domaine** : un module pur nouveau, **`src/domain/changement-de-ville.ts`** (aucune entrée-sortie, comme `src/domain/apercu.ts`), qui calcule de façon déterministe, depuis les villes et les engagements du brouillon (`TripCommitment`, qui portent `end`) et la configuration :
    - la liste des changements de ville (date, ville quittée, ville d'arrivée) ;
-   - pour chacun, le départ saisi (règle du billet de trajet, § 6 ci-dessous) ou estimé (§ 5.2), l'arrivée saisie, le mode estimé ;
+   - pour chacun, le départ saisi (règle du billet de trajet, § 9 point 1) ou estimé (§ 5.2), l'arrivée saisie, le mode estimé ;
    - le **créneau occupé** par le changement de ville, pour la planification (§ 5.3) ;
    - le nombre maximal d'activités (§ 5.4) et le thème « De {ville} à {ville} ».
    `squelette.ts` n'est **pas** modifié : il ne sert que l'ancienne chaîne (Contexte, point 1).
 2. **Avant le prompt** : la conversion de `api` (§ 8, T8) met ces valeurs dans l'entrée du prompt `programme` v5 (cadre de chaque journée de changement de ville : heure de départ, arrivée si connue, créneau, nombre maximal d'activités, ville de chaque moitié). L'IA les applique ; elle **n'écrit pas** la ligne « Vers {ville} » ni le thème de ce jour.
-3. **Contrôle de la sortie, à l'assemblage** (`assemblerProgrammeIa`, M4b), qui **garantit** le résultat quelle que soit la sortie de l'IA :
+3. **Contrôle de la sortie, en deux temps** (correction 1, bloquant 1 ; option retenue : celle que préfère le CEO). Il **garantit** le résultat quelle que soit la sortie de l'IA.
+
+   **(a) Cadrage, avant la vérification.** Une **étape nouvelle 2 bis** de `redigerEtVerifier` (`src/server/generation/etapes-programme.ts`), entre la rédaction (étape 2) et la vérification des sites et des lieux (étape 3). Elle appelle une fonction pure **`cadrerProgramme`** (`src/server/programme/cadrage.ts`, nouveau ; forme structurelle des créneaux, comme `assemblage.ts`, sans importer `src/ai`, 0136 § 1.2). Cette fonction reçoit la sortie lue (`redaction.programme`), les changements de ville du domaine et la configuration, et rend un programme **cadré** :
+   - **ville de chaque créneau**, posée par le code (§ 7.1 point 3, bloquant 2) : la ville du jour (`villeDuJour`, § 6) ; le jour d'un changement de ville, la ville quittée pour un créneau rangé avant la ligne, la ville d'arrivée pour un créneau rangé après ;
+   - **rangement**, le jour d'un changement de ville, par la **fin occupée** du créneau : sa `fin`, sinon `debut` plus la durée par défaut de sa nature (`dureesParDefaut` de `moteur.json`). Tout créneau a un `debut`, exigé par la lecture (`HEURE`, `src/ai/sorties.ts`). Fin occupée ≤ départ : **avant** la ligne. `debut` ≥ fin du créneau occupé (§ 5.3) : **après**. Tout autre créneau (commencé avant le départ et fini après, ou commencé dans le créneau occupé) : **retiré** (mineur 7) ;
+   - **plafond d'activités** : au plus le nombre maximal (§ 5.4), dans l'ordre écrit. Les créneaux `visite`, `soiree` et `pause` avec lieu comptent ; les repas et les pauses sans lieu ne comptent pas. Les suivants sont retirés ;
+   - **`aReserver`** retiré de chaque créneau ce jour-là (spécification § 3.2 : jamais une étape à réserver) ;
+   - les jours ordinaires ne sont pas touchés, sauf la ville de leurs créneaux.
+
+   Les retraits sont comptés dans `compteurs.slotsRemoved`. Tout ce qui suit lit le programme **cadré** : `sitesDuProgramme`, `lieuxDuProgramme` (donc `placesToVerify` et `lieuxHorsPart`), la vérification, puis l'assemblage. Un créneau retiré ne coûte donc **aucune** requête Text Search ni fiche : le jour de changement de ville reste à 4 lieux au plus, et le forfait du § 3 tient.
+
+   Conséquence de signature : `CapaciteProgramme.lieux(destination)` (`src/server/composition/generation.ts`, l. 676) relit aujourd'hui l'état interne `lu` de la capacité. Elle reçoit désormais **le programme cadré** en argument (`lieux(programme)`), pour que les indices `(jour, rang)` de `placeIdDe` soient ceux du programme cadré. La même étape 2 bis s'applique après la révision M1b (`reviser`), sur la version révisée.
+
+   **(b) Assemblage** (`assemblerProgrammeIa`, M4b), sur le programme cadré :
    - il insère l'élément `transfer` (§ 1) entre les deux groupes ;
-   - il range chaque créneau de l'IA par son heure de début `d` : `d` < départ → avant la ligne (ville quittée) ; `d` ≥ fin du créneau occupé → après (ville d'arrivée) ; entre les deux → **retiré** (compté dans `slotsRemoved`) ;
-   - il garde, dans l'ordre écrit, au plus le nombre maximal d'activités (étapes `activity` qui ne sont pas des engagements ; les repas et les lignes `free` ne comptent pas) et retire les suivantes ;
-   - il ne pose jamais le badge `toReserve` ce jour-là (spécification § 3.2) ;
-   - il écrit `Day.theme` « De {ville quittée} à {ville d'arrivée} » (`texteMaison`, coupé à `LONGUEURS_CONTRAT.theme` ; trop long : absent, l'écran nomme la journée depuis `Trip.cities`, § 6) ;
-   - il ajoute une ligne `free` entre la dernière ligne avant le départ et le départ quand l'écart atteint `seuilTempsLibreMinutes` (30, `moteur.json`) : pas de trou (§ 3.2 point 1 de la spécification) ; un écart plus court est une marge, renvoyée à M4-suite ;
-   - il ne pose aucun `segment` entre la dernière étape avant la ligne et la première après : la première étape après l'arrivée n'a pas de segment avant elle (`travelFromPrevious` absent, § 7.3 de la spécification).
+   - il écrit `Day.theme` « De {ville quittée} à {ville d'arrivée} » (`texteMaison`, coupé à `LONGUEURS_CONTRAT.theme` ; trop long : absent, et l'écran nomme la journée depuis `Trip.cities`, § 6) ;
+   - il ajoute une ligne `free` entre la dernière ligne avant le départ et le départ quand l'écart atteint `seuilTempsLibreMinutes` (30, `moteur.json`) : il n'y a pas de trou (§ 3.2 point 1 de la spécification). Un écart plus court est une marge, renvoyée à M4-suite ;
+   - il ne pose aucun `segment` entre la dernière étape avant la ligne et la première après : la première étape après l'arrivée n'a pas de segment avant elle (`travelFromPrevious` absent, § 7.3 de la spécification) ;
+   - **second contrôle** : il rappelle `cadrerProgramme`, qui est idempotente (un programme cadré ressort inchangé), comme `texteAdmis` double la lecture. Sur la chaîne de `api`, un écart ne peut venir que d'une entrée qui n'est pas passée par l'étape 2 bis.
 
    Ces retraits **amendent 0116 § 1.6** (« sans retirer ») **pour la seule journée du changement de ville** ; les autres journées ne changent pas.
-4. **Où se testent les critères 6 à 12** : dans **M4b** (tests unitaires de `changement-de-ville.ts` et de l'assemblage, puis base de données en composition simulée), sur des sorties simulées qui **violent** volontairement le cadre (activités en trop, étape dans le créneau, `aReserver` ce jour-là) pour prouver le contrôle. **M4a** mesure l'adhésion du prompt dans son jeu d'évaluation (§ 14 de la spécification), sans en faire un critère d'acceptation.
+
+   *Option écartée* : tout faire à l'assemblage, après la vérification. Au moment de la recherche, la ville de vérification d'un lieu du jour de changement de ville ne serait pas connue, et des lieux retirés ensuite consommeraient du forfait.
+4. **Où se testent les critères 6 à 12** : dans **M4b**. Ce sont des tests unitaires de `changement-de-ville.ts`, de `cadrerProgramme` et de l'assemblage, puis des tests de base de données en composition simulée. Ils utilisent des sorties simulées qui **violent** volontairement le cadre : activités en trop, étape dans le créneau occupé ou à cheval sur le départ, `aReserver` ce jour-là, `ville` écrite par l'IA. Ils prouvent le contrôle et vérifient qu'aucun créneau retiré n'est cherché (compteur de Text Search du double). **M4a** mesure l'adhésion du prompt dans son jeu d'évaluation (§ 14 de la spécification), sans en faire un critère d'acceptation.
 5. **Valeurs dans `moteur.json`** (proposition du Product Owner retenue) : une section nouvelle `changementDeVille`, validée par `src/domain/configuration.ts` :
 
    ```json
@@ -121,9 +144,16 @@ Combinaison des trois, avec **une seule source de vérité, le code** (principe 
 
    Test : `heureParDefaut` est dans `fenetreJour`, et `limite + creneauSansDureeMinutes` ne dépasse pas `fenetreJour.fin`.
 
+   Une durée estimée longue peut, elle, dépasser `fenetreJour.fin` (départ à 18:00 et 600 minutes). Dans ce cas (mineur 7) :
+   - le créneau occupé est **borné à `fenetreJour.fin`** (§ 5.3) ;
+   - aucun créneau de l'IA n'est gardé après la ligne ;
+   - la durée reste affichée comme estimation, sans heure d'arrivée.
+
+   Un changement de ville qui finirait le lendemain relève des trains de nuit, hors de ce lot.
+
 ### 5.2 Départ estimé : défaut technique (remplace la valeur provisoire du § 3.4 ; Q703, Q712)
 
-Sans billet ni vol le jour du changement de ville, seuls des engagements « Sortie » (`booking`) peuvent rester ce jour-là. Pour chacun, sa **fin occupée** est `finOccupee` (`src/domain/squelette.ts`, l. 148) : son heure de fin, sinon la durée par défaut de sa nature (B5-PO-1 : 90 minutes pour une activité, 75 pour un déjeuner, 90 pour un dîner).
+Sans billet ni vol le jour du changement de ville, seuls des engagements « Sortie » (`booking`) peuvent rester ce jour-là. Avec un billet ou un vol, le départ est saisi : **tout** « Billet » de ce jour, y compris un billet de musée ou de spectacle, est lu comme le transport (règle du billet de trajet, spécification § 3.3). C'est une règle du Product Owner, que ce choix n'amende pas ; son effet est signalé à M4-suite (mineur 8, § 14). Pour chacun, sa **fin occupée** est `finOccupee` (`src/domain/squelette.ts`, l. 148) : son heure de fin, sinon la durée par défaut de sa nature (B5-PO-1 : 90 minutes pour une activité, 75 pour un déjeuner, 90 pour un dîner).
 
 > **Départ estimé** = la plus tardive des fins occupées qui ne dépassent pas `limite` (18:00), sans descendre sous `heureParDefaut` (09:00) ; sans telle fin, `heureParDefaut`.
 
@@ -135,7 +165,7 @@ Les variantes du critère 8 donnent les mêmes heures (aucun engagement : 09:00 
 
 ### 5.3 Créneau occupé par la ligne « Vers {ville} » (Q703, bloquant 1)
 
-- **Départ estimé** : de départ à départ + `estimatedMinutes` ; sans durée estimée, départ + **`creneauSansDureeMinutes` (180)**. Le créneau sert à la planification (cadre du prompt, rangement du § 5.1 point 3) ; il n'est pas affiché, et l'arrivée reste « à confirmer ».
+- **Départ estimé** : de départ à départ + `estimatedMinutes` ; sans durée estimée, départ + **`creneauSansDureeMinutes` (180)** ; dans les deux cas, borné à `fenetreJour.fin` (§ 5.1 point 5). Le créneau sert à la planification (cadre du prompt, cadrage du § 5.1 point 3) ; il n'est pas affiché, et l'arrivée reste « à confirmer ». La durée estimée vient de la sortie rédigée, lue avant le cadrage : elle est connue à l'étape 2 bis.
 - **Billet ou vol avec heure de fin** : de `start` à `end`.
 - **Billet ou vol sans heure de fin** : **aucun créneau fixé** (spécification § 3.4 et critère 7, Q703) ; le créneau est réduit à l'heure de départ, et le rangement ne fait que l'ordre (avant ou après le départ). L'intervalle reste à M4-suite.
 
@@ -155,9 +185,18 @@ Nombre maximal d'activités : `changementDeVille.activitesParRythme` (1, 2, 2 : 
 ### 7.1 T5 — Vérification par ville
 
 1. **Logements** : chaque logement est ancré sur **sa** ville (`« {libellé}, {ville} »`), et non sur `brief.destination`.
-2. **Zones** : une zone **par ville**, le cercle de `RAYON_BIAIS_METRES` (30 km, inchangé) autour du logement ancré de cette ville (position de fiche, en mémoire seulement, 0011) ; pour un logement `area` ou `none`, la position de la ville par le chemin existant (Text Search « IDs only » du nom de la ville et fiche, 0100 § 6.2 (c)). `ancrerLogementsDuSejour` rend les zones par ville au lieu d'un rectangle commun.
-3. **Lieux** : chaque lieu est cherché par `« {lieu}, {ville de son étape} »` avec la **restriction** à la zone de cette ville, et sa fiche doit tomber dans cette zone (`dansZone`). La ville de l'étape est celle du code (§ 6 point 3), jamais une ville écrite par l'IA. **« Loin de la ville de son étape » = hors de sa zone** : la règle actuelle, appliquée ville par ville, **sans seuil nouveau**. Un lieu trouvé dans une autre ville du voyage, hors de la zone de son étape, perd son `placeId` (0116, badge « à confirmer », critère 12). Deux villes à moins de 60 km ont des zones qui se recouvrent : un lieu dans le recouvrement est gardé dans les deux ; risque accepté.
-4. **Lieux distincts** : la clé d'un lieu distinct devient (nom, ville) : un même nom dans deux villes donne deux vérifications.
+2. **Zones** : une zone **par ville**. C'est le `RectangleZone` englobant le cercle de `RAYON_BIAIS_METRES` (30 km, inchangé) autour du logement ancré de cette ville, soit `zoneDuSejour([position], RAYON_BIAIS_METRES)` sur une seule position (mineur 5). La position est celle de la fiche, en mémoire seulement (0011). Pour un logement `area` ou `none`, on prend la position de la ville par le chemin existant (Text Search « IDs only » du nom de la ville et fiche, 0100 § 6.2 (c)). `ancrerLogementsDuSejour` rend les zones par ville au lieu d'un rectangle commun.
+3. **Lieux** : chaque lieu est cherché par `« {lieu}, {ville de son étape} »`, avec la **restriction** à la zone de cette ville, et sa fiche doit tomber dans cette zone (`dansZone`).
+   - **Ville du lieu (bloquant 2)** : celle que le **cadrage** (§ 5.1 point 3 (a)) pose sur chaque créneau **avant** la vérification. Elle vient de la ville du jour (§ 6 point 3) et, le jour d'un changement de ville, du rangement par rapport au départ.
+   - **Le champ `ville` de l'IA est ignoré** sur la chaîne de `api` :
+     - le prompt v5 ne le demande plus (M4a) ;
+     - la lecture tolérante (`CreneauIaObjet`, `src/ai/sorties.ts`, l. 612, 621 et 651) le garde facultatif pour ne pas casser la lecture ;
+     - le cadrage l'**écrase** toujours par la ville du code.
+   - `lieuxDuProgramme` et `verifierLieuxDuProgramme` (`lieu.ville ?? destination`, `src/grounding/ancrage-zone.ts`) ne changent pas de forme : sur `api`, ils ne lisent donc que la ville du code. Le site d'essai et `p0Run`, sans cadrage, gardent la ville de l'IA comme aujourd'hui.
+   - Une excursion d'un jour reste admise tant que le lieu tombe dans la zone de sa ville : le texte de la ville n'est qu'une indication, la restriction est la zone.
+   - **« Loin de la ville de son étape » = hors de sa zone** : c'est la règle actuelle, appliquée ville par ville, **sans seuil nouveau**. Un lieu trouvé dans une autre ville du voyage, hors de la zone de son étape, perd son `placeId` (0116, badge « à confirmer », critère 12).
+   - Deux villes dont les rectangles se recouvrent (centres à moins de 60 km environ, davantage dans les coins) : un lieu dans le recouvrement est gardé pour les deux ; risque accepté.
+4. **Lieux distincts** : la clé d'un lieu distinct reste `(cleDeNom(lieu), cleDeNom(ville))` (`lieuxDuProgramme`, `src/ai/sorties.ts`, l. 823-845). Sur `api`, la ville est celle du code : un même nom dans deux villes donne deux vérifications.
 5. **Forfait** : inchangé dans sa forme ; `lieuxHorsPart` compte les logements de toutes les villes (`brief.logements.length`, déjà juste).
 
 ### 7.2 T7 — Carte
@@ -169,12 +208,18 @@ Nombre maximal d'activités : `changementDeVille.activitesParRythme` (1, 2, 2 : 
 ## 8. T8 — Module partagé : deux fonctions de conversion
 
 1. **`briefDepuisFormulaire` ne change pas** : il garde son refus de `draft.otherCities` pour le site d'essai et `p0Run` (M4-PO-1, critère 19) ; `BriefEssai` et `BriefSchema` ne changent pas, et l'égalité de types du pont `p0Run` reste vérifiée.
-2. **Nouvelle fonction `briefProgrammeDepuisFormulaire(draft, brief, recit)`** dans `src/server/programme/brief.ts`, pour `api` seulement (`creer-voyage.ts`, `etapes-programme.ts`, et `voyageEtBriefSansRecit` de la révision M1b). Elle rend un **`BriefProgramme`**, déclaré dans `forme.ts` comme une **extension** de `BriefEssai` (assignable à `BriefEssai`, donc accepté par `assemblage.ts` et l'ancrage sans copie) :
+2. **Nouvelle fonction `briefProgrammeDepuisFormulaire(draft, brief, recit)`** dans `src/server/programme/brief.ts`, pour `api` seulement (`creer-voyage.ts`, `etapes-programme.ts`, et `voyageEtBriefSansRecit` de la révision M1b). Elle rend un **`BriefProgramme`**, déclaré dans `forme.ts` comme une **extension** de `BriefEssai`. Il est assignable à `BriefEssai`, ce qui laisse passer les modules partagés qui n'en lisent que les champs communs. Il ne suffit pourtant pas : M4b **change ces signatures** (mineur 6) :
+   - `assemblerProgrammeIa` (`EntreeAssemblageIa.brief`) reçoit un `BriefEssai | BriefProgramme` et lit `villes` et `changements` quand ils sont présents. Sans ces champs, sur le chemin de `p0Run`, son comportement ne change pas ;
+   - `CapaciteProgramme.lieux(destination)` devient `lieux(programme)`, sur le programme cadré (§ 5.1 point 3) ;
+   - `CapaciteProgramme.logements(brief)` et `ancrerLogementsDuSejour(brief)` ancrent chaque logement sur sa ville et rendent une zone par ville (§ 7.1). Le site d'essai (une ville) en reçoit une seule, égale à la zone d'aujourd'hui ;
+   - `cadrerProgramme` (nouvelle) reçoit le `BriefProgramme`.
+
+   Champs du `BriefProgramme` :
    - `villes` : 1 à 3 entrées `{ nom, arrivee, nuits, logement }` (nom maison, texte du logement de `texteDuLogement` avec **sa** ville) ; `logements` reste rempli (texte et nuits dans l'ordre), pour les modules partagés ;
    - `changements` : la sortie du domaine (§ 5.1), sans libellé (§ 13, S-M4-1) ;
    - `engagements[].fin` facultatif, et **sans** les engagements qui sont devenus le changement de ville (ils ne sont ni des événements ni répétés au modèle).
    Les deux fonctions partagent les contrôles de destination, de durée et de pays (une fonction interne commune, aucune copie).
-3. L'entrée du prompt v5 (`EntreeProgrammeV5`, `src/ai/entrees.ts`) est construite par une fonction de `entree.ts` à partir du `BriefProgramme` ; sa forme exacte revient à ia-recherche (M4a), sous les contraintes de cette décision : aucune donnée Google, aucun libellé de billet, durée de sortie en minutes entières.
+3. L'entrée du prompt v5 (`EntreeProgrammeV5`, `src/ai/entrees.ts`) est construite par une fonction de `entree.ts` à partir du `BriefProgramme` ; sa forme exacte revient à ia-recherche (M4a), sous les contraintes de cette décision : aucune donnée Google, aucun libellé de billet, durée de sortie en minutes entières, **aucun champ `ville` par créneau** (la ville est posée par le code, § 7.1 point 3).
 
 ## 9. T9 — Engagements et changement de ville
 
@@ -182,15 +227,15 @@ Nombre maximal d'activités : `changementDeVille.activitesParRythme` (1, 2, 2 : 
 2. **Heure de fin** : elle atteint la couche qui planifie **hors du brief de l'essai** : le domaine lit les `TripCommitment` du brouillon, qui portent `end`. Elle entre aussi dans le `BriefProgramme` (`engagements[].fin`, § 8) pour informer le modèle. `BriefEssai` et le prompt v4 ne changent pas.
 3. **Vols** : `heuresDeVol` ne change pas (il ne lit que le premier et le dernier jour, qui ne sont jamais des changements de ville, § 3.1 point 4 de la spécification). La nouvelle conversion ne retire pas le vol d'un jour de changement de ville : il devient le changement de ville. Les autres vols restent écartés comme aujourd'hui.
 4. **L'engagement devenu changement de ville** n'est pas un événement de `Day.events` : il n'apparaît qu'une fois, comme élément `transfer` (`label`, `start`, `end`).
-5. **Ville d'un engagement** (report du CEO, Q703, Q718) : **déduite par l'heure**, relativement au changement de ville, sans champ saisi (M4-PO-7 et § 13 de la spécification : aucun champ nouveau) ni vérification de lieu (un engagement n'a pas de lieu) : un engagement dont la fin occupée (§ 5.2) ne dépasse pas le départ appartient à la ville quittée ; tout autre engagement de ce jour, à la ville d'arrivée. Pour un départ estimé, cela revient à la règle du § 5.2 ; pour un départ saisi, le départ est l'heure du billet. Fonction `villeDeLEngagement` de `changement-de-ville.ts`. Elle n'est pas affichée (les événements n'ont pas de ville à l'écran) ; elle sert au départ estimé et aux règles de M4-suite.
+5. **Ville d'un engagement** (report du CEO, Q703, Q718) : **déduite par l'heure**, relativement au changement de ville, sans champ saisi (M4-PO-7 et § 13 de la spécification : aucun champ nouveau) ni vérification de lieu (un engagement n'a pas de lieu) : un engagement dont la fin occupée (§ 5.2) ne dépasse pas le départ appartient à la ville quittée ; tout autre engagement de ce jour, à la ville d'arrivée. Pour un départ estimé, cela revient à la règle du § 5.2 ; pour un départ saisi, le départ est l'heure du billet. Un engagement commencé avant le départ et fini après (Sortie de 11:30 à 12:30, billet à 12:00) est donc rangé dans la ville d'arrivée, bien qu'il commence dans la ville quittée (mineur 9). C'est voulu : il chevauche le changement de ville, cas toléré jusqu'à M4-suite (point 7), qui en fixera la règle. Fonction `villeDeLEngagement` de `changement-de-ville.ts`. Elle n'est pas affichée (les événements n'ont pas de ville à l'écran) ; elle sert au départ estimé et aux règles de M4-suite.
 6. **Couche des règles des engagements autour du changement de ville** (marges, engagement pendant le trajet, arrivée proche, chevauchement) : **la même**, le domaine (`changement-de-ville.ts`) et le contrôle de l'assemblage, valeurs dans `moteur.json` (`changementDeVille`). M4-suite en écrit les règles ; leur code suivra dans une tâche après M4-suite.
-7. **Chevauchement toléré** (spécification § 3.4) : un engagement qui chevauche le créneau occupé garde son heure et reste un événement ; le contrôle de l'assemblage ne retire que des créneaux **de l'IA** (§ 5.1 point 3), jamais un engagement.
+7. **Chevauchement toléré** (spécification § 3.4) : un engagement qui chevauche le créneau occupé garde son heure et reste un événement ; le cadrage ne retire que des créneaux **de l'IA** (§ 5.1 point 3), jamais un engagement.
 
 ## 10. T10 et T12 — Tests ; cases de l'aperçu
 
 ### 10.1 T12 — Cases de l'aperçu
 
-1. **Filtre des jours avant l'appel**, sans paramètre nouveau : `selectionApercu` et `servisAvantDeblocage` ne changent pas (le site d'essai non plus). Une fonction pure `joursHorsChangement(jours)` (`src/domain/apercu.ts`) retire les journées qui contiennent un `transfer` ; `cases-programme.ts` (écriture des cases, M4b) et `src/server/voyages/lecture.ts` (lecture avant le déblocage) l'appliquent avant `selectionApercu`. J1 n'est jamais un changement de ville ; une journée de changement de ville sans case reste « À débloquer » (critère 14). La règle de `retenirApercu` reste la même.
+1. **Filtre des jours avant l'appel**, sans paramètre nouveau : `selectionApercu` et `servisAvantDeblocage` ne changent pas (le site d'essai non plus). Une fonction pure `joursHorsChangement(jours)` (`src/domain/apercu.ts`) retire les journées qui contiennent un `transfer` ; `cases-programme.ts` (écriture des cases, M4b) et `src/server/voyages/lecture.ts` (lecture avant le déblocage) l'appliquent avant `selectionApercu`. J1 n'est jamais un changement de ville. Par défense, `joursHorsChangement` **ne retire jamais l'indice 1**, quels que soient ses éléments (mineur 11) ; une journée de changement de ville sans case reste « À débloquer » (critère 14). La règle de `retenirApercu` reste la même.
 2. **Première carte après l'arrivée** : `etapeEnCase` ne pose `segmentAvant` que si l'élément précédent est un `segment` ; avec le `transfer` juste avant, il n'y en a pas : `travelFromPrevious` est absent, et `DeckCard.tsx` ne rend la ligne `detour` qu'avec le trajet (Contexte, point 6). Aucun code de plus ; un test de M4b le prouve.
 3. **`context`** : le `transfer` arrête la recherche du voisin de ce côté (§ 1 point 3) ; le jour d'un changement de ville, un voisin repas de midi compte comme absent (règle provisoire de la spécification, § 7.3), dans `voisins` (`src/domain/calculs.ts`), par un paramètre « jour de changement de ville » ; rien ne change pour les autres jours.
 
@@ -200,13 +245,23 @@ Comme 0136 § 9, **aucun test n'est supprimé ni désactivé**. Seules ces atten
 
 1. `tests/db/chaine-inversee.test.ts`, « chaine-inversee: une seule ville (otherCities refusé sur draft.otherCities sans écriture ; admis sous l'ancienne chaîne) » (l. 978) : sous `inversee`, Rome puis Florence est **accepté** (2 lignes `stays`, critère 1) ; la partie « admis sous l'ancienne chaîne » ne change pas. Le titre devient « chaine-inversee: deux villes acceptées (admis aussi sous l'ancienne chaîne) ». Le refus de `draft.otherCities` reste tenu par les tests du site d'essai (`tests/unit/p0/depuis-formulaire.test.ts`, inchangé). M4b.
 2. `src/server/config/usage.test.ts` et `tests/support/plafonds-usage.ts` : profils `programme` et `revision` à 100 et 100 (§ 3 point 2), et le commentaire des montants de test de ce dernier fichier (l. 14-15 : 100 fiches, soit 2,60 et 2,70 USD). M4b.
-3. `MAX_CITIES` à 3 (§ 4 point 1) : aucune attente écrite ne change (elles citent la constante) ; si M4-C en trouve une qui écrit « 4 » ou quatre villes en dur, elle la liste dans sa PR en citant ce point.
+3. `MAX_CITIES` à 3 (§ 4 point 1), **par M4-C** (qui porte la constante et doit passer `pnpm verify`) : deux attentes écrites en dur changent (bloquant 3).
+   - `src/features/creation/CreateTripForm.test.tsx`, test « une {MAX_CITIES + 1}e ville et un {MAX_COMMITMENTS + 1}e engagement ne peuvent pas être ajoutés » (l. 201). Avant : `toHaveAccessibleDescription("Au plus 4 villes en tout, destination comprise.")`. Après : `"Au plus 3 villes en tout, destination comprise."`, ou mieux le texte composé avec `MAX_CITIES`. La boucle d'ajout cite déjà `MAX_CITIES - 1`.
+   - `tests/e2e/creation.e2e.spec.ts`, l. 136-142 :
+     - `toHaveCount(3)` des champs « Nom de la ville » (l. 141) devient **`toHaveCount(2)`** : 2 autres villes au plus ;
+     - le texte (l. 142) devient **« Au plus 3 villes en tout, destination comprise. »** ;
+     - la boucle de trois clics (l. 136) peut rester : le troisième clic, sur un bouton `aria-disabled`, n'ajoute rien, et c'est ce que le test vérifie ensuite.
+
+   Relevé par `grep` sur `c96f3cd` : aucune autre attente n'écrit « 4 villes » en dur. Les autres tests citent la constante (§ 4 point 1). Le texte de l'interface vient de la clé existante `villes.maximum` avec `{max}` : M4-C ne change aucun texte.
 
 Sont **étendues** (ajouts seulement) : les listes de variantes de `DayLineItemSchema` et de l'instantané (`src/contracts/*.test.ts`), `share.test.ts` (un `transfer` n'apparaît pas), les tests de `voisins`, `pointsDuJour` et `appliquerPatch` (un `transfer` est ignoré ou recopié). Toute autre attente modifiée est un écart à justifier dans la PR qui la touche, revu par le Tech Lead.
 
 **Tests nouveaux demandés** (noms de la spécification, critères 1 à 25), plus :
 - `changement de ville: départ estimé, sortie du matin et dîner du soir` (11:30) et `… sortie sans fin` (11:30), § 5.2 ;
-- `changement de ville: créneau de l'IA retiré` (étape de l'IA dans le créneau occupé), `… activités au-delà du rythme retirées`, `… aucun toReserve ce jour-là`, § 5.1 ;
+- `changement de ville: créneau de l'IA retiré` (étape de l'IA dans le créneau occupé, et étape à cheval sur le départ), `… activités au-delà du rythme retirées`, `… aucun toReserve ce jour-là`, `… créneau retiré jamais cherché` (aucune requête Text Search ni fiche pour lui), `… ville de l'IA écrasée par la ville du code`, § 5.1 et § 7.1 ;
+- `changement de ville: durée estimée longue bornée à la fin du jour` (départ 18:00, 600 minutes : aucun créneau après la ligne), § 5.1 point 5 ;
+- `aperçu: joursHorsChangement ne retire jamais J1` (J1 avec un `transfer` malformé reste), § 10.1 ;
+- `villes: même ville de suite refusée avant le décalage` (`controlerVilles`, raison `repetee`), § 4 point 2 ;
 - `changement de ville: durée estimée hors bornes → durée à confirmer`, § 2 ;
 - `changement de ville: l'engagement devenu transfer n'est pas un événement`, § 9 point 4 ;
 - `plusieurs-villes: transfer absent de la vue partagée` (base de données, `shared_day`), § 1 point 4 ;
@@ -229,7 +284,7 @@ Une tâche = une branche `claude/<id>-<slug>` = une PR. Toutes citent `specs/M4-
 |---|---|---|---|---|
 | **M4-C** (nouvelle) | **PR de contrat** : `TransferItemSchema` dans `DayLineItemSchema` et l'instantané (§ 1), `Trip.cities` (§ 6), `MAX_CITIES = 3` (§ 4), cas « recopié tel quel » des fonctions qui parcourent `Day.items` (`patch.ts`, `calculs.ts`), jeu `mock` à deux villes, lignes du handover. Aucun cas d'usage, aucun écran. | backend | cette décision | `src/contracts/{trip,snapshot,values}.ts`, `src/domain/{patch,calculs}.ts`, `src/mocks/`, `docs/handovers/backend.md` |
 | **M4a** | Prompt `programme` v5 multi-villes (cadre des journées du § 5.1 point 2, durée estimée en minutes, § 2), lecture tolérante de sa sortie, jeu d'évaluation (Rome puis Florence avec billet ; Lisbonne puis Porto en départ estimé ; Paris, Lyon, Marseille au rythme « intense »), sorties simulées | ia-recherche | cette décision ; **réponse de la Sécurité à S-M4-2** | `src/ai/prompts/` (v5), `src/ai/entrees.ts`, `src/ai/sorties.ts`, jeu d'évaluation, `tests/unit/ia/prompts-sentinelles.test.ts` |
-| **M4b** | Domaine `changement-de-ville.ts` et `villes-du-voyage.ts`, section `changementDeVille` de `moteur.json`, `briefProgrammeDepuisFormulaire`, `memeVilleQueLaPrecedente` et `controlerVilles`, vérification par ville (§ 7.1), assemblage et contrôle (§ 5.1), cases (§ 10.1), lecture (`Trip.cities`, relecteur coupé au `transfer`), révision M1b, profils simulés (§ 3), fixtures simulées à deux et trois villes, tests des critères 1 à 12, 19 à 21 et du § 10 | backend | M4-C, M4a ; **réponses de la Sécurité à S-M4-1, S-M4-2 et S-M4-4** | `src/domain/`, `src/server/config/moteur.json`, `src/server/programme/`, `src/lib/fuseaux/index.ts`, `src/server/creation/creer-voyage.ts`, `src/server/generation/{etapes-programme,etapes-revision,cases-programme}.ts`, `src/server/composition/generation.ts`, `src/grounding/ancrage-zone.ts`, `src/server/voyages/lecture.ts`, `src/server/config/usage.ts`, `tests/db/` |
+| **M4b** | Domaine `changement-de-ville.ts` et `villes-du-voyage.ts`, section `changementDeVille` de `moteur.json`, `briefProgrammeDepuisFormulaire`, `memeVilleQueLaPrecedente` et `controlerVilles`, vérification par ville (§ 7.1), cadrage `cadrerProgramme` et étape 2 bis de `redigerEtVerifier`, signatures de `CapaciteProgramme` (§ 5.1, § 8 point 2), assemblage (§ 5.1), cases (§ 10.1), lecture (`Trip.cities`, relecteur coupé au `transfer`), révision M1b, profils simulés (§ 3), fixtures simulées à deux et trois villes, tests des critères 1 à 12, 19 à 21 et du § 10 | backend | M4-C, M4a ; **réponses de la Sécurité à S-M4-1, S-M4-2 et S-M4-4** | `src/domain/`, `src/server/config/moteur.json`, `src/server/programme/`, `src/lib/fuseaux/index.ts`, `src/server/creation/creer-voyage.ts`, `src/server/generation/{etapes-programme,etapes-revision,cases-programme}.ts`, `src/server/composition/generation.ts`, `src/grounding/ancrage-zone.ts`, `src/server/voyages/lecture.ts`, `src/server/config/usage.ts`, `tests/db/` |
 | **M4c** | Écrans (§ 7 de la spécification) : écran 1 (villes, aide, erreurs, annonces), écran 5 (pastille et légende), écran 6 (cartes), Séjour (liste et carte cadrée), Journée (ligne « Vers {ville} », carte coupée), `DayBadge` (prop facultative), textes, tests des critères 13 à 18, 22, 23 et 25 | frontend avec UX/UI | M4b ; **réponse de la Sécurité à S-M4-3** pour la seule recherche de ville des autres villes | `src/features/{creation,preparation,presentation,sejour}/`, `src/components/ligne/`, `src/i18n/fr/{creation,sejour,presentation}.json`, `tests/e2e/` |
 
 **Ordre** (le CEO le place dans les cycles) : M4-C et M4a en parallèle (fichiers distincts), puis M4b, puis M4c. M4-suite (Product Owner) peut s'écrire dès la fusion de cette décision ; elle ne bloque ni M4a, ni M4b, ni M4c. Aucune tâche `db/migrations`.
@@ -256,6 +311,8 @@ Une tâche = une branche `claude/<id>-<slug>` = une PR. Toutes citent `specs/M4-
 5. Durée estimée par l'IA bornée à 20 à 600 minutes (§ 2) ; hors bornes, « durée à confirmer ». Accepté ?
 6. Formulation du critère 13 (mineur 2, § 11) : « De Saint-Jacques-de-Compostelle à Florence » pour le cas sur deux lignes, et « sans troncature ni débordement » pour le nom seul.
 7. Mineurs 3 et 4 de #876 (§ 11) : disposition de la rangée de l'écran 5 (UX/UI) ; entrée éventuelle des engagements dans la ligne du jour.
+8. **Billet de musée ou de spectacle le jour d'un changement de ville** (mineur 8 de la revue de 0148, § 5.2) : la règle du billet de trajet lit tout « Billet » de ce jour comme le transport. L'aide de l'écran 1 demande « Sortie » pour un concert ou une visite. Un billet d'entrée saisi en « Billet » devient donc le changement de ville. Faut-il une règle de plus, par exemple ne retenir qu'un billet dont l'heure laisse un trajet plausible ?
+9. Engagement à cheval sur le départ saisi, rangé dans la ville d'arrivée (§ 9 point 5) : à reprendre avec le chevauchement.
 
 **UX/UI** : disposition de la rangée de jour de l'écran 5 (mineur 3, § 11), au plus tard dans la PR de M4c.
 
