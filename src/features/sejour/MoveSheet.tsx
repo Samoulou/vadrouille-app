@@ -50,7 +50,17 @@ function bannerFor(error: RevisionError): "noOption" | "error" | "conflict" {
 export function insertionIndex(day: Day, time: string): number {
   let found = 0;
   day.items.forEach((item, index) => {
-    const at = item.type === "stop" ? item.stop.start : item.type === "free" ? item.from : item.type === "segment" ? null : item.time;
+    // Changement de ville (décision 0148 § 1) : rangé par son départ, comme une étape ; son rendu est à M4c.
+    const at =
+      item.type === "stop"
+        ? item.stop.start
+        : item.type === "transfer"
+          ? item.start
+          : item.type === "free"
+            ? item.from
+            : item.type === "segment"
+              ? null
+              : item.time;
     if (at !== null && at <= time && !(item.type === "terminus" && item.role === "end")) found = index;
   });
   return found;

@@ -59,6 +59,9 @@ function ligne(item: DayLineItem): LigneReduite {
       return { type: "stop", stop: etape(item.stop) };
     case "segment":
       return { type: "segment", segment: segment(item.segment) };
+    case "transfer":
+      // Le site d'essai n'a qu'une ville (décision 0148 § 4) : un changement de ville n'a pas de forme réduite.
+      throw new ReductionRefusee();
     default:
       return item;
   }

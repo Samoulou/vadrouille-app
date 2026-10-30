@@ -117,11 +117,13 @@ export function demandeDeRelectures(entree: {
       const couple = couples.get(rang);
       if (item.type === "segment" && couple !== undefined) ajouterTrajet(couple.depuis, couple.vers, [item.segment.mode]);
     });
-    const points = pointsDuJour(jour, entree.nombreDeNuits);
-    for (let rang = 1; rang < points.length; rang += 1) {
-      const depuis = points.at(rang - 1);
-      const vers = points.at(rang);
-      if (depuis !== undefined && vers !== undefined) ajouterTrajet(depuis, vers, entree.modes);
+    // Un tronçon par partie de la ligne : aucun trajet à travers un changement de ville (décision 0148 § 1 point 3).
+    for (const points of pointsDuJour(jour, entree.nombreDeNuits)) {
+      for (let rang = 1; rang < points.length; rang += 1) {
+        const depuis = points.at(rang - 1);
+        const vers = points.at(rang);
+        if (depuis !== undefined && vers !== undefined) ajouterTrajet(depuis, vers, entree.modes);
+      }
     }
   }
   for (const { proposition, jour } of entree.propositions ?? []) {

@@ -25,7 +25,11 @@ export function debutDeLigne(item: DayLineItemSnapshot): number | undefined {
       return versMinutes(item.from);
     case "openMeal":
       return versMinutes(item.time);
-    default:
+    case "segment":
+      return undefined;
+    case "transfer":
+      // Changement de ville (décision 0148 § 1 point 3) : traité avant cet appel par `voisins` ; son heure (départ
+      // `start`) pour les autres parcours est à M4b.
       return undefined;
   }
 }
