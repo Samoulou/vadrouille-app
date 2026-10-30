@@ -498,7 +498,7 @@ function refusDuMoteur(resultat: Exclude<ResultatPatch, { ok: true }>): RefusDeR
 }
 
 /** Étape 1 : contexte du voyage et choix, ou une réponse immédiate ; `null` : `not_found`. */
-type Prepare = { readonly contexte: ContexteVoyage; readonly choix: ChoixRetenu; readonly lignes: readonly LigneAFaire[] };
+type Prepare = { readonly contexte: ContexteVoyage; readonly choix: ChoixRetenu };
 type Preparation = { readonly fin: RefusDeReponse } | { readonly prepare: Prepare; readonly ctx: Session };
 
 async function preparer(
@@ -521,9 +521,7 @@ async function preparer(
     const refus = refusDuChoix(choix.refus);
     return refus === null ? null : { fin: refus };
   }
-  // Lignes « À faire » du voyage : lues pour les lignes `checklist` de l'aperçu (0147 § 7.2 point 2), jamais un refus.
-  const lignes = await lireLignesAFaire(executeur, ctx.organizationId, valeur.tripId);
-  return { prepare: { contexte, choix, lignes }, ctx: { organizationId: ctx.organizationId, userId: ctx.userId } };
+  return { prepare: { contexte, choix }, ctx: { organizationId: ctx.organizationId, userId: ctx.userId } };
 }
 
 function journaliser(nom: "preview-replacement" | "apply-replacement", erreur: unknown, tripId: string): void {
@@ -568,10 +566,14 @@ export async function proposerRemplacement(dependances: DependancesRemplacement,
   const lu = await executerActionVoyage("preview-replacement", dependances, DemandeApercuSchema, entree, async (executeur, ctx, valeur) => {
     await executeur.query("SET TRANSACTION READ ONLY");
     const preparation = await preparer(executeur, ctx, valeur);
-    return preparation === null ? null : { preparation, valeur };
+    if (preparation === null) return null;
+    // Lignes « À faire » du voyage, pour les lignes `checklist` de l'aperçu seulement (0147 § 7.2 point 2), jamais un refus ;
+    // l'application les relit sous le verrou des versions, dans `ecrireVersion`.
+    const lignes = "fin" in preparation ? [] : await lireLignesAFaire(executeur, ctx.organizationId, valeur.tripId);
+    return { preparation, valeur, lignes };
   });
   if (!lu.ok) return lu;
-  const { preparation, valeur } = lu.value;
+  const { preparation, valeur, lignes } = lu.value;
   if ("fin" in preparation) return ok(preparation.fin);
   const { prepare, ctx } = preparation;
   const relectures = await relire(dependances, "preview-replacement", prepare, ctx);
@@ -581,7 +583,7 @@ export async function proposerRemplacement(dependances: DependancesRemplacement,
   if (!resultat.ok) return ok(refusDuMoteur(resultat));
   try {
     const cible = identifiantRemplacement(valeur.baseVersion, prepare.choix.proposition.candidat.id);
-    const draft = brouillonDuRemplacement(prepare.contexte, resultat, relectures, cible, Date.now(), prepare.lignes);
+    const draft = brouillonDuRemplacement(prepare.contexte, resultat, relectures, cible, Date.now(), lignes);
     return ok({ status: "offer", version: valeur.baseVersion, candidateId: prepare.choix.proposition.candidat.id, draft });
   } catch (erreur) {
     journaliser("preview-replacement", erreur, valeur.tripId);

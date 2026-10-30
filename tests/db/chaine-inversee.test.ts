@@ -370,44 +370,17 @@ describe("chaîne inversée : chemin nominal (Rome)", () => {
       ]),
     ).toEqual([{ place_id: null }]);
 
-    // a-faire: lignes écrites à la génération (M5e, critère 27 ; décision 0147 § 7.1) : une ligne `reservation` non faite par
-    // étape `toReserve` (libellé stocké = le seul nom de l'étape), dans l'ordre du programme, puis les bons plans (`other`),
-    // sur un seul rang d'identifiants stables. Le brouillon de Rome n'a aucun engagement : aucune ligne `ticket`.
-    const aFaire = await lire<{
-      id: string;
-      label: string;
-      kind: string;
-      sponsored: boolean;
-      stop_id: string | null;
-      done: boolean;
-    }>(
+    // « À faire dans l'ordre » : identifiants stables sur un seul rang (0136 § 3.3, 0147 § 7.1 point 2) ; contenu détaillé
+    // dans « a-faire: lignes écrites à la génération » (M5e, critère 27).
+    const aFaire = await lire<{ id: string }>(
       org,
-      "SELECT id, label, kind, sponsored, stop_id, done FROM public.checklist_items WHERE trip_id = $1 ORDER BY id",
+      "SELECT id FROM public.checklist_items WHERE trip_id = $1 ORDER BY id",
       [tripId],
     );
+    expect(aFaire.length).toBeGreaterThan(0);
     expect(aFaire.map((l) => l.id)).toEqual(
       aFaire.map((_, rang) => identifiantBonPlan(etat.generationRunId, rang)),
     );
-    const v1 = TripSnapshotSchema.parse(versions[0]!.snapshot);
-    const aReserver = v1.days.flatMap((jour) =>
-      jour.items.flatMap((item) =>
-        item.type === "stop" &&
-        item.stop.commitment === undefined &&
-        item.stop.exceptions.includes("toReserve")
-          ? [item.stop]
-          : [],
-      ),
-    );
-    expect(aReserver.length).toBeGreaterThan(0);
-    expect(
-      aFaire
-        .slice(0, aReserver.length)
-        .map((l) => [l.kind, l.stop_id, l.label, l.done, l.sponsored]),
-    ).toEqual(aReserver.map((stop) => ["reservation", stop.id, stop.name, false, false]));
-    const bonsPlans = aFaire.slice(aReserver.length);
-    expect(bonsPlans.length).toBeGreaterThan(0);
-    for (const l of bonsPlans)
-      expect(l).toMatchObject({ kind: "other", sponsored: false, stop_id: null, done: false });
 
     expect(
       await lire(org, "SELECT story FROM public.briefs WHERE trip_id = $1", [
@@ -1188,9 +1161,8 @@ describe("chaîne inversée : lecture avant et après le déblocage (0136 § 3.5
     const toutes = await lire<{ id: string; stop_id: string | null }>(org, "SELECT id, stop_id FROM public.checklist_items WHERE trip_id = $1 ORDER BY id", [tripId]);
     // Position de chaque étape de la version 1 dans le programme (jour, puis rang dans la journée) et son jour.
     const v1 = await version1(org, tripId);
-    const etapes = [...v1.days]
-      .sort((a, b) => a.index - b.index)
-      .flatMap((j) => j.items.flatMap((l) => (l.type === "stop" ? [{ id: l.stop.id, jour: j.index }] : [])));
+    // Même ordre que la lecture (`ordreDeLecture`) : jour, puis heure, événements compris.
+    const etapes = dansLOrdre(v1).map((e) => ({ id: e.stop.id, jour: e.jour }));
     const position = new Map(etapes.map((e, rang) => [e.id, rang] as const));
     const jourDe = new Map(etapes.map((e) => [e.id, e.jour] as const));
     // Ordre de lecture (M5e, décision 0147 § 7.1 point 3) : lignes liées par la position de leur étape, puis lignes sans étape
@@ -1300,6 +1272,88 @@ describe("chaîne inversée : lecture avant et après le déblocage (0136 § 3.5
     const { tripId } = await voyageEcrit(org);
     expect((await lecteur("ancienne").getTrip(contexteDe(org), tripId))?.days.map((d) => d.index)).toEqual([1, 2, 3, 4, 5]);
     expect((await lecteur("ancienne").getDay(contexteDe(org), tripId, 4))?.index).toBe(4);
+  });
+});
+
+/**
+ * Étapes et engagements d'un instantané dans l'ordre du programme (jour, puis heure de début ; à égalité, étapes de la ligne
+ * avant les événements), écrit ici sans `src/domain/a-faire.ts` pour vérifier l'écriture de la génération indépendamment.
+ */
+function dansLOrdre(instantane: TripSnapshot) {
+  return [...instantane.days]
+    .sort((x, y) => x.index - y.index)
+    .flatMap((jour) =>
+      [
+        ...jour.items.flatMap((l) => (l.type === "stop" ? [{ stop: l.stop, evenement: false, jour: jour.index }] : [])),
+        ...jour.events.map((stop) => ({ stop, evenement: true, jour: jour.index })),
+      ]
+        .map((e, rang) => ({ e, rang }))
+        .sort((x, y) => x.e.stop.start.localeCompare(y.e.stop.start) || x.rang - y.rang)
+        .map(({ e }) => e),
+    );
+}
+
+describe("chaîne inversée : liste « À faire » (M5e, décision 0147 § 7.1)", () => {
+  it("a-faire: lignes écrites à la génération : sortie simulée de Rome, une ligne reservation par étape toReserve (nom seul), une ligne ticket faite par engagement, puis les bons plans, identifiants stables", async () => {
+    const org = await createOrg(auth);
+    const engagement = { kind: "ticket" as const, label: "[Concert à l'Auditorium]", date: "2027-05-05", start: "21:00" };
+    const lance = await lancer(org, demandeRome({ commitments: [engagement] }));
+    expect((await derouler(lance.etat, dependances())).fin.arret).toBeUndefined();
+    const v1 = await version1(org, lance.tripId);
+    const lignes = await lire<{ id: string; label: string; kind: string; sponsored: boolean; stop_id: string | null; done: boolean; done_at: Date | null; booking_url: string | null; moment: unknown }>(
+      org,
+      "SELECT id, label, kind, sponsored, stop_id, done, done_at, booking_url, moment FROM public.checklist_items WHERE trip_id = $1 ORDER BY id",
+      [lance.tripId],
+    );
+    // Lignes attendues du programme, dans son ordre : réservations (étapes toReserve sans engagement), engagements faits.
+    const attendues = dansLOrdre(v1).flatMap(({ stop, evenement }) =>
+      evenement && stop.commitment !== undefined
+        ? [["ticket", stop.id, stop.name, true]]
+        : !evenement && stop.commitment === undefined && stop.exceptions.includes("toReserve")
+          ? [["reservation", stop.id, stop.name, false]]
+          : [],
+    );
+    expect(attendues.filter(([kind]) => kind === "reservation").length).toBeGreaterThan(0);
+    expect(attendues.filter(([kind]) => kind === "ticket")).toEqual([["ticket", expect.any(String), "[Concert à l'Auditorium]", true]]);
+    expect(lignes.slice(0, attendues.length).map((l) => [l.kind, l.stop_id, l.label, l.done])).toEqual(attendues);
+    // Puis les bons plans de l'IA, sans étape.
+    const bonsPlans = lignes.slice(attendues.length);
+    expect(bonsPlans.length).toBeGreaterThan(0);
+    for (const l of bonsPlans) expect(l).toMatchObject({ kind: "other", stop_id: null, done: false });
+    // Un seul rang d'identifiants stables (exécution, rang) ; ni lien ni lien rémunéré ; moment « avant le départ » ; une
+    // ligne faite porte sa date de cochage.
+    expect(lignes.map((l) => l.id)).toEqual(lignes.map((_, rang) => identifiantBonPlan(lance.etat.generationRunId, rang)));
+    for (const l of lignes) {
+      expect(l).toMatchObject({ sponsored: false, booking_url: null, moment: { type: "beforeDeparture" } });
+      expect(l.done_at === null).toBe(!l.done);
+    }
+  });
+
+  it("a-faire: avant le déblocage : seules les lignes des journées de l'aperçu sont servies (critère 31, 0136 § 3.5) ; après : toutes, dans l'ordre de lecture", async () => {
+    const org = await createOrg(auth);
+    const { tripId } = await voyageEcrit(org);
+    const apercu = await journeesDesCases(org, tripId);
+    const v1 = await version1(org, tripId);
+    const situees = dansLOrdre(v1);
+    const jourDe = new Map(situees.map((e) => [e.stop.id, e.jour] as const));
+    const toutes = await lire<{ id: string; stop_id: string | null; kind: string }>(org, "SELECT id, stop_id, kind FROM public.checklist_items WHERE trip_id = $1 ORDER BY id", [tripId]);
+    // Des réservations écrites à la génération tombent hors des journées de l'aperçu.
+    const horsApercu = toutes.filter((l) => l.stop_id !== null && !apercu.includes(jourDe.get(l.stop_id)!));
+    expect(horsApercu.length).toBeGreaterThan(0);
+    expect(horsApercu.every((l) => l.kind === "reservation")).toBe(true);
+
+    const avant = await lecteur().getTrip(contexteDe(org), tripId);
+    expect(avant?.unlocked).toBe(false);
+    const servies = new Set(avant?.checklist.map((l) => l.id));
+    expect([...servies].sort()).toEqual(toutes.filter((l) => !horsApercu.includes(l)).map((l) => l.id));
+    for (const l of avant?.checklist ?? []) if (l.stopId !== undefined) expect(apercu).toContain(jourDe.get(l.stopId));
+
+    await debloquer(org, tripId);
+    const apres = await lecteur().getTrip(contexteDe(org), tripId);
+    // Ordre de lecture (0147 § 7.1 point 3) : lignes liées par la position de leur étape, puis lignes sans étape par id.
+    const position = new Map(situees.map((e, rang) => [e.stop.id, rang] as const));
+    const liees = toutes.filter((l) => l.stop_id !== null).sort((x, y) => position.get(x.stop_id!)! - position.get(y.stop_id!)!);
+    expect(apres?.checklist.map((l) => l.id)).toEqual([...liees, ...toutes.filter((l) => l.stop_id === null)].map((l) => l.id));
   });
 });
 

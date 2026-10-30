@@ -8,7 +8,8 @@ import { edimbourg, edimbourgDebloque } from "@/mocks/edimbourg";
 import { axeViolations } from "../../../tests/unit/axe";
 
 import { SejourOriginProvider } from "./SejourOrigin";
-import { checklistLabel, SejourPanel } from "./SejourPanel";
+import { SejourPanel } from "./SejourPanel";
+import { checklistLabel } from "./travel";
 import { TripShell } from "./TripShell";
 
 // Séjour : pas de paramètre `n` ni `etape`.
@@ -181,6 +182,9 @@ describe("SejourPanel : « À faire avant de partir » (F5-PO-4)", () => {
     expect(alerte()).toHaveTextContent("Impossible d'enregistrer. Réessaie.");
     await act(async () => new Promise((wait) => setTimeout(wait, 50)));
     expect(recorder.events).toEqual([]);
+    // Nouvel échec : le message reste (annoncé de nouveau) ; il ne disparaît qu'au prochain cochage réussi.
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Réserver : [Château d'Édimbourg]" })));
+    expect(alerte()).toHaveTextContent("Impossible d'enregistrer. Réessaie.");
     // Nouvel essai réussi : le message disparaît.
     echoue = false;
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Réserver : [Château d'Édimbourg]" })));

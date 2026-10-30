@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 import { EventLines, eventRange } from "./EventLines";
 import { useSejourOrigin } from "./SejourOrigin";
-import { daySummary, tripBudgetLine, tripEvents } from "./travel";
+import { checklistLabel, daySummary, tripBudgetLine, tripEvents } from "./travel";
 import { useTripShell } from "./TripShell";
 
 const t = messages.sejour;
@@ -44,14 +44,6 @@ export interface SejourPanelProps {
 /** Nom accessible du compteur : « 1 réservation à faire », « 4 réservations à faire ». */
 function counterLabel(remaining: number): string {
   return remaining === 1 ? ts.aFaire.compteur.un : format(ts.aFaire.compteur.plusieurs, { n: remaining });
-}
-
-/**
- * Libellé affiché d'une ligne (spécification M5 § 7.1 et § 9 ; décision 0147 § 7.1) : une ligne `reservation` stocke le seul
- * nom de l'étape, l'écran compose « Réserver : {nom} » ; les autres sortes s'affichent telles quelles.
- */
-export function checklistLabel(item: Pick<ChecklistItem, "kind" | "label">): string {
-  return item.kind === "reservation" ? format(ts.aFaire.reserver, { nom: item.label }) : item.label;
 }
 
 /**
@@ -103,7 +95,10 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
   const online = useOnline();
   const offlineId = `${useId()}-hors-ligne`;
   const checklistOffline = actions.checklistOnServer === true && !online;
-  const [toggleFailed, setToggleFailed] = useState(false);
+  // Échecs consécutifs de l'enregistrement : l'alerte reste jusqu'au prochain cochage réussi (revue UX de M5e, m3) ; un
+  // nouvel échec la remonte (clé), pour qu'elle soit annoncée de nouveau.
+  const [echecs, setEchecs] = useState(0);
+  const toggleFailed = echecs > 0;
   const events = tripEvents(trip.days);
   const dayOfEvent = new Map(events.map(({ day, event }) => [event.id, day]));
 
@@ -125,13 +120,13 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
   // Cocher envoie `checklist_item_done` une fois l'action résolue ; décocher n'envoie rien (décision 0015 § 6). Un échec de
   // l'action (case non enregistrée, rétablie par l'implémentation) affiche « Impossible d'enregistrer. Réessaie. ».
   const onToggle = async (item: ChecklistItem, done: boolean) => {
-    setToggleFailed(false);
     try {
       await actions.setChecklistItemDone(item.id, done);
     } catch {
-      setToggleFailed(true);
+      setEchecs((n) => n + 1);
       return;
     }
+    setEchecs(0);
     if (done) await track({ name: "checklist_item_done", properties: {} });
   };
 
@@ -166,7 +161,7 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
             <StatusBanner kind="offline" message={ts.aFaire.horsLigne} />
           </div>
         ) : null}
-        <p role="alert" data-part="a-faire-echec" className={cn("text-corps-s font-semibold text-ink", toggleFailed ? undefined : EMPTY_LIVE_REGION_CLASS)}>
+        <p key={echecs} role="alert" data-part="a-faire-echec" className={cn("text-corps-s font-semibold text-ink", toggleFailed ? undefined : EMPTY_LIVE_REGION_CLASS)}>
           {toggleFailed ? ts.aFaire.echec : null}
         </p>
         <ul>

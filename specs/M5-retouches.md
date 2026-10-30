@@ -224,6 +224,7 @@ Clés dans `src/i18n/fr/sejour.json` et `src/i18n/fr/revision.json` (noms des cl
 | Toast du retour | Programme rétabli. |
 | Conflit de version | Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie. |
 | Case non enregistrée | Impossible d'enregistrer. Réessaie. |
+| Liste, hors ligne (Ajout M5e, accepté par l'UX/UI à la revue de #908) | Tu es hors ligne. Cocher une ligne demande une connexion. |
 | Liste, réservation | Réserver : {nom} |
 
 ## 10. Propositions au Tech Lead (décision M5-TL, avant le code)

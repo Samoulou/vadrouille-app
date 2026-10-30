@@ -106,6 +106,10 @@ async function suivreLaListe(executeur: ExecuteurVersions, demande: DemandeVersi
   const { organizationId, tripId } = demande;
   const suite = lignesApresVersion(await lireLignesAFaire(executeur, organizationId, tripId), avant, apres);
   if (suite.retirer.length > 0) await executeur.query(SQL_RETIRER, [organizationId, tripId, suite.retirer]);
+  // Les lignes à retirer sont aussi passées à la déliaison : `toggleChecklistItem` ne prend pas le verrou des versions, une
+  // ligne lue non faite peut donc être cochée entre la lecture et le `DELETE … AND NOT done`, qui la garde. Elle reste alors
+  // comme une ligne faite d'une étape absente : déliée, jamais orpheline (0147 § 7.2 point 1). Sur une ligne déjà supprimée,
+  // l'`UPDATE` ne touche rien.
   const delier = [...suite.retirer, ...suite.delier];
   if (delier.length > 0) await executeur.query(SQL_DELIER, [organizationId, tripId, delier]);
   for (const [rang, ligne] of suite.ajouter.entries()) {
