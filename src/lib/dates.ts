@@ -4,7 +4,8 @@ import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
 const t = messages.ligne.dates;
-const plaque = messages.debloquer.plaque;
+// Espace de noms à part (décision 0152) : lire `debloquer` embarquait ses textes dans toutes les pages qui datent.
+const plaque = messages.plaque;
 
 function parts(iso: string): { year: number; month: number; day: number } | null {
   const [year, month, day] = iso.split("-").map(Number);
