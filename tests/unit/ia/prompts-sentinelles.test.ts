@@ -10,13 +10,17 @@ import { createMockStopReports } from "@/adapters/mock-reports";
 import type { ClientModeles, EtapeRequete } from "@/ai/client";
 import { creerCoucheIa, type ReglagesIa } from "@/ai/couche";
 import { EntreeProgrammeV5Schema, versEntreeQuartier, type EntreeModeles, type EntreeProgrammeV5 } from "@/ai/entrees";
+import { EntreeRevisionV3Schema, type EntreeRevisionV3 } from "@/ai/entree-revision";
 import { PROMPT_PROGRAMME, PROMPT_PROGRAMME_V5 } from "@/ai/prompts/programme";
+import { PROMPT_REVISION } from "@/ai/prompts/revision";
 import { creerRedigerProgramme, creerRedigerProgrammeV5 } from "@/ai/rediger-programme";
-import { requeteProgrammeV5 } from "@/ai/requetes";
+import { creerRedigerRevisionV3 } from "@/ai/rediger-revision";
+import { requeteProgrammeV5, requeteRevisionV3 } from "@/ai/requetes";
 import { MAX_CITIES, type LodgingRequest } from "@/contracts";
 import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
 import { EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, MOCK_USER_ID } from "@/mocks/edimbourg";
+import { RECIT_API_AUTORISE } from "@/server/config/generation";
 import { entreeRevisionDepuisJours } from "@/server/programme/revision";
 import { candidatPourModele, entreeModelesDepuisBrief, entreeProgrammeDepuisBrief, lieuRetenuDepuisCandidat } from "@/server/p0/vers-couche-ia";
 
@@ -328,6 +332,156 @@ describe("prompts: entrée et requête programme v5 (plusieurs villes, M4a)", ()
     expect(EntreeProgrammeV5Schema.safeParse(uneVille).success).toBe(true);
     const estime = { date: "2027-05-07", de: "Rome", vers: "Florence", source: "estime", depart: "09:00", activitesMax: 2 };
     expect(EntreeProgrammeV5Schema.safeParse({ ...ENTREE_V5, changements: [estime] }).success).toBe(true);
+  });
+});
+
+/**
+ * M4a-2 (ticket #926 ; décision 0148 § 8 point 2 ; verdict de la Sécurité 0149 § 1.3, S-M4-1, S-M4-2, S-M4-5 : mêmes
+ * conditions que pour la v5). Entrée `revision` v3 d'un voyage Rome puis Florence : le brief v5 (sans récit, sans le
+ * libellé du billet devenu changement de ville), le programme précédent tel que l'écrit l'instantané (le titre du jour
+ * du changement de ville, écrit par le code, y est une sentinelle) et les choix du tri. La requête passe par la capacité
+ * de production (`creerRedigerRevisionV3`), journalisée.
+ */
+const BRIEF_REVISION_V3: EntreeProgrammeV5 = { ...ENTREE_V5 };
+delete BRIEF_REVISION_V3.recit;
+const TITRE_CODE = "SENTINELLE_TITRE_DU_CODE";
+const ENTREE_REVISION_V3: EntreeRevisionV3 = {
+  brief: BRIEF_REVISION_V3,
+  programme: {
+    jours: [
+      { date: "2027-05-06", titre: "Centre historique", etapes: [{ id: "j3-1", debut: "09:30", fin: "10:30", repas: false, lieu: "Panthéon", quartier: "Centro storico", pourquoi: "Le temple antique le mieux conservé." }] },
+      {
+        date: "2027-05-07",
+        titre: TITRE_CODE,
+        etapes: [
+          { id: "j4-1", debut: "09:00", fin: "10:15", repas: false, lieu: "Villa Borghese", quartier: "Pincio", pourquoi: "Une promenade avant le train." },
+          { id: "j4-2", debut: "15:00", fin: "16:30", repas: false, lieu: "Duomo de Florence", quartier: "Duomo", pourquoi: "La coupole de Brunelleschi." },
+        ],
+      },
+      { date: "2027-05-08", titre: "Offices et Oltrarno", etapes: [{ id: "j5-1", debut: "18:30", fin: "20:00", repas: true, lieu: "Osteria Santo Spirito", quartier: "Santo Spirito", pourquoi: "Un dîner toscan sur la place." }] },
+    ],
+  },
+  choix: { pasPourMoi: ["j5-1"], jAime: ["j4-2"] },
+};
+
+describe("prompts: entrée et requête revision v3 (plusieurs villes, M4a-2)", () => {
+  const preparer = () => {
+    const modeles: ClientModeles = { envoyer: async () => ({ texte: "{}", coutUsd: 0 }) };
+    const journal = journalDePrompts(modeles);
+    const reviser = creerRedigerRevisionV3(journal.client, { modele: "test/revision", routage: { data_collection: "allow", zdr: false } as unknown as ReglagesIa["plan"]["routage"] });
+    return { journal, reviser };
+  };
+
+  it("revision: prompt v3 sans donnée Google : requête journalisée sans sentinelle, zdr et data_collection deny imposés ; v2 inchangée", async () => {
+    const { fixtures } = charger();
+    const sentinelles = avecSentinellesGoogle({ places: creerPlacesSimule(fixtures.places), routes: creerRoutesSimule(fixtures.routes) });
+    for (const lieu of Object.values(fixtures.places.lieux)) await sentinelles.places.details(lieu.placeId);
+    expect(sentinelles.valeurs.size).toBeGreaterThan(5);
+
+    const { journal, reviser } = preparer();
+    await reviser(ENTREE_REVISION_V3);
+    expect(journal.requetes).toHaveLength(1);
+    const [requete] = journal.requetes;
+    expect(requete?.etape).toBe("programme");
+    expect(requete?.prompt).toEqual({ id: "revision", version: 3 });
+    expect(requete?.routage).toMatchObject({ zdr: true, data_collection: "deny" });
+    expect(sentinellesPresentes(journal.texte(), sentinelles)).toEqual([]);
+    for (const cle of ["placeId", "place_id", "websiteUri", "lat", "lng", "location", "duration", "distanceMeters", "ville", "transfer"]) {
+      expect(journal.texte(), cle).not.toContain(`"${cle}"`);
+      expect(journal.texte(), cle).not.toContain(`\\"${cle}\\"`);
+    }
+    // Le brief est celui de la v5 (même projection) : villes et cadre du changement de ville.
+    const donnees = JSON.stringify(requete?.messages[1]);
+    for (const attendu of ['\\"villes\\"', '\\"changements\\"', '\\"activitesMax\\":2', '\\"pasPourMoi\\":[\\"j5-1\\"]']) expect(donnees).toContain(attendu);
+    // La v2 reste celle du site d'essai.
+    expect(PROMPT_REVISION.version).toBe(2);
+  });
+
+  it("prompts: entrée revision v3 sans libellé du billet de changement de ville (ses heures seulement)", async () => {
+    const { journal, reviser } = preparer();
+    await reviser(ENTREE_REVISION_V3);
+    const texte = journal.texte();
+    expect(texte).not.toContain(LIBELLE_BILLET);
+    expect(texte).not.toMatch(/Train/);
+    const donnees = JSON.stringify(journal.requetes[0]?.messages[1]);
+    for (const attendu of ['\\"depart\\":\\"12:10\\"', '\\"arrivee\\":\\"13:45\\"', '\\"source\\":\\"saisi\\"']) expect(donnees).toContain(attendu);
+    expect(donnees).toContain('\\"fin\\":\\"22:00\\"');
+    // Glissé dans le cadre du jour ou dans un engagement de plus : refusé sans requête ; la projection ne le recopierait pas.
+    const glisse = { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, changements: [{ ...BRIEF_REVISION_V3.changements[0]!, libelle: LIBELLE_BILLET }] } } as unknown as EntreeRevisionV3;
+    await expect(reviser(glisse)).rejects.toBeInstanceOf(RangeError);
+    expect(journal.requetes).toHaveLength(1);
+    expect(JSON.stringify(requeteRevisionV3(glisse, "test/revision", { data_collection: "deny", zdr: true }))).not.toContain(LIBELLE_BILLET);
+  });
+
+  it("prompts: titre du jour de changement de ville (écrit par le code) jamais renvoyé ; les autres titres le sont", async () => {
+    const { journal, reviser } = preparer();
+    await reviser(ENTREE_REVISION_V3);
+    const donnees = JSON.stringify(journal.requetes[0]?.messages[1]);
+    expect(donnees).not.toContain(TITRE_CODE);
+    expect(donnees).toContain("Offices et Oltrarno");
+    expect(donnees).toContain("Villa Borghese");
+  });
+
+  it("prompts: entrée revision v3 refuse une clé en trop (schéma strict à chaque niveau), sans requête", async () => {
+    const { journal, reviser } = preparer();
+    const [j3, j4, j5] = ENTREE_REVISION_V3.programme.jours;
+    const avecJours = (jours: unknown[]) => ({ ...ENTREE_REVISION_V3, programme: { jours } });
+    const glissees: unknown[] = [
+      { ...ENTREE_REVISION_V3, placeId: "SENTINELLE" },
+      { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, placeId: "SENTINELLE" } },
+      { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, logements: [{ texte: "Hôtel", nuits: 5 }] } },
+      { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, villes: [{ ...BRIEF_REVISION_V3.villes[0]!, position: { lat: 41.9, lng: 12.5 } }, BRIEF_REVISION_V3.villes[1]] } },
+      { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, changements: [{ ...BRIEF_REVISION_V3.changements[0]!, dureeMinutes: 95 }] } },
+      { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, engagements: [{ ...BRIEF_REVISION_V3.engagements![0]!, lieu: "Église" }] } },
+      { ...ENTREE_REVISION_V3, programme: { ...ENTREE_REVISION_V3.programme, transfer: { label: LIBELLE_BILLET } } },
+      avecJours([j3, { ...j4!, transfer: { label: LIBELLE_BILLET, start: "12:10", end: "13:45" } }, j5]),
+      avecJours([j3, { ...j4!, dureeEstimeeMinutes: 95 }, j5]),
+      avecJours([j3, { ...j4!, etapes: [{ ...j4!.etapes[0]!, ville: "Rome" }, j4!.etapes[1]] }, j5]),
+      avecJours([j3, { ...j4!, etapes: [{ ...j4!.etapes[0]!, placeId: "SENTINELLE" }, j4!.etapes[1]] }, j5]),
+      avecJours([j3, { ...j4!, etapes: [{ ...j4!.etapes[0]!, segment: { minutes: 12 } }, j4!.etapes[1]] }, j5]),
+      { ...ENTREE_REVISION_V3, choix: { ...ENTREE_REVISION_V3.choix, raison: "closed" } },
+    ];
+    for (const entree of glissees) {
+      expect(EntreeRevisionV3Schema.safeParse(entree).success, JSON.stringify(entree).slice(0, 80)).toBe(false);
+      await expect(reviser(entree as EntreeRevisionV3)).rejects.toBeInstanceOf(RangeError);
+    }
+    expect(journal.requetes).toHaveLength(0);
+    expect(EntreeRevisionV3Schema.safeParse(ENTREE_REVISION_V3).success).toBe(true);
+  });
+
+  it("prompts: entrée revision v3, contrôles du brief v5 et du programme (fin, cohérence des villes, journées du séjour, choix)", () => {
+    const refusees: [string, unknown][] = [
+      ["fin d'engagement hors format", { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, engagements: [{ ...BRIEF_REVISION_V3.engagements![0]!, fin: "22h" }] } }],
+      ["changement manquant", { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, changements: [] } }],
+      ["arrivée d'un départ estimé", { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, changements: [{ ...BRIEF_REVISION_V3.changements[0]!, source: "estime" }] } }],
+      ["journée hors du séjour", { ...ENTREE_REVISION_V3, programme: { jours: [...ENTREE_REVISION_V3.programme.jours, { date: "2027-05-10", etapes: [] }] } }],
+      ["journée répétée", { ...ENTREE_REVISION_V3, programme: { jours: [...ENTREE_REVISION_V3.programme.jours, { date: "2027-05-06", etapes: [] }] } }],
+      ["choix hors du programme", { ...ENTREE_REVISION_V3, choix: { pasPourMoi: ["j9-9"], jAime: [] } }],
+      ["étape aimée et écartée", { ...ENTREE_REVISION_V3, choix: { pasPourMoi: ["j5-1"], jAime: ["j5-1"] } }],
+    ];
+    for (const [nom, entree] of refusees) expect(EntreeRevisionV3Schema.safeParse(entree).success, nom).toBe(false);
+  });
+
+  // Garde du récit (0139 § 1.2 points 2 et 6 ; 0149 § 1.3 point 7) étendue à l'entrée v3 : aucune requête de révision ne
+  // reçoit le récit. La garde de l'app est fermée ; l'entrée v3 refuse le récit quel que soit son état (une ouverture de la
+  // garde n'ouvre pas la révision : verdict de la Sécurité requis, question de la PR #926).
+  it("prompts: garde du récit étendue à l'entrée revision v3 (récit refusé avant toute requête, jamais recopié)", async () => {
+    expect(RECIT_API_AUTORISE).toBe(false);
+    const { journal, reviser } = preparer();
+    const RECIT = "SENTINELLE_RECIT Nous aimons marcher.";
+    const avecRecit = { ...ENTREE_REVISION_V3, brief: { ...BRIEF_REVISION_V3, recit: RECIT } };
+    const lu = EntreeRevisionV3Schema.safeParse(avecRecit);
+    expect(lu.success).toBe(false);
+    expect(lu.error?.issues.map((issue) => issue.path.join("."))).toContain("brief.recit");
+    await expect(reviser(avecRecit)).rejects.toBeInstanceOf(RangeError);
+    expect(journal.requetes).toHaveLength(0);
+    // Même sans le schéma, la projection de la requête v3 ne recopie pas le récit (la v5 le recopierait).
+    expect(JSON.stringify(requeteRevisionV3(avecRecit, "test/revision", { data_collection: "deny", zdr: true }))).not.toContain("SENTINELLE_RECIT");
+    expect(JSON.stringify(requeteProgrammeV5({ ...ENTREE_V5, recit: RECIT }, "test/programme", { data_collection: "deny", zdr: true }))).toContain("SENTINELLE_RECIT");
+    // Sans récit : admise, une requête.
+    await reviser(ENTREE_REVISION_V3);
+    expect(journal.requetes).toHaveLength(1);
+    expect(journal.texte()).not.toMatch(/recit/);
   });
 });
 
