@@ -588,6 +588,7 @@ describe("module de journal", () => {
       "lieu.recherche",
       // M5d-4 (décision 0155 § 2.4) : lieux à soi réinjectés par la révision M1b, deux compteurs seulement.
       "recalcul.lieux_a_soi",
+      "calendrier.version_unavailable",
       "log.unknown_event",
     ]);
   });
@@ -684,6 +685,17 @@ describe("limiteur: espèce trip (M5d-1, ticket 939 ; décision 0147 § 6.4 poin
     expect(await limiteur2.verdict(depuis("192.0.2.9"))).toEqual({ ok: false, kind: "ip" });
     expect(increments2()).toHaveLength(7);
     expect(increments()).toHaveLength(8);
+  });
+
+  it("calendrier : configuration de la spécification M6 § 4 (30 par voyage et par heure) ; clé rl/v1/calendrier/3600s/trip/<uuid>", async () => {
+    expect(RATE_LIMITS.calendrier).toEqual([{ kind: "trip", windowSeconds: 3600, threshold: 30 }]);
+    const octets = randomBytes(32);
+    const env = { VADROUILLE_ENV: "ci", TRUSTED_IP_HEADER: "x-vercel-forwarded-for", [HMAC]: octets.toString("base64url") };
+    const { pool, increments } = poolSimule();
+    const limiteur = createRateLimiter({ pool, env, config: RATE_LIMITS });
+    expect(await limiteur.verdict({ action: "calendrier", headers: entetes(), tripId: TRIP })).toEqual({ ok: true });
+    expect(increments().map((r) => r.values?.[0])).toEqual([rateLimitKey(octets, rateLimitMessage("calendrier", 3600, `trip/${TRIP.toLowerCase()}`))]);
+    expect(rateLimitMessage("calendrier", 3600, `trip/${TRIP.toLowerCase()}`)).toBe(`rl/v1/calendrier/3600s/trip/${TRIP.toLowerCase()}`);
   });
 
   it("lieu-recherche : configuration de 0147 § 6.4 (5 par minute par adresse, 20 par voyage et par 24 heures)", () => {

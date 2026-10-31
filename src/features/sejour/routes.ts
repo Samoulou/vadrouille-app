@@ -56,6 +56,14 @@ export function mesVoyagesRoute(): string {
   return "/voyages";
 }
 
+/**
+ * Fichier `.ics` du programme (M6b, ticket 1005 ; décision 0157 § 1.6 point 1) : route `GET /api/v1/voyages/[id]/calendrier`,
+ * seul endroit qui écrit cette adresse (bouton « Ajouter au calendrier » du Séjour, tests).
+ */
+export function calendrierRoute(tripId: string): string {
+  return `/api/v1/voyages/${encodeURIComponent(tripId)}/calendrier`;
+}
+
 export function tripRoutes(base: TripRoutesBase, tripId: string): TripRoutes {
   const trip = `${base}/${encodeURIComponent(tripId)}`;
   const jour = (n: number) => `${trip}/jour/${n}`;

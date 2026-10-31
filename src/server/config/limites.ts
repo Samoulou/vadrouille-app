@@ -63,6 +63,11 @@ export const RATE_LIMITS: RateLimitConfig = {
     { kind: "ip", windowSeconds: 60, threshold: 5 },
     { kind: "trip", windowSeconds: 86_400, threshold: 20 },
   ],
+  // M6b (ticket 1005 ; décision 0157 § 1.6 point 2 et § 2.5, S5 confirmée) : téléchargement du fichier `.ics`, 30 par heure
+  // et par voyage (proposition). La route a une session : l'espèce `trip` ne dépend pas de l'en-tête d'adresse, et le
+  // compte ne se partage pas entre personnes. Vérifié après la session et le contrôle du voyage dans l'organisation, avant
+  // la lecture de la version ; `api` seulement (limiteur en base).
+  calendrier: [{ kind: "trip", windowSeconds: 3600, threshold: 30 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

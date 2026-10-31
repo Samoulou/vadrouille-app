@@ -256,6 +256,7 @@ Tutoiement, phrases courtes, sans point d'exclamation (handover § 10). Vocabula
 - Aucune étape : « Aucune étape à ajouter pour l'instant. »
 - Hors ligne : « Tu es hors ligne. Ajouter au calendrier demande une connexion. »
 - Nom du calendrier : « {destination} · Programme » ; description d'une étape à réserver : « À réserver. »
+- **Décision UX/UI (U1, U3), revue consolidée du head `518f9bc` de la PR 1007 (M6b)** : bouton secondaire de Ligne (52 px), dans le Séjour sous « Jour par jour » et avant « Versions du programme », Séjour seulement (pas l'écran 15) ; textes ci-dessus validés tels quels. Définitive à la fusion de M6b (décision 0093).
 
 **Rappels (M6c)** :
 - Interrupteur : « Rappel par e-mail la veille »

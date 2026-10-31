@@ -169,6 +169,10 @@ export const LOG_EVENTS = [
   // la publication n'écrit rien (R3, jour incohérent, version de base dépassée), et un rejeu du lot peut compter deux fois le
   // même lieu (biais de mesure seulement).
   "recalcul.lieux_a_soi",
+  // M6b (ticket 1005, spécification M6 § 4) : le fichier de calendrier d'un voyage débloqué n'a pas trouvé sa version
+  // courante (incohérence de la base) ; réponse 500 sans corps ; niveau `error`. **Aucun champ** (`CHAMPS_ADMIS_PAR_EVENEMENT`) :
+  // jamais `tripId`, `organizationId`, un nom ni une heure.
+  "calendrier.version_unavailable",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -899,6 +903,8 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   ["lieu.recherche", new Set(["places", "reason", "googleCode", "httpStatus", "errorName"])],
   // Décision 0155 § 2.4 : deux compteurs ; identifiants, noms, `placeId` et heures retirés.
   ["recalcul.lieux_a_soi", new Set(["places", "stopsRemoved"])],
+  // M6b (ticket 1005) : aucun champ ; tout champ passé est retiré.
+  ["calendrier.version_unavailable", new Set<string>()],
   [
     "generation.programme_written",
     new Set([

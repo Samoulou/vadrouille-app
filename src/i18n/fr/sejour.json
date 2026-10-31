@@ -132,6 +132,15 @@
       "debloquer": "Débloquer",
       "versVille": "Vers {ville}"
     },
+    "calendrier": {
+      "bouton": "Ajouter au calendrier",
+      "aide": "Un fichier pour ton agenda, avec une entrée par étape. Si ton programme change, ajoute-le à nouveau.",
+      "enPreparation": "Les journées encore en préparation n'y sont pas.",
+      "aucuneEtape": "Aucune étape à ajouter pour l'instant.",
+      "horsLigne": "Tu es hors ligne. Ajouter au calendrier demande une connexion.",
+      "nom": "{destination} · Programme",
+      "aReserver": "À réserver."
+    },
     "villes": {
       "separateur": " · ",
       "titre": {

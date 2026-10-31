@@ -49,6 +49,8 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/payment/composition-stripe.ts", "@/server/env"],
     ["src/server/routes/stripe-webhook.ts", "@/server/env"],
     ["src/server/routes/webhook-commun.ts", "@/server/env"],
+    // M6b (ticket 1005 ; décision 0157 § 1.6 point 9) : route du fichier `.ics`, pour `index` seulement (origine de `APP_URL`).
+    ["src/server/routes/calendrier.ts", "@/server/env"],
     // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, deux importateurs nommés.
     ["src/server/p0/garde.ts", "@/server/env/p0"],
     ["src/server/p0/acces.ts", "@/server/env/p0"],

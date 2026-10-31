@@ -57,6 +57,9 @@ export const IMPORTATEURS_ADMIS = new Map([
       "src/server/payment/composition-stripe.ts",
       "src/server/routes/stripe-webhook.ts",
       "src/server/routes/webhook-commun.ts",
+      // M6b (ticket 1005 ; décision 0157 § 1.6 point 9) : route du fichier `.ics`, origine de `APP_URL` pour `URL` et
+      // `DESCRIPTION` (`serverEnv().betterAuth.appUrl`), aucune clé lue.
+      "src/server/routes/calendrier.ts",
     ],
   ],
   ["resolve", ["db/connection.ts", "tests/unit/server/env.test.ts"]],
