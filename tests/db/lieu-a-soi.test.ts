@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createApiTripAdapter } from "@/adapters/api";
 import type { AdapterContext } from "@/adapters/types";
 import { ok, PatchResultSchema, RevisionPreviewSchema, TripPatchSchema, TripSnapshotSchema, type Result, type StopSnapshot, type TripSnapshot } from "@/contracts";
 import { INCONNU, memePoint, type Point, type SourceRelectures, type Validite } from "@/domain/relectures";
@@ -9,8 +10,10 @@ import { creerRelecturesVoyages, type DoubleRelectures } from "@/mocks/relecture
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
 import { appliquerAjout, identifiantAjout, proposerAjout, type DependancesAjout } from "@/server/lieux/ajout";
+import { annulerAjout } from "@/server/lieux/annulation";
 import { rechercherLieuxApiTerminal } from "@/server/composition/lieux-api";
 import { SQL_VILLE_DU_JOUR } from "@/server/lieux/recherche";
+import { appliquerRetour } from "@/server/versions/historique";
 import { basculerVerrou } from "@/server/versions/retouches";
 import { creerWithOrg } from "@/server/with-org";
 import { createApiCreationAdapter } from "@/adapters/api-creation";
@@ -365,6 +368,175 @@ describe("lieu à soi sur api (M5d-1, ticket 939)", () => {
     expect(valeur(await appliquer(tripId, 2)).version).toBe(3);
     const apres = etape(instantane((await versions(a, tripId))[2]), "j2-diner");
     expect(apres).toEqual(avant);
+  });
+});
+
+/**
+ * Annuler un ajout sur `api` (tâche M5d-6, ticket 994 ; décision 0155 § 4.1, Q779 ; modèle : `annulerRemplacement`, 0145
+ * § 4) : `annulerAjout` de `src/server/lieux/annulation.ts`, directement et par l'adaptateur `api` (`places.undoAddPlace`),
+ * sous `vadrouille_app` avec le `withOrg` réel. Aucun limiteur n'est injecté : l'annulation n'a pas de débit `retouche`.
+ */
+describe("annuler un ajout sur api (M5d-6, ticket 994)", () => {
+  const annuler = (tripId: string, version: number, requestId: string = randomUUID(), ctx: AdapterContext | null = contexte(a)) =>
+    annulerAjout({ contexte: async () => ctx, withOrg }, { tripId, requestId, version });
+  const retouche = (ctx: AdapterContext = contexte(a)) => ({ contexte: async () => ctx, withOrg, limiteur: async () => ok(undefined) });
+  /** Droit `tripUnlocked` posé dans une transaction ultérieure : la version 1 est écrite **avant** le déblocage. */
+  const debloquerApres = (tripId: string, org: Org = a) =>
+    inTx(app, { org: org.org, user: org.owner }, async (c) => {
+      await c.query("SET LOCAL ROLE vadrouille_webhook");
+      await c.query("INSERT INTO entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [org.org, tripId]);
+    });
+  /** Version écrite directement (auteur `engine` ou `workflow`, sans patch, parent 1), recopie de la version 1, devenue courante. */
+  const versionSansPatch = async (tripId: string, version: number, auteur: "engine" | "workflow") => {
+    const [v1] = await versions(a, tripId);
+    await inTx(app, { org: a.org, user: a.owner }, async (c) => {
+      await c.query(
+        "INSERT INTO trip_versions (organization_id, trip_id, version, parent_version, request_id, snapshot, author_kind) VALUES ($1, $2, $3, 1, $4, $5, $6)",
+        [a.org, tripId, version, randomUUID(), JSON.stringify(v1?.snapshot), auteur],
+      );
+      await c.query("UPDATE trips SET current_version = $3 WHERE organization_id = $1 AND id = $2", [a.org, tripId, version]);
+    });
+  };
+
+  it("premier ajout après le déblocage puis annulation : version 3 égale à la base de l'ajout (antérieure au déblocage, écart voulu à 0147 § 5.3 point 4) ; aucun appel du port", async () => {
+    const tripId = await nouveauVoyage(false);
+    await debloquerApres(tripId);
+    const requestIdAjout = randomUUID();
+    expect(valeur(await appliquer(tripId, 1, requestIdAjout)).version).toBe(2);
+    // `applyRevert` garde la règle « après le déblocage » : la version 1 n'est pas proposée au retour.
+    expect(erreur(await appliquerRetour(retouche(), { tripId, requestId: randomUUID(), baseVersion: 2, toVersion: 1 }))).toEqual({ code: "validation_failed", field: "toVersion" });
+
+    // Par l'adaptateur `api` (réponse validée par `PatchResultSchema`) : aucun appel du port de relectures.
+    const places = createApiTripAdapter({ relectures, withOrg }).places;
+    if (places === undefined) throw new Error("lieu à soi absent de l'adaptateur api");
+    const appels = double.appels();
+    const requestId = randomUUID();
+    const annule = PatchResultSchema.parse(valeur(await places.undoAddPlace(contexte(a), { tripId, requestId, version: 2 })));
+    expect(double.appels()).toBe(appels);
+    expect(annule.version).toBe(3);
+    expect(annule.touchedDays).toContain(2);
+    expect(annule.changes).toContainEqual({ type: "removed", label: NOM, before: { day: 2, time: "16:00" } });
+
+    const lignes = await versions(a, tripId);
+    expect(lignes).toHaveLength(3);
+    expect(lignes[2]).toMatchObject({ version: 3, parent_version: 2, author_kind: "user", author_user_id: a.owner });
+    expect(TripPatchSchema.parse(lignes[2]?.patch)).toEqual({ requestId, baseVersion: 2, operations: [{ op: "revert", toVersion: 1 }] });
+    expect(instantane(lignes[2])).toEqual(instantane(lignes[0]));
+    expect(etape(instantane(lignes[2]), identifiantAjout(requestIdAjout))).toBeUndefined();
+    // Rien n'est supprimé : la version de l'ajout reste dans l'historique.
+    expect(etape(instantane(lignes[1]), identifiantAjout(requestIdAjout))?.stop.name).toBe(NOM);
+  });
+
+  it("rejeu par requestId : même réponse, sans nouvelle version ni appel ; autre geste sous le même requestId : version_conflict", async () => {
+    const tripId = await nouveauVoyage();
+    const requestIdAjout = randomUUID();
+    valeur(await appliquer(tripId, 1, requestIdAjout));
+    const requestId = randomUUID();
+    const premiere = valeur(await annuler(tripId, 2, requestId));
+    expect(premiere.version).toBe(3);
+    const appels = double.appels();
+    expect(valeur(await annuler(tripId, 2, requestId))).toEqual(premiere);
+    expect(double.appels()).toBe(appels);
+    // Même requestId, autre version visée : conflit.
+    expect(erreur(await annuler(tripId, 3, requestId))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 3 });
+    // Le requestId de l'ajout lui-même : ce n'est pas une annulation.
+    expect(erreur(await annuler(tripId, 2, requestIdAjout))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 3 });
+    expect(await versions(a, tripId)).toHaveLength(3);
+  });
+
+  it("version_conflict sans écriture : version dépassée, autre version après l'ajout, annulation déjà faite, retour, remplacement, version du workflow, version 1", async () => {
+    // Une autre version suit l'ajout (verrou) : ni l'ajout ni le verrou ne s'annulent ici.
+    const suivie = await nouveauVoyage();
+    valeur(await appliquer(suivie, 1));
+    valeur(await basculerVerrou(retouche(), "lock", { tripId: suivie, requestId: randomUUID(), stopId: "j2-diner", baseVersion: 2 }));
+    expect(erreur(await annuler(suivie, 2))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 3 });
+    expect(erreur(await annuler(suivie, 3))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 3 });
+    expect(erreur(await annuler(suivie, 9))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 3 });
+    expect(await versions(a, suivie)).toHaveLength(3);
+
+    // Annulation déjà faite (un `revert`) : elle ne s'annule pas ici.
+    const annulee = await nouveauVoyage();
+    valeur(await appliquer(annulee, 1));
+    valeur(await annuler(annulee, 2));
+    expect(erreur(await annuler(annulee, 3))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 3 });
+    expect(await versions(a, annulee)).toHaveLength(3);
+
+    // Retour à une version (`applyRevert`) : la version courante est un `revert`.
+    const retour = await nouveauVoyage();
+    valeur(await appliquer(retour, 1));
+    expect(valeur(await appliquerRetour(retouche(), { tripId: retour, requestId: randomUUID(), baseVersion: 2, toVersion: 1 })).version).toBe(3);
+    expect(erreur(await annuler(retour, 3))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 3 });
+    expect(await versions(a, retour)).toHaveLength(3);
+
+    // Remplacement d'une personne (M1g) : patch `[replace]`.
+    const remplace = await nouveauVoyage();
+    const revision = createApiTripAdapter({ relectures, withOrg }).revision;
+    if (revision === undefined) throw new Error("révision absente de l'adaptateur api");
+    const candidateId = await inTx(app, { org: a.org, user: a.owner }, async (c) =>
+      String((await c.query("SELECT candidate_id FROM proposals WHERE organization_id = $1 AND trip_id = $2 AND content ->> 'id' = 'prop-j1-diner-2' AND phase = 'deck'", [a.org, remplace])).rows[0]?.candidate_id),
+    );
+    expect(valeur(await revision.applyReplacement(contexte(a), { tripId: remplace, requestId: randomUUID(), stopId: "j1-diner", candidateId, baseVersion: 1 }))).toEqual({ status: "applied", version: 2 });
+    expect(erreur(await annuler(remplace, 2))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 2 });
+    expect(await versions(a, remplace)).toHaveLength(2);
+
+    // Version du workflow (sans patch), et version 1.
+    const workflow = await nouveauVoyage();
+    expect(erreur(await annuler(workflow, 1))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 1 });
+    await versionSansPatch(workflow, 2, "workflow");
+    expect(erreur(await annuler(workflow, 2))).toEqual({ code: "version_conflict", retryable: true, currentVersion: 2 });
+    expect(await versions(a, workflow)).toHaveLength(2);
+  });
+
+  it("not_unlocked (retryable faux) sans écriture ; autre organisation : not_found ; sans session : unauthenticated ; entrée stricte", async () => {
+    const ferme = await nouveauVoyage(false);
+    expect(erreur(await annuler(ferme, 1))).toEqual({ code: "not_unlocked", retryable: false });
+    expect(await versions(a, ferme)).toHaveLength(1);
+
+    const tripId = await nouveauVoyage();
+    valeur(await appliquer(tripId, 1));
+    expect(erreur(await annuler(tripId, 2, randomUUID(), contexte(b)))).toEqual({ code: "not_found" });
+    expect(erreur(await annuler(tripId, 2, randomUUID(), null))).toEqual({ code: "unauthenticated" });
+    expect(erreur(await annulerAjout({ contexte: async () => contexte(a), withOrg }, { tripId, requestId: randomUUID(), version: 2, toVersion: 1 }))).toMatchObject({ code: "validation_failed" });
+    expect(await versions(a, tripId)).toHaveLength(2);
+  });
+
+  it("recalcul ou voyage complet en cours : generation_in_progress (retryable), sans écriture", async () => {
+    const tripId = await nouveauVoyage();
+    valeur(await appliquer(tripId, 1));
+    await admin.query("INSERT INTO public.generation_runs (organization_id, trip_id, kind, phase) VALUES ($1, $2, 'full', 'preparing')", [a.org, tripId]);
+    expect(erreur(await annuler(tripId, 2))).toEqual({ code: "generation_in_progress", retryable: true });
+    expect(await versions(a, tripId)).toHaveLength(2);
+  });
+
+  it(`ni borne VERSIONS_MAX_PAR_VOYAGE ni débit : l'ajout qui atteint ${String(VERSIONS_MAX_PAR_VOYAGE)} versions s'annule (0155 § 4.1)`, async () => {
+    const tripId = await nouveauVoyage();
+    await versionSansPatch(tripId, VERSIONS_MAX_PAR_VOYAGE - 1, "engine");
+    expect(valeur(await appliquer(tripId, VERSIONS_MAX_PAR_VOYAGE - 1)).version).toBe(VERSIONS_MAX_PAR_VOYAGE);
+    expect(erreur(await appliquer(tripId, VERSIONS_MAX_PAR_VOYAGE))).toEqual({ code: "validation_failed", field: "baseVersion" });
+    expect(valeur(await annuler(tripId, VERSIONS_MAX_PAR_VOYAGE)).version).toBe(VERSIONS_MAX_PAR_VOYAGE + 1);
+  });
+
+  it("liste « À faire » suivie dans la transaction de l'annulation : ligne non faite de l'étape ajoutée retirée, ligne faite déliée, « Ce qui change » le dit", async () => {
+    const tripId = await nouveauVoyage();
+    const requestIdAjout = randomUUID();
+    valeur(await appliquer(tripId, 1, requestIdAjout));
+    const stopId = identifiantAjout(requestIdAjout);
+    const NON_FAITE = randomUUID();
+    const FAITE = randomUUID();
+    await inTx(app, { org: a.org, user: a.owner }, async (c) =>
+      c.query(
+        `INSERT INTO checklist_items (id, organization_id, trip_id, stop_id, kind, label, moment, sponsored, done, done_at) VALUES
+         ($3, $1, $2, $5, 'reservation', '[Réserver le lieu ajouté]', '{"type":"beforeDeparture"}'::jsonb, false, false, NULL),
+         ($4, $1, $2, $5, 'ticket', '[Billet déjà pris]', '{"type":"beforeDeparture"}'::jsonb, false, true, now())`,
+        [a.org, tripId, NON_FAITE, FAITE, stopId],
+      ),
+    );
+    const annule = valeur(await annuler(tripId, 2));
+    expect(annule.changes).toContainEqual({ type: "checklist", action: "removed", label: "[Réserver le lieu ajouté]" });
+    const lignes = await inTx(app, { org: a.org, user: a.owner }, async (c) =>
+      (await c.query("SELECT id, stop_id, done FROM checklist_items WHERE organization_id = $1 AND trip_id = $2 AND id = ANY($3::uuid[]) ORDER BY id", [a.org, tripId, [NON_FAITE, FAITE]])).rows,
+    );
+    expect(lignes).toEqual([{ id: FAITE, stop_id: null, done: true }]);
   });
 });
 

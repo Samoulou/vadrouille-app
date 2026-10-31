@@ -213,8 +213,8 @@ Clés dans `src/i18n/fr/sejour.json` et `src/i18n/fr/revision.json` (noms des cl
 | Recherche, indisponible | La recherche n'est pas disponible pour le moment. Réessaie plus tard. |
 | Aperçu d'ajout, trajets | Temps de trajet calculé après l'ajout |
 | Ajout refusé par le moteur, manque de place (`sejour.json`, clé proposée `ajouter.pasDePlace` ; décision 0154 point 1) | Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour. |
-| Ajout refusé, lieu introuvable (0154 point 1, dès que le contrat dit la cause) | Ce lieu est introuvable. Ton programme est inchangé. Choisis un autre résultat ou cherche un autre nom. |
-| Ajout refusé, lieu fermé définitivement (0154 point 1, dès que le contrat dit la cause) | Ce lieu est fermé définitivement. Ton programme est inchangé. Choisis un autre lieu. |
+| Ajout refusé, lieu introuvable (0154 point 1 ; cause portée par `ApiError.cause`, décision 0155 § 1.1) | Ce lieu est introuvable. Ton programme est inchangé. Choisis un autre résultat ou cherche un autre nom. |
+| Ajout refusé, lieu fermé définitivement (0154 point 1 ; cause portée par `ApiError.cause`, décision 0155 § 1.1) | Ce lieu est fermé définitivement. Ton programme est inchangé. Choisis un autre lieu. |
 | Ajout, calcul indisponible (panne, plafond, échec de lecture des fiches ; 0154 point 1) | Le calcul n'est pas disponible pour le moment. Ton programme est inchangé. Réessaie plus tard. |
 | Ajout, trop de retouches (`rate_limited`, règle `retouche` ; 0154 point 1) | Trop de retouches en peu de temps. Ton programme est inchangé. Réessaie dans une heure. |
 | Aperçu du retour, version actuelle avec une étape verrouillée | Ce retour peut toucher des étapes verrouillées. |

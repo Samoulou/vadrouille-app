@@ -68,7 +68,7 @@ function fakeCalls(overrides: Partial<AjouterLieuCalls> = {}) {
     searchPlaces: vi.fn<AjouterLieuCalls["searchPlaces"]>(async () => ({ ok: true, value: RESULTATS })),
     previewAddPlace: vi.fn<AjouterLieuCalls["previewAddPlace"]>(async (input) => ({ ok: true, value: apercu((input as { name: string }).name) })),
     applyAddPlace: vi.fn<AjouterLieuCalls["applyAddPlace"]>(async () => ({ ok: true, value: { version: 6, touchedDays: [2], changes: [] } })),
-    applyRevert: vi.fn<AjouterLieuCalls["applyRevert"]>(async () => ({ ok: true, value: { version: 7, touchedDays: [2], changes: [] } })),
+    undoAddPlace: vi.fn<AjouterLieuCalls["undoAddPlace"]>(async () => ({ ok: true, value: { version: 7, touchedDays: [2], changes: [] } })),
   };
   // Une action remplacée n'est pas relue comme un double (`mock`) par les tests qui la remplacent.
   return { ...defauts, ...overrides } as typeof defauts;
@@ -290,7 +290,7 @@ describe("ajouter: aperçu et application", () => {
     expect(preview).toHaveBeenLastCalledWith(expect.objectContaining({ baseVersion: 8 }));
   });
 
-  it("« Appliquer » sur `api` : `[add, lock]` demandé avec un `requestId`, toast « Lieu ajouté. », retour à la Journée ; « Annuler » revient à la version d'avant", async () => {
+  it("« Appliquer » sur `api` : `[add, lock]` demandé avec un `requestId`, toast « Lieu ajouté. », retour à la Journée ; « Annuler » appelle `undoAddPlace` avec la version écrite (M5d-6)", async () => {
     const calls = fakeCalls();
     renderScreen(calls, { api: true });
     await choisirEtVoir("Ma librairie");
@@ -317,7 +317,49 @@ describe("ajouter: aperçu et application", () => {
       // « Annuler » du toast (l'écran reste monté ici : la navigation est simulée).
       fireEvent.click(screen.getAllByRole("button", { name: "Annuler" }).at(-1)!);
     });
-    expect(calls.applyRevert).toHaveBeenCalledWith({ tripId: edimbourg.id, requestId: "00000000-0000-4000-8000-000000000001", baseVersion: 6, toVersion: 5 });
+    // `undoAddPlace` (M5d-6, décision 0155 § 4.1), jamais `applyRevert` : la version écrite par l'ajout, sans version visée.
+    expect(calls.undoAddPlace).toHaveBeenCalledTimes(1);
+    expect(calls.undoAddPlace).toHaveBeenCalledWith({ tripId: edimbourg.id, requestId: "00000000-0000-4000-8000-000000000001", version: 6 });
+  });
+
+  it("« Annuler » sur `api` refusé (`version_conflict` de `undoAddPlace`) : le toast revient avec l'annonce de l'échec, l'ajout reste annulable (M5d-6)", async () => {
+    const calls = fakeCalls({
+      undoAddPlace: vi
+        .fn<AjouterLieuCalls["undoAddPlace"]>()
+        .mockResolvedValueOnce({ ok: false, error: { code: "version_conflict", retryable: true, currentVersion: 7 } })
+        .mockResolvedValueOnce({ ok: true, value: { version: 8, touchedDays: [2], changes: [] } }),
+    });
+    renderScreen(calls, { api: true });
+    await choisirEtVoir("Ma librairie");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Annuler" }).at(-1)!);
+    });
+    expect(calls.undoAddPlace).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("L'annulation n'a pas abouti. Ta modification est toujours là. Réessaie avec Annuler.")).toBeInTheDocument();
+    // Toujours annulable : un second « Annuler » rappelle `undoAddPlace` avec la même version écrite.
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Annuler" }).at(-1)!);
+    });
+    expect(calls.undoAddPlace).toHaveBeenCalledTimes(2);
+    expect(calls.undoAddPlace).toHaveBeenLastCalledWith(expect.objectContaining({ tripId: edimbourg.id, version: 6 }));
+  });
+
+  it("« Annuler » du toast sur `mock` : annulation en mémoire (Q762), aucun appel de `undoAddPlace` (M5d-6)", async () => {
+    const calls = fakeCalls();
+    renderScreen(calls);
+    await choisirEtVoir("Ma librairie");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
+    });
+    expect(calls.applyAddPlace).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Lieu ajouté.")).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Annuler" }).at(-1)!);
+    });
+    expect(calls.undoAddPlace).not.toHaveBeenCalled();
   });
 
   it("refus à l'application : bandeau d'erreur, l'écran reste ouvert", async () => {
@@ -439,7 +481,7 @@ describe("ajouter: critère 22 sur `mock`", () => {
       searchPlaces: (input: unknown) => adaptateur.searchPlaces(ctx, input),
       previewAddPlace: vi.fn((input: unknown) => adaptateur.previewAddPlace(ctx, input)),
       applyAddPlace: vi.fn((input: unknown) => adaptateur.applyAddPlace(ctx, input)),
-      applyRevert: vi.fn<AjouterLieuCalls["applyRevert"]>(),
+      undoAddPlace: vi.fn<AjouterLieuCalls["undoAddPlace"]>(),
     };
     const { container } = renderScreen(calls, { trip: CRITERE_22 });
     await rechercher("bouquiniste");
@@ -548,7 +590,7 @@ describe("ajouter: second ajout du même jour sur `mock` (décision 0154 § 3, M
       searchPlaces: (input: unknown) => adaptateur.searchPlaces(ctx, input),
       previewAddPlace: (input: unknown) => adaptateur.previewAddPlace(ctx, input),
       applyAddPlace: (input: unknown) => adaptateur.applyAddPlace(ctx, input),
-      applyRevert: vi.fn<AjouterLieuCalls["applyRevert"]>(),
+      undoAddPlace: vi.fn<AjouterLieuCalls["undoAddPlace"]>(),
     };
     let serie = 0;
     const ecran = (cle: string) => (
@@ -633,7 +675,7 @@ describe("ajouter: entrée « Choisir » d'un repas pas encore choisi (`?de=&rep
       searchPlaces: (input: unknown) => adaptateur.searchPlaces(ctx, input),
       previewAddPlace: (input: unknown) => adaptateur.previewAddPlace(ctx, input),
       applyAddPlace: vi.fn((input: unknown) => adaptateur.applyAddPlace(ctx, input)),
-      applyRevert: vi.fn<AjouterLieuCalls["applyRevert"]>(),
+      undoAddPlace: vi.fn<AjouterLieuCalls["undoAddPlace"]>(),
     };
     render(ecran(calls));
     await rechercher("bouquiniste");

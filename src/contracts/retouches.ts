@@ -193,3 +193,16 @@ export type AddPlaceRequest = z.infer<typeof AddPlaceRequestSchema>;
 /** Application d'un ajout : la demande d'aperçu et son `requestId` (idempotence). */
 export const AddPlaceApplySchema = AddPlaceRequestSchema.extend({ requestId: z.uuid() });
 export type AddPlaceApply = z.infer<typeof AddPlaceApplySchema>;
+
+/**
+ * Annulation d'un ajout (`undoAddPlace`, tâche M5d-6, ticket 994 ; décision 0155 § 4.1, sur le modèle de l'annulation d'un
+ * remplacement, 0145 § 4) : `version` est celle **écrite par l'ajout** (`PatchResult.version` de `applyAddPlace`) ;
+ * `requestId` rend l'annulation idempotente. Le serveur n'accepte l'annulation que si `version` est encore la version
+ * courante et qu'elle est un ajout `[add, lock]` d'une personne ; sinon `version_conflict`.
+ */
+export const AddPlaceUndoSchema = z.strictObject({
+  tripId: TripIdSchema,
+  requestId: z.uuid(),
+  version: VersionSchema,
+});
+export type AddPlaceUndo = z.infer<typeof AddPlaceUndoSchema>;

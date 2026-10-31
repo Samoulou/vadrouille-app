@@ -1,6 +1,7 @@
 import {
   AddPlaceApplySchema,
   AddPlaceRequestSchema,
+  AddPlaceUndoSchema,
   PlaceSearchRequestSchema,
   PlaceSearchResultsSchema,
   fail,
@@ -34,6 +35,10 @@ import type { AdapterContext, PlaceAdapter, TripAdapter } from "./types";
  *   choisi à la même heure, verrouillée, `addedBy: "person"`, avec le nom saisi et le `placeId` choisi ; sinon `no_option` avec `cause: "no_room"` (décision 0155 § 1.2 : le seul refus de `mock` est le manque de place).
  *   L'application rend la version 2 **sans modifier le jeu simulé** (comme le verrou de `mock`, l'écran garde l'ajout en
  *   mémoire) ; rien d'autre n'est gardé que le compteur des recherches.
+ * - `undoAddPlace` (M5d-6, ticket 994 ; décision 0155 § 4.1) : même signature et mêmes contrôles d'entrée que `api`
+ *   (`unauthenticated`, `validation_failed`, `not_found`, `not_unlocked`) ; la version écrite par un ajout simulé est
+ *   toujours la 2 : l'annulation rend la version 3, sans rien modifier ni garder ; toute autre version rend
+ *   `version_conflict`. L'écran sur `mock` annule en mémoire (`actions.undo()`, Q762) et n'appelle pas cette action.
  */
 
 /** Durées prévues par type (minutes), lues dans `dureesParDefaut` de la configuration du moteur. */
@@ -169,6 +174,16 @@ export function createMockPlaces(options: OptionsLieuxSimules): PlaceAdapter {
       const lu = await apercu(ctx, input, AddPlaceApplySchema, null);
       if ("erreur" in lu) return lu.erreur;
       return ok({ version: VERSION_SIMULEE + 1, touchedDays: [lu.demande.day], changes: [{ type: "added", time: lu.pose.stop.start, label: lu.pose.stop.name }] });
+    },
+    async undoAddPlace(ctx, input): Promise<Result<PatchResult>> {
+      if (ctx === null) return fail("unauthenticated");
+      const lue = AddPlaceUndoSchema.safeParse(input);
+      if (!lue.success) return refusEntree(lue.error.issues);
+      const lu = await voyage(ctx, lue.data.tripId);
+      if ("refus" in lu) return lu.refus;
+      // Le jeu simulé n'a pas d'historique : la seule version d'un ajout simulé est la 2 (`applyAddPlace`).
+      if (lue.data.version !== VERSION_SIMULEE + 1) return { ok: false, error: { code: "version_conflict", retryable: true, currentVersion: VERSION_SIMULEE } };
+      return ok({ version: VERSION_SIMULEE + 2, touchedDays: [], changes: [] });
     },
   };
 }

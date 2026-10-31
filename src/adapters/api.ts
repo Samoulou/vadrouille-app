@@ -18,6 +18,7 @@ import {
   type Result,
 } from "@/contracts";
 import { appliquerAjout, proposerAjout } from "@/server/lieux/ajout";
+import { annulerAjout } from "@/server/lieux/annulation";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
 import { annulerRemplacement, appliquerRemplacement, proposerRemplacement, versionDuVoyage, type DependancesRemplacement } from "@/server/versions/remplacement";
 import { appliquerDeplacement, optionsDeDeplacement, proposerDeplacement } from "@/server/versions/deplacement";
@@ -89,7 +90,8 @@ function signalementsApi(options: OptionsAdaptateurApi): StopReportAdapter {
  * processus, avec le contexte de la session et **le même port de relectures** que la lecture (un appel par aperçu ou
  * application, hors transaction ; décision 0147 § 4). Chaque réponse est validée par son contrat. Un refus est rendu tel que
  * le cas d'usage l'a construit (validé par `ApiErrorSchema`) : `no_option` porte sa `cause` (`no_room`, `place_not_found`,
- * `place_closed`), une lecture des fiches en échec rend `provider_error` (décision 0155 § 1).
+ * `place_closed`), une lecture des fiches en échec rend `provider_error` (décision 0155 § 1). L'annulation d'un ajout
+ * (`undoAddPlace`, M5d-6, `src/server/lieux/annulation.ts`) n'appelle pas le port : elle recopie la base de l'ajout.
  */
 function lieuxApi(options: OptionsAdaptateurApi): AddPlaceAdapter {
   const { withOrg, relectures } = options;
@@ -98,6 +100,8 @@ function lieuxApi(options: OptionsAdaptateurApi): AddPlaceAdapter {
   return {
     previewAddPlace: async (ctx, input) => valide(RevisionPreviewSchema)(await proposerAjout(dependances(ctx), input)),
     applyAddPlace: async (ctx, input) => valide(PatchResultSchema)(await appliquerAjout(dependances(ctx), input)),
+    // M5d-6 (ticket 994) : annulation d'un ajout, sans appel du port de relectures (décision 0155 § 4.1).
+    undoAddPlace: async (ctx, input) => valide(PatchResultSchema)(await annulerAjout(dependances(ctx), input)),
   };
 }
 

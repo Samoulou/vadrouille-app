@@ -116,6 +116,7 @@ export type {
 export {
   AddPlaceApplySchema,
   AddPlaceRequestSchema,
+  AddPlaceUndoSchema,
   GooglePlaceLabelSchema,
   PlaceSearchRequestSchema,
   PlaceSearchResultSchema,
@@ -130,6 +131,7 @@ export {
 export type {
   AddPlaceApply,
   AddPlaceRequest,
+  AddPlaceUndo,
   GooglePlaceLabel,
   PlaceSearchRequest,
   PlaceSearchResult,
