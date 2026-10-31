@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -8,12 +8,18 @@ import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
 import { isMapConfigComplete, useCarteInjection } from "./config";
-import { GoogleMapRenderer } from "./GoogleMapRenderer";
 import { MAP_FALLBACK_TEXTS, MapFallback, type MapFallbackCause } from "./MapFallback";
 import { buildCityOverview, buildDayRoute, buildOverview, type DayRoute, type Moitie, type RouteDay, type RouteMap, type VilleDuJour } from "./route";
 import type { FitPadding, MapView } from "./types";
 
 const t = messages.carte;
+
+/**
+ * Rendu Google chargé à la demande (décision 0152 § 4, ticket 991) : il n'est monté qu'en ligne, avec des positions et
+ * une configuration complète. Hors ligne, sans position ou sans configuration, l'écran n'en télécharge rien. Repli
+ * `null` pendant le chargement du bloc : la région live reste vide, comme pendant le chargement des scripts Google.
+ */
+const GoogleMapRenderer = lazy(() => import("./GoogleMapRenderer").then((loaded) => ({ default: loaded.GoogleMapRenderer })));
 
 export type DayMapProps =
   | {
@@ -187,12 +193,14 @@ export function DayMap(props: DayMapProps) {
     content = <Simulated view={view} />;
   } else {
     content = (
-      <GoogleMapRenderer
-        view={view}
-        config={{ apiKey: config.apiKey ?? "", mapId: config.mapId ?? "" }}
-        placesFromGoogle={props.placesFromGoogle}
-        onErrorChange={setLoadError}
-      />
+      <Suspense fallback={null}>
+        <GoogleMapRenderer
+          view={view}
+          config={{ apiKey: config.apiKey ?? "", mapId: config.mapId ?? "" }}
+          placesFromGoogle={props.placesFromGoogle}
+          onErrorChange={setLoadError}
+        />
+      </Suspense>
     );
     cause = loadError ? "error" : null;
   }

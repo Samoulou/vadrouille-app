@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -76,8 +76,8 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
     const setOnline = stubOnline(false);
     renderMap(FAKE);
     act(() => setOnline(true));
-    await act(async () => {});
-    expect(loader.importLibrary).toHaveBeenCalled();
+    // Le rendu Google se charge à la demande (ticket 991) : on attend son montage plutôt qu'un seul tour de `act`.
+    await waitFor(() => expect(loader.importLibrary).toHaveBeenCalled());
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
@@ -126,8 +126,8 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
   it("configuration complète en ligne → le rendu Google charge la carte", async () => {
     stubOnline(true);
     renderMap(FAKE);
-    await act(async () => {});
-    expect(loader.importLibrary).toHaveBeenCalled();
+    // Rendu Google chargé à la demande (ticket 991) : attendu par `waitFor`.
+    await waitFor(() => expect(loader.importLibrary).toHaveBeenCalled());
     expect(document.querySelector("[data-renderer='google']")).not.toBeNull();
   });
 });
@@ -161,9 +161,9 @@ describe("DayMap : région live persistante (annonce des états de remplacement)
     renderMap(FAKE);
     const live = screen.getByRole("status");
     expect(live).toBeEmptyDOMElement();
-    await act(async () => {});
+    // Rendu Google chargé à la demande (ticket 991) : l'erreur est attendue par `waitFor`.
+    await waitFor(() => expect(live).toHaveTextContent(t.erreur));
     expect(screen.getByRole("status")).toBe(live);
-    expect(live).toHaveTextContent(t.erreur);
     expect(screen.getByRole("button", { name: t.reessayer })).toBeInTheDocument();
   });
 });
