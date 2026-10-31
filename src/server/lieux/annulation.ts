@@ -9,25 +9,13 @@ import {
   type ApiError,
   type PatchResult,
   type Result,
-  type TripPatch,
-  type TripSnapshot,
 } from "@/contracts";
 import type { ConfigurationMoteur } from "@/domain/configuration";
-import { appliquerPatch, type ResultatPatch } from "@/domain/patch";
 import { lireDroitVoyage } from "@/server/payment/paiements";
 import { SQL_VERROU_TRI } from "@/server/presentation/etat";
 import { BaseDeVersionDepassee, ecrireVersion, verrouillerVersions } from "@/server/versions/ecrire";
-import { patchDuRetour } from "@/server/versions/historique";
-import {
-  contexteVoyage,
-  entreeMoteurDeRevision,
-  lireVersion,
-  refuserPendantUnRecalcul,
-  RELECTURES_INCONNUES,
-  SQL_PAR_DEMANDE,
-  versionCourante,
-  type ContexteVoyage,
-} from "@/server/versions/remplacement";
+import { moteurDuRetour, patchDuRetour } from "@/server/versions/historique";
+import { contexteVoyage, lireVersion, refuserPendantUnRecalcul, SQL_PAR_DEMANDE, versionCourante } from "@/server/versions/remplacement";
 import { erreurDuMoteur } from "@/server/versions/retouches";
 import { executerActionVoyage, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
 
@@ -80,19 +68,6 @@ export function estUnAjout(auteur: unknown, patch: unknown): boolean {
   return ajout?.op === "add" && verrou?.op === "lock" && ajout.stopId === verrou.stopId && ajout.stopId.startsWith(PREFIXE_ETAPE_AJOUTEE);
 }
 
-/** (i) Moteur : recopie de la version de base de l'ajout, relectures inconnues (aucun appel, aucune replanification). */
-function moteurDeLAnnulation(contexte: ContexteVoyage, patch: TripPatch, actuelle: TripSnapshot, anterieure: TripSnapshot, configuration?: ConfigurationMoteur): ResultatPatch {
-  const operation = patch.operations[0];
-  const toVersion = operation?.op === "revert" ? operation.toVersion : 0;
-  return appliquerPatch({
-    moteur: entreeMoteurDeRevision(contexte, [], RELECTURES_INCONNUES, configuration),
-    patch,
-    versionCourante: patch.baseVersion,
-    base: actuelle,
-    versionsAnterieures: new Map([[toVersion, anterieure]]),
-  });
-}
-
 /**
  * (e) Rejeu d'une annulation déjà écrite : la même réponse si la version est bien une annulation `[revert]` d'une personne
  * écrite sur la version `version` ; sinon `version_conflict`.
@@ -115,7 +90,7 @@ async function rejeu(
   if (contexte === null) return null;
   const actuelle = await lireVersion(executeur, ctx.organizationId, valeur.tripId, patch.data.baseVersion);
   const anterieure = await lireVersion(executeur, ctx.organizationId, valeur.tripId, operation.toVersion);
-  const resultat = moteurDeLAnnulation(contexte, patch.data, actuelle.instantane, anterieure.instantane, dependances.configuration);
+  const resultat = moteurDuRetour(contexte, patch.data, actuelle.instantane, anterieure.instantane, dependances.configuration);
   if (!resultat.ok) return conflit(courante);
   return { ok: true, value: PatchResultSchema.parse({ ...resultat.resultat, version }) };
 }
@@ -143,12 +118,13 @@ export async function annulerAjout(dependances: DependancesAnnulationAjout, entr
     const actuelle = await lireVersion(executeur, org, valeur.tripId, courante);
     if (!estUnAjout(actuelle.auteur, actuelle.patch)) return conflit(courante);
     const cible = TripPatchSchema.parse(actuelle.patch).baseVersion;
-    // (i) Moteur. Pas de contrôle « après le déblocage » sur `cible` : écart voulu (0155 § 4.1, voir l'en-tête).
+    // (i) Moteur (`moteurDuRetour`, partagé avec `applyRevert`). Pas de contrôle « après le déblocage » sur `cible` : écart
+    // voulu (0155 § 4.1, voir l'en-tête).
     const anterieure = await lireVersion(executeur, org, valeur.tripId, cible);
     const contexte = await contexteVoyage(executeur, ctx, valeur.tripId);
     if (contexte === null) return null;
     const patch = patchDuRetour(valeur.requestId, courante, cible);
-    const resultat = moteurDeLAnnulation(contexte, patch, actuelle.instantane, anterieure.instantane, dependances.configuration);
+    const resultat = moteurDuRetour(contexte, patch, actuelle.instantane, anterieure.instantane, dependances.configuration);
     if (!resultat.ok) return refus(erreurDuMoteur(resultat));
     // (j) Écriture : la liste « À faire » suit dans la même transaction (0147 § 7.2).
     try {

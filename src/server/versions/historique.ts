@@ -193,8 +193,11 @@ export function patchDuRetour(requestId: string, baseVersion: number, toVersion:
   return patchDeLaPersonne({ requestId, baseVersion, operations: [{ op: "revert", toVersion }] });
 }
 
-/** Moteur d'un retour : recopie de `cible`, relectures vides (aucune replanification, aucun appel ; 0147 § 5.2 point 5). */
-function moteurDuRetour(contexte: ContexteVoyage, patch: TripPatch, base: TripSnapshot, cible: TripSnapshot, configuration?: ConfigurationMoteur): ResultatPatch {
+/**
+ * Moteur d'un retour : recopie de `cible`, relectures vides (aucune replanification, aucun appel ; 0147 § 5.2 point 5).
+ * Partagé avec l'annulation d'un ajout (`src/server/lieux/annulation.ts`, M5d-6).
+ */
+export function moteurDuRetour(contexte: ContexteVoyage, patch: TripPatch, base: TripSnapshot, cible: TripSnapshot, configuration?: ConfigurationMoteur): ResultatPatch {
   const operation = patch.operations[0];
   const toVersion = operation?.op === "revert" ? operation.toVersion : 0;
   return appliquerPatch({
