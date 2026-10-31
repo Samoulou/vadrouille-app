@@ -50,3 +50,20 @@ test("ajouter: aucune violation axe, voyage non débloqué", async ({ page }) =>
   await expect(sheet(page).getByText("Tu pourras ajouter tes propres lieux une fois ton voyage débloqué.")).toBeVisible();
   await expectNoViolations(page);
 });
+
+test("ajouter: « Choisir » d'un repas pas encore choisi (/dev/composants, M5d-3) : nom accessible, cible de 44 px, aucune violation axe", async ({ page }) => {
+  await page.goto("/dev/composants");
+  const programme = page.getByRole("region", { name: "Programme", exact: true });
+  for (const nom of ["Choisir le déjeuner", "Choisir le dîner"]) {
+    const lien = programme.getByRole("link", { name: nom });
+    await expect(lien).toHaveText("Choisir");
+    const box = await lien.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(44);
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
+  const resultats = await new AxeBuilder({ page })
+    .include("section[data-component='Programme']")
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
+    .analyze();
+  expect(resultats.violations).toEqual([]);
+});

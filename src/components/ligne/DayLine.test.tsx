@@ -245,6 +245,41 @@ describe("DayLine, ajouts de F5b (Q17)", () => {
     expect(container.querySelectorAll("a[data-part='arret']")).toHaveLength(2);
   });
 
+  it("« Choisir » d'un repas pas encore choisi (F7-PO-8, M5d-3) : lien vers l'adresse de l'écran, nom accessible « Choisir le déjeuner », cible de 44 px ; aucun lien sans getMealLink", async () => {
+    const calls: { time: string; meal: string }[] = [];
+    const { container } = render(
+      <DayLine
+        items={WITH_ADDITIONS}
+        getStopHref={href}
+        getMealLink={(openMeal) => {
+          calls.push(openMeal);
+          return {
+            href: `/voyages/v/jour/2/ajouter?de=${openMeal.time}&repas=${openMeal.meal}`,
+            label: "Choisir",
+            name: openMeal.meal === "lunch" ? "Choisir le déjeuner" : "Choisir le dîner",
+          };
+        }}
+      />,
+    );
+    expect(calls).toEqual([
+      { time: "12:30", meal: "lunch" },
+      { time: "20:00", meal: "dinner" },
+    ]);
+    const dejeuner = screen.getByRole("link", { name: "Choisir le déjeuner" });
+    expect(dejeuner).toHaveAttribute("href", "/voyages/v/jour/2/ajouter?de=12:30&repas=lunch");
+    expect(dejeuner).toHaveTextContent(/^Choisir$/);
+    expect(dejeuner).toHaveAttribute("data-part", "choisir-repas-lunch");
+    expect(dejeuner).toHaveClass("min-h-(--touch-target)", "min-w-(--touch-target)", "text-ink", "font-bold", "underline");
+    expect(dejeuner.closest("li")).toHaveAttribute("data-meal", "lunch");
+    expect(screen.getByRole("link", { name: "Choisir le dîner" })).toHaveAttribute("href", "/voyages/v/jour/2/ajouter?de=20:00&repas=dinner");
+    // Le texte du repas reste celui de F5-PO-13, en arret ink-2 ; aucun badge.
+    expect(within(dejeuner.closest("li")!).getByText("Déjeuner pas encore choisi")).toHaveClass("text-arret", "text-ink-2");
+    expect(await axeViolations(container)).toEqual([]);
+    // Rendu `undefined` : pas de lien pour ce repas.
+    const { container: sansLien } = render(<DayLine items={WITH_ADDITIONS} getMealLink={() => undefined} />);
+    expect(sansLien.querySelectorAll("a[data-part^='choisir-repas']")).toHaveLength(0);
+  });
+
   it("lien « Idées » par plage : getIdeasHref reçoit from et to de chaque temps libre (F5-TL-8)", () => {
     const calls: { from: string; to: string }[] = [];
     const { container } = render(
