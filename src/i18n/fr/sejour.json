@@ -140,6 +140,10 @@
       }
     }
   },
+  "carteCadrage": {
+    "nom": "Afficher sur la carte",
+    "toutes": "Toutes les villes"
+  },
   "aujourdhui": {
     "lien": "Aujourd'hui · Jour {n}"
   },

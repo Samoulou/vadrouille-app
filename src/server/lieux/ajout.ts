@@ -22,6 +22,7 @@ import { appliquerPatch, type ResultatPatch } from "@/domain/patch";
 import { demandeDeRelectures } from "@/domain/recomposition";
 import type { Relectures, SourceRelectures } from "@/domain/relectures";
 import { versMinutes } from "@/domain/temps";
+import { etatDuLieuAjoute } from "@/domain/validation";
 import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
 import { errorNameOf, logEvent } from "@/server/log";
 import { lireDroitVoyage } from "@/server/payment/paiements";
@@ -52,9 +53,14 @@ import { recomposerJourDeRevision, relireRevision } from "@/server/voyages/lectu
  * (`validation_failed`, `field: "baseVersion"`) ; (h) version de base (`version_conflict` avec `currentVersion`) ; (i) jour
  * du voyage (`not_found`) ; puis, **hors transaction et sans verrou**, (j) **un** appel du port de relectures de la lecture
  * (0147 § 4 : profil `relecture`, aucun temps de trajet écrit ; échec : `provider_error`, ou `cost_cap_reached` si le forfait
- * est atteint) ; enfin le moteur (`no_option` : « Pas de place ce jour-là ») et, pour l'application, sous le verrou du tri
- * puis celui des versions (même ordre que M1g et M5a) : rejeu, recalcul en cours (`generation_in_progress`), borne, version
- * de base inchangée, moteur, écriture (`ecrireVersion`, `instantanePrecedent` obligatoire : la liste « À faire » suit).
+ * est atteint) ; (k) **état de la fiche du lieu ajouté**, avant le moteur (décision 0155 § 1.2, `etatDuLieuAjoute`, même
+ * règle et même portée que R1) : `inconnu` (lecture des fiches en échec) → `provider_error` ; `introuvable` → `no_option`
+ * avec `cause: "place_not_found"` ; `ferme` → `no_option` avec `cause: "place_closed"` ; enfin le moteur (son refus
+ * `no_option` porte `cause: "no_room"`, posée explicitement : « Pas de place ce jour-là ») et, pour l'application, sous le
+ * verrou du tri puis celui des versions (même ordre que M1g et M5a) : rejeu, recalcul en cours (`generation_in_progress`),
+ * borne, version de base inchangée, moteur, écriture (`ecrireVersion`, `instantanePrecedent` obligatoire : la liste « À
+ * faire » suit). Le moteur reste le gardien : un lieu non `valide` qui l'atteindrait serait refusé par R1. Un rejeu ne
+ * relit rien et ne recalcule aucune cause.
  *
  * L'aperçu n'écrit rien et ne garde rien. Aucun prompt ; aucune donnée Google autre que le `placeId`.
  */
@@ -215,13 +221,43 @@ async function relire(
   }
 }
 
+const entreeDuMoteur = (dependances: DependancesAjout, contexte: ContexteVoyage, relectures: Relectures) =>
+  entreeMoteurDeRevision(contexte, [], relectures, dependances.configuration);
+
 function moteur(dependances: DependancesAjout, contexte: ContexteVoyage, relectures: Relectures, patch: TripPatch): ResultatPatch {
   return appliquerPatch({
-    moteur: entreeMoteurDeRevision(contexte, [], relectures, dependances.configuration),
+    moteur: entreeDuMoteur(dependances, contexte, relectures),
     patch,
     versionCourante: contexte.base.version,
     base: contexte.base.snapshot,
   });
+}
+
+/**
+ * (k) Cause du refus connue avant le moteur (décision 0155 § 1.1 et § 1.2) : état de la fiche du lieu ajouté, avec la portée
+ * de R1 de l'entrée du moteur ; `null` si la fiche est `valide` (le moteur décide). Aucun nom, adresse ni `placeId` dans
+ * l'erreur : un code fermé.
+ */
+function refusAvantMoteur(dependances: DependancesAjout, contexte: ContexteVoyage, relectures: Relectures, placeId: string): Issue<never> | null {
+  switch (etatDuLieuAjoute(relectures, placeId, entreeDuMoteur(dependances, contexte, relectures).porteeR1)) {
+    case "valide":
+      return null;
+    case "inconnu":
+      return refus({ code: "provider_error" });
+    case "introuvable":
+      return refus({ code: "no_option", cause: "place_not_found" });
+    case "ferme":
+      return refus({ code: "no_option", cause: "place_closed" });
+  }
+}
+
+/**
+ * Refus du moteur sur un lieu `valide` : la correspondance commune (`erreurDuMoteur`, inchangée), et `cause: "no_room"` posée
+ * explicitement sur un `no_option` (toute cause de la famille « manque de place », 0155 § 1.2).
+ */
+function refusDuMoteur(resultat: Exclude<ResultatPatch, { ok: true }>): Issue<never> {
+  const erreur = erreurDuMoteur(resultat);
+  return refus(erreur.code === "no_option" ? { ...erreur, cause: "no_room" } : erreur);
 }
 
 /**
@@ -268,9 +304,11 @@ export async function proposerAjout(dependances: DependancesAjout, entree: unkno
   const cible = identifiantAjout(id);
   const relectures = await relire(dependances, ctx, prepare.value, cible, valeur);
   if (!relectures.ok) return relectures;
+  const avant = refusAvantMoteur(dependances, prepare.value.contexte, relectures.value, valeur.resultId);
+  if (avant !== null) return avant;
   const patch = patchDeLAjout(id, valeur.baseVersion, valeur);
   const resultat = moteur(dependances, prepare.value.contexte, relectures.value, patch);
-  if (!resultat.ok) return refus(erreurDuMoteur(resultat));
+  if (!resultat.ok) return refusDuMoteur(resultat);
   try {
     return { ok: true, value: apercuDeLAjout(prepare.value.contexte, resultat, relectures.value, cible, id, Date.now(), prepare.value.lignes) };
   } catch (erreur) {
@@ -332,6 +370,9 @@ export async function appliquerAjout(dependances: DependancesAjout, entree: unkn
   const cible = identifiantAjout(demande.requestId);
   const relectures = await relire(dependances, session, prepareAjout, cible, demande);
   if (!relectures.ok) return relectures;
+  // (k) État de la fiche, avant la transaction d'écriture et le moteur.
+  const avant = refusAvantMoteur(dependances, prepareAjout.contexte, relectures.value, demande.resultId);
+  if (avant !== null) return avant;
 
   // Écriture, sous les verrous ; la version relue doit être encore la base de la première transaction.
   const ecrit = await executerActionVoyage("apply-add-place", dependances, AddPlaceApplySchema, entree, async (executeur, ctx, valeur): Promise<Issue<PatchResult> | null> => {
@@ -349,7 +390,7 @@ export async function appliquerAjout(dependances: DependancesAjout, entree: unkn
     if (derniere !== valeur.baseVersion || derniere !== contexte.base.version) return conflit(derniere);
     const patch = patchDeLAjout(valeur.requestId, derniere, valeur);
     const resultat = moteur(dependances, contexte, relectures.value, patch);
-    if (!resultat.ok) return refus(erreurDuMoteur(resultat));
+    if (!resultat.ok) return refusDuMoteur(resultat);
     try {
       const ecrite = await ecrireVersion(executeur, {
         organizationId: org,

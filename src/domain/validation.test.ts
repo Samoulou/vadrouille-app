@@ -11,6 +11,7 @@ import {
   CODES_REGLE,
   compterParRegle,
   estBloquante,
+  etatDuLieuAjoute,
   validerProgramme,
   type CodeRegle,
   type ContexteValidation,
@@ -287,6 +288,26 @@ describe("validation: R1 lieu ancré et sourcé", () => {
     expect(r1(cas(avecEtape(ajout, "v1-j2-1", (stop) => ({ ...stop, placeId: undefined })), { ajouts }))).toEqual([]);
     expect(r1(cas(ajout, { ajouts, porteeR1: { ajouts: "complete" } }))).toEqual([{ regle: "R1", etape: "v1-j2-1" }]);
     expect(r1(cas(avecEtape(ajout, "v1-j2-1", (stop) => ({ ...stop, placeId: P_FERME })), { ajouts, porteeR1: { ajouts: "aucune" } }))).toEqual([]);
+  });
+
+  it("etatDuLieuAjoute (0155 § 1.2) : quatre états d'après la fiche relue ; portée `aucune` : valide ; R1 refuse tout état autre que valide", () => {
+    const lu = relectures();
+    expect(etatDuLieuAjoute(lu, PA)).toBe("valide");
+    expect(etatDuLieuAjoute(lu, P_INTROUVABLE)).toBe("introuvable");
+    expect(etatDuLieuAjoute(lu, P_FERME)).toBe("ferme");
+    expect(etatDuLieuAjoute(lu, P_INCONNU)).toBe("inconnu");
+    // Portée par défaut (`lieu`, provisoire, Q332) et `complete` : la fiche décide ; `aucune` : jamais contrôlée.
+    for (const placeId of [PA, P_INTROUVABLE, P_FERME, P_INCONNU]) {
+      expect(etatDuLieuAjoute(lu, placeId, { ajouts: "lieu" })).toBe(etatDuLieuAjoute(lu, placeId));
+      expect(etatDuLieuAjoute(lu, placeId, { ajouts: "complete" })).toBe(etatDuLieuAjoute(lu, placeId));
+      expect(etatDuLieuAjoute(lu, placeId, { ajouts: "aucune" })).toBe("valide");
+    }
+    // Même règle que R1 : l'étape ajoutée est refusée si et seulement si l'état n'est pas `valide`.
+    const ajouts = new Set(["v1-j2-1"]);
+    for (const placeId of [PA, P_INTROUVABLE, P_FERME, P_INCONNU]) {
+      const jour = avecEtape(jourDeReference(), "v1-j2-1", (stop) => ({ ...stop, source: undefined, placeId }));
+      expect(r1(cas(jour, { ajouts })).length > 0, placeId).toBe(etatDuLieuAjoute(lu, placeId) !== "valide");
+    }
   });
 });
 

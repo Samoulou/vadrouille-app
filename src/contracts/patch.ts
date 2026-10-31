@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { texteMaison } from "./texte";
 import { ChangeSchema, TimeSchema } from "./trip";
+import { ADDED_STOP_NAME_MAX } from "./values";
 
 /**
  * Patch d'une révision (décision 0037, B2-TL-3), stocké dans `trip_versions.patch`. **Contrat interne du
@@ -19,8 +20,8 @@ export const DayIndexSchema = z.number().int().positive();
 /** Natures d'une étape ajoutée par la personne : jamais `event`. Source d'`add.kind` et d'`AddPlaceRequest.kind`. */
 export const AddedStopKindSchema = z.enum(["activity", "meal"]);
 
-/** Longueur maximale du nom saisi par la personne pour un ajout. */
-export const ADDED_STOP_NAME_MAX = 80;
+/** Longueur maximale du nom saisi par la personne pour un ajout : définie dans `./values` (décision 0155 § 5.1), réexportée ici. */
+export { ADDED_STOP_NAME_MAX };
 
 export const TripPatchOperationSchema = z.discriminatedUnion("op", [
   /**

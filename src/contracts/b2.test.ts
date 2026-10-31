@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ADDED_STOP_NAME_MAX,
+  API_ERROR_CODES,
   ApiErrorSchema,
   ChecklistItemSchema,
   ChecklistMomentSchema,
@@ -13,6 +15,7 @@ import {
   StopFactsSchema,
   TripPatchSchema,
   TripSchema,
+  NO_OPTION_CAUSES,
   type ChecklistItem,
   type Proposal,
   type Stop,
@@ -250,5 +253,33 @@ describe("ApiError.currentVersion (E10, B2-PO-8)", () => {
     expect(ApiErrorSchema.safeParse({ code: "version_conflict", currentVersion: 4 }).success).toBe(false);
     expect(ApiErrorSchema.safeParse({ code: "version_conflict", currentVersion: 4, retryable: false }).success).toBe(false);
     expect(ApiErrorSchema.safeParse({ code: "version_conflict", currentVersion: 0, retryable: true }).success).toBe(false);
+  });
+});
+
+describe("ApiError.cause (E16, décision 0155 § 1.1)", () => {
+  it("contrats: cause admise avec no_option seulement, facultative, valeur hors liste refusée", () => {
+    expect(NO_OPTION_CAUSES).toEqual(["no_room", "place_not_found", "place_closed"]);
+    for (const cause of NO_OPTION_CAUSES) expect(ApiErrorSchema.safeParse({ code: "no_option", cause }).success, cause).toBe(true);
+    // Compatibilité M5-C : tout no_option d'aujourd'hui (remplacement, déplacement, écran 3) reste valide sans cause.
+    expect(ApiErrorSchema.safeParse({ code: "no_option" }).success).toBe(true);
+    expect(ApiErrorSchema.safeParse({ code: "no_option", retryable: false }).success).toBe(true);
+    for (const cause of ["", "closed", "NO_ROOM", "place_temporarily_closed", 1, null]) {
+      expect(ApiErrorSchema.safeParse({ code: "no_option", cause }).success, String(cause)).toBe(false);
+    }
+    // Avec tout autre code, la cause est refusée (provider_error compris : échec des fiches).
+    for (const code of API_ERROR_CODES.filter((c) => c !== "no_option")) {
+      const autres = code === "version_conflict" ? { currentVersion: 2, retryable: true } : code === "active_preview_exists" ? { activeTripId: "mock_trip_edimbourg" } : {};
+      const retryable = code === "generation_in_progress" ? { retryable: true } : code === "email_cap_reached" || code === "not_unlocked" ? { retryable: false } : {};
+      expect(ApiErrorSchema.safeParse({ code, ...autres, ...retryable }).success, code).toBe(true);
+      expect(ApiErrorSchema.safeParse({ code, ...autres, ...retryable, cause: "no_room" }).success, code).toBe(false);
+    }
+  });
+
+  it("contrats: ADDED_STOP_NAME_MAX défini dans values (sans Zod) et réexporté par patch (0155 § 5.1)", async () => {
+    const values = await import("./values");
+    const patch = await import("./patch");
+    expect(values.ADDED_STOP_NAME_MAX).toBe(80);
+    expect(patch.ADDED_STOP_NAME_MAX).toBe(values.ADDED_STOP_NAME_MAX);
+    expect(ADDED_STOP_NAME_MAX).toBe(values.ADDED_STOP_NAME_MAX);
   });
 });

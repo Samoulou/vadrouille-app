@@ -7,7 +7,11 @@ import type { Meal, Stop } from "@/contracts";
  * quels pour que `:` ne devienne pas `%3A`. Aucun paramètre n'est un identifiant de lieu Google.
  */
 
-export type TripRoutesBase = "/voyages" | "/dev/voyages";
+/**
+ * `/dev/carte/villes` : voyages simulés à plusieurs villes avec positions, carte simulée (décision 0150, page de
+ * développement de M4-suite-carte) ; comme `/dev/voyages`, ni « Pendant le voyage » ni versions.
+ */
+export type TripRoutesBase = "/voyages" | "/dev/voyages" | "/dev/carte/villes";
 
 /**
  * Numéro de jour d'une adresse `/jour/{n}` : entier écrit sans zéro initial, trois chiffres au plus. Seule forme admise
