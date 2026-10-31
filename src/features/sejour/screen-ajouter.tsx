@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { parametresAjoutDeLieu } from "@/adapters";
+import type { RecorderKind } from "@/analytics/track";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
@@ -22,10 +23,13 @@ export async function AjouterScreen({
   tripId,
   n,
   searchParams,
+  recorderKind,
 }: {
   tripId: string;
   n: string;
   searchParams: Readonly<Record<string, string | string[] | undefined>>;
+  /** Enregistreur de la mesure `place_added` (décision 0155 § 4.2), comme pour « Remplacer ». */
+  recorderKind: RecorderKind;
 }) {
   const data = await loadTrip(tripId);
   const day = data ? dayFromParam(data.trip, n) : null;
@@ -43,6 +47,7 @@ export async function AjouterScreen({
       durees={parametres.durees}
       versionSimulee={parametres.versionSimulee}
       resultatsGoogle={parametres.resultatsGoogle}
+      recorderKind={recorderKind}
     />
   );
 }

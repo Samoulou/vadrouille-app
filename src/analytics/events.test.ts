@@ -110,6 +110,27 @@ describe("analytics: today_opened (spécification F10, F10-PO-16, C18)", () => {
   });
 });
 
+describe("analytics: place_added (spécification F7, F7-PO-18 ; décision 0155 § 4.2)", () => {
+  it("accepte { method: \"button\" } seulement", () => {
+    const parse = (properties: unknown) => AnalyticsEventSchema.safeParse({ name: "place_added", properties }).success;
+    expect(parse({ method: "button" })).toBe(true);
+    expect(parse({ method: "drag" })).toBe(false);
+    expect(parse({})).toBe(false);
+  });
+
+  it.each([
+    ["name", "Ma librairie"],
+    ["googleName", "SENTINELLE-NOM-LIEU-M5D"],
+    ["placeId", "ChIJ-M5D-1"],
+    ["resultId", "ChIJ-M5D-1"],
+    ["query", "bouquiniste"],
+    ["stopId", "ajout-apercu"],
+    ["day", 2],
+  ])("refuse la propriété %s", (key, value) => {
+    expect(AnalyticsEventSchema.safeParse({ name: "place_added", properties: { method: "button", [key]: value } }).success).toBe(false);
+  });
+});
+
 describe("analytics: enregistreurs", () => {
   afterEach(() => {
     vi.restoreAllMocks();

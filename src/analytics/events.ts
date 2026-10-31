@@ -186,6 +186,16 @@ export const StopMovedEventSchema = z.strictObject({
   properties: z.strictObject({ method: z.enum(["button", "drag"]) }),
 });
 
+/**
+ * « Appliquer » d'un ajout de lieu (handover § 12, spécification F7, F7-PO-18 ; décision 0155 § 4.2), une fois
+ * l'application aboutie, sur `mock` comme sur `api` ; jamais sur un refus. `method` vaut `button` seulement. Ni nom
+ * saisi, ni nom Google, ni `placeId`, ni requête, ni jour : l'objet strict les refuse.
+ */
+export const PlaceAddedEventSchema = z.strictObject({
+  name: z.literal("place_added"),
+  properties: z.strictObject({ method: z.literal("button") }),
+});
+
 export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   DeckDecisionEventSchema,
   DeckUndoEventSchema,
@@ -202,6 +212,7 @@ export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   ReplaceAppliedEventSchema,
   ReplaceUndoneEventSchema,
   StopMovedEventSchema,
+  PlaceAddedEventSchema,
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
 export type AnalyticsEventName = AnalyticsEvent["name"];
