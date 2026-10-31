@@ -30,7 +30,7 @@ import type { AdapterContext, PlaceAdapter, TripAdapter } from "./types";
  *   « aucun » (texte « Aucun lieu trouvé. »). Le débit par adresse IP et le plafond global n'existent que sur `api`.
  * - `previewAddPlace` et `applyAddPlace` : version simulée **1** (le jeu simulé n'a pas d'historique) ; l'étape `ajout-<id>`
  *   est posée dans un temps libre qui la contient (durée prévue de son type, `durees`) ou à la place d'un repas pas encore
- *   choisi à la même heure, verrouillée, `addedBy: "person"`, avec le nom saisi et le `placeId` choisi ; sinon `no_option`.
+ *   choisi à la même heure, verrouillée, `addedBy: "person"`, avec le nom saisi et le `placeId` choisi ; sinon `no_option` avec `cause: "no_room"` (décision 0155 § 1.2 : le seul refus de `mock` est le manque de place).
  *   L'application rend la version 2 **sans modifier le jeu simulé** (comme le verrou de `mock`, l'écran garde l'ajout en
  *   mémoire) ; rien d'autre n'est gardé que le compteur des recherches.
  */
@@ -145,7 +145,8 @@ export function createMockPlaces(options: OptionsLieuxSimules): PlaceAdapter {
     const lu2 = AddPlaceApplySchema.safeParse(input);
     const requestId = id ?? (lu2.success ? lu2.data.requestId : crypto.randomUUID());
     const pose = poserAjoutSimule(day, `ajout-${requestId}`, demande, durees);
-    if (pose === null) return { erreur: fail("no_option") };
+    // Seul refus du calcul simulé : le manque de place (décision 0155 § 1.2), cause posée comme sur `api`.
+    if (pose === null) return { erreur: { ok: false, error: { code: "no_option", cause: "no_room" } } as Result<never> };
     return { pose, demande, requestId };
   }
 

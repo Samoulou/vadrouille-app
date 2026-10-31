@@ -87,7 +87,9 @@ function signalementsApi(options: OptionsAdaptateurApi): StopReportAdapter {
 /**
  * Lieu à soi, aperçu et application d'un ajout (M5d-1, ticket 939) : cas d'usage de `src/server/lieux/ajout.ts`, dans le même
  * processus, avec le contexte de la session et **le même port de relectures** que la lecture (un appel par aperçu ou
- * application, hors transaction ; décision 0147 § 4). Chaque réponse est validée par son contrat.
+ * application, hors transaction ; décision 0147 § 4). Chaque réponse est validée par son contrat. Un refus est rendu tel que
+ * le cas d'usage l'a construit (validé par `ApiErrorSchema`) : `no_option` porte sa `cause` (`no_room`, `place_not_found`,
+ * `place_closed`), une lecture des fiches en échec rend `provider_error` (décision 0155 § 1).
  */
 function lieuxApi(options: OptionsAdaptateurApi): AddPlaceAdapter {
   const { withOrg, relectures } = options;

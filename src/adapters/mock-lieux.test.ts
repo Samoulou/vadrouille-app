@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PatchResultSchema, PlaceSearchResultsSchema, RevisionPreviewSchema, type Day } from "@/contracts";
+import { ApiErrorSchema, PatchResultSchema, PlaceSearchResultsSchema, RevisionPreviewSchema, type Day } from "@/contracts";
 import { EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, MOCK_USER_ID } from "@/mocks/edimbourg";
 
 import { createMockTripAdapter } from "./mock";
@@ -100,7 +100,7 @@ describe("lieu à soi simulé: aperçu et application", () => {
     if (applique.ok) expect(PatchResultSchema.parse(applique.value)).toEqual({ version: VERSION_SIMULEE + 1, touchedDays: [day], changes: [{ type: "added", time, label: "Chez Marie" }] });
   });
 
-  it("refus : version de base, jour inconnu, autre organisation, sans requestId à l'application, aucune place (no_option)", async () => {
+  it("refus : version de base, jour inconnu, autre organisation, sans requestId à l'application, aucune place (no_option, cause no_room, 0155 § 1.2)", async () => {
     const { lieux, trips } = banc();
     const { day, time } = await tempsLibre(trips);
     const demande = { tripId: EDIMBOURG_TRIP_ID, baseVersion: VERSION_SIMULEE, day, time, kind: "activity", name: "Chez Marie", resultId: "mock-lieu-1" };
@@ -108,7 +108,10 @@ describe("lieu à soi simulé: aperçu et application", () => {
     expect(await lieux.previewAddPlace(CTX, { ...demande, day: 30 })).toEqual({ ok: false, error: { code: "not_found" } });
     expect(await lieux.previewAddPlace(AUTRE, demande)).toEqual({ ok: false, error: { code: "not_found" } });
     expect((await lieux.applyAddPlace(CTX, demande)).ok).toBe(false);
-    expect(await lieux.previewAddPlace(CTX, { ...demande, time: "23:30" })).toEqual({ ok: false, error: { code: "no_option" } });
+    const aucunePlace = await lieux.previewAddPlace(CTX, { ...demande, time: "23:30" });
+    expect(aucunePlace).toEqual({ ok: false, error: { code: "no_option", cause: "no_room" } });
+    if (!aucunePlace.ok) expect(ApiErrorSchema.parse(aucunePlace.error)).toEqual(aucunePlace.error);
+    expect(await lieux.applyAddPlace(CTX, { ...demande, requestId: crypto.randomUUID(), time: "23:30" })).toEqual({ ok: false, error: { code: "no_option", cause: "no_room" } });
   });
 
   it("poserAjoutSimule : un repas ouvert à la même heure est remplacé ; hors d'un temps libre : null", () => {
