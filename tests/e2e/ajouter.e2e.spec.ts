@@ -111,3 +111,49 @@ test("ajouter: « Annuler » de l'aperçu et « Retour à la Journée » revienn
   await sheet(page).getByRole("button", { name: "Retour à la Journée" }).click();
   await expect(page).toHaveURL(JOUR_2_DEBLOQUE);
 });
+
+test("ajouter: retour sans application, focus sur l'élément d'origine (F7-PO-8, handover §§ 7 et 11)", async ({ page }) => {
+  await page.goto(JOUR_2_DEBLOQUE);
+  const entree = sheet(page).getByRole("link", { name: "Ajouter un lieu" });
+  await entree.click();
+  await expect(addTitle(page)).toBeFocused();
+  await sheet(page).getByRole("button", { name: "Retour à la Journée" }).click();
+  await expect(page).toHaveURL(JOUR_2_DEBLOQUE);
+  await expect(sheet(page).getByRole("link", { name: "Ajouter un lieu" })).toBeFocused();
+
+  // « Annuler » de l'aperçu : même retour.
+  await sheet(page).getByRole("link", { name: "Ajouter un lieu" }).click();
+  await previewAdd(page, "Ma librairie");
+  await sheet(page).getByRole("button", { name: "Annuler" }).click();
+  await expect(page).toHaveURL(JOUR_2_DEBLOQUE);
+  await expect(sheet(page).getByRole("link", { name: "Ajouter un lieu" })).toBeFocused();
+});
+
+test("ajouter: « Ajouter à ma journée » de « Surprends-moi » : sans recherche, nom prérempli par l'idée (F7-PO-8, F7-PO-10)", async ({ page }) => {
+  await page.goto(JOUR_2_DEBLOQUE);
+  await sheet(page).getByRole("button", { name: "Surprends-moi" }).click();
+  const lien = sheet(page).getByRole("link", { name: "Ajouter à ma journée" });
+  await expect(lien).toHaveAttribute("href", `${AJOUTER_DEBLOQUE}?idee=j2-surprise-circus-lane`);
+  await lien.click();
+  await expect(addTitle(page)).toBeFocused();
+  await expect(searchField(page)).toHaveCount(0);
+  await expect(nameField(page)).toHaveValue("[Circus Lane]");
+  await sheet(page).getByRole("button", { name: "Voir l'effet" }).click();
+  await expect(sheet(page).getByRole("heading", { level: 2, name: "[Circus Lane]" }).last()).toBeFocused();
+  await sheet(page).getByRole("button", { name: "Retour à la Journée" }).click();
+  // L'idée est refermée au retour : « Surprends-moi » reprend le focus.
+  await expect(sheet(page).getByRole("button", { name: "Surprends-moi" })).toBeFocused();
+
+  // Idée absente du jour : paramètre retiré, écran ordinaire.
+  await page.goto(`${AJOUTER_DEBLOQUE}?idee=j4-surprise-dunbars-close`);
+  await expect(page).toHaveURL(AJOUTER_DEBLOQUE);
+  await expect(searchField(page)).toBeVisible();
+});
+
+test("ajouter: jour sans moment libre : « Plus aucun moment libre ce jour-là. », pas de « Voir l'effet »", async ({ page }) => {
+  await page.goto("/voyages/mock_trip_edimbourg_debloque/jour/3/ajouter");
+  await search(page, "librairie");
+  await results(page).getByRole("radio").first().click();
+  await expect(sheet(page).getByText("Plus aucun moment libre ce jour-là. Choisis un autre jour, ou remplace une étape.")).toBeVisible();
+  await expect(sheet(page).getByRole("button", { name: "Voir l'effet" })).toHaveCount(0);
+});

@@ -1,12 +1,14 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PatchResult, PlaceSearchResult, Result, RevisionPreview, Trip } from "@/contracts";
+import { createMockPlaces } from "@/adapters/mock-lieux";
+import { ADDED_STOP_NAME_MAX, type DayLineItem, type PatchResult, type PlaceSearchResult, type Result, type RevisionPreview, type Trip } from "@/contracts";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
-import { AjouterLieuView, type AjouterLieuCalls } from "./AjouterLieu";
+import { AjouterLieuView, NOM_LIEU_MAX, type AjouterLieuCalls } from "./AjouterLieu";
+import type { EntreeAjout } from "./ajouter-lieu";
 import { TripShell } from "./TripShell";
 
 /**
@@ -72,18 +74,24 @@ function fakeCalls(overrides: Partial<AjouterLieuCalls> = {}) {
 
 function renderScreen(
   calls: AjouterLieuCalls,
-  { trip = DEBLOQUE, api = false, resultatsGoogle = api }: { trip?: Trip; api?: boolean; resultatsGoogle?: boolean } = {},
+  {
+    trip = DEBLOQUE,
+    api = false,
+    resultatsGoogle = api,
+    entree = null,
+    newRequestId = () => "00000000-0000-4000-8000-000000000001",
+  }: { trip?: Trip; api?: boolean; resultatsGoogle?: boolean; entree?: EntreeAjout | null; newRequestId?: () => string } = {},
 ) {
   return render(
     <TripShell trip={trip} maps={[]} base="/voyages" versionable revisionVersion={api ? 5 : null}>
       <AjouterLieuView
         dayIndex={2}
-        entree={null}
+        entree={entree}
         durees={DUREES}
         versionSimulee={api ? null : 1}
         resultatsGoogle={resultatsGoogle}
         calls={calls}
-        newRequestId={() => "00000000-0000-4000-8000-000000000001"}
+        newRequestId={newRequestId}
       />
     </TripShell>,
   );
@@ -181,6 +189,14 @@ describe("ajouter: nom et moment", () => {
     expect(nameField()).toHaveValue("Ma librairie");
   });
 
+  it("nom : 80 caractères au plus, comme le contrat (M5-PO-10)", async () => {
+    expect(NOM_LIEU_MAX).toBe(ADDED_STOP_NAME_MAX);
+    renderScreen(fakeCalls());
+    await rechercher("librairie");
+    fireEvent.click(within(results()).getAllByRole("radio")[0]!);
+    expect(nameField()).toHaveAttribute("maxLength", String(ADDED_STOP_NAME_MAX));
+  });
+
   it("nom vide : « Donne un nom à ce lieu. », focus sur le champ, aucun aperçu", async () => {
     const calls = fakeCalls();
     renderScreen(calls);
@@ -210,14 +226,22 @@ describe("ajouter: aperçu et application", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
-  it("refus du moteur : bandeau « pas de place » avec le focus, rien d'écrit (critère 22, Q770)", async () => {
+  it("tout `no_option` (lieu fermé ou introuvable compris, en attendant la cause dans le contrat) : texte du manque de place (0154 § 1), focus, rien d'écrit", async () => {
     const calls = fakeCalls({ previewAddPlace: vi.fn(async (): Promise<Result<RevisionPreview>> => ({ ok: false, error: { code: "no_option", retryable: false } })) });
-    const { container } = renderScreen(calls);
+    const { container } = renderScreen(calls, { api: true });
     await choisirEtVoir("Ma librairie");
     const bandeau = container.querySelector("[data-part='bandeau-pas-de-place']");
     expect(bandeau).toHaveFocus();
-    expect(bandeau).toHaveTextContent("Ce lieu ne trouve pas sa place à ce moment, ou on n'a pas pu vérifier qu'il est ouvert.");
+    expect(bandeau).toHaveTextContent("Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour.");
     expect(calls.applyAddPlace).not.toHaveBeenCalled();
+  });
+
+  it("trop de gestes (`rate_limited`) : texte de 0154, sans « Réessayer »", async () => {
+    const calls = fakeCalls({ previewAddPlace: vi.fn(async (): Promise<Result<RevisionPreview>> => ({ ok: false, error: { code: "rate_limited", retryable: true } })) });
+    renderScreen(calls, { api: true });
+    await choisirEtVoir("Ma librairie");
+    expect(screen.getByText("Trop de retouches en peu de temps. Ton programme est inchangé. Réessaie dans une heure.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Réessayer" })).toBeNull();
   });
 
   it("conflit de version : bandeau et « Revoir l'effet » sur la version relue", async () => {
@@ -273,5 +297,111 @@ describe("ajouter: aperçu et application", () => {
     });
     expect(screen.getByText("Le calcul n'est pas disponible pour le moment. Ton programme est inchangé. Réessaie plus tard.")).toBeInTheDocument();
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("réponse perdue à l'application : « Réessayer » rejoue le même `requestId` tant que l'aperçu ne change pas (0147 A.7)", async () => {
+    const apply = vi
+      .fn<AjouterLieuCalls["applyAddPlace"]>()
+      .mockRejectedValueOnce(new Error("réseau"))
+      .mockResolvedValueOnce({ ok: true, value: { version: 6, touchedDays: [2], changes: [] } });
+    let tirage = 0;
+    renderScreen(fakeCalls({ applyAddPlace: apply }), { api: true, newRequestId: () => `00000000-0000-4000-8000-00000000000${String(++tirage)}` });
+    await choisirEtVoir("Ma librairie");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
+    });
+    expect(apply).toHaveBeenCalledTimes(2);
+    expect(apply.mock.calls[0]?.[0]).toMatchObject({ requestId: "00000000-0000-4000-8000-000000000001" });
+    expect(apply.mock.calls[1]?.[0]).toMatchObject({ requestId: "00000000-0000-4000-8000-000000000001" });
+  });
+});
+
+/** Jour du critère 22 sans temps libre assez long : A 09:00 – 10:30, temps libre 10:30 – 11:15, B et D verrouillées, C. */
+const etape = (id: string, start: string, end: string, locked = false): DayLineItem => ({
+  type: "stop",
+  stop: { id, kind: "activity", placeId: `mock_place_${id}`, name: `[${id}]`, start, end, facts: {}, exceptions: [], locked },
+});
+const CRITERE_22: Trip = {
+  ...DEBLOQUE,
+  days: DEBLOQUE.days.map((day) =>
+    day.index === 2
+      ? {
+          ...day,
+          items: [
+            etape("A", "09:00", "10:30"),
+            { type: "free", from: "10:30", to: "11:15" },
+            etape("B", "11:15", "13:00", true),
+            etape("C", "13:00", "14:30"),
+            etape("D", "14:30", "18:00", true),
+          ],
+        }
+      : day,
+  ),
+};
+
+describe("ajouter: critère 22 sur `mock`", () => {
+  it("aucune heure proposée, « Temps libre 10:30 – 11:15 » choisi, « Voir l'effet » → `no_option`, texte de la spécification, aucune version écrite", async () => {
+    // Adaptateur `mock` réel (M5d-1) : seule la demande d'application est observée, rien n'est simulé au-delà.
+    const adaptateur = createMockPlaces({ trips: { getTrip: async () => CRITERE_22 }, store: { records: [] }, now: () => 0, plafond: 20, durees: DUREES, max: 100 });
+    const ctx = { organizationId: "org", userId: "user", role: "owner" as const };
+    const calls = {
+      searchPlaces: (input: unknown) => adaptateur.searchPlaces(ctx, input),
+      previewAddPlace: vi.fn((input: unknown) => adaptateur.previewAddPlace(ctx, input)),
+      applyAddPlace: vi.fn((input: unknown) => adaptateur.applyAddPlace(ctx, input)),
+      applyRevert: vi.fn<AjouterLieuCalls["applyRevert"]>(),
+    };
+    const { container } = renderScreen(calls, { trip: CRITERE_22 });
+    await rechercher("bouquiniste");
+    fireEvent.click(within(results()).getByRole("radio", { name: "Lieu simulé 1, Adresse simulée 1" }));
+    fireEvent.change(nameField(), { target: { value: "Ma librairie" } });
+    const options = within(moments()).getAllByRole("radio");
+    expect(options.map((option) => option.textContent)).toEqual(["Temps libre 10:30 – 11:15"]);
+    expect(options[0]).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(options[0]!);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Voir l'effet" }));
+    });
+    expect(calls.previewAddPlace).toHaveBeenCalledWith(expect.objectContaining({ day: 2, time: "10:30", kind: "activity" }));
+    expect(await calls.previewAddPlace.mock.results[0]?.value).toMatchObject({ ok: false, error: { code: "no_option" } });
+    const bandeau = container.querySelector("[data-part='bandeau-pas-de-place']");
+    expect(bandeau).toHaveTextContent("Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour.");
+    expect(bandeau).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Appliquer" })).toBeNull();
+    expect(calls.applyAddPlace).not.toHaveBeenCalled();
+  });
+});
+
+describe("ajouter: « Ajouter à ma journée » (`?idee=`, F7-PO-8, F7-PO-10)", () => {
+  it("sans recherche : l'idée du jour est le lieu choisi, nom prérempli et modifiable, `placeId` de l'idée envoyé", async () => {
+    const calls = fakeCalls();
+    renderScreen(calls, { entree: { type: "idee", id: "j2-surprise-circus-lane" } });
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "[Circus Lane]" })).toBeInTheDocument();
+    expect(nameField()).toHaveValue("[Circus Lane]");
+    fireEvent.change(nameField(), { target: { value: "Ma ruelle" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Voir l'effet" }));
+    });
+    expect(calls.previewAddPlace).toHaveBeenCalledWith(expect.objectContaining({ name: "Ma ruelle", resultId: "mock_place_circus_lane" }));
+    expect(calls.searchPlaces).not.toHaveBeenCalled();
+  });
+
+  it("idée d'un autre jour : écran ordinaire, nom vide", () => {
+    renderScreen(fakeCalls(), { entree: { type: "idee", id: "j4-surprise-dunbars-close" } });
+    expect(searchField()).toBeInTheDocument();
+  });
+});
+
+describe("ajouter: retour sans application", () => {
+  it("« Retour à la Journée » revient à la Journée", () => {
+    renderScreen(fakeCalls());
+    fireEvent.click(screen.getByRole("button", { name: "Retour à la Journée" }));
+    expect(router.replace).toHaveBeenCalledWith("/voyages/mock_trip_edimbourg/jour/2", { scroll: false });
   });
 });

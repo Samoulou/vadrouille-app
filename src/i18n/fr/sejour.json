@@ -49,7 +49,8 @@
   },
   "surprise": {
     "bouton": "Surprends-moi",
-    "mention": "Une idée pour ta journée, pas encore dans ton programme."
+    "mention": "Une idée pour ta journée, pas encore dans ton programme.",
+    "ajouterAMaJournee": "Ajouter à ma journée"
   },
   "regionFiche": "Fiche étape",
   "fiche": {
@@ -203,11 +204,11 @@
     "pret": "Effet calculé.",
     "moment": "{start} – {end}",
     "trajetsApres": "Temps de trajet calculé après l'ajout",
-    "pasDePlace": "Ce lieu ne trouve pas sa place à ce moment, ou on n'a pas pu vérifier qu'il est ouvert. Choisis un autre moment, un autre jour ou un autre lieu.",
+    "pasDePlace": "Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour.",
     "conflit": "Ton programme a changé entre-temps. Rien n'a été modifié.",
     "revoirEffet": "Revoir l'effet",
     "calculIndisponible": "Le calcul n'est pas disponible pour le moment. Ton programme est inchangé. Réessaie plus tard.",
-    "tropDeGestes": "Tu as fait beaucoup de modifications en peu de temps. Réessaie dans un moment.",
+    "tropDeGestes": "Trop de retouches en peu de temps. Ton programme est inchangé. Réessaie dans une heure.",
     "tropDeVersions": "Tu as fait beaucoup de retouches sur ce voyage. Ton programme est inchangé.",
     "enPreparation": "Ton programme est en train d'être mis à jour. Réessaie dans un instant.",
     "ajoute": "Lieu ajouté."

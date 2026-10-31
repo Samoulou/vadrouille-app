@@ -92,7 +92,11 @@ export function JourneeView({ recorderKind = "none" }: { recorderKind?: Recorder
     const link = Array.from(contentRef.current?.querySelectorAll<HTMLAnchorElement>("a[data-part='arret']") ?? []).find(
       (candidate) => candidate.getAttribute("href") === href,
     );
-    (link ?? contentRef.current?.querySelector<HTMLElement>("[data-part='titre-jour']"))?.focus();
+    // Retour sans application d'« Ajouter un lieu » : son entrée, la première encore affichée (F7-PO-8).
+    const origin = (focusRequest.originParts ?? [])
+      .map((part) => contentRef.current?.querySelector<HTMLElement>(`[data-part='${part}']`))
+      .find((element) => element != null);
+    (link ?? origin ?? contentRef.current?.querySelector<HTMLElement>("[data-part='titre-jour']"))?.focus();
     consumeFocusRequest();
   }, [fiche, day, focusRequest, routes, consumeFocusRequest]);
 

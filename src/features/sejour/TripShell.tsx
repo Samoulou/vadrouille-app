@@ -78,6 +78,12 @@ export interface ClosedFiche {
 export interface FocusRequest {
   dayIndex: number;
   stopId?: Stop["id"];
+  /**
+   * Élément d'origine d'un écran quitté sans rien appliquer (« Ajouter un lieu », M5d-2 ; F7-PO-8) : `data-part` de
+   * l'entrée, le premier présent dans la Journée (« Ajouter à ma journée », puis « Surprends-moi » si l'idée est
+   * refermée), sinon le titre du jour.
+   */
+  originParts?: readonly string[];
 }
 
 /** Étapes surlignées 2 s après « Appliquer » (décision 0016 § 9). */
@@ -136,6 +142,8 @@ export interface TripShellValue {
   /** Focus à poser par la Journée, ou `null` ; la Journée le consomme. */
   focusRequest: FocusRequest | null;
   consumeFocusRequest: () => void;
+  /** Demande un focus à la Journée (retour d'un écran sans application, F7-PO-8). */
+  requestFocus: (request: FocusRequest) => void;
   /** Adresse de l'écran 14 ouvert depuis la fiche (« Remplacer ») : « Retour à la fiche » revient alors dans l'historique. */
   replaceOrigin: string | null;
   markReplaceOrigin: (href: string | null) => void;
@@ -547,6 +555,7 @@ export function TripShell({
   }, []);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const consumeFocusRequest = useCallback(() => setFocusRequest(null), []);
+  const requestFocus = useCallback((request: FocusRequest) => setFocusRequest(request), []);
   // « Modification annulée. » : annonce de la région du toast après l'annulation d'une révision (F7-PO-1).
   const [undone, setUndone] = useState<{ id: number } | null>(null);
 
@@ -644,6 +653,7 @@ export function TripShell({
       highlight,
       focusRequest,
       consumeFocusRequest,
+      requestFocus,
       replaceOrigin,
       markReplaceOrigin,
       markOpenedFromPanel,
@@ -678,6 +688,7 @@ export function TripShell({
       highlight,
       focusRequest,
       consumeFocusRequest,
+      requestFocus,
       replaceOrigin,
       markReplaceOrigin,
       markOpenedFromPanel,

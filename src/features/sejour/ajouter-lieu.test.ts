@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Day, DayLineItem, RevisionPreview, Stop } from "@/contracts";
 
-import { demandeDuMoment, joursAvecEtapeEcrite, lireEntree, momentPropose, momentsDuJour, trajetsCalculesApres } from "./ajouter-lieu";
+import { demandeDuMoment, ideeDeLEntree, joursAvecEtapeEcrite, lireEntree, momentPropose, momentsDuJour, trajetsCalculesApres } from "./ajouter-lieu";
 
 /** Fonctions pures de « Ajouter un lieu » (M5d-2 ; spécification M5 § 6, M5-PO-12 ; critère 22 ; addendum 0147 A.5). */
 
@@ -50,14 +50,16 @@ describe("ajouter: heure proposée (M5-PO-12, critère 22)", () => {
 });
 
 describe("ajouter: paramètres d'adresse (F7-PO-8)", () => {
-  it("`de` et `a`, ou `de` et `repas` ; tout le reste est ignoré et l'adresse nettoyée", () => {
+  it("`de` et `a`, `de` et `repas`, ou `idee` ; tout le reste est ignoré et l'adresse nettoyée", () => {
     expect(lireEntree({})).toEqual({ entree: null, invalide: false });
     expect(lireEntree({ de: "15:00", a: "18:30" })).toEqual({ entree: { type: "libre", from: "15:00", to: "18:30" }, invalide: false });
     expect(lireEntree({ de: "19:00", repas: "dinner" })).toEqual({ entree: { type: "repas", time: "19:00", meal: "dinner" }, invalide: false });
     expect(lireEntree({ de: "25:00", a: "18:30" })).toEqual({ entree: null, invalide: true });
     expect(lireEntree({ de: "19:00", repas: "brunch" })).toEqual({ entree: null, invalide: true });
     expect(lireEntree({ de: "18:30", a: "15:00" })).toEqual({ entree: null, invalide: true });
-    expect(lireEntree({ idee: "idee-1" })).toEqual({ entree: null, invalide: true });
+    expect(lireEntree({ idee: "idee-1" })).toEqual({ entree: { type: "idee", id: "idee-1" }, invalide: false });
+    expect(lireEntree({ idee: "idee-1", de: "15:00" })).toEqual({ entree: { type: "idee", id: "idee-1" }, invalide: true });
+    expect(lireEntree({ idee: "ChIJ x/../y" })).toEqual({ entree: null, invalide: true });
     expect(lireEntree({ de: "15:00", a: "18:30", etape: "x" })).toEqual({ entree: { type: "libre", from: "15:00", to: "18:30" }, invalide: true });
   });
 });
@@ -85,5 +87,18 @@ describe("ajouter: « Temps de trajet calculé après l'ajout » (addendum 0147,
     const jours = joursAvecEtapeEcrite(apercu([{ type: "stop", stop: ajoutee }]), "ajout-demande");
     const item = jours[0]?.items[0];
     expect(item?.type === "stop" ? item.stop.id : null).toBe("ajout-demande");
+  });
+});
+
+describe("ajouter: idée « Surprends-moi » (`?idee=`, F7-PO-8)", () => {
+  const idee = { id: "j2-idee", placeId: "mock_place_idee", name: "[Ruelle]", facts: {}, reason: "[Raison]", source: { label: "[Source]", url: "https://example.org" } };
+  const avecIdee = { ...CRITERE_22, surprise: idee } as unknown as Day;
+
+  it("l'idée du jour avec un `placeId` ; un autre identifiant, ou une idée sans `placeId` : `null`", () => {
+    expect(ideeDeLEntree(avecIdee, { type: "idee", id: "j2-idee" })).toMatchObject({ name: "[Ruelle]", placeId: "mock_place_idee" });
+    expect(ideeDeLEntree(avecIdee, { type: "idee", id: "j4-idee" })).toBeNull();
+    expect(ideeDeLEntree({ ...avecIdee, surprise: { ...idee, placeId: undefined } } as unknown as Day, { type: "idee", id: "j2-idee" })).toBeNull();
+    expect(ideeDeLEntree(CRITERE_22, { type: "idee", id: "j2-idee" })).toBeNull();
+    expect(ideeDeLEntree(avecIdee, null)).toBeNull();
   });
 });

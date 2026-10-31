@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 
@@ -15,6 +14,7 @@ import { PLACE_SEARCH_QUERY_LENGTH } from "@/contracts/values";
 import { describedBy, EMPTY_LIVE_REGION_CLASS, INPUT_CLASS } from "@/features/creation/fields";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
+import { formatFaits } from "@/lib/faits";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 import { applyAddPlace, previewAddPlace, searchPlaces } from "@/server/actions/lieux";
@@ -23,6 +23,7 @@ import { applyRevert } from "@/server/actions/retouches";
 import {
   demandeDuMoment,
   etapeAjoutee,
+  ideeDeLEntree,
   joursAvecEtapeEcrite,
   momentPropose,
   momentsDuJour,
@@ -37,6 +38,11 @@ import { useTripShell } from "./TripShell";
 const t = messages.sejour.ajouter;
 const rv = messages.revision;
 
+/**
+ * Longueur maximale du nom saisi : `ADDED_STOP_NAME_MAX` de `src/contracts/patch.ts` (M5-PO-10), recopiée ici parce que
+ * le navigateur n'importe que `@/contracts/values` (décision 0016 § 3.1) ; l'égalité est vérifiée par un test.
+ */
+export const NOM_LIEU_MAX = 80;
 
 /** Actions serveur injectées (tests) ; celles de `@/server/actions/lieux` et `@/server/actions/retouches` par défaut. */
 export type AjouterLieuCalls = {
@@ -55,10 +61,19 @@ type Recherche =
   | { type: "results"; results: readonly PlaceSearchResult[] }
   | { type: "error"; message: string };
 
-/** Refus d'un aperçu ou d'une application, affichés par un bandeau (décisions de la PR, Q770). */
+/**
+ * Refus d'un aperçu ou d'une application, affichés par un bandeau, avec les textes de la décision 0154 (§ 1 et § 7) : tout
+ * `no_option` dit le manque de place tant que le contrat ne dit pas la cause (lieu introuvable ou fermé : tâche de suivi,
+ * prérequis de M1h) ; « trop de gestes » et le nombre maximal de versions n'ont pas de « Réessayer ».
+ */
 type Refus = "noOption" | "conflict" | "indisponible" | "tropDeGestes" | "tropDeVersions" | "enPreparation" | "nonDebloque" | "error";
 
-type Phase = { type: "idle" } | { type: "waiting" } | { type: "preview"; preview: RevisionPreviewData } | { type: "banner"; refus: Refus };
+type Phase =
+  | { type: "idle" }
+  | { type: "waiting" }
+  // `requestId` tiré une fois par aperçu : un nouvel « Appliquer » du même aperçu rejoue la même demande (0147 A.7).
+  | { type: "preview"; preview: RevisionPreviewData; requestId: string }
+  | { type: "banner"; refus: Refus };
 
 /** Code d'erreur d'un aperçu ou d'une application → bandeau (le nom refusé est rendu au champ, pas ici). */
 function refusDe(error: ApiError): Refus {
@@ -91,6 +106,9 @@ const TEXTE_REFUS: Readonly<Record<Exclude<Refus, "noOption" | "conflict">, stri
   nonDebloque: t.nonDebloque,
   error: rv.erreur,
 };
+
+/** Refus sans « Réessayer » : un nouvel essai immédiat serait refusé aussi (décision 0154 § 1). */
+const SANS_REESSAYER: ReadonlySet<Refus> = new Set(["nonDebloque", "tropDeVersions", "tropDeGestes"]);
 
 function libelleMoment(moment: MomentAjout): string {
   if (moment.type === "libre") return format(t.tempsLibre, { from: moment.from, to: moment.to });
@@ -158,6 +176,8 @@ export function AjouterLieuView({
   const offlineId = `${ids}-hors-ligne`;
 
   const moments = useMemo(() => (day ? momentsDuJour(day) : []), [day]);
+  // `?idee=` : l'idée du jour est le lieu choisi, sans recherche ; son nom (contenu maison) préremplit le champ (F7-PO-10).
+  const idee = useMemo(() => (day ? ideeDeLEntree(day, entree) : null), [day, entree]);
   const [momentId, setMomentId] = useState<string | null>(() => (day ? momentPropose(momentsDuJour(day), entree, durees)?.id ?? null : null));
   const [momentError, setMomentError] = useState(false);
 
@@ -165,7 +185,7 @@ export function AjouterLieuView({
   const [queryError, setQueryError] = useState(false);
   const [recherche, setRecherche] = useState<Recherche>({ type: "idle" });
   const [resultId, setResultId] = useState<string | null>(null);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => idee?.name ?? "");
   const [nameError, setNameError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>({ type: "idle" });
   const [status, setStatus] = useState<string | null>(null);
@@ -180,6 +200,9 @@ export function AjouterLieuView({
   const noOptionRef = useRef<HTMLDivElement>(null);
   const token = useRef(0);
   const applying = useRef(false);
+  // Demande d'application envoyée sans réponse sûre : rejouée avec le même `requestId` tant que le lieu, le nom et le
+  // moment ne changent pas (rejeu idempotent, 0147 A.7) ; oubliée dès qu'ils changent.
+  const pendingId = useRef<string | null>(null);
   const [focusTarget, setFocusTarget] = useState<{ target: "preview" | "noOption"; serial: number } | null>(null);
 
   // Ouverture : focus sur le titre (handover § 7) ; paramètres d'adresse invalides retirés sans erreur (F7-PO-8).
@@ -187,8 +210,8 @@ export function AjouterLieuView({
     titleRef.current?.focus();
   }, []);
   useEffect(() => {
-    if (cleanAddress) router.replace(routes.ajouter(dayIndex), { scroll: false });
-  }, [cleanAddress, router, routes, dayIndex]);
+    if (cleanAddress) router.replace(idee ? `${routes.ajouter(dayIndex)}?idee=${encodeURIComponent(idee.id)}` : routes.ajouter(dayIndex), { scroll: false });
+  }, [cleanAddress, router, routes, dayIndex, idee]);
   useEffect(() => {
     if (!focusTarget) return;
     (focusTarget.target === "preview" ? previewTitleRef.current : noOptionRef.current)?.focus();
@@ -205,14 +228,21 @@ export function AjouterLieuView({
 
   /** Un aperçu correspond toujours au lieu, au nom et au moment visibles (F7-PO-21). */
   const invalidate = () => {
+    pendingId.current = null;
     if (phase.type === "idle") return;
     token.current += 1;
     setPhase({ type: "idle" });
     setStatus(null);
   };
 
+  /**
+   * Retour à la Journée sans rien appliquer (« Retour à la Journée », « Annuler ») : le focus revient sur l'élément
+   * d'origine (F7-PO-8 ; handover §§ 7 et 11) : « Ajouter à ma journée » (ou « Surprends-moi », l'idée refermée) pour
+   * `?idee=`, sinon « Ajouter un lieu ». Les entrées « Idées » et « Choisir » ne sont pas livrées (décision 0154 attendue).
+   */
   const backToDay = () => {
     token.current += 1;
+    shell.requestFocus({ dayIndex, originParts: idee ? ["ajouter-a-ma-journee", "surprise-bouton"] : ["ajouter-un-lieu"] });
     router.replace(routes.jour(dayIndex), { scroll: false });
   };
 
@@ -238,8 +268,8 @@ export function AjouterLieuView({
         <p data-part="non-debloque" className="text-corps text-ink-2">
           {t.nonDebloque}
         </p>
-        <Button asChild variant="secondary" className="w-full">
-          <Link href={routes.jour(dayIndex)}>{t.retourJournee}</Link>
+        <Button variant="secondary" className="w-full" onClick={backToDay}>
+          {t.retourJournee}
         </Button>
       </div>
     );
@@ -247,7 +277,7 @@ export function AjouterLieuView({
 
   const baseVersion = versionVue ?? versionSimulee ?? shell.revision.version();
   const results = recherche.type === "results" ? recherche.results : [];
-  const chosen = results.find((result) => result.resultId === resultId) ?? null;
+  const chosen: { resultId: string } | null = idee ? { resultId: idee.placeId } : (results.find((result) => result.resultId === resultId) ?? null);
   const moment = moments.find((candidate) => candidate.id === momentId) ?? null;
 
   const search = async (event: FormEvent) => {
@@ -342,7 +372,7 @@ export function AjouterLieuView({
       showRefus(result.error);
       return;
     }
-    setPhase({ type: "preview", preview: result.value });
+    setPhase({ type: "preview", preview: result.value, requestId: pendingId.current ?? requestId() });
     setStatus(t.pret);
     focus("preview");
   };
@@ -352,9 +382,9 @@ export function AjouterLieuView({
     if (!online || phase.type !== "preview" || applying.current) return;
     const input = demande();
     if (input === null) return;
-    const { preview } = phase;
+    const { preview, requestId: id } = phase;
     applying.current = true;
-    const id = requestId();
+    pendingId.current = id;
     let result: Result<PatchResult> | null;
     try {
       result = await calls.applyAddPlace({ ...input, requestId: id });
@@ -367,6 +397,8 @@ export function AjouterLieuView({
         setPhase({ type: "banner", refus: "error" });
         setStatus(null);
       } else {
+        // Réponse reçue : la demande n'a pas été appliquée, la suivante en tire une nouvelle.
+        pendingId.current = null;
         showRefus(result.error);
       }
       return;
@@ -397,6 +429,7 @@ export function AjouterLieuView({
   };
 
   const cible = phase.type === "preview" ? etapeAjoutee(phase.preview) : null;
+  const faitsIdee = idee ? formatFaits(idee.facts) : null;
   const disabled = online ? undefined : true;
   const disabledBy = online ? undefined : offlineId;
 
@@ -410,60 +443,76 @@ export function AjouterLieuView({
         </div>
       )}
 
-      <form role="search" onSubmit={search} className="flex flex-col gap-2">
-        <label htmlFor={searchId} className="text-corps font-bold text-ink">
-          {t.champRecherche}
-        </label>
-        <input
-          ref={searchRef}
-          id={searchId}
-          type="search"
-          value={query}
-          maxLength={PLACE_SEARCH_QUERY_LENGTH.max}
-          autoComplete="off"
-          aria-invalid={queryError || undefined}
-          aria-describedby={describedBy(queryError && searchErrorId)}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setQueryError(false);
-          }}
-          className={INPUT_CLASS}
-        />
-        <p id={searchErrorId} role="alert" className={cn("text-corps-s font-semibold text-ink", queryError ? undefined : EMPTY_LIVE_REGION_CLASS)}>
-          {queryError ? t.deuxLettres : null}
-        </p>
-        <Button type="submit" variant="primary" className={cn("w-full", ARIA_DISABLED)} aria-disabled={disabled} aria-describedby={disabledBy} data-part="rechercher">
-          {t.rechercher}
-        </Button>
-      </form>
-
-      <section aria-labelledby={resultsTitleId} data-part="resultats" aria-busy={recherche.type === "waiting"} className="flex flex-col gap-3">
-        <h2 id={resultsTitleId} className={recherche.type === "results" && results.length > 0 ? "text-section font-extrabold text-ink" : "sr-only"}>
-          {t.resultats}
-        </h2>
-        {/* Nombre de résultats, puis état de l'aperçu : région présente dès le chargement (0018, « Attente »). */}
-        <p role="status" data-part="annonce" className={cn("text-corps-s text-ink-soft", status ? undefined : EMPTY_LIVE_REGION_CLASS)}>
-          {status}
-        </p>
-        {recherche.type === "error" ? <StatusBanner kind="error" message={recherche.message} /> : null}
-        {results.length > 0 ? (
-          <>
-            <SegmentedControl
-              options={results.map((result) => ({ value: result.resultId, label: libelleResultat(result) }))}
-              value={resultId}
-              onChange={(value) => {
-                setResultId(value);
-                invalidate();
+      {idee ? (
+        // `?idee=` : pas de recherche ; l'idée du jour (nom et faits, contenu maison) est le lieu choisi (F7, « Ajouter un lieu »).
+        <section aria-labelledby={`${ids}-idee`} data-part="idee" className="flex flex-col gap-1">
+          <h2 id={`${ids}-idee`} className="text-section font-extrabold text-ink">
+            {idee.name}
+          </h2>
+          {faitsIdee ? <p className="text-corps-s text-ink-soft">{faitsIdee}</p> : null}
+          {/* État de l'aperçu : région présente dès le chargement (0018, « Attente »). */}
+          <p role="status" data-part="annonce" className={cn("text-corps-s text-ink-soft", status ? undefined : EMPTY_LIVE_REGION_CLASS)}>
+            {status}
+          </p>
+        </section>
+      ) : (
+        <>
+          <form role="search" onSubmit={search} className="flex flex-col gap-2">
+            <label htmlFor={searchId} className="text-corps font-bold text-ink">
+              {t.champRecherche}
+            </label>
+            <input
+              ref={searchRef}
+              id={searchId}
+              type="search"
+              value={query}
+              maxLength={PLACE_SEARCH_QUERY_LENGTH.max}
+              autoComplete="off"
+              aria-invalid={queryError || undefined}
+              aria-describedby={describedBy(queryError && searchErrorId)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setQueryError(false);
               }}
-              label={t.resultats}
-              labelledBy={resultsTitleId}
-              orientation="vertical"
+              className={INPUT_CLASS}
             />
-            {/* Noms et adresses de Google à l'écran : mention visible tant qu'ils le sont (F4-PO-9, critère 26). */}
-            <PlacesAttribution placesFromGoogle={resultatsGoogle} />
-          </>
-        ) : null}
-      </section>
+            <p id={searchErrorId} role="alert" className={cn("text-corps-s font-semibold text-ink", queryError ? undefined : EMPTY_LIVE_REGION_CLASS)}>
+              {queryError ? t.deuxLettres : null}
+            </p>
+            <Button type="submit" variant="primary" className={cn("w-full", ARIA_DISABLED)} aria-disabled={disabled} aria-describedby={disabledBy} data-part="rechercher">
+              {t.rechercher}
+            </Button>
+          </form>
+
+          <section aria-labelledby={resultsTitleId} data-part="resultats" aria-busy={recherche.type === "waiting"} className="flex flex-col gap-3">
+            <h2 id={resultsTitleId} className={recherche.type === "results" && results.length > 0 ? "text-section font-extrabold text-ink" : "sr-only"}>
+              {t.resultats}
+            </h2>
+            {/* Nombre de résultats, puis état de l'aperçu : région présente dès le chargement (0018, « Attente »). */}
+            <p role="status" data-part="annonce" className={cn("text-corps-s text-ink-soft", status ? undefined : EMPTY_LIVE_REGION_CLASS)}>
+              {status}
+            </p>
+            {recherche.type === "error" ? <StatusBanner kind="error" message={recherche.message} /> : null}
+            {results.length > 0 ? (
+              <>
+                <SegmentedControl
+                  options={results.map((result) => ({ value: result.resultId, label: libelleResultat(result) }))}
+                  value={resultId}
+                  onChange={(value) => {
+                    setResultId(value);
+                    invalidate();
+                  }}
+                  label={t.resultats}
+                  labelledBy={resultsTitleId}
+                  orientation="vertical"
+                />
+                {/* Noms et adresses de Google à l'écran : mention visible tant qu'ils le sont (F4-PO-9, critère 26). */}
+                <PlacesAttribution placesFromGoogle={resultatsGoogle} />
+              </>
+            ) : null}
+          </section>
+        </>
+      )}
 
       {chosen ? (
         <>
@@ -480,6 +529,7 @@ export function AjouterLieuView({
               id={nameId}
               type="text"
               value={name}
+              maxLength={NOM_LIEU_MAX}
               required
               autoComplete="off"
               aria-invalid={nameError !== null || undefined}
@@ -593,7 +643,7 @@ export function AjouterLieuView({
               announce={false}
               message={TEXTE_REFUS[phase.refus]}
               action={
-                phase.refus === "nonDebloque" || phase.refus === "tropDeVersions" ? undefined : (
+                SANS_REESSAYER.has(phase.refus) ? undefined : (
                   <Button variant="secondary" size="sm" className={ARIA_DISABLED} aria-disabled={disabled} aria-describedby={disabledBy} onClick={ask}>
                     {rv.reessayer}
                   </Button>

@@ -6,7 +6,7 @@ import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
 import { AjouterLieuView } from "./AjouterLieu";
-import { lireEntree } from "./ajouter-lieu";
+import { ideeDeLEntree, lireEntree } from "./ajouter-lieu";
 import { dayFromParam, loadTrip } from "./load";
 
 const ROBOTS = { index: false, follow: false } as const;
@@ -31,12 +31,15 @@ export async function AjouterScreen({
   const day = data ? dayFromParam(data.trip, n) : null;
   const parametres = parametresAjoutDeLieu();
   if (!day || parametres === null) notFound();
-  const { entree, invalide } = lireEntree(searchParams);
+  const lue = lireEntree(searchParams);
+  // `?idee=` absente du jour (ou sans `placeId`) : ignorée, adresse remplacée sans elle (F7-PO-8).
+  const ideeAbsente = lue.entree?.type === "idee" && ideeDeLEntree(day, lue.entree) === null;
+  const entree = ideeAbsente ? null : lue.entree;
   return (
     <AjouterLieuView
       dayIndex={day.index}
       entree={entree}
-      cleanAddress={invalide}
+      cleanAddress={lue.invalide || ideeAbsente}
       durees={parametres.durees}
       versionSimulee={parametres.versionSimulee}
       resultatsGoogle={parametres.resultatsGoogle}

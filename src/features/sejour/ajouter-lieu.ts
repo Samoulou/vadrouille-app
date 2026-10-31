@@ -1,4 +1,5 @@
-import type { Day, DayLineItem, Meal, RevisionPreview, Stop } from "@/contracts";
+import type { Day, DayLineItem, Meal, RevisionPreview, Stop, SurpriseIdea } from "@/contracts";
+import { PLACE_ID_MOTIF } from "@/contracts/values";
 
 /**
  * Fonctions pures de l'écran « Ajouter un lieu » (tâche M5d-2, ticket 961 ; spécification M5 § 6, M5-PO-12 ; F7,
@@ -14,25 +15,37 @@ export type MomentAjout =
   | { readonly id: string; readonly type: "libre"; readonly from: string; readonly to: string }
   | { readonly id: string; readonly type: "repas"; readonly time: string; readonly meal: Meal };
 
-/** Entrée désignée par l'adresse : `?de=&a=` (lien « Idées » d'un temps libre) ou `?de=&repas=` (repas pas encore choisi). */
-export type EntreeAjout = { readonly type: "libre"; readonly from: string; readonly to: string } | { readonly type: "repas"; readonly time: string; readonly meal: Meal };
+/**
+ * Entrée désignée par l'adresse : `?de=&a=` (lien « Idées » d'un temps libre), `?de=&repas=` (repas pas encore choisi) ou
+ * `?idee=` (« Ajouter à ma journée » de « Surprends-moi », F7-PO-8).
+ */
+export type EntreeAjout =
+  | { readonly type: "libre"; readonly from: string; readonly to: string }
+  | { readonly type: "repas"; readonly time: string; readonly meal: Meal }
+  | { readonly type: "idee"; readonly id: string };
 
 const HEURE = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+/** Identifiant interne d'une idée (jamais un `placeId` ni un nom, F7 § « Données »). */
+const IDEE = /^[A-Za-z0-9_-]{1,128}$/;
 
 export const versMinutes = (heure: string): number => Number(heure.slice(0, 2)) * 60 + Number(heure.slice(3, 5));
 
 const premier = (valeur: string | string[] | undefined): string | undefined => (Array.isArray(valeur) ? valeur[0] : valeur);
 
 /**
- * Lit les paramètres de l'adresse (F7-PO-8). Un paramètre mal formé (heure hors `HH:MM`, `repas` inconnu, plage vide)
- * ou inconnu de l'écran (`idee`, pas encore branché sur `api`) est ignoré : `invalide` demande de remplacer l'adresse sans
- * eux, sans erreur.
+ * Lit les paramètres de l'adresse (F7-PO-8). Un paramètre mal formé (heure hors `HH:MM`, `repas` inconnu, plage vide,
+ * identifiant d'idée hors motif) ou inconnu de l'écran est ignoré : `invalide` demande de remplacer l'adresse sans eux,
+ * sans erreur. Qu'une idée existe dans le jour se vérifie ensuite (`ideeDeLEntree`).
  */
 export function lireEntree(params: Readonly<Record<string, string | string[] | undefined>>): { entree: EntreeAjout | null; invalide: boolean } {
   const de = premier(params.de);
   const a = premier(params.a);
   const repas = premier(params.repas);
+  const idee = premier(params.idee);
   const presents = Object.entries(params).some(([, valeur]) => valeur !== undefined);
+  if (idee !== undefined && IDEE.test(idee)) {
+    return { entree: { type: "idee", id: idee }, invalide: Object.keys(params).some((cle) => cle !== "idee" && params[cle] !== undefined) };
+  }
   if (de !== undefined && HEURE.test(de)) {
     if (a !== undefined && HEURE.test(a) && repas === undefined && versMinutes(a) > versMinutes(de)) {
       return { entree: { type: "libre", from: de, to: a }, invalide: Object.keys(params).some((cle) => cle !== "de" && cle !== "a" && params[cle] !== undefined) };
@@ -42,6 +55,18 @@ export function lireEntree(params: Readonly<Record<string, string | string[] | u
     }
   }
   return { entree: null, invalide: presents };
+}
+
+/**
+ * Idée « Surprends-moi » désignée par `?idee=` : celle du jour si l'identifiant est le sien et qu'elle a un `placeId`
+ * (seul identifiant que l'ajout écrit), sinon `null` (paramètre ignoré, F7-PO-8). Son nom est un contenu maison
+ * (décision 0015 § 3) : il préremplit « Nom dans ton programme » (M5-PO-10, F7-PO-10).
+ */
+export function ideeDeLEntree(day: Day, entree: EntreeAjout | null): (SurpriseIdea & { readonly placeId: string }) | null {
+  if (entree?.type !== "idee") return null;
+  const idee = day.surprise;
+  if (idee?.id !== entree.id || idee.placeId === undefined || !PLACE_ID_MOTIF.test(idee.placeId)) return null;
+  return { ...idee, placeId: idee.placeId };
 }
 
 /** Temps libres et repas pas encore choisis du jour, dans l'ordre de la ligne du jour. */

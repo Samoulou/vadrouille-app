@@ -119,7 +119,7 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
         </section>
       ) : null}
 
-      {!day.generating && day.surprise ? <SurpriseBlock idea={day.surprise} /> : null}
+      {!day.generating && day.surprise ? <SurpriseBlock idea={day.surprise} addHref={addPlaceHref === null ? null : `${addPlaceHref}?idee=${encodeURIComponent(day.surprise.id)}`} /> : null}
 
       <PlacesAttribution placesFromGoogle={placesFromGoogle} />
     </div>
