@@ -84,6 +84,31 @@ function lieuValide(relectures: Relectures, placeId: string | undefined): boolea
   return placeId !== undefined && relectures.validite(placeId) === "valide";
 }
 
+/** État de la fiche d'un lieu ajouté par la personne, au regard de R1 (décision 0155 § 1.2). */
+export type EtatLieuAjoute = "valide" | "introuvable" | "ferme" | "inconnu";
+
+/**
+ * État du lieu ajouté par la personne (`placeId` choisi), d'après la fiche relue et la portée `ajouts` de R1 (décision 0155
+ * § 1.2) : **seule écriture** de la règle « quel état d'un lieu ajouté est refusé ». R1 l'utilise pour les étapes ajoutées ;
+ * le cas d'usage de l'ajout (`src/server/lieux/ajout.ts`) l'appelle avant le moteur pour nommer la cause du refus. Tout état
+ * autre que `valide` fait refuser l'étape par R1. Portée `aucune` : le lieu n'est pas contrôlé (`valide`) ; `lieu` et
+ * `complete` : la fiche doit être `valide` (`complete` exige en plus une source, contrôlée par R1 seule). `inconnu` : la
+ * lecture des fiches a échoué ou n'a pas servi ce lieu.
+ */
+export function etatDuLieuAjoute(relectures: Relectures, placeId: string, portee: Partial<PorteeR1> = {}): EtatLieuAjoute {
+  if ({ ...PORTEE_R1_PAR_DEFAUT, ...portee }.ajouts === "aucune") return "valide";
+  switch (relectures.validite(placeId)) {
+    case "valide":
+      return "valide";
+    case "introuvable":
+      return "introuvable";
+    case "ferme_definitivement":
+      return "ferme";
+    default:
+      return "inconnu";
+  }
+}
+
 /** Étape de soirée : activité qui commence au début de soirée de la configuration ou après (B5-PO-1). */
 function estSoiree(stop: StopSnapshot, configuration: ConfigurationMoteur): boolean {
   return stop.kind === "activity" && versMinutes(stop.start) >= versMinutes(configuration.debutSoiree);
@@ -100,10 +125,11 @@ function regleR1(jour: JourProgramme, contexte: ContexteValidation, entrees: Ent
   for (const stop of etapesDuJour(jour)) {
     // Un engagement est la réservation de la personne : ni lieu ni source contrôlés (B5-PO-4).
     if (stop.commitment !== undefined) continue;
-    if (contexte.ajouts?.has(stop.id) === true && portee.ajouts !== "complete") {
-      if (portee.ajouts === "lieu" && stop.placeId !== undefined && !lieuValide(relectures, stop.placeId)) {
-        entrees.push({ regle: "R1", etape: stop.id });
-      }
+    if (contexte.ajouts?.has(stop.id) === true) {
+      // Lieu ajouté par la personne : état de sa fiche par `etatDuLieuAjoute` (0155 § 1.2) ; sans `placeId`, contrôlé
+      // seulement en portée `complete`, qui exige aussi une source.
+      const lieu = stop.placeId === undefined ? portee.ajouts !== "complete" : etatDuLieuAjoute(relectures, stop.placeId, portee) === "valide";
+      if (!lieu || (portee.ajouts === "complete" && !sourceValide(stop))) entrees.push({ regle: "R1", etape: stop.id });
       continue;
     }
     if (!lieuValide(relectures, stop.placeId) || !sourceValide(stop)) entrees.push({ regle: "R1", etape: stop.id });

@@ -102,6 +102,11 @@ export const TRIP_VERSIONS_PAGE_SIZE = 20;
  * caractères après retrait des espaces aux extrémités, aucune recherche à la frappe.
  */
 export const PLACE_SEARCH_QUERY_LENGTH = { min: 2, max: 80 } as const;
+/**
+ * Longueur maximale du nom saisi par la personne pour un ajout (M5-PO-10). Ici, module sans Zod que le code client lit
+ * (décision 0155 § 5.1) ; `src/contracts/patch.ts` l'importe et la réexporte.
+ */
+export const ADDED_STOP_NAME_MAX = 80;
 /** Résultats d'une recherche de lieu à soi, au plus (décision 0147 § 3 point 1 : `pageSize: 5`). */
 export const PLACE_SEARCH_MAX_RESULTS = 5;
 /** Longueur maximale d'un nom ou d'une adresse Google affichés dans un résultat de recherche (décision 0147 § 3 point 3). */
@@ -275,6 +280,17 @@ export const API_ERROR_CODES = [
   "not_unlocked",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
+
+/**
+ * Cause d'un refus `no_option` d'ajout d'un lieu à soi (décision 0155 § 1.1, évolution E16) : `ApiError.cause`, présent
+ * **seulement** avec `no_option`. `no_room` : toute cause de la famille « manque de place » (heure hors de la journée, trajet
+ * non relu, chevauchement d'une étape fixe, fin de journée, R5, R8, changement de ville) ; `place_not_found` : fiche du lieu
+ * ajouté `introuvable` ; `place_closed` : fiche `ferme_definitivement` (un lieu fermé temporairement a une fiche `valide`).
+ * Un `no_option` sans `cause` (remplacement, déplacement, verrou, écran 3, `mock` d'autres gestes) se lit comme `no_room`.
+ * Code fermé, dérivé du statut relu : aucun nom, adresse ni `placeId`.
+ */
+export const NO_OPTION_CAUSES = ["no_room", "place_not_found", "place_closed"] as const;
+export type NoOptionCause = (typeof NO_OPTION_CAUSES)[number];
 
 export function isCheckoutFailure(status: string): status is CheckoutFailure {
   return (CHECKOUT_FAILURES as readonly string[]).includes(status);

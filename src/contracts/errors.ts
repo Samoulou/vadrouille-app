@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { API_ERROR_CODES, TRIP_ID_PATTERN } from "./values";
+import { API_ERROR_CODES, NO_OPTION_CAUSES, TRIP_ID_PATTERN } from "./values";
 
 /**
  * Format d'erreur commun des actions serveur (décision 0017 § 4, reprise par 0020 § 1.3) : codes en
@@ -25,6 +25,12 @@ export const ApiErrorSchema = z
      * 0018 § 18). Calculé par le serveur.
      */
     activeTripId: z.string().regex(TRIP_ID_PATTERN).optional(),
+    /**
+     * Cause d'un refus d'ajout d'un lieu à soi (décision 0155 § 1.1, évolution E16), présente **seulement** avec
+     * `no_option` (jamais exigée : tout autre `no_option` reste valide sans elle et se lit comme `no_room`). Calculée par
+     * le serveur, avant le moteur, depuis le statut relu de la fiche du lieu ajouté (`etatDuLieuAjoute`).
+     */
+    cause: z.enum(NO_OPTION_CAUSES).optional(),
   })
   .superRefine((error, ctx) => {
     const conflict = error.code === "version_conflict";
@@ -56,6 +62,9 @@ export const ApiErrorSchema = z
         message: "activeTripId présent si et seulement si code vaut active_preview_exists",
         path: ["activeTripId"],
       });
+    }
+    if (error.cause !== undefined && error.code !== "no_option") {
+      ctx.addIssue({ code: "custom", message: "cause présent seulement si code vaut no_option", path: ["cause"] });
     }
   });
 export type ApiError = z.infer<typeof ApiErrorSchema>;
