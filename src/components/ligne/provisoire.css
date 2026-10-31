@@ -158,3 +158,12 @@
   /* Q108 (U2-Q1) : carré terminus aux extrémités de la mini-ligne d'un jour, 12 px (0018 § 19). */
   --ligne-mini-terminus: 12px;
 }
+
+/*
+ * M4-suite-carte, étiquette de ville posée sur la carte à plusieurs villes (décision 0150 § 4, non maquettée). Choix
+ * assumé de l'UX/UI, sans token dans Ligne.
+ */
+:root {
+  /* Q19 (mesure sans token ; décision 0150 § 4) : largeur maximale de l'étiquette de ville, quatre cibles tactiles (176 px) ; le nom passe à la ligne au-delà. */
+  --ligne-etiquette-ville-max: calc(4 * var(--touch-target));
+}
