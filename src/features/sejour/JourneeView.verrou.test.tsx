@@ -26,6 +26,11 @@ vi.mock("@/components/carte/DayMap", () => ({ DayMap: () => null }));
 const serveur = vi.hoisted(() => ({
   lockStop: vi.fn(),
   unlockStop: vi.fn(),
+  // Ticket 947 : déplacement enregistré, non appelé par ces tests.
+  getMoveOptions: vi.fn(),
+  previewMove: vi.fn(),
+  applyMove: vi.fn(),
+  applyRevert: vi.fn(),
 }));
 vi.mock("@/server/actions/retouches", () => serveur);
 vi.mock("@/server/actions/remplacement", () => ({ previewReplacement: vi.fn(), applyReplacement: vi.fn(), undoReplacement: vi.fn() }));
