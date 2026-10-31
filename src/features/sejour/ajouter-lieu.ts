@@ -150,7 +150,7 @@ export function joursAvecEtapeEcrite(preview: RevisionPreview, stopId: string): 
  * Aperçu d'ajout sur **`mock` seulement**, reporté sur le jour affiché (décision 0154 § 3, M5d-3) : le jeu simulé ne garde
  * aucun ajout, son aperçu part donc du jour simulé et ne montre que le dernier lieu ajouté. L'étape de l'aperçu est posée
  * dans le jour affiché, qui garde les ajouts précédents en mémoire de la page, par la même fonction pure que l'adaptateur
- * `mock` (`poserEtapeDansJour`, `src/domain/pose-ajout.ts`). Recharger la page rétablit le jeu simulé. Sans place dans le
+ * `mock` (`poserEtapeDansJour`, `src/lib/pose-ajout.ts`). Recharger la page rétablit le jeu simulé. Sans place dans le
  * jour affiché (cas que les moments proposés écartent), l'aperçu est rendu tel quel.
  *
  * Jamais sur `api`, et `api` ne doit pas s'en inspirer : son aperçu vient du moteur, qui peut replanifier d'autres étapes,
