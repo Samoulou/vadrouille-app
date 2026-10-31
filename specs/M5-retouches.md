@@ -322,7 +322,7 @@ Chaque critère est vérifié par un test nommé dans la PR de sa tâche. Les te
 
 ## 14. Hors périmètre
 
-- « Remplacer » (écran 14) sur `api` : M1g (#869). « Déplacer » sur `api` : tâche à ouvrir par le CEO (non listée dans le plan ; question au CEO).
+- « Remplacer » (écran 14) sur `api` : M1g (#869). « Déplacer » sur `api` : ticket #947 (PR #953), par le moteur (`appliquerPatch`, patch `[move]`) et la relecture du port de la lecture, comme M1g et l'ajout : décision 0153 (`docs/decisions/0153-deplacement-sur-api.md`).
 - « Garder » sur la fiche (Q67, Samuel).
 - Le nombre de remplacements inclus dans le voyage complet (« [N] remplacements », Q88, Samuel).
 - La file de vérification humaine des signalements, toute vérification Google déclenchée par un signalement, et tout apprentissage tiré des signalements.
@@ -346,4 +346,4 @@ Chaque critère est vérifié par un test nommé dans la PR de sa tâche. Les te
 
 **UX/UI** : rendu de l'écran « Versions du programme », de la feuille « Signaler une erreur », des mentions « Déjà réservé » et « Ajouté par toi. », de l'ordre des sortes de lignes de la liste, et textes du § 9. Ne bloque pas le code (clés de `src/i18n`), mais bloque la fusion de M5b, M5c et M5d.
 
-**CEO** : ordre des tâches (M5-TL au cycle 221 du plan, puis M5e, M5a à M5d) ; une tâche « Déplacer une étape sur `api` », absente du plan ; report dans `QUESTIONS.md` des questions ci-dessus ; Q71 tranchée par M5-PO-3 (partie Product Owner, rendu UX/UI).
+**CEO** : ordre des tâches (M5-TL au cycle 221 du plan, puis M5e, M5a à M5d) ; la tâche « Déplacer une étape sur `api` » est ouverte (ticket #947, PR #953 ; décision 0153), rattachée à l'étape 5 du plan `docs/plans/mvp-etapes-1-9.md` (§ 5, qui ne la liste pas encore dans son tableau) ; report dans `QUESTIONS.md` des questions ci-dessus ; Q71 tranchée par M5-PO-3 (partie Product Owner, rendu UX/UI).
