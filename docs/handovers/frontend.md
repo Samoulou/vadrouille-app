@@ -231,7 +231,7 @@ Thème clair uniquement au MVP. Pas d'ombres : la profondeur vient des aplats et
 | `Chip` | Choix multiple | `selected`, `inferred` (pointillé) | `aria-pressed` |
 | `OtpInput` | Code à 6 chiffres | `length=6`, `onComplete` | Collage du code accepté, `autocomplete="one-time-code"` |
 | `ChangeSet` | « Ce qui change » sur la ligne | `changes: Change[]` | Ancien barré + texte « à la place de » |
-| `StatusBanner` | États transverses | `kind: offline \| conflict \| noOption \| error \| generating` | `role="status"` ou `alert` selon gravité |
+| `StatusBanner` | États transverses | `kind: offline \| conflict \| noOption \| error \| generating \| travel \| overlap` | `role="alert"` et filet `ink` pour `error` et `conflict`, `role="status"` et filet `ink-soft` pour les autres (0012, Q13) ; `travel` : budget de trajet du jour dépassé (0015 § 7) ; `overlap` : engagement qui chevauche la ligne « Vers {ville} » de la Journée, message coupé n'importe où (`overflow-wrap: anywhere`), action « Voir les événements du jour » (spécification M4-suite § 5, UX-M4S-A) |
 
 Chaque composant a une story ou une page de démonstration (`/dev/composants`, désactivée en production) et un test d'accessibilité axe.
 

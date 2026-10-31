@@ -31,6 +31,13 @@
         "car": "En voiture"
       },
       "pastille": "de {de} à {vers}"
+    },
+    "chevauchement": {
+      "un": "À {heure}, « {libelle} » tombe pendant que tu te rends à {ville}. Vérifie tes horaires.",
+      "unEstime": "À {heure}, « {libelle} » tombe pendant que tu te rends à {ville}, d'après la durée estimée. Vérifie tes horaires.",
+      "plusieurs": "{n} de tes réservations tombent pendant que tu te rends à {ville}. Vérifie tes horaires.",
+      "plusieursEstime": "{n} de tes réservations tombent pendant que tu te rends à {ville}, d'après la durée estimée. Vérifie tes horaires.",
+      "action": "Voir les événements du jour"
     }
   },
   "evenements": {
