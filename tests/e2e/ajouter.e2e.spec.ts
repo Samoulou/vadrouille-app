@@ -151,6 +151,10 @@ test("ajouter: « Ajouter à ma journée » de « Surprends-moi » : « Lieu à 
   await expect(nameField(page)).toHaveValue("[Circus Lane]");
   await sheet(page).getByRole("button", { name: "Voir l'effet" }).click();
   await expect(sheet(page).getByRole("heading", { level: 2, name: "[Circus Lane]" })).toBeFocused();
+  // Verdict Sécurité S2 (décision 0155, PR n° 972) : l'adresse ne porte que l'identifiant de l'idée ; rien dans le stockage.
+  expect(new URL(page.url()).search).toBe("?idee=j2-surprise-circus-lane");
+  const stockage = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+  expect(stockage).not.toContain("Circus Lane");
   await sheet(page).getByRole("button", { name: "Retour à la Journée" }).click();
   // L'idée est refermée au retour : « Surprends-moi » reprend le focus.
   await expect(sheet(page).getByRole("button", { name: "Surprends-moi" })).toBeFocused();

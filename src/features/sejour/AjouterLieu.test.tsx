@@ -401,6 +401,43 @@ describe("ajouter: « Ajouter à ma journée » (`?idee=`, F7-PO-8, F7-PO-10 ; d
     expect(JSON.stringify(calls.previewAddPlace.mock.calls)).not.toContain(NOM_GOOGLE);
   });
 
+  it("verdict Sécurité S2 (décision 0155, PR n° 972), nom sentinelle : rien avant « Rechercher », même envoi qu'une saisie, adresse sans le nom, stockage du navigateur vide", async () => {
+    const SENTINELLE = "SENTINELLE-IDEE-M5D3";
+    const avecSentinelle: Trip = {
+      ...DEBLOQUE,
+      days: DEBLOQUE.days.map((jour) => (jour.index === 2 && jour.surprise ? { ...jour, surprise: { ...jour.surprise, name: SENTINELLE } } : jour)),
+    };
+    localStorage.clear();
+    sessionStorage.clear();
+    const calls = fakeCalls();
+    render(
+      <TripShell trip={avecSentinelle} maps={[]} base="/voyages" versionable revisionVersion={null}>
+        <AjouterLieuView dayIndex={2} entree={{ type: "idee", id: "j2-surprise-circus-lane" }} cleanAddress durees={DUREES} versionSimulee={1} resultatsGoogle={false} calls={calls} />
+      </TripShell>,
+    );
+    // (1) Rien n'est envoyé avant « Rechercher ».
+    expect(searchField()).toHaveValue(SENTINELLE);
+    expect(calls.searchPlaces).not.toHaveBeenCalled();
+    expect(calls.previewAddPlace).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Rechercher" }));
+    });
+    // (2) Même action et même forme qu'une saisie (aucun indicateur « idée »).
+    expect(calls.searchPlaces).toHaveBeenCalledTimes(1);
+    expect(calls.searchPlaces.mock.calls[0]?.[0]).toStrictEqual({ tripId: avecSentinelle.id, day: 2, query: SENTINELLE });
+    fireEvent.change(searchField(), { target: { value: SENTINELLE } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Rechercher" }));
+    });
+    expect(calls.searchPlaces.mock.calls[1]?.[0]).toStrictEqual(calls.searchPlaces.mock.calls[0]?.[0]);
+    // (3) L'adresse ne porte que l'identifiant de l'idée.
+    const adresses = [...router.replace.mock.calls, ...router.push.mock.calls].map((appel) => String(appel[0]));
+    expect(adresses).toEqual(["/voyages/mock_trip_edimbourg/jour/2/ajouter?idee=j2-surprise-circus-lane"]);
+    expect(adresses.join(" ")).not.toContain(SENTINELLE);
+    // (4) Rien dans le stockage du navigateur.
+    expect(JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage })).not.toContain(SENTINELLE);
+  });
+
   it("idée d'un autre jour : écran ordinaire, recherche vide", () => {
     const calls = fakeCalls();
     renderScreen(calls, { entree: { type: "idee", id: "j4-surprise-dunbars-close" } });
