@@ -13,6 +13,11 @@ export interface DayBadgeProps {
   day: number;
   /** Jour abrégé, utilisé seulement dans le nom accessible (Q18). */
   weekday?: Weekday;
+  /**
+   * Ville du jour, déjà composée par l'écran (« Rome », « de Rome à Florence »), utilisée seulement dans le nom
+   * accessible, après le jour abrégé et avant « complet » (spécification M4 § 7.7). Absente : aucun effet.
+   */
+  ville?: string;
   active?: boolean;
   /** Jour complet (Déplacer) : pas de lien, mention « complet » visible. */
   disabled?: boolean;
@@ -25,9 +30,13 @@ export interface DayBadgeProps {
   className?: string;
 }
 
-/** Nom accessible : « Jour 2 », « Jour 2, lun. », puis « , complet » si la pastille est désactivée. */
-export function dayBadgeName({ day, weekday, disabled }: Pick<DayBadgeProps, "day" | "weekday" | "disabled">) {
-  const nom = weekday ? format(t.nomAvecJour, { day, weekday }) : format(t.nom, { day });
+/**
+ * Nom accessible : « Jour 2 », « Jour 2, lun. », puis la ville s'il y en a une (« Jour 3, lun., de Rome à Florence »,
+ * spécification M4 § 7.7), puis « , complet » si la pastille est désactivée.
+ */
+export function dayBadgeName({ day, weekday, ville, disabled }: Pick<DayBadgeProps, "day" | "weekday" | "ville" | "disabled">) {
+  const jour = weekday ? format(t.nomAvecJour, { day, weekday }) : format(t.nom, { day });
+  const nom = ville ? format(t.nomVille, { nom: jour, ville }) : jour;
   return disabled ? format(t.nomComplet, { nom }) : nom;
 }
 
@@ -48,14 +57,14 @@ function dayBadgeClasses({ small, active, disabled, className }: { small: boolea
 }
 
 /** Contenu visible (« J2 », puis « complet ») et nom accessible complet en texte masqué. */
-function DayBadgeContent({ day, weekday, disabled }: Pick<DayBadgeProps, "day" | "weekday" | "disabled">) {
+function DayBadgeContent({ day, weekday, ville, disabled }: Pick<DayBadgeProps, "day" | "weekday" | "ville" | "disabled">) {
   return (
     <>
       <span aria-hidden="true" className="flex flex-col items-center">
         <span>{format(t.pastille, { day })}</span>
         {disabled ? <span className="text-legende font-semibold">{t.complet}</span> : null}
       </span>
-      <span className="sr-only">{dayBadgeName({ day, weekday, disabled })}</span>
+      <span className="sr-only">{dayBadgeName({ day, weekday, ville, disabled })}</span>
     </>
   );
 }
@@ -64,6 +73,7 @@ function DayBadgeContent({ day, weekday, disabled }: Pick<DayBadgeProps, "day" |
 export function DayBadge({
   day,
   weekday,
+  ville,
   active = false,
   disabled = false,
   href,
@@ -74,7 +84,7 @@ export function DayBadge({
   const small = size === "sm";
   const isActive = active && !disabled;
   const classes = dayBadgeClasses({ small, active: isActive, disabled, className });
-  const content = <DayBadgeContent day={day} weekday={weekday} disabled={disabled} />;
+  const content = <DayBadgeContent day={day} weekday={weekday} ville={ville} disabled={disabled} />;
 
   const current = isActive ? currentValue : undefined;
 

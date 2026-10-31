@@ -29,6 +29,7 @@ export const metadata: Metadata = {
  */
 export default async function NouveauVoyagePage() {
   if (siteEssaiAutorise()) return <CreateTripForm essai />;
-  if (isApiAdapter() && (await rechercheVilleApiOuverte())) return <CreateTripForm recherche="api" />;
+  // `api` (spécification M4 § 7.1) : les autres villes sont contrôlées à « Continuer » comme par `createTrip`.
+  if (isApiAdapter()) return (await rechercheVilleApiOuverte()) ? <CreateTripForm recherche="api" controleVilles /> : <CreateTripForm controleVilles />;
   return <CreateTripForm />;
 }

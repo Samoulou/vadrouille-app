@@ -56,7 +56,12 @@
       "nom": "Nom de la ville",
       "arrivee": "Arrivée dans cette ville",
       "recapitulatif": "Tes villes",
-      "plage": "{nom} : {debut} – {fin}"
+      "plage": "{nom} : {debut} – {fin}",
+      "aideBillet": "Pour changer de ville, ajoute ton billet ou ton vol dans Déjà réservé, avec ses heures. Ce jour-là, un billet compte comme ton transport : pour un concert ou une visite, choisis Sortie. Les trains de nuit ne sont pas encore pris en compte.",
+      "aideChangement": "Ce jour-là, tu changes de ville : ce billet sera ton transport vers {ville}.",
+      "ajoutee": "Ville {n} ajoutée.",
+      "retiree": "{ville} retirée.",
+      "retireeSansNom": "Ville {n} retirée."
     },
     "engagements": {
       "titre": "Déjà réservé",
@@ -103,7 +108,10 @@
       "horsTable": "Cette ville n'est pas encore proposée. Choisis une ville voisine ou une autre destination.",
       "villeCaracteres": "Écris le nom de ta ville avec des lettres seulement, sans chiffres ni symboles.",
       "uneSeuleVille": "Une seule ville sur le site d'essai : retire cette ville.",
-      "tropLong": "{max} jours au plus sur le site d'essai : choisis un départ plus proche de l'arrivée."
+      "tropLong": "{max} jours au plus sur le site d'essai : choisis un départ plus proche de l'arrivée.",
+      "villeRepetee": "Choisis une autre ville que la précédente.",
+      "villeDecalage": "{ville} n'a pas la même heure que {destination}. Choisis une ville à la même heure.",
+      "villeInconnue": "Cette ville n'est pas encore proposée. Choisis une autre ville."
     }
   },
   "ecran2": {
@@ -259,6 +267,10 @@
     "voirMesVoyages": "Voir mes voyages",
     "voirPropositions": "Voir mes propositions",
     "passer": "Passer, voir le programme",
+    "villes": {
+      "changement": "De {de} à {vers}",
+      "nomChangement": "de {de} à {vers}"
+    },
     "essai": {
       "relance": "On relance la préparation de ton voyage…",
       "relanceEchec": "Impossible de relancer la préparation pour le moment. Réessaie dans un instant.",

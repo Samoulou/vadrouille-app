@@ -28,6 +28,7 @@ import { ShareButton } from "@/features/partage/ShareButton";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
 import { cn } from "@/lib/utils";
 
+import { villeDeLaPastille } from "./pastille-ville";
 import { DAY_LIST_ID, PLACES_FROM_GOOGLE } from "./constants";
 import { findFicheTarget, type FicheTarget } from "./fiche";
 import {
@@ -77,6 +78,12 @@ export interface ClosedFiche {
 export interface FocusRequest {
   dayIndex: number;
   stopId?: Stop["id"];
+  /**
+   * Élément d'origine d'un écran quitté sans rien appliquer (« Ajouter un lieu », M5d-2 ; F7-PO-8) : `data-part` de
+   * l'entrée, le premier présent dans la Journée (« Ajouter à ma journée », puis « Surprends-moi » si l'idée est
+   * refermée), sinon le titre du jour.
+   */
+  originParts?: readonly string[];
 }
 
 /** Étapes surlignées 2 s après « Appliquer » (décision 0016 § 9). */
@@ -99,6 +106,11 @@ export interface AppliedChange {
   originStopId?: Stop["id"];
   /** Appelé une fois l'annulation résolue (mesure `replace_undone`). */
   onUndone?: () => void;
+  /**
+   * Annulation propre à cette modification (ajout d'un lieu à soi enregistré sur `api`, M5d-2 : un retour vers la version
+   * d'avant) ; sinon `actions.undo()`. Lève en cas d'échec : le toast revient avec l'annonce de l'échec.
+   */
+  undo?: () => Promise<void>;
 }
 
 export interface TripShellValue {
@@ -130,6 +142,8 @@ export interface TripShellValue {
   /** Focus à poser par la Journée, ou `null` ; la Journée le consomme. */
   focusRequest: FocusRequest | null;
   consumeFocusRequest: () => void;
+  /** Demande un focus à la Journée (retour d'un écran sans application, F7-PO-8). */
+  requestFocus: (request: FocusRequest) => void;
   /** Adresse de l'écran 14 ouvert depuis la fiche (« Remplacer ») : « Retour à la fiche » revient alors dans l'historique. */
   replaceOrigin: string | null;
   markReplaceOrigin: (href: string | null) => void;
@@ -178,6 +192,17 @@ export interface TripShellValue {
   recordRevert: (version: number) => void;
   /** L'écran des versions signale son montage (`true`) et son démontage (`false`) : « Retour » mène alors au Séjour. */
   markVersionsOpen: (open: boolean) => void;
+  /**
+   * « Ajouter un lieu » (M5d-2 ; spécification M5 § 6) : voyage débloqué (M5-PO-1), adaptateurs `mock` et `api`, routes
+   * `/voyages` (même condition serveur que les versions, `versionable`) ; sinon faux (ni bouton, ni formulaire).
+   */
+  addPlaceAvailable: boolean;
+  /**
+   * Ajout d'un lieu à soi appliqué (M5d-2) : les jours de l'aperçu s'affichent aussitôt. Sur `api` (`version` non nulle),
+   * la version écrite devient la base des gestes suivants (la modification précédente devient définitive), puis le voyage
+   * est relu ; sans révision enregistrée (`mock`), l'ajout reste en mémoire, annulable par `actions.undo()` (Q762).
+   */
+  showAddedPlace: (days: readonly Day[], version: number | null) => void;
 }
 
 const TripShellContext = createContext<TripShellValue | null>(null);
@@ -489,6 +514,20 @@ export function TripShell({
   // Écran des versions monté (il le signale) : « Retour » sur la carte mène au Séjour, comme depuis une Journée.
   const [onVersions, setOnVersions] = useState(false);
   const markVersionsOpen = useCallback((open: boolean) => setOnVersions(open), []);
+  // « Ajouter un lieu » (M5d-2) : même condition serveur que les versions, voyage débloqué seulement (M5-PO-1).
+  const addPlaceAvailable = versionable && sourceTrip.unlocked;
+  const showAddedPlace = useCallback(
+    (days: readonly Day[], version: number | null) => {
+      if (serverStore !== null && version !== null) {
+        recordServerRevert(serverStore, version);
+        send({ type: "applyRevision", days });
+        afterWrite();
+        return;
+      }
+      send({ type: "applyRevision", days });
+    },
+    [serverStore, send, afterWrite],
+  );
   const recordRevert = useCallback(
     (version: number) => {
       // Le retour rend définitive toute modification précédente (une seule modification annulable à la fois).
@@ -516,6 +555,7 @@ export function TripShell({
   }, []);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const consumeFocusRequest = useCallback(() => setFocusRequest(null), []);
+  const requestFocus = useCallback((request: FocusRequest) => setFocusRequest(request), []);
   // « Modification annulée. » : annonce de la région du toast après l'annulation d'une révision (F7-PO-1).
   const [undone, setUndone] = useState<{ id: number } | null>(null);
 
@@ -554,6 +594,7 @@ export function TripShell({
       setToast({
         id,
         message: change.message,
+        undo: change.undo,
         afterUndo: () => {
           setUndone({ id });
           // Étape d'origine si elle est dans le jour affiché, sinon titre du jour (F7-PO-1).
@@ -612,6 +653,7 @@ export function TripShell({
       highlight,
       focusRequest,
       consumeFocusRequest,
+      requestFocus,
       replaceOrigin,
       markReplaceOrigin,
       markOpenedFromPanel,
@@ -629,6 +671,8 @@ export function TripShell({
       notifyReverted,
       recordRevert,
       markVersionsOpen,
+      addPlaceAvailable,
+      showAddedPlace,
     }),
     [
       routes,
@@ -644,6 +688,7 @@ export function TripShell({
       highlight,
       focusRequest,
       consumeFocusRequest,
+      requestFocus,
       replaceOrigin,
       markReplaceOrigin,
       markOpenedFromPanel,
@@ -661,6 +706,8 @@ export function TripShell({
       notifyReverted,
       recordRevert,
       markVersionsOpen,
+      addPlaceAvailable,
+      showAddedPlace,
     ],
   );
 
@@ -694,6 +741,8 @@ export function TripShell({
         index: candidate.index,
         href: routes.jour(candidate.index),
         weekday: weekdayOf(candidate.date) ?? undefined,
+        // Journée d'un changement de ville : « Jour 3, lun., de Rome à Florence » (spécification M4 § 7.7).
+        ...villeDeLaPastille(trip.cities, candidate.date),
       }))}
       current={day ? day.index : "sejour"}
       sejourHref={routes.sejour()}

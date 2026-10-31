@@ -103,12 +103,14 @@ describe("déplacer: feuille", () => {
       previewMove: vi.fn(),
     } as unknown as RevisionActions;
     const { baseElement } = renderSheet(revision);
+    expect(within(dialog()).getByRole("heading", { name: "Déplacer [Jardin botanique royal]" })).toHaveFocus();
     const alerte = await within(dialog()).findByRole("alert");
     await waitFor(() => expect(alerte).toHaveTextContent("La proposition n'a pas pu être calculée. Ton programme est inchangé."));
     expect(dialog().querySelector("[data-part='aucun-jour']")).toBeNull();
     expect(within(alerte).queryByRole("button")).toBeNull();
     expect(within(dialog()).queryByRole("radiogroup")).toBeNull();
     expect(within(dialog()).queryByText("complet")).toBeNull();
+    expect(within(dialog()).getByRole("heading", { name: "Déplacer [Jardin botanique royal]" })).toHaveFocus();
     expect(revision.previewMove).not.toHaveBeenCalled();
     expect(await axeViolations(baseElement)).toEqual([]);
   });

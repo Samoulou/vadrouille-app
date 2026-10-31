@@ -145,11 +145,18 @@ const F11C_FILES = [
 
 /**
  * B10a (décision 0112 § 2 point 2, amendement de 0016 § 3.1 règle 4) : depuis le code chargé par le navigateur, seul
- * `@/domain/preferences` (règles du tri, sans `zod`) s'importe de `src/domain`.
+ * `@/domain/preferences` (règles du tri, sans `zod`) s'importe de `src/domain`. M4c (décision 0148 § 6 point 3 : la ville
+ * d'un jour est une fonction pure **unique**, « appelée par le serveur et par les écrans ») : `@/domain/villes-du-voyage`
+ * aussi, module pur qui n'importe que des types de @/contracts. M4-suite-front (T-M4S-1 et T-M4S-2 de la spécification
+ * M4-suite, § 12 ; décision 0151 § 6) : `@/domain/changement-de-ville`, dont la Journée lit le chevauchement à l'affichage
+ * (chargé à la demande) et dont l'écran 1 appelle la détection du départ saisi ; il n'importe à l'exécution que des modules
+ * purs de `src/domain` et `@/contracts/values`, ni `zod` ni `src/server` (`configuration` en type seulement).
  */
 const CLIENT_DOMAIN_PATTERN = {
-  regex: "^(@/domain/(?!preferences$)|(\\.{1,2}/)+(.*/)?domain/(?!preferences$))",
-  message: "Depuis le code chargé par le navigateur, seul @/domain/preferences s'importe de src/domain (décision 0112 § 2 point 2).",
+  regex:
+    "^(@/domain/(?!(preferences|villes-du-voyage|changement-de-ville)$)|(\\.{1,2}/)+(.*/)?domain/(?!(preferences|villes-du-voyage|changement-de-ville)$))",
+  message:
+    "Depuis le code chargé par le navigateur, seuls @/domain/preferences, @/domain/villes-du-voyage et @/domain/changement-de-ville s'importent de src/domain (décisions 0112 § 2 point 2, 0148 § 6 point 3 et 0151 § 6).",
 };
 
 /** Imports interdits : en configuration plate, le dernier bloc remplace les précédents, d'où une seule fonction. */

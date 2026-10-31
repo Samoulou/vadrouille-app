@@ -81,6 +81,15 @@ export interface DestinationVilleProps {
   recherche?: RechercheVille;
   /** Actions de la recherche ; par défaut les actions serveur de `recherche`. */
   actions?: ActionsVilles;
+  /**
+   * Champ du brouillon servi (identifiant, erreurs, focus) : la destination par défaut, ou le nom d'une autre ville
+   * (`otherCities.{i}.name`, `api` seulement : spécification M4 § 4.2 et § 7.1 ; verdict 0149 § 3).
+   */
+  champ?: string;
+  /** Libellé visible du champ ; « Destination » par défaut. */
+  libelle?: string;
+  /** Longueur maximale de la saisie ; 80 par défaut (destination). */
+  maxLength?: number;
 }
 
 /** Nom tapé incomplet : préfixe strict du texte principal de la suggestion (comparaison en mémoire seulement). */
@@ -118,10 +127,13 @@ export function DestinationVille({
   relance,
   recherche = "essai",
   actions = ACTIONS_SERVEUR[recherche],
+  champ = "destination",
+  libelle = e1.destination,
+  maxLength = 80,
 }: DestinationVilleProps) {
   // `api` (décision 0141 § 6.1 point 5) : aucun cookie d'accès, l'état « accès » n'existe pas ; un tel statut se replie.
   const accesPossible = recherche === "essai";
-  const id = fieldId("destination");
+  const id = fieldId(champ);
   const listeId = `${id}-liste`;
   const statutId = `${id}-statut`;
   // Suggestions affichées (données Google, en mémoire du composant seulement, jamais dans le brouillon).
@@ -286,7 +298,7 @@ export function DestinationVille({
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <FieldLabel htmlFor={id}>{e1.destination}</FieldLabel>
+      <FieldLabel htmlFor={id}>{libelle}</FieldLabel>
       <FieldHelp id={helpId(id)}>{v.aide}</FieldHelp>
       <input
         id={id}
@@ -299,7 +311,7 @@ export function DestinationVille({
         aria-invalid={message ? true : undefined}
         aria-describedby={describedBy(helpId(id), message && errorId(id), montrerConfirmation && statutId)}
         autoComplete="off"
-        maxLength={80}
+        maxLength={maxLength}
         value={value}
         onChange={(evenement) => {
           setErreurChoix(null);

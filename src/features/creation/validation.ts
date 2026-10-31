@@ -13,7 +13,7 @@ import {
   PROTOTYPE_STAY_DAYS_MAX,
   STORY_LENGTH,
 } from "@/contracts/values";
-import { fuseauDeVille, fuseauDuPays, paysParCode, villeDuPays } from "@/lib/fuseaux";
+import { controlerVilles, fuseauDeVille, fuseauDuPays, memeVilleQueLaPrecedente, paysParCode, villeDuPays } from "@/lib/fuseaux";
 
 import { DESTINATION_KEY, markedFields, type BriefForm, type BriefValues, type LodgingChoice, type LodgingForm, type TripForm } from "./draft";
 
@@ -42,7 +42,12 @@ export type FieldError =
   // Écran 1 de `api` (décision 0141 § 8.2) : la recherche a répondu, la ville n'est pas l'une des 62 villes du MVP.
   | "cityNotOffered"
   | "singleCity"
-  | "tooLong";
+  | "tooLong"
+  // Autres villes sur `api` (spécification M4 § 7.1 et § 8 ; décision 0148 § 4 point 2) : ville hors des 62 villes du MVP,
+  // même ville que la précédente, autre décalage horaire que la destination.
+  | "cityUnknown"
+  | "cityRepeated"
+  | "cityTimeZone";
 
 /** Erreur d'un champ ; `field` est aussi la base de l'identifiant du champ dans la page. */
 export interface FormError {
@@ -151,6 +156,31 @@ export interface ValidateTripOptions {
    * « Continuer » répète alors `cityNotOffered` au lieu de `selectCity` (une seule consigne pour le champ).
    */
   horsTable?: boolean;
+  /**
+   * Écran 1 de `api` (spécification M4 § 7.1 ; décision 0148 § 4 point 2) : chaque autre ville est contrôlée comme le
+   * fera `createTrip` (`controlerVilles`, `memeVilleQueLaPrecedente`) : ville connue des 62 villes du MVP, différente de
+   * la précédente, même décalage horaire que la destination. Erreur sous le nom de la ville. Absent : aucun contrôle de plus.
+   */
+  controleVilles?: boolean;
+}
+
+/**
+ * Erreur du nom de chaque autre ville sous `controleVilles` (même ordre que `controlerVilles` : inconnue, répétée,
+ * décalage), indexée comme `otherCities` ; `null` sans erreur. Une destination inconnue ne fait refuser aucune autre ville
+ * (son erreur relève de la destination). Le décalage n'est contrôlé qu'avec des dates cohérentes.
+ */
+export function erreursDesVilles(trip: Pick<TripForm, "destination" | "start" | "end" | "otherCities">, datesValides: boolean): (FieldError | null)[] {
+  const noms = trip.otherCities.map((city) => city.name.trim());
+  const destination = trip.destination.trim();
+  const repetee = memeVilleQueLaPrecedente([destination, ...noms]);
+  return noms.map((nom, index) => {
+    if (textError(nom, CITY_NAME_LENGTH) !== null) return null;
+    if (fuseauDeVille(nom) === null) return "cityUnknown";
+    if (repetee === index + 1) return "cityRepeated";
+    if (!datesValides || fuseauDeVille(destination) === null) return null;
+    const controle = controlerVilles([destination, nom], trip.start, trip.end);
+    return !controle.ok && controle.raison === "decalage" ? "cityTimeZone" : null;
+  });
 }
 
 /** Vrai si la destination saisie (non vide) est absente de la table maison des villes. */
@@ -212,9 +242,10 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
   errors.push(...lodgingErrors(trip.lodging, "lodging"));
 
   let previous = start;
+  const villes = !essai && options.controleVilles === true ? erreursDesVilles(trip, datesValid) : [];
   trip.otherCities.forEach((city, index) => {
     const base = `otherCities.${index}`;
-    push(`${base}.name`, essai ? "singleCity" : textError(city.name, CITY_NAME_LENGTH));
+    push(`${base}.name`, essai ? "singleCity" : (textError(city.name, CITY_NAME_LENGTH) ?? villes[index] ?? null));
     if (!isDate(city.arrival)) {
       push(`${base}.arrival`, "required");
     } else if (datesValid) {

@@ -29,6 +29,8 @@ import {
 } from "@/mocks/edimbourg";
 import { deriveEdimbourgCarte, edimbourgCarte } from "@/mocks/edimbourg-carte";
 import { edimbourgRevision } from "@/mocks/edimbourg-revision";
+import { chevauchement } from "@/mocks/chevauchement";
+import { compostelleFlorence, propositionsRomeFlorence, romeFlorence } from "@/mocks/rome-florence";
 
 import type { AdapterContext, TripAdapter } from "./types";
 
@@ -39,6 +41,8 @@ interface MockEntry {
   previewSlots?: PreviewSlot[];
   /** Positions simulées des jours (F4), facultatives. */
   maps?: DayMap[];
+  /** Hors de « Mes voyages » (`listTrips`) : voyage servi à son adresse seulement (M4c, Rome puis Florence). */
+  unlisted?: true;
 }
 
 const DEFAULT_ENTRIES: MockEntry[] = [
@@ -50,6 +54,14 @@ const DEFAULT_ENTRIES: MockEntry[] = [
   // ajoutés après les deux d'Édimbourg pour que les tests qui lisent les entrées par identifiant ne changent pas.
   { trip: lisbonne, proposals: [] },
   { trip: porto, proposals: [] },
+  // M4c (spécification M4 § 7 ; décision 0148 § 12) : voyage à deux villes, servi à son adresse seulement, pour que
+  // « Mes voyages » et ses tests ne changent pas (spécification M4 § 7.8). Sans positions : la carte montre son repli.
+  { trip: romeFlorence, proposals: propositionsRomeFlorence, unlisted: true },
+  // Même voyage, première ville au nom long (« Saint-Jacques-de-Compostelle », hors des 62) : mesures à 390 px.
+  { trip: compostelleFlorence, proposals: [], unlisted: true },
+  // M4-suite (critère 17) : trois villes, un engagement qui chevauche chaque ligne « Vers {ville} » ; bandeau de
+  // chevauchement de la Journée, axe et mesures à 390 px. Servi à son adresse seulement.
+  { trip: chevauchement, proposals: [], unlisted: true },
 ];
 
 /**
@@ -143,7 +155,7 @@ export function createMockTripAdapter(entries: MockEntry[] = DEFAULT_ENTRIES): T
     versions: undefined,
     async listTrips(ctx) {
       return entries
-        .filter((entry) => entry.trip.organizationId === ctx.organizationId)
+        .filter((entry) => entry.trip.organizationId === ctx.organizationId && entry.unlisted !== true)
         .map((entry) => toTripSummary(TripSchema.parse(entry.trip)));
     },
     async getTrip(ctx, tripId) {

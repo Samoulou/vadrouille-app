@@ -18,6 +18,7 @@
     "nom": "Jour {day}",
     "nomAvecJour": "Jour {day}, {weekday}",
     "complet": "complet",
+    "nomVille": "{nom}, {ville}",
     "nomComplet": "{nom}, complet"
   },
   "jours": {
