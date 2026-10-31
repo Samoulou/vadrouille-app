@@ -18,8 +18,7 @@ import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
-import { applyAddPlace, previewAddPlace, searchPlaces } from "@/server/actions/lieux";
-import { applyRevert } from "@/server/actions/retouches";
+import { applyAddPlace, previewAddPlace, searchPlaces, undoAddPlace } from "@/server/actions/lieux";
 
 import {
   apercuSurJourAffiche,
@@ -40,15 +39,16 @@ import { useTripShell } from "./TripShell";
 const t = messages.sejour.ajouter;
 const rv = messages.revision;
 
-/** Actions serveur injectées (tests) ; celles de `@/server/actions/lieux` et `@/server/actions/retouches` par défaut. */
+/** Actions serveur injectées (tests) ; celles de `@/server/actions/lieux` par défaut. */
 export type AjouterLieuCalls = {
   searchPlaces(input: unknown): Promise<Result<PlaceSearchResult[]>>;
   previewAddPlace(input: unknown): Promise<Result<RevisionPreviewData>>;
   applyAddPlace(input: unknown): Promise<Result<PatchResult>>;
-  applyRevert(input: unknown): Promise<Result<PatchResult>>;
+  /** « Annuler » du toast sur `api` (M5d-6, décision 0155 § 4.1) : `{ tripId, requestId, version }`, `version` écrite par l'ajout. */
+  undoAddPlace(input: unknown): Promise<Result<PatchResult>>;
 };
 
-const APPELS: AjouterLieuCalls = { searchPlaces, previewAddPlace, applyAddPlace, applyRevert };
+const APPELS: AjouterLieuCalls = { searchPlaces, previewAddPlace, applyAddPlace, undoAddPlace };
 
 /** État de la recherche ; les résultats vivent en mémoire de l'écran seulement (F7-PO-9, décision 0147 § 12 S2). */
 type Recherche =
@@ -64,8 +64,9 @@ type Recherche =
 type RefusSansOption = "pasDePlace" | "lieuIntrouvable" | "lieuFerme";
 
 /**
- * Refus d'un aperçu ou d'une application, affichés par un bandeau, avec les textes de la décision 0154 (§ 1 et § 7) ;
- * « trop de gestes » et le nombre maximal de versions n'ont pas de « Réessayer ».
+ * Refus d'un aperçu ou d'une application, affichés par un bandeau, avec les textes de la décision 0154 (§ 1 et § 7) et la
+ * cause portée par `ApiError.cause` (décision 0155 § 1.1) ; « trop de gestes » et le nombre maximal de versions n'ont pas
+ * de « Réessayer ».
  */
 type Refus = RefusSansOption | "conflict" | "indisponible" | "tropDeGestes" | "tropDeVersions" | "enPreparation" | "nonDebloque" | "error";
 
@@ -439,7 +440,6 @@ export function AjouterLieuView({
     }
     const written = result.value.version;
     const stopId = `ajout-${id}`;
-    const base = input.baseVersion;
     const surApi = versionSimulee === null;
     // Les jours de l'aperçu, avec l'identifiant de l'étape écrite, s'affichent aussitôt (puis la relecture sur `api`).
     shell.showAddedPlace(joursAvecEtapeEcrite(preview, stopId), surApi ? written : null);
@@ -448,11 +448,12 @@ export function AjouterLieuView({
       dayIndex,
       highlighted: [stopId],
       targetStopId: stopId,
-      // `api` : un retour vers la version d'avant l'ajout ; `mock` : l'ajout reste en mémoire, `actions.undo()` (Q762).
+      // `api` : `undoAddPlace` revient à la version d'avant l'ajout, même antérieure au déblocage (décision 0155 § 4.1) ;
+      // `mock` : l'ajout reste en mémoire, `actions.undo()` (Q762).
       ...(surApi
         ? {
             undo: async () => {
-              const annule = await calls.applyRevert({ tripId: trip.id, requestId: requestId(), baseVersion: written, toVersion: base });
+              const annule = await calls.undoAddPlace({ tripId: trip.id, requestId: requestId(), version: written });
               if (!annule.ok) throw new Error("annulation refusée");
               shell.recordRevert(annule.value.version);
             },

@@ -8,6 +8,7 @@ import type { z } from "zod";
 import {
   AddPlaceApplySchema,
   AddPlaceRequestSchema,
+  AddPlaceUndoSchema,
   ApiErrorSchema,
   ChangeSchema,
   ChecklistItemSchema,
@@ -220,6 +221,17 @@ describe("Recherche d'un lieu à soi et demande d'ajout (décision 0147 § 3)", 
     expect(AddPlaceRequestSchema.safeParse({ ...demande, kind: "event" }).success).toBe(false);
     expect(AddPlaceApplySchema.safeParse({ ...demande, requestId: REQUETE }).success).toBe(true);
     expect(AddPlaceApplySchema.safeParse(demande).success).toBe(false);
+  });
+
+  it("AddPlaceUndo (M5d-6, décision 0155 § 4.1) : voyage, requestId et version écrite par l'ajout ; objet strict", () => {
+    const annulation = { tripId: TRIP, requestId: REQUETE, version: 5 };
+    expect(AddPlaceUndoSchema.safeParse(annulation).success).toBe(true);
+    for (const extra of [{ baseVersion: 4 }, { toVersion: 4 }, { stopId: "ajout-x" }, { organizationId: "org" }]) {
+      expect(AddPlaceUndoSchema.safeParse({ ...annulation, ...extra }).success, Object.keys(extra)[0]).toBe(false);
+    }
+    for (const version of [0, -1, 1.5, "5"]) expect(AddPlaceUndoSchema.safeParse({ ...annulation, version }).success, String(version)).toBe(false);
+    expect(AddPlaceUndoSchema.safeParse({ ...annulation, requestId: "pas-un-uuid" }).success).toBe(false);
+    expect(AddPlaceUndoSchema.safeParse({ tripId: TRIP, version: 5 }).success).toBe(false);
   });
 });
 

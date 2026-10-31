@@ -132,3 +132,19 @@ describe("lieu à soi simulé: aperçu et application", () => {
     expect(poserAjoutSimule(jour, "ajout-x", { ...demande, kind: "activity", time: "11:30" }, DUREES)).toBeNull();
   });
 });
+
+describe("lieu à soi simulé: annulation d'un ajout (M5d-6, ticket 994 ; décision 0155 § 4.1)", () => {
+  it("même signature que api : version 2 d'un ajout simulé → version 3 ; autre version : version_conflict ; refus d'entrée, de session, de voyage et de déblocage", async () => {
+    const { lieux } = banc();
+    const annulation = { tripId: EDIMBOURG_TRIP_ID, requestId: REQUETE, version: VERSION_SIMULEE + 1 };
+    const annule = await lieux.undoAddPlace(CTX, annulation);
+    expect(annule).toEqual({ ok: true, value: { version: VERSION_SIMULEE + 2, touchedDays: [], changes: [] } });
+    if (annule.ok) expect(PatchResultSchema.parse(annule.value)).toEqual(annule.value);
+    expect(await lieux.undoAddPlace(CTX, { ...annulation, version: VERSION_SIMULEE })).toEqual({ ok: false, error: { code: "version_conflict", retryable: true, currentVersion: VERSION_SIMULEE } });
+    expect(await lieux.undoAddPlace(null, annulation)).toEqual({ ok: false, error: { code: "unauthenticated" } });
+    expect(await lieux.undoAddPlace(CTX, { ...annulation, baseVersion: 1 })).toMatchObject({ ok: false, error: { code: "validation_failed" } });
+    expect(await lieux.undoAddPlace(CTX, { ...annulation, requestId: "x" })).toEqual({ ok: false, error: { code: "validation_failed", field: "requestId" } });
+    expect(await lieux.undoAddPlace(AUTRE, annulation)).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await banc(false).lieux.undoAddPlace(CTX, annulation)).toEqual({ ok: false, error: { code: "not_unlocked", retryable: false } });
+  });
+});

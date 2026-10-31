@@ -456,7 +456,8 @@ Noms en `snake_case`, propriétés sans donnée personnelle. Ils alimentent les 
 | `preference_prompt_answered` | `category` (dont `distance`), `answer: yes \| no`, `reason?` |
 | `paywall_viewed` / `payment_started` / `payment_succeeded` | `method: twint \| card`, `price_variant` |
 | `replace_applied` / `replace_undone` | `reason`, `from_reserve: boolean`, `duration_ms` |
-| `place_added` / `stop_moved` | `method: button \| drag` |
+| `place_added` | `method: button` (seul geste d'ajout ; décision 0155 § 4.2) |
+| `stop_moved` | `method: button \| drag` |
 | `checklist_item_done` | — |
 | `today_opened` | `offline: boolean` |
 | `error_reported` | `kind` |

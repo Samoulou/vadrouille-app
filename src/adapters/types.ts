@@ -121,13 +121,20 @@ export interface TripAdapter {
 
 /**
  * Ajout d'un lieu à soi (M5d-1 ; décision 0147 § 3 point 5 et § 11) : `AddPlaceRequest` → `RevisionPreview` (`kind:
- * "add"`), `AddPlaceApply` → `PatchResult` (version nouvelle, auteur `user`, patch `[add, lock]`). Voyage débloqué seulement
+ * "add"`), `AddPlaceApply` → `PatchResult` (version nouvelle, auteur `user`, patch `[add, lock]`), `AddPlaceUndo` → `PatchResult` (annulation). Voyage débloqué seulement
  * (`not_unlocked`), débit `retouche`, `version_conflict`, `no_option` (« Pas de place ce jour-là »), `provider_error`. Le
  * contexte est celui **de la session** ; `null` : `unauthenticated`. Aucun nom ni adresse Google dans la demande.
  */
 export interface AddPlaceAdapter {
   previewAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<RevisionPreview>>;
   applyAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+  /**
+   * Annulation d'un ajout (« Annuler » du toast, M5d-6 ; décision 0155 § 4.1) : `AddPlaceUndo` `{ tripId, requestId,
+   * version }` → `PatchResult`. Sur `api`, `[revert]` vers la base de l'ajout tant que `version` est la version courante et
+   * un ajout `[add, lock]` d'une personne (sinon `version_conflict`), même si cette base précède le déblocage ; ni débit
+   * `retouche` ni borne du nombre de versions. `mock` : même signature, sur la version simulée.
+   */
+  undoAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
 }
 
 /**

@@ -26,6 +26,11 @@ import { journaliserExceptionLieux, rechercherLieuxApiTerminal } from "@/server/
  *   jour-là » ; `place_not_found`, `place_closed` : fiche du lieu ajouté ; décision 0155 § 1), `provider_error` (dont la
  *   lecture des fiches en échec), `cost_cap_reached`, `generation_in_progress`, `internal` ; hors `mock` et `api`,
  *   `internal` sans rien lire.
+ * - `undoAddPlace` (`AddPlaceUndo` `{ tripId, requestId, version }` → `PatchResult` ; tâche M5d-6, ticket 994 ; décision
+ *   0155 § 4.1) : « Annuler » du toast après un ajout ; sur `api`, `[revert]` vers la base de l'ajout tant que `version` (celle
+ *   écrite par l'ajout) est la version courante et un ajout d'une personne, même si cette base précède le déblocage ; aucun
+ *   appel du port, ni débit `retouche` ni borne du nombre de versions. Erreurs `unauthenticated`, `validation_failed`,
+ *   `not_found`, `not_unlocked`, `version_conflict` (avec `currentVersion`), `generation_in_progress`, `internal`.
  *
  * Aucun nom ni adresse Google n'est stocké, journalisé ni mis dans un prompt ; la requête saisie non plus.
  */
@@ -51,4 +56,9 @@ export async function previewAddPlace(input: unknown): Promise<Result<RevisionPr
 export async function applyAddPlace(input: unknown): Promise<Result<PatchResult>> {
   const lieux = await ajoutDeLieu();
   return lieux === null ? fail("internal") : lieux.applyAddPlace(await contexteFacultatif(), input);
+}
+
+export async function undoAddPlace(input: unknown): Promise<Result<PatchResult>> {
+  const lieux = await ajoutDeLieu();
+  return lieux === null ? fail("internal") : lieux.undoAddPlace(await contexteFacultatif(), input);
 }

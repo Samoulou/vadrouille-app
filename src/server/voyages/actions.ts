@@ -60,6 +60,8 @@ export type NomAction =
   | "search-places"
   | "preview-add-place"
   | "apply-add-place"
+  // M5d-6 (ticket 994) : annuler un ajout de lieu à soi sur `api` (`src/server/lieux/annulation.ts`).
+  | "undo-add-place"
   // M5b (ticket 934) : versions du programme et retour à une version sur `api` (`src/server/versions/historique.ts`).
   | "list-versions"
   | "preview-revert"
