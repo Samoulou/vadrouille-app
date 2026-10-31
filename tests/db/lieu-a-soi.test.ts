@@ -6,6 +6,7 @@ import type { AdapterContext } from "@/adapters/types";
 import { ok, PatchResultSchema, RevisionPreviewSchema, TripPatchSchema, TripSnapshotSchema, type Result, type StopSnapshot, type TripSnapshot } from "@/contracts";
 import { INCONNU, memePoint, type Point, type SourceRelectures, type Validite } from "@/domain/relectures";
 import { creerRelecturesVoyages, type DoubleRelectures } from "@/mocks/relectures-voyages";
+import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
 import { appliquerAjout, identifiantAjout, proposerAjout, type DependancesAjout } from "@/server/lieux/ajout";
 import { rechercherLieuxApiTerminal } from "@/server/composition/lieux-api";
@@ -499,7 +500,11 @@ describe("lieu à soi et révision après le tri (M1b)", () => {
     const [v1] = await instantanes(org, tripId);
     const stopId = `ajout-${randomUUID()}`;
     const ajoutee: StopSnapshot = { id: stopId, kind: "activity", placeId: LIEU, name: NOM, start: "22:15", end: "22:45", facts: {}, exceptions: [], locked: true, addedBy: "person" };
-    const avecAjout = lieuxASoiReinjectes({ days: v1!.days.map((jour) => (jour.index === 2 ? { ...jour, items: [{ type: "stop", stop: ajoutee }] } : { ...jour, items: [] })) }, v1!);
+    // Règles de la réinjection (M5d-4, décision 0155 § 2) : mode de trajet du jeu (marche) et configuration du moteur.
+    const avecAjout = lieuxASoiReinjectes({ days: v1!.days.map((jour) => (jour.index === 2 ? { ...jour, items: [{ type: "stop", stop: ajoutee }] } : { ...jour, items: [] })) }, v1!, {
+      mode: "walk",
+      configuration: CONFIGURATION_MOTEUR,
+    });
     expect(etape(avecAjout, stopId)?.stop).toEqual(ajoutee);
     expect(etapes(avecAjout).filter((e) => e.stop.id !== stopId)).toEqual(etapes(v1!));
     // INSERT direct dans `trip_versions` (auteur `engine`), et non `ecrireVersion` ni `appliquerAjout` : seul l'instantané

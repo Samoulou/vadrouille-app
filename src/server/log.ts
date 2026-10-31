@@ -162,6 +162,13 @@ export const LOG_EVENTS = [
   // `httpStatus` (sur `google_erreur`), `errorName`. Jamais la requête saisie, la ville, un `placeId`, un nom ou une adresse
   // Google, `tripId`, `organizationId`, une adresse IP ni une clé. Niveau `info`, `warn` pour une panne.
   "lieu.recherche",
+  // M5d-4 (décision 0155 § 2.4) : lieux à soi réinjectés par la révision M1b (étape `e`, `ecritureRevision` seule), une fois
+  // par passage qui en réinjecte au moins un, après R3 ; niveau `info`. **Compteurs seulement** (`CHAMPS_ADMIS_PAR_EVENEMENT`) :
+  // `places` (lieux à soi réinjectés) et `stopsRemoved` (étapes de l'IA retirées parce qu'elles les chevauchaient). Jamais
+  // `tripId`, `organizationId`, `generationRunId`, un nom, un `placeId` ni une heure. Le compte peut inclure un passage dont
+  // la publication n'écrit rien (R3, jour incohérent, version de base dépassée), et un rejeu du lot peut compter deux fois le
+  // même lieu (biais de mesure seulement).
+  "recalcul.lieux_a_soi",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -201,6 +208,8 @@ export type LogFields = {
   readonly candidates?: number;
   /** Candidats retenus hors événements (lieux) : 0 donne le niveau `warn` et l'arrêt `research_empty` (mineur 2). */
   readonly places?: number;
+  /** Étapes de l'IA retirées par la réinjection des lieux à soi (`recalcul.lieux_a_soi`, 0155 § 2.4) : entier positif ou nul. */
+  readonly stopsRemoved?: number;
   readonly candidatesRefused?: number;
   readonly planRefused?: number;
   readonly planUnreadable?: number;
@@ -816,6 +825,7 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["pagesRead", entierPositif],
   ["candidates", entierPositif],
   ["places", entierPositif],
+  ["stopsRemoved", entierPositif],
   ["candidatesRefused", entierPositif],
   ["planRefused", entierPositif],
   ["planUnreadable", entierPositif],
@@ -887,6 +897,8 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   ["voyages.stop_reported", new Set(["reason"])],
   // Décision 0147 § 12 S1 point 5 : compteur et codes fermés ; requête, ville, `placeId`, textes Google et identifiants retirés.
   ["lieu.recherche", new Set(["places", "reason", "googleCode", "httpStatus", "errorName"])],
+  // Décision 0155 § 2.4 : deux compteurs ; identifiants, noms, `placeId` et heures retirés.
+  ["recalcul.lieux_a_soi", new Set(["places", "stopsRemoved"])],
   [
     "generation.programme_written",
     new Set([
