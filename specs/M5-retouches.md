@@ -323,6 +323,12 @@ Chaque critère est vérifié par un test nommé dans la PR de sa tâche. Les te
 ## 14. Hors périmètre
 
 - « Remplacer » (écran 14) sur `api` : M1g (#869). « Déplacer » sur `api` : tâche à ouvrir par le CEO (non listée dans le plan ; question au CEO).
+  - **Feuille « Déplacer », état « points indisponibles »** (ticket #947 ; non maquetté : rendu UX/UI, sur le modèle de la feuille « Signaler une erreur », § 5). Quand le serveur ne peut pas calculer les points de déplacement :
+    - titre de la feuille, inchangé, focus dessus à l'ouverture ;
+    - puis le bandeau `revision.erreur` seul (« La proposition n'a pas pu être calculée. Ton programme est inchangé. »), **sans bouton** ;
+    - la section « Vers quel jour ? » est **masquée** (ni jours, ni pastille « complet », ni « Aucun jour ») ;
+    - **aucun texte nouveau**.
+  - Capture de référence : `docs/ux/captures/947/deplacer-points-indisponibles-390x844.png`. Décision de forme définitive dès la fusion, sans délai de veto (décision 0093).
 - « Garder » sur la fiche (Q67, Samuel).
 - Le nombre de remplacements inclus dans le voyage complet (« [N] remplacements », Q88, Samuel).
 - La file de vérification humaine des signalements, toute vérification Google déclenchée par un signalement, et tout apprentissage tiré des signalements.
