@@ -58,6 +58,7 @@
       "recapitulatif": "Tes villes",
       "plage": "{nom} : {debut} – {fin}",
       "aideBillet": "Pour changer de ville, ajoute ton billet ou ton vol dans Déjà réservé, avec ses heures. Ce jour-là, un billet compte comme ton transport : pour un concert ou une visite, choisis Sortie. Les trains de nuit ne sont pas encore pris en compte.",
+      "aideChangement": "Ce jour-là, tu changes de ville : ce billet sera ton transport vers {ville}.",
       "ajoutee": "Ville {n} ajoutée.",
       "retiree": "{ville} retirée.",
       "retireeSansNom": "Ville {n} retirée."

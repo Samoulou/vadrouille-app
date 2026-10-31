@@ -23,6 +23,7 @@ import { formatDateCourte } from "@/features/voyage/plate";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
+import { aidesDeChangement } from "./aide-changement";
 import { CreationShell, stepTotal, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { DestinationVille, type ActionsVilles, type MotifIndisponible } from "./DestinationVille";
@@ -270,6 +271,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
   const citiesFull = trip.otherCities.length >= MAX_CITIES - 1;
   // Aide du billet de trajet : dès qu'une autre ville est ajoutée, reliée au « Type de réservation » de chaque engagement.
   const aideBillet = trip.otherCities.length > 0;
+  // Aide sous le « Billet » qui deviendra le changement de ville (spécification M4-suite § 4.2, UX-M4S-C).
+  const aidesChangement = aidesDeChangement(trip);
   const commitmentsFull = trip.commitments.length >= MAX_COMMITMENTS;
 
   return (
@@ -510,6 +513,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
             const base = `commitments.${index}`;
             const title = commitment.label.trim() || format(e1.engagements.engagement, { n: index + 1 });
             const kindError = errorOf(`${base}.kind`);
+            const villeChangement = aidesChangement.get(index);
+            const aideChangementId = `${fieldId(base)}-aide-changement`;
             return (
               <section
                 key={commitment.key}
@@ -543,9 +548,16 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
                     value={commitment.kind}
                     onChange={(kind) => dispatch({ type: "commitment", index, patch: { kind } })}
                     invalid={kindError !== null}
-                    describedBy={describedBy(aideBillet && AIDE_BILLET_ID, kindError && errorId(fieldId(`${base}.kind`)))}
+                    describedBy={describedBy(
+                      aideBillet && AIDE_BILLET_ID,
+                      villeChangement !== undefined && aideChangementId,
+                      kindError && errorId(fieldId(`${base}.kind`)),
+                    )}
                     id={fieldId(`${base}.kind`)}
                   />
+                  {villeChangement === undefined ? null : (
+                    <FieldHelp id={aideChangementId}>{format(e1.villes.aideChangement, { ville: villeChangement })}</FieldHelp>
+                  )}
                   <FieldMessage id={errorId(fieldId(`${base}.kind`))} message={kindError} />
                 </div>
                 <TextField

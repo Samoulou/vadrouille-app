@@ -804,6 +804,13 @@ const PREFERENCES_DOMAINE = "src/domain/preferences.ts";
 /** M4c (décision 0148 § 6 point 3) : ville d'un jour, fonction pure unique appelée par le serveur et par les écrans. */
 const VILLES_DOMAINE = "src/domain/villes-du-voyage.ts";
 const VILLES_ECRANS = "src/features/voyage/villes.ts";
+/**
+ * M4-suite-front (spécification M4-suite § 4.2 et § 5 ; T-M4S-1 et T-M4S-2 ; décision 0151 § 6) : règles du changement de
+ * ville, fonction pure unique appelée par le serveur et par les écrans (chevauchement à l'affichage, départ saisi).
+ */
+const CHANGEMENT_DOMAINE = "src/domain/changement-de-ville.ts";
+/** Les deux seuls modules d'écran qui l'importent : le bandeau de la Journée et l'aide de l'écran 1. */
+const CHANGEMENT_ECRANS = ["src/features/sejour/BandeauChevauchement.tsx", "src/features/creation/aide-changement.ts"];
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 /** Classification des codes de la couche IA (B9b, 0081 B9-TL-1 point 2 ; 0077 § 3 point 4). */
 const NATURES_IA = "src/ai/natures.ts";
@@ -920,6 +927,19 @@ const ARETES_ADMISES: readonly AreteAdmise[] = [
     typeSeulement: false,
     exemple: VILLES_ECRANS,
     horsArete: "src/features/sejour/SejourPanel.tsx",
+  },
+  {
+    // M4-suite-front (spécification M4-suite § 12, T-M4S-1 et T-M4S-2 ; décision 0151 § 6) : le chevauchement d'un
+    // engagement avec la ligne « Vers {ville} » (bandeau de la Journée, chargé à la demande) et la détection du départ
+    // saisi (aide de l'écran 1) viennent de `src/domain/changement-de-ville.ts`, la même fonction pure que le serveur, qui
+    // n'importe à l'exécution que des modules purs de src/domain et `@/contracts/values`. Deux modules d'écran l'importent,
+    // sans la recopier ; arête exacte : le parcours ne descend pas au-delà.
+    nom: "M4-suite-front : bandeau de chevauchement et aide de l'écran 1 → src/domain/changement-de-ville.ts",
+    de: (chemin) => CHANGEMENT_ECRANS.includes(chemin),
+    vers: [CHANGEMENT_DOMAINE],
+    typeSeulement: false,
+    exemple: "src/features/sejour/BandeauChevauchement.tsx",
+    horsArete: "src/features/sejour/JourneePanel.tsx",
   },
 ];
 
@@ -1600,7 +1620,7 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       // Aucun autre fichier de l'application hors de src/server n'importe src/domain : l'arête ne vaut que pour le double.
       // B10a (0112 § 2) : seule autre arête, l'écran de présentation vers les règles du tri (`src/domain/preferences.ts`).
       const importeurs = application.filter(
-        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/")) && !(c === VILLES_DOMAINE && f === VILLES_ECRANS)),
+        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/")) && !(c === VILLES_DOMAINE && f === VILLES_ECRANS) && !(c === CHANGEMENT_DOMAINE && CHANGEMENT_ECRANS.includes(f))),
       );
       expect(importeurs).toEqual([DOUBLE_RELECTURES]);
     });
