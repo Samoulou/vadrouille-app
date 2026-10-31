@@ -770,6 +770,11 @@ export const shareLinks = pgTable(
     unique(uniqueKeyName("share_links_token_hash")).on(t.tokenHash),
     uniqueIndex("share_links_one_active_idx").on(t.organizationId, t.tripId).where(sql`${t.revokedAt} IS NULL`),
     check("share_links_token_hash_check", sql`octet_length(${t.tokenHash}) = 32`),
+    // M6a-D (migration 0023, décision 0157 § 1.9, T9) : bornes d'`expires_at`, posées par rapport à `created_at` (valeur
+    // par défaut de la base, jamais fournie par l'application : `INSERT` par colonnes). Une borne de départ des voyages
+    // dans les contrats permettrait de resserrer la seconde, jamais de l'élargir sans décision.
+    check("share_links_expires_after_created_check", sql`${t.expiresAt} > ${t.createdAt}`),
+    check("share_links_expires_within_3_years_check", sql`${t.expiresAt} <= ${t.createdAt} + interval '3 years'`),
   ],
 );
 

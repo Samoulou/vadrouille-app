@@ -234,13 +234,14 @@ describe("schéma", () => {
   it("partage: la vue partagée n'expose jamais place_coordinates", async () => {
     // Part de B1 : aucune vue partagée ne dépend d'une table nommée place_coordinates (pg_depend) ; aucun droit de
     // vadrouille_share ni de vadrouille_fn_share_views sur elle quand elle existe (B8, décision 0011 point 6).
+    // M6a-D (migration 0023, décision 0157 § 1.5, T5) : `shared_checklist` retirée, les deux vues restantes.
     const { rows } = await app.query(
       `SELECT DISTINCT v.relname AS view, ref.relname AS referenced
        FROM pg_catalog.pg_class v
        JOIN pg_catalog.pg_rewrite rw ON rw.ev_class = v.oid
        JOIN pg_catalog.pg_depend d ON d.classid = 'pg_catalog.pg_rewrite'::regclass AND d.objid = rw.oid
        JOIN pg_catalog.pg_class ref ON ref.oid = d.refobjid AND ref.oid <> v.oid
-       WHERE v.relnamespace = 'public'::regnamespace AND v.relname IN ('shared_trip', 'shared_trip_version', 'shared_checklist')`,
+       WHERE v.relnamespace = 'public'::regnamespace AND v.relname IN ('shared_trip', 'shared_trip_version')`,
     );
     const referenced = rows.map((r) => r.referenced as string);
     expect(referenced).toEqual(expect.arrayContaining(["share_links", "trips"]));

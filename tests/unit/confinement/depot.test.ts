@@ -543,7 +543,11 @@ describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)"
   it("rôle des compteurs pris dans le seul module des compteurs ; nom de la table dans le module, le schéma et les migrations 0021 et 0022 (colonne `lieux`, décision 0147 § 6.4 point 3)", () => {
     expect(contenant("SET LOCAL ROLE vadrouille_autocomplete_counter")).toEqual([COMPTEURS]);
     const table = contenant("autocomplete_daily_counts");
-    expect(table.filter((c) => c !== COMPTEURS && c !== "db/schema/auth.ts" && !/^db\/migrations\/(meta\/)?002[12]_/.test(c))).toEqual([]);
+    // Clichés drizzle-kit (`meta/<n>_snapshot.json`) : chacun recopie le schéma entier, donc la table, à chaque migration
+    // suivante (0023, M6a-D, ticket 1009) ; ce sont des fichiers générés, jamais du code qui prend le rôle.
+    expect(
+      table.filter((c) => c !== COMPTEURS && c !== "db/schema/auth.ts" && !/^db\/migrations\/(meta\/)?002[12]_/.test(c) && !/^db\/migrations\/meta\/\d{4}_snapshot\.json$/.test(c)),
+    ).toEqual([]);
     for (const attendu of [COMPTEURS, "db/schema/auth.ts", "db/migrations/0021_compteurs_autocompletion.sql"]) expect(table).toContain(attendu);
   });
 
