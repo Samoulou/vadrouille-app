@@ -22,8 +22,10 @@ import { journaliserExceptionLieux, rechercherLieuxApiTerminal } from "@/server/
  *   demain. »), `cost_cap_reached` et `provider_error` (« La recherche n'est pas disponible pour le moment. »), `internal`.
  * - `previewAddPlace` (`AddPlaceRequest` → `RevisionPreview`, `kind: "add"`) et `applyAddPlace` (`AddPlaceApply` →
  *   `PatchResult`) : patch `[add, lock]` ; erreurs `unauthenticated`, `validation_failed`, `not_found`, `not_unlocked`,
- *   `rate_limited` (règle `retouche`), `version_conflict`, `no_option` (« Pas de place ce jour-là »), `provider_error`,
- *   `cost_cap_reached`, `generation_in_progress`, `internal` ; hors `mock` et `api`, `internal` sans rien lire.
+ *   `rate_limited` (règle `retouche`), `version_conflict`, `no_option` avec `cause` (`no_room` : « Pas de place ce
+ *   jour-là » ; `place_not_found`, `place_closed` : fiche du lieu ajouté ; décision 0155 § 1), `provider_error` (dont la
+ *   lecture des fiches en échec), `cost_cap_reached`, `generation_in_progress`, `internal` ; hors `mock` et `api`,
+ *   `internal` sans rien lire.
  *
  * Aucun nom ni adresse Google n'est stocké, journalisé ni mis dans un prompt ; la requête saisie non plus.
  */

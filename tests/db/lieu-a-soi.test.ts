@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { AdapterContext } from "@/adapters/types";
 import { ok, PatchResultSchema, RevisionPreviewSchema, TripPatchSchema, TripSnapshotSchema, type Result, type StopSnapshot, type TripSnapshot } from "@/contracts";
-import { INCONNU, memePoint, type Point, type SourceRelectures } from "@/domain/relectures";
+import { INCONNU, memePoint, type Point, type SourceRelectures, type Validite } from "@/domain/relectures";
 import { creerRelecturesVoyages, type DoubleRelectures } from "@/mocks/relectures-voyages";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
@@ -229,7 +229,7 @@ describe("lieu à soi sur api (M5d-1, ticket 939)", () => {
       expect(erreur(await apercu(tripId, 1, extra))).toMatchObject({ code: "validation_failed" });
     }
     expect(erreur(await apercu(tripId, 1, { day: 30 }))).toEqual({ code: "not_found" });
-    expect(erreur(await apercu(tripId, 1, { time: "23:50" }))).toEqual({ code: "no_option" });
+    expect(erreur(await apercu(tripId, 1, { time: "23:50" }))).toEqual({ code: "no_option", cause: "no_room" });
     expect(await versions(a, tripId)).toHaveLength(1);
   });
 
@@ -275,6 +275,50 @@ describe("lieu à soi sur api (M5d-1, ticket 939)", () => {
     expect(await versions(a, tripId)).toHaveLength(1);
   });
 
+  it("fiche du lieu ajouté non valide : introuvable → no_option place_not_found, fermé → place_closed, fiches en échec → provider_error ; avant le moteur, à l'aperçu et à l'application, rien d'écrit (0155 § 1)", async () => {
+    const tripId = await nouveauVoyage();
+    // Double qui ne sert que la demande (règle des doubles, 0147 A.3) : la fiche du lieu ajouté vaut `etat` seulement si
+    // elle est demandée (sinon inconnue) ; tout le reste, le double des voyages et les trajets du lieu ajouté (10 minutes).
+    const avecFiche = (etat: Validite): SourceRelectures & { appels(): number } => {
+      let appels = 0;
+      return {
+        appels: () => appels,
+        async pour(voyage, demande) {
+          appels += 1;
+          const issue = await relectures.pour(voyage, demande);
+          if (!issue.ok) return issue;
+          const base = issue.relectures;
+          const ficheDemandee = demande.lieux.some((lieu) => lieu.placeId === LIEU);
+          return {
+            ok: true as const,
+            relectures: { ...base, validite: (placeId: string) => (placeId === LIEU ? (ficheDemandee ? etat : INCONNU) : base.validite(placeId)) },
+          };
+        },
+      };
+    };
+    for (const [etat, attendu] of [
+      ["introuvable", { code: "no_option", cause: "place_not_found" }],
+      ["ferme_definitivement", { code: "no_option", cause: "place_closed" }],
+      [INCONNU, { code: "provider_error" }],
+    ] as const) {
+      const source = avecFiche(etat);
+      const deps: DependancesAjout = { ...dependances(contexte(a)), relectures: source };
+      // À 16 h (place libre) comme à 23 h 50 (que le moteur refuserait faute de place) : la cause vient de la fiche, décidée
+      // avant le moteur.
+      for (const time of ["16:00", "23:50"]) {
+        expect(erreur(await proposerAjout(deps, { tripId, baseVersion: 1, ...DEMANDE, time })), `${etat} ${time}`).toEqual(attendu);
+        expect(erreur(await appliquerAjout(deps, { tripId, baseVersion: 1, requestId: randomUUID(), ...DEMANDE, time })), `${etat} ${time}`).toEqual(attendu);
+      }
+      expect(source.appels()).toBe(4);
+    }
+    expect(await versions(a, tripId)).toHaveLength(1);
+    const texte = await lignesDuVoyage(tripId);
+    expect(texte).not.toContain(LIEU);
+    expect(texte).not.toContain(NOM);
+    // Fiche valide, même double : l'ajout passe (le double ne refuse rien d'autre).
+    expect(valeur(await appliquerAjout({ ...dependances(contexte(a)), relectures: avecFiche("valide") }, { tripId, baseVersion: 1, requestId: randomUUID(), ...DEMANDE })).version).toBe(2);
+  });
+
   it("recalcul ou voyage complet en cours : l'application rend generation_in_progress (retryable), sans écriture", async () => {
     const tripId = await nouveauVoyage();
     await admin.query("INSERT INTO public.generation_runs (organization_id, trip_id, kind, phase) VALUES ($1, $2, 'full', 'preparing')", [a.org, tripId]);
@@ -282,16 +326,17 @@ describe("lieu à soi sur api (M5d-1, ticket 939)", () => {
     expect(await versions(a, tripId)).toHaveLength(1);
   });
 
-  it("étape mobile repoussée après le lieu ajouté : trajet non relu, no_option, sans écriture (réponse du Tech Lead, revue de la PR 943)", async () => {
+  it("étape mobile repoussée après le lieu ajouté : trajet non relu, no_option avec cause no_room, sans écriture (réponse du Tech Lead, revue de la PR 943 ; 0147 A.7, 0155 § 1)", async () => {
     const tripId = await nouveauVoyage();
     // 13 h 35 au J2 : le jardin botanique (13 h 25 – 15 h, mobile) chevauche le bloc ajouté et serait repoussé après lui ; le
-    // trajet du lieu ajouté vers le jardin n'est pas dans la demande de relectures.
-    expect(erreur(await apercu(tripId, 1, { time: "13:35" }))).toEqual({ code: "no_option" });
-    expect(erreur(await appliquer(tripId, 1, randomUUID(), { time: "13:35" }))).toEqual({ code: "no_option" });
+    // trajet du lieu ajouté vers le jardin n'est pas dans la demande de relectures. La fiche du lieu ajouté est valide : la
+    // cause est le manque de place (`no_room`), posée par le cas d'usage sur le refus du moteur.
+    expect(erreur(await apercu(tripId, 1, { time: "13:35" }))).toEqual({ code: "no_option", cause: "no_room" });
+    expect(erreur(await appliquer(tripId, 1, randomUUID(), { time: "13:35" }))).toEqual({ code: "no_option", cause: "no_room" });
     expect(await versions(a, tripId)).toHaveLength(1);
   });
 
-  it("ajout sur une étape verrouillée : no_option, rien d'écrit, à l'aperçu comme à l'application (critère 22, ticket 954)", async () => {
+  it("ajout sur une étape verrouillée : no_option avec cause no_room, rien d'écrit, à l'aperçu comme à l'application (critère 22, ticket 954 ; 0155 § 1)", async () => {
     const tripId = await nouveauVoyage();
     // Le dîner du J2 (19 h – 20 h 30) verrouillé : version 2. Le lieu ajouté, verrouillé par son propre patch `[add, lock]`,
     // n'ouvre pas l'exception des conflits entre verrous (B5-PO-6) : refus par le contrôle des étapes fixes du moteur.
@@ -300,8 +345,8 @@ describe("lieu à soi sur api (M5d-1, ticket 939)", () => {
     expect(avant).toHaveLength(2);
     // À l'heure du dîner, puis 30 minutes avant (le bloc ajouté de 90 minutes le recouvre).
     for (const time of ["19:00", "18:30"]) {
-      expect(erreur(await apercu(tripId, 2, { time })), time).toEqual({ code: "no_option" });
-      expect(erreur(await appliquer(tripId, 2, randomUUID(), { time })), time).toEqual({ code: "no_option" });
+      expect(erreur(await apercu(tripId, 2, { time })), time).toEqual({ code: "no_option", cause: "no_room" });
+      expect(erreur(await appliquer(tripId, 2, randomUUID(), { time })), time).toEqual({ code: "no_option", cause: "no_room" });
     }
     expect(await versions(a, tripId)).toEqual(avant);
     const texte = await lignesDuVoyage(tripId);
