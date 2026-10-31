@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeAll, describe, expect, expectTypeOf, it } from "vitest";
+import { beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { EntreeRevisionSchema, type EntreeRevision } from "@/ai/entree-revision";
 import { TripSnapshotSchema, type TripSnapshot } from "@/contracts";
@@ -9,7 +9,21 @@ import { composerSimuleeAvec, type EntreeRevisionDuProgramme, type FiltreRevisio
 import { ArretEtape } from "@/server/generation/codes";
 import { resoudre } from "@/server/generation/dependances";
 import { forfaitDeLaRevision } from "@/server/generation/forfait-etape";
-import { choixDuTri, lieuxASoiReinjectes, verrousReportes } from "@/server/generation/etapes-revision";
+import {
+  choixDuTri,
+  journaliserReinjection,
+  ligneDuJourCoherente,
+  lieuxASoiReinjectes,
+  reinjecterLieuxASoi,
+  versionDeLaRevision,
+  verrousReportes,
+  type ReglesReinjection,
+} from "@/server/generation/etapes-revision";
+import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
+import { formatLogLine } from "@/server/log";
+import { modeDeTrajet } from "@/server/programme/assemblage";
+import { demandeDeRelectures, recomposerJour } from "@/domain/recomposition";
+import { INCONNU, memePoint, type Relectures } from "@/domain/relectures";
 import * as p0 from "@/server/p0/revision";
 import type { EntreeProgramme } from "@/server/programme/entree";
 import {
@@ -225,6 +239,20 @@ async function capaciteRome(transformer: (programme: ProgrammeLu) => ProgrammeLu
 const lieux = (programme: { readonly jours: readonly { readonly creneaux: readonly { readonly lieu?: string }[] }[] } | null) =>
   (programme?.jours ?? []).flatMap((jour) => jour.creneaux.flatMap((c) => (c.lieu === undefined ? [] : [nomNormalise(c.lieu)])));
 
+/** Règles de la réinjection (0155 § 2) : mode du brief (marche) et configuration du moteur (seuil du temps libre : 30 min). */
+const REGLES: ReglesReinjection = { mode: modeDeTrajet(BRIEF), configuration: CONFIGURATION_MOTEUR };
+
+/** Lignes JSON écrites par `fonction` sur la console (`logEvent`). */
+function lignesDuJournal(fonction: () => void): unknown[] {
+  const espion = vi.spyOn(console, "log").mockImplementation(() => undefined);
+  try {
+    fonction();
+    return espion.mock.calls.map(([ligne]) => JSON.parse(String(ligne)) as unknown);
+  } finally {
+    espion.mockRestore();
+  }
+}
+
 describe("R3 sur la version révisée (spécification M5 § 3, critère 2 ; revue de la PR 923, bloquant 1)", () => {
   // Base : `j1-2` verrouillée (« Forum romain », 10:00-11:00, sans `placeId`).
   const revisee = (j1: unknown[]): TripSnapshot =>
@@ -258,9 +286,10 @@ describe("lieu à soi dans la révision (M5d-1, ticket 939 ; 0147 § 12 S4 ; rev
   const base = TripSnapshotSchema.parse({ days: INSTANTANE.days.map((jour) => (jour.index === 1 ? { ...jour, items: [...jour.items, ajoutee] } : jour)) });
   const revisee = (j1: unknown[]): TripSnapshot =>
     TripSnapshotSchema.parse({ days: INSTANTANE.days.map((jour) => (jour.index === 1 ? { ...jour, items: j1 } : jour)) });
+  // M5d-4 (0155 § 2.5, test 2) : Panthéon de 09:00 à 10:00, pour que la ligne du jour ne porte aucun chevauchement de l'IA.
   const sortie = revisee([
     { type: "terminus", role: "start", label: "Monti", time: "09:00" },
-    etape("j1-1", "Panthéon"),
+    etape("j1-1", "Panthéon", { start: "09:00", end: "10:00" }),
     etape("j1-2", "Forum romain", { kind: "meal" }),
     { type: "segment", segment: { mode: "walk", estimated: true } },
     { type: "free", from: "14:00", to: "15:20" },
@@ -272,20 +301,223 @@ describe("lieu à soi dans la révision (M5d-1, ticket 939 ; 0147 § 12 S4 ; rev
 
   it("sans réinjection, la sortie du modèle (qui ne voit pas le lieu à soi) serait refusée par R3 ; réinjecté, il est gardé tel quel et la version s'écrit", () => {
     expect(verrousReportes(base, sortie)).toBeNull();
-    const tenue = verrousReportes(base, lieuxASoiReinjectes(base, sortie));
+    const tenue = verrousReportes(base, lieuxASoiReinjectes(base, sortie, REGLES));
     expect(tenue).not.toBeNull();
+    expect(versionDeLaRevision(base, sortie, REGLES).tenue).toEqual(tenue);
     const j1 = tenue!.days.find((jour) => jour.index === 1)!.items;
-    // Trevi (non verrouillée) et le temps libre qui chevauchent le lieu à soi sont retirés ; deux trajets voisins n'en font qu'un.
-    expect(j1.map((l) => (l.type === "stop" ? l.stop.id : l.type))).toEqual(["terminus", "j1-1", "j1-2", "segment", AJOUT, "j1-5", "terminus"]);
+    // Trevi (non verrouillée) et le temps libre qui chevauchent le lieu à soi sont retirés ; M5d-4 (0155 § 2.5, test 2) :
+    // l'intervalle libéré hors du lieu est réécrit en « Temps libre » (11:00-15:00, 16:00-17:00), un segment de chaque côté du
+    // lieu (depuis le logement : les étapes avant lui n'ont pas de `placeId` ; vers le logement : Pincio n'en a pas).
+    expect(j1.map((l) => (l.type === "stop" ? l.stop.id : l.type))).toEqual(["terminus", "j1-1", "j1-2", "free", "segment", AJOUT, "free", "j1-5", "segment", "terminus"]);
+    expect(j1.filter((l) => l.type === "free")).toEqual([
+      { type: "free", from: "11:00", to: "15:00" },
+      { type: "free", from: "16:00", to: "17:00" },
+    ]);
     expect(j1.find((l) => l.type === "stop" && l.stop.id === AJOUT)).toEqual(ajoutee);
     // Le verrou de la base reste reporté sur l'étape verrouillée de l'IA.
     expect(j1.find((l) => l.type === "stop" && l.stop.id === "j1-2")).toMatchObject({ stop: { locked: true } });
+    // L'étape retirée laisse une trace à compteurs seulement (0155 § 2.4) : `recalcul.lieux_a_soi`, `places: 1`, `stopsRemoved: 1`.
+    const { places, stopsRemoved } = reinjecterLieuxASoi(base, sortie, REGLES);
+    expect({ places, stopsRemoved }).toEqual({ places: 1, stopsRemoved: 1 });
+    expect(lignesDuJournal(() => journaliserReinjection({ places, stopsRemoved }))).toEqual([{ level: "info", event: "recalcul.lieux_a_soi", places: 1, stopsRemoved: 1 }]);
   });
 
   it("sans lieu à soi dans la base, ou déjà présent : rien ne change", () => {
-    expect(lieuxASoiReinjectes(INSTANTANE, sortie)).toBe(sortie);
-    const deja = lieuxASoiReinjectes(base, lieuxASoiReinjectes(base, sortie));
-    expect(deja).toEqual(lieuxASoiReinjectes(base, sortie));
+    expect(lieuxASoiReinjectes(INSTANTANE, sortie, REGLES)).toBe(sortie);
+    const deja = lieuxASoiReinjectes(base, lieuxASoiReinjectes(base, sortie, REGLES), REGLES);
+    expect(deja).toEqual(lieuxASoiReinjectes(base, sortie, REGLES));
+  });
+});
+
+describe("relecture du lieu réinjecté (M5d-4, ticket 976 ; décision 0155 § 2, Q765)", () => {
+  const AJOUT = "ajout-0d000000-0000-4000-8000-0000000000dd";
+  const NOM = "SENTINELLE-NOM-SAISI-M5D4";
+  const PLACE_AJOUT = "SENTINELLE_PLACE_AJOUT_M5D4";
+  const MODE = modeDeTrajet({ deplacements: ["walk", "transit"] });
+  const REGLES_TRANSIT: ReglesReinjection = { mode: MODE, configuration: CONFIGURATION_MOTEUR };
+  const seg = (mode: ReglesReinjection["mode"] = MODE) => ({ type: "segment", segment: { mode, estimated: false } });
+  const debut = { type: "terminus", role: "start", label: "Monti", time: "09:00" };
+  const fin = { type: "terminus", role: "end", label: "Monti", time: "19:00" };
+  const lieuASoi = (start: string, end: string, extra: Record<string, unknown> = {}) =>
+    etape(AJOUT, NOM, { start, end, placeId: PLACE_AJOUT, locked: true, addedBy: "person", ...extra });
+  /** Version à un jour (J1, 2027-05-04) ; `items` de la base et de la révision. */
+  const version = (items: unknown[]): TripSnapshot =>
+    TripSnapshotSchema.parse({ days: [{ index: 1, date: "2027-05-04", theme: "Monti", travelBudgetMinutes: 90, items, events: [] }] });
+  const baseAvec = (ajout: unknown) => version([debut, ajout, fin]);
+  const ligne = (instantane: TripSnapshot) => instantane.days[0]!.items;
+  const forme = (instantane: TripSnapshot) => ligne(instantane).map((l) => (l.type === "stop" ? l.stop.id : l.type));
+  const voisins = (instantane: TripSnapshot) => {
+    const items = ligne(instantane);
+    const rang = items.findIndex((l) => l.type === "stop" && l.stop.id === AJOUT);
+    return { avant: items[rang - 1], apres: items[rang + 1] };
+  };
+  const coherent = (instantane: TripSnapshot) => ligneDuJourCoherente(instantane.days[0]!, new Set([AJOUT]), CONFIGURATION_MOTEUR);
+
+  // Jour de l'IA : Colisée 09:00-10:00, pause de 10:00 à 16:00, Forum 16:00-17:00 (forme de l'assemblage).
+  const revisionAvecPause = version([
+    debut,
+    seg("walk"),
+    etape("j1-1", "Colisée", { start: "09:00", end: "10:00", placeId: `${PLACE}_A` }),
+    { type: "free", from: "10:00", to: "16:00" },
+    seg("walk"),
+    etape("j1-2", "Forum romain", { start: "16:00", end: "17:00", placeId: `${PLACE}_B` }),
+    seg("walk"),
+    fin,
+  ]);
+
+  it("test 1 : lieu au milieu d'un temps libre de l'IA : deux temps libres d'au moins le seuil ; une part sous le seuil n'est pas écrite", () => {
+    const milieu = reinjecterLieuxASoi(baseAvec(lieuASoi("12:00", "13:00")), revisionAvecPause, REGLES_TRANSIT);
+    expect(milieu).toMatchObject({ places: 1, stopsRemoved: 0, coherente: true });
+    expect(forme(milieu.instantane)).toEqual(["terminus", "segment", "j1-1", "free", "segment", AJOUT, "free", "segment", "j1-2", "segment", "terminus"]);
+    const libres = ligne(milieu.instantane).filter((l) => l.type === "free");
+    expect(libres).toEqual([
+      { type: "free", from: "10:00", to: "12:00" },
+      { type: "free", from: "13:00", to: "16:00" },
+    ]);
+    // Une part de 15 minutes (10:00-10:15), sous le seuil de 30 : pas de temps libre, et ce n'est pas un trou.
+    expect(CONFIGURATION_MOTEUR.seuilTempsLibreMinutes).toBe(30);
+    const courte = reinjecterLieuxASoi(baseAvec(lieuASoi("10:15", "11:00")), revisionAvecPause, REGLES_TRANSIT);
+    expect(courte.coherente).toBe(true);
+    expect(ligne(courte.instantane).filter((l) => l.type === "free")).toEqual([{ type: "free", from: "11:00", to: "16:00" }]);
+  });
+
+  it("test 3 : un segment, au mode du brief, entre le lieu et chaque voisin à placeId ; jamais deux segments voisins", () => {
+    const reinjectee = lieuxASoiReinjectes(baseAvec(lieuASoi("12:00", "13:00")), revisionAvecPause, REGLES_TRANSIT);
+    expect(MODE).toBe("transit");
+    const { avant, apres } = voisins(reinjectee);
+    expect(avant).toEqual({ type: "segment", segment: { mode: "transit", estimated: false } });
+    // Après le lieu : le « Temps libre », puis le segment juste avant Forum (comme l'assemblage).
+    expect(apres?.type).toBe("free");
+    expect(forme(reinjectee).slice(forme(reinjectee).indexOf(AJOUT))).toEqual([AJOUT, "free", "segment", "j1-2", "segment", "terminus"]);
+    const items = ligne(reinjectee);
+    expect(items.some((l, i) => l.type === "segment" && items[i - 1]?.type === "segment")).toBe(false);
+  });
+
+  it("test 3 : en début et en fin de jour, le segment va au logement (terminus)", () => {
+    const tot = lieuxASoiReinjectes(baseAvec(lieuASoi("08:00", "08:45")), revisionAvecPause, REGLES_TRANSIT);
+    expect(forme(tot).slice(0, 5)).toEqual(["terminus", "segment", AJOUT, "segment", "j1-1"]);
+    expect(coherent(tot)).toBe(true);
+    const tard = lieuxASoiReinjectes(baseAvec(lieuASoi("17:30", "18:30")), revisionAvecPause, REGLES_TRANSIT);
+    expect(forme(tard).slice(-6)).toEqual(["j1-2", "free", "segment", AJOUT, "segment", "terminus"]);
+    expect(voisins(tard).apres).toEqual({ type: "segment", segment: { mode: "transit", estimated: false } });
+    expect(coherent(tard)).toBe(true);
+  });
+
+  it("test 3 : aucun segment à travers un changement de ville, d'un côté comme de l'autre", () => {
+    const changement = { type: "transfer", from: "Rome", to: "Florence", source: "estimated", start: "12:00", estimatedMinutes: 120 };
+    // Jour de l'IA : Colisée, « Temps libre » jusqu'au départ, changement (arrivée 14:00), « Temps libre » dès l'arrivée, Offices
+    // sans segment avant (première étape après la ligne « Vers {ville} »), retour au logement.
+    const revisionChangement = version([
+      debut,
+      seg("walk"),
+      etape("j1-1", "Colisée", { start: "09:00", end: "10:00", placeId: `${PLACE}_A` }),
+      { type: "free", from: "10:00", to: "12:00" },
+      changement,
+      { type: "free", from: "14:00", to: "15:00" },
+      etape("j1-2", "Offices", { start: "15:00", end: "16:00", placeId: `${PLACE}_C` }),
+      seg("walk"),
+      fin,
+    ]);
+    expect(coherent(revisionChangement)).toBe(true);
+    // Avant le départ : un segment depuis Colisée, aucun vers le changement ; temps libres réécrits jusqu'au départ.
+    const avantDepart = lieuxASoiReinjectes(baseAvec(lieuASoi("10:30", "11:30")), revisionChangement, REGLES_TRANSIT);
+    expect(forme(avantDepart)).toEqual(["terminus", "segment", "j1-1", "free", "segment", AJOUT, "free", "transfer", "free", "j1-2", "segment", "terminus"]);
+    expect(coherent(avantDepart)).toBe(true);
+    // À l'arrivée : aucun segment depuis le changement, un vers Offices.
+    const arrivee = lieuxASoiReinjectes(baseAvec(lieuASoi("14:00", "14:30")), revisionChangement, REGLES_TRANSIT);
+    expect(forme(arrivee).slice(forme(arrivee).indexOf("transfer"))).toEqual(["transfer", AJOUT, "free", "segment", "j1-2", "segment", "terminus"]);
+    expect(coherent(arrivee)).toBe(true);
+    // En fin de jour, après Offices : un segment depuis Offices, un vers le logement.
+    const apresArrivee = lieuxASoiReinjectes(baseAvec(lieuASoi("16:30", "17:00")), revisionChangement, REGLES_TRANSIT);
+    expect(forme(apresArrivee).slice(forme(apresArrivee).indexOf("transfer"))).toEqual(["transfer", "free", "j1-2", "free", "segment", AJOUT, "segment", "terminus"]);
+    expect(coherent(apresArrivee)).toBe(true);
+  });
+
+  it("test 4 : le jour réinjecté, recomposé avec un double qui ne sert que la demande, donne une durée à chaque segment voisin du lieu", () => {
+    const reinjectee = lieuxASoiReinjectes(baseAvec(lieuASoi("12:00", "13:00")), revisionAvecPause, REGLES_TRANSIT);
+    const jour = reinjectee.days[0]!;
+    const contexte = { nombreDeNuits: 2, modes: [MODE] as const };
+    const demande = demandeDeRelectures({ jours: [{ jour, mesure: true }], ...contexte });
+    // Règle des doubles (0147 A.3) : une durée pour un trajet demandé seulement, avec son mode ; inconnu sinon.
+    const double: Relectures = {
+      validite: () => "valide",
+      plages: () => INCONNU,
+      duree: (depuis, vers, mode) =>
+        demande.trajets.some((trajet) => memePoint(trajet.depuis, depuis) && memePoint(trajet.vers, vers) && trajet.modes.includes(mode)) ? { minutes: 12, estimee: false } : INCONNU,
+    };
+    expect(demande.trajets).toEqual(
+      expect.arrayContaining([
+        { depuis: { lieu: `${PLACE}_A` }, vers: { lieu: PLACE_AJOUT }, modes: ["transit"] },
+        { depuis: { lieu: PLACE_AJOUT }, vers: { lieu: `${PLACE}_B` }, modes: ["transit"] },
+      ]),
+    );
+    const lu = recomposerJour(jour, { ...contexte, generating: false, relectures: double, verification: () => undefined });
+    expect(lu.ok).toBe(true);
+    if (!lu.ok) return;
+    const items = lu.valeur.items;
+    const rang = items.findIndex((l) => l.type === "stop" && l.stop.id === AJOUT);
+    const segmentApres = items.slice(rang + 1).find((l) => l.type === "segment");
+    expect(items[rang - 1]).toEqual({ type: "segment", segment: { mode: "transit", minutes: 12, estimated: false } });
+    expect(segmentApres).toEqual({ type: "segment", segment: { mode: "transit", minutes: 12, estimated: false } });
+  });
+
+  it("test 5 : cohérence de la ligne du jour : un jour forgé incohérent fait que rien n'est écrit", () => {
+    const etapeA = etape("j1-1", "Colisée", { start: "09:00", end: "10:00", placeId: `${PLACE}_A` });
+    const etapeB = etape("j1-2", "Forum romain", { start: "10:00", end: "11:00", placeId: `${PLACE}_B` });
+    const jour = (items: unknown[]) => version(items).days[0]!;
+    const tient = (items: unknown[], verrouillees: string[] = []) => ligneDuJourCoherente(jour(items), new Set(verrouillees), CONFIGURATION_MOTEUR);
+    expect(tient([debut, seg(), etapeA, seg(), etapeB, seg(), fin])).toBe(true);
+    // Deux segments entre deux points.
+    expect(tient([debut, seg(), etapeA, seg(), seg(), etapeB, seg(), fin])).toBe(false);
+    // Terminus hors de sa place.
+    expect(tient([seg(), etapeA, debut, seg(), etapeB, seg(), fin])).toBe(false);
+    expect(tient([debut, seg(), etapeA, fin, seg(), etapeB])).toBe(false);
+    // Lignes hors d'ordre ; chevauchement (admis seulement entre deux étapes verrouillées dans la base).
+    expect(tient([debut, seg(), etapeB, seg(), etapeA, seg(), fin])).toBe(false);
+    const chevauche = etape("j1-3", "Panthéon", { start: "09:30", end: "10:30" });
+    expect(tient([debut, seg(), etapeA, chevauche, seg(), etapeB, seg(), fin])).toBe(false);
+    expect(tient([debut, seg(), etapeA, chevauche, seg(), etapeB, seg(), fin], ["j1-1", "j1-2", "j1-3"])).toBe(true);
+    // Trou : 11:00-12:00 sans « Temps libre ».
+    const tard = etape("j1-4", "Panthéon", { start: "12:00", end: "13:00", placeId: `${PLACE}_D` });
+    expect(tient([debut, seg(), etapeA, seg(), etapeB, seg(), tard, seg(), fin])).toBe(false);
+    expect(tient([debut, seg(), etapeA, seg(), etapeB, { type: "free", from: "11:00", to: "12:00" }, seg(), tard, seg(), fin])).toBe(true);
+    // Segment à travers un changement de ville.
+    const changement = { type: "transfer", from: "Rome", to: "Florence", source: "estimated", start: "11:00", estimatedMinutes: 30 };
+    expect(tient([debut, seg(), etapeA, seg(), etapeB, changement, seg(), etape("j1-5", "Offices", { start: "11:30", end: "12:00", placeId: `${PLACE}_C` }), seg(), fin])).toBe(false);
+    expect(tient([debut, seg(), etapeA, seg(), etapeB, seg(), changement, etape("j1-5", "Offices", { start: "11:30", end: "12:00", placeId: `${PLACE}_C` }), seg(), fin])).toBe(false);
+
+    // Par la révision : un lieu à soi **non verrouillé** qui chevauche une étape verrouillée dans la base (jamais retirée) : la
+    // réinjection ne peut pas tenir le jour, R3 seule l'aurait laissé passer, et rien n'est écrit.
+    const verrouillee = etape("j1-2", "Forum romain", { start: "12:30", end: "13:30", placeId: `${PLACE}_B`, locked: true });
+    const base = version([debut, seg(), verrouillee, lieuASoi("12:00", "13:00", { locked: false }), fin]);
+    const sortieIa = version([debut, seg(), etape("j1-2", "Forum romain", { start: "12:30", end: "13:30", placeId: `${PLACE}_B` }), seg(), fin]);
+    const reinjection = reinjecterLieuxASoi(base, sortieIa, REGLES_TRANSIT);
+    expect(reinjection.coherente).toBe(false);
+    expect(verrousReportes(base, reinjection.instantane)).not.toBeNull();
+    expect(versionDeLaRevision(base, sortieIa, REGLES_TRANSIT).tenue).toBeNull();
+  });
+
+  it("test 6 : R3 bloque toujours ; un voyage sans lieu à soi : version identique, aucun événement", () => {
+    const sansLieu = reinjecterLieuxASoi(INSTANTANE, revisionAvecPause, REGLES_TRANSIT);
+    expect(sansLieu).toEqual({ instantane: revisionAvecPause, places: 0, stopsRemoved: 0, coherente: true });
+    expect(sansLieu.instantane).toBe(revisionAvecPause);
+    expect(lignesDuJournal(() => journaliserReinjection(sansLieu))).toEqual([]);
+    // R3 : une étape verrouillée de la base absente de la révision : rien n'est écrit, lieu à soi réinjecté ou non.
+    const base = version([debut, etape("j1-9", "Panthéon", { start: "17:30", end: "18:30", locked: true }), lieuASoi("12:00", "13:00"), fin]);
+    expect(versionDeLaRevision(base, revisionAvecPause, REGLES_TRANSIT).tenue).toBeNull();
+  });
+
+  it("test 7 : journal : recalcul.lieux_a_soi garde places et stopsRemoved, retire identifiants, placeId et textes, refuse une chaîne", () => {
+    const ligneJournal = JSON.parse(
+      formatLogLine("recalcul.lieux_a_soi", { places: 2, stopsRemoved: 1, tripId: "00000000-0000-4000-8000-000000000001", placeId: PLACE_AJOUT, name: NOM, start: "12:00" }),
+    ) as Record<string, unknown>;
+    expect(ligneJournal).toEqual({ level: "info", event: "recalcul.lieux_a_soi", places: 2, stopsRemoved: 1, dropped: 4 });
+    expect(JSON.parse(formatLogLine("recalcul.lieux_a_soi", { places: 1, stopsRemoved: "1" }))).toEqual({ level: "info", event: "recalcul.lieux_a_soi", places: 1, dropped: 1 });
+    expect(JSON.parse(formatLogLine("recalcul.lieux_a_soi", { places: 1, stopsRemoved: -1 }))).toEqual({ level: "info", event: "recalcul.lieux_a_soi", places: 1, dropped: 1 });
+    // Par la révision : compteurs seulement, ni nom ni `placeId` du lieu à soi.
+    const lignes = lignesDuJournal(() => journaliserReinjection(reinjecterLieuxASoi(baseAvec(lieuASoi("12:00", "13:00")), revisionAvecPause, REGLES_TRANSIT)));
+    expect(lignes).toEqual([{ level: "info", event: "recalcul.lieux_a_soi", places: 1, stopsRemoved: 0 }]);
+    for (const sentinelle of [NOM, PLACE_AJOUT, AJOUT]) expect(JSON.stringify(lignes)).not.toContain(sentinelle);
   });
 });
 

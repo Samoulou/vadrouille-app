@@ -131,6 +131,19 @@ function texteAdmis(valeur: string | undefined, max: number): string | undefined
 const minutesDe = (heure: string) => Number(heure.slice(0, 2)) * 60 + Number(heure.slice(3, 5));
 
 /**
+ * Règle du « Temps libre » de l'assemblage (décision 0155 § 2.2), **seule définition**, appelée par `assemblerProgrammeIa`
+ * (marges d'une ligne « Vers {ville} », M4-suite § 3.4) et par la réinjection des lieux à soi de la révision M1b
+ * (`lieuxASoiReinjectes`, `src/server/generation/etapes-revision.ts`) : un intervalle vide de `seuilTempsLibreMinutes` ou plus
+ * entre la **fin occupée** de la dernière ligne datée (en minutes, jamais son seul début : une étape sans `fin` occupe sa durée
+ * par défaut) et le début de la ligne suivante (`jusqua`) est un « Temps libre » de l'une à l'autre ; en dessous, c'est de la
+ * marge, pas un trou (définition de R8). `undefined` : pas de temps libre. Extraite d'`assemblerProgrammeIa` par M5d-4 sans
+ * changement de comportement.
+ */
+export function tempsLibreEntre(finOccupee: number, jusqua: string, seuil: number): { type: "free"; from: string; to: string } | undefined {
+  return minutesDe(jusqua) - finOccupee >= seuil ? { type: "free", from: versHeure(finOccupee), to: jusqua } : undefined;
+}
+
+/**
  * Source d'une étape depuis son site vérifié (§ 11.4 ; 0122 § 1 condition 14 et § 2.2 point 2) : `url` = adresse
  * réduite de l'IA, `label` = nom d'hôte calculé par le code, `www.` retiré **en tête seulement**, forme ASCII rendue par
  * `URL` (punycode pour un IDN, jamais reconverti), coupé à `LONGUEUR_LIBELLE_SOURCE`. Aucune date. Adresse illisible : aucune
@@ -266,8 +279,8 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
     const poserChangement = (ligne: NonNullable<typeof ligneChangement>, suivant: string | undefined): void => {
       const seuil = entree.configuration.seuilTempsLibreMinutes;
       // Seuil et `from` depuis la fin **occupée** de la dernière ligne (jamais son seul début, pour une étape sans `fin`).
-      const libreDepuis = Math.max(minutesDe(derniere), occupeeJusqua);
-      if (minutesDe(ligne.start) - libreDepuis >= seuil) items.push({ type: "free", from: versHeure(libreDepuis), to: ligne.start });
+      const avant = tempsLibreEntre(Math.max(minutesDe(derniere), occupeeJusqua), ligne.start, seuil);
+      if (avant !== undefined) items.push(avant);
       items.push(ligne);
       precedent = undefined;
       apresChangement = true;
@@ -276,8 +289,9 @@ export function assemblerProgrammeIa(entree: EntreeAssemblageIa): ProgrammeCompl
       if (arrivee === undefined || arrivee > minutesDe(entree.configuration.fenetreJour.fin)) return;
       derniere = versHeure(arrivee);
       const jusqua = suivant ?? depart?.debut ?? (index === dernierIndice ? brief.heureDepart : entree.configuration.fenetreJour.fin);
-      if (minutesDe(jusqua) - arrivee >= seuil) {
-        items.push({ type: "free", from: derniere, to: jusqua });
+      const apres = tempsLibreEntre(arrivee, jusqua, seuil);
+      if (apres !== undefined) {
+        items.push(apres);
         derniere = jusqua;
       }
     };
