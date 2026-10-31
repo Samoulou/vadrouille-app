@@ -317,22 +317,53 @@ function FreeTime({ from, to, ideasHref }: DayLineFreeTimeProps) {
   );
 }
 
+/**
+ * Lien « Choisir » d'un repas pas encore choisi (F7-PO-8, M5d-3), textes composés par l'écran (`sejour.json`) : la ligne
+ * du jour ne connaît ni l'adresse ni la condition (voyage débloqué, M5-PO-1).
+ */
+export interface DayLineMealLink {
+  /** `…/ajouter?de={heure}&repas={lunch|dinner}`. */
+  href: string;
+  /** Libellé visible : « Choisir ». */
+  label: string;
+  /** Nom accessible : « Choisir le déjeuner », « Choisir le dîner » (il commence par le libellé visible, WCAG 2.5.3). */
+  name: string;
+}
+
 export interface DayLineOpenMealProps {
   time: string;
   meal: Meal;
+  /** Lien « Choisir » ; sans lui, la ligne n'a ni lien ni focus (vue partagée, écran 15, voyage non débloqué). */
+  link?: DayLineMealLink;
 }
 
 /**
  * Créneau de repas pas encore choisi (F5-PO-13, décision 0015 § 2 ; provisoire UX/UI) : heure, anneau et
  * rail comme un arrêt, « Déjeuner pas encore choisi » ou « Dîner pas encore choisi » en `arret` `ink-2`.
- * Sans lieu : ni lien, ni fiche, ni marqueur sur la carte ; signalé par son texte, sans badge.
+ * Sans lieu : ni fiche, ni marqueur sur la carte ; signalé par son texte, sans badge. Avec `link` (M5d-3, rendu UX/UI) :
+ * « Choisir » à droite, même rendu que « Idées » d'un temps libre (texte `ink` gras souligné, cible de 44 px), aligné
+ * sur la ligne de base du texte du repas ; le texte du repas passe à la ligne avant le lien.
  */
-function OpenMeal({ time, meal }: DayLineOpenMealProps) {
+function OpenMeal({ time, meal, link }: DayLineOpenMealProps) {
   return (
     <li data-type="openMeal" data-meal={meal} className={ROW}>
       <Heure>{time}</Heure>
       <Rail texture="plein" marker={<StopMarker kind="stop" variant="ligne" />} />
-      <p className="flex min-h-(--touch-target) items-start pb-4 text-arret font-bold text-ink-2">{t.repasNonChoisi[meal]}</p>
+      {link === undefined ? (
+        <p className="flex min-h-(--touch-target) items-start pb-4 text-arret font-bold text-ink-2">{t.repasNonChoisi[meal]}</p>
+      ) : (
+        <div className="flex min-h-(--touch-target) items-baseline justify-between gap-(--ligne-espace-2) pb-4">
+          <p className="min-w-0 text-arret font-bold text-ink-2">{t.repasNonChoisi[meal]}</p>
+          <Link
+            href={link.href}
+            aria-label={link.name}
+            data-part={`choisir-repas-${meal}`}
+            className="inline-flex min-h-(--touch-target) min-w-(--touch-target) shrink-0 justify-center px-2 text-corps-s font-bold text-ink underline underline-offset-2"
+          >
+            {link.label}
+          </Link>
+        </div>
+      )}
     </li>
   );
 }
@@ -367,6 +398,11 @@ export interface DayLineProps<S extends DayLineViewStop = Stop> {
    * fonction, pas de lien. Remplace l'ancienne prop `ideasHref`.
    */
   getIdeasHref?: (free: { from: string; to: string }) => string;
+  /**
+   * Lien « Choisir » d'un repas pas encore choisi (F7-PO-8, M5d-3), adresse et textes fournis par l'écran ; sans fonction
+   * (ou si elle rend `undefined`), pas de lien.
+   */
+  getMealLink?: (openMeal: { time: string; meal: Meal }) => DayLineMealLink | undefined;
   /** Écran 15 : une ligne par élément, ni faits ni raison (F10-TL-12). */
   compact?: boolean;
   /** Clé de l'étape en cours (`id`, sinon clé locale) : `aria-current="step"` et étiquette « En cours ». */
@@ -399,6 +435,7 @@ function DayLineRoot<S extends DayLineViewStop = Stop>({
   items,
   getStopHref,
   getIdeasHref,
+  getMealLink,
   compact = false,
   currentKey,
   isPast,
@@ -454,7 +491,14 @@ function DayLineRoot<S extends DayLineViewStop = Stop>({
           />
         );
       case "openMeal":
-        return <OpenMeal key={`openMeal-${index}`} time={item.time} meal={item.meal} />;
+        return (
+          <OpenMeal
+            key={`openMeal-${index}`}
+            time={item.time}
+            meal={item.meal}
+            link={getMealLink?.({ time: item.time, meal: item.meal })}
+          />
+        );
       case "transfer":
         // Ligne « Vers {ville} » (décision 0148 § 1 point 3) : seulement avec les textes de l'écran.
         return renderTransfer ? <Fragment key={`transfer-${index}`}>{renderTransfer(item)}</Fragment> : null;

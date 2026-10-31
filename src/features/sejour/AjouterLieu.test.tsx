@@ -9,7 +9,7 @@ import { axeViolations } from "../../../tests/unit/axe";
 
 import { AjouterLieuView, NOM_LIEU_MAX, type AjouterLieuCalls } from "./AjouterLieu";
 import type { EntreeAjout } from "./ajouter-lieu";
-import { TripShell } from "./TripShell";
+import { TripShell, useTripShell } from "./TripShell";
 
 /**
  * « Ajouter un lieu » avec des actions injectées (tâche M5d-2 ; spécification M5 § 6, critères 19, 21, 22, 25, 26 ; S3
@@ -377,24 +377,88 @@ describe("ajouter: critère 22 sur `mock`", () => {
   });
 });
 
-describe("ajouter: « Ajouter à ma journée » (`?idee=`, F7-PO-8, F7-PO-10)", () => {
-  it("sans recherche : l'idée du jour est le lieu choisi, nom prérempli et modifiable, `placeId` de l'idée envoyé", async () => {
+describe("ajouter: « Ajouter à ma journée » (`?idee=`, F7-PO-8, F7-PO-10 ; décision 0154 § 6 point 2)", () => {
+  it("« Lieu à ajouter » et « Nom dans ton programme » préremplis par le nom de l'idée ; aucune recherche avant « Rechercher » ; le lieu écrit est le résultat choisi", async () => {
     const calls = fakeCalls();
     renderScreen(calls, { entree: { type: "idee", id: "j2-surprise-circus-lane" } });
-    expect(screen.queryByRole("searchbox")).toBeNull();
-    expect(screen.getByRole("heading", { level: 2, name: "[Circus Lane]" })).toBeInTheDocument();
+    expect(searchField()).toHaveValue("[Circus Lane]");
+    expect(calls.searchPlaces).not.toHaveBeenCalled();
+    // Pas de nom ni de moment tant qu'aucun résultat n'est choisi.
+    expect(screen.queryByRole("textbox", { name: "Nom dans ton programme" })).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Rechercher" }));
+    });
+    expect(calls.searchPlaces).toHaveBeenCalledTimes(1);
+    expect(calls.searchPlaces).toHaveBeenCalledWith({ tripId: DEBLOQUE.id, day: 2, query: "[Circus Lane]" });
+    fireEvent.click(within(results()).getByRole("radio", { name: `${NOM_GOOGLE} 1, ${ADRESSE_GOOGLE} 1` }));
+    // Nom prérempli par l'idée (contenu maison), jamais par le nom Google ; modifiable.
     expect(nameField()).toHaveValue("[Circus Lane]");
     fireEvent.change(nameField(), { target: { value: "Ma ruelle" } });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Voir l'effet" }));
     });
-    expect(calls.previewAddPlace).toHaveBeenCalledWith(expect.objectContaining({ name: "Ma ruelle", resultId: "mock_place_circus_lane" }));
-    expect(calls.searchPlaces).not.toHaveBeenCalled();
+    expect(calls.previewAddPlace).toHaveBeenCalledWith(expect.objectContaining({ name: "Ma ruelle", resultId: "ChIJ-M5D-1" }));
+    expect(JSON.stringify(calls.previewAddPlace.mock.calls)).not.toContain(NOM_GOOGLE);
   });
 
-  it("idée d'un autre jour : écran ordinaire, nom vide", () => {
-    renderScreen(fakeCalls(), { entree: { type: "idee", id: "j4-surprise-dunbars-close" } });
-    expect(searchField()).toBeInTheDocument();
+  it("idée d'un autre jour : écran ordinaire, recherche vide", () => {
+    const calls = fakeCalls();
+    renderScreen(calls, { entree: { type: "idee", id: "j4-surprise-dunbars-close" } });
+    expect(searchField()).toHaveValue("");
+    expect(calls.searchPlaces).not.toHaveBeenCalled();
+  });
+});
+
+/** Jour affiché par le panneau : les étapes du jour 2 lues dans la mémoire de la page (TripShell). */
+function EtapesDuJour() {
+  const { day } = useTripShell();
+  return <p data-testid="etapes">{day?.items.flatMap((item) => (item.type === "stop" ? [`${item.stop.start} ${item.stop.name}`] : [])).join(" | ")}</p>;
+}
+
+describe("ajouter: second ajout du même jour sur `mock` (décision 0154 § 3, M5d-3)", () => {
+  it("le second lieu s'ajoute au premier, aucun lieu ajouté ne disparaît ; recharger rétablit le jeu simulé", async () => {
+    // Adaptateur `mock` réel (M5d-1) : il part toujours du jeu simulé, sans garder d'ajout.
+    const adaptateur = createMockPlaces({ trips: { getTrip: async () => DEBLOQUE }, store: { records: [] }, now: () => 0, plafond: 20, durees: DUREES, max: 100 });
+    const ctx = { organizationId: DEBLOQUE.organizationId, userId: "user", role: "owner" as const };
+    const calls = {
+      searchPlaces: (input: unknown) => adaptateur.searchPlaces(ctx, input),
+      previewAddPlace: (input: unknown) => adaptateur.previewAddPlace(ctx, input),
+      applyAddPlace: (input: unknown) => adaptateur.applyAddPlace(ctx, input),
+      applyRevert: vi.fn<AjouterLieuCalls["applyRevert"]>(),
+    };
+    let serie = 0;
+    const ecran = (cle: string) => (
+      <TripShell trip={DEBLOQUE} maps={[]} base="/voyages" versionable revisionVersion={null}>
+        <AjouterLieuView key={cle} dayIndex={2} entree={null} durees={DUREES} versionSimulee={1} resultatsGoogle={false} calls={calls} newRequestId={() => `00000000-0000-4000-8000-00000000000${String((serie += 1))}`} />
+        <EtapesDuJour />
+      </TripShell>
+    );
+    const ajouter = async (nom: string) => {
+      await rechercher("bouquiniste");
+      fireEvent.click(within(results()).getByRole("radio", { name: "Lieu simulé 1, Adresse simulée 1" }));
+      fireEvent.change(nameField(), { target: { value: nom } });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Voir l'effet" }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
+      });
+    };
+    const { rerender, unmount } = render(ecran("premier"));
+    const avant = screen.getByTestId("etapes").textContent ?? "";
+    await ajouter("Ma librairie");
+    expect(screen.getByTestId("etapes")).toHaveTextContent("Ma librairie");
+    // Retour sur l'écran, même page : le jour affiché garde le premier ajout.
+    rerender(ecran("second"));
+    await ajouter("Mon café");
+    const apres = screen.getByTestId("etapes").textContent ?? "";
+    expect(apres).toContain("Ma librairie");
+    expect(apres).toContain("Mon café");
+    for (const etape of avant.split(" | ")) expect(apres).toContain(etape);
+    // Recharger : nouveau shell, jeu simulé rétabli (rien n'est gardé hors de la mémoire de la page).
+    unmount();
+    render(ecran("recharge"));
+    expect(screen.getByTestId("etapes").textContent).toBe(avant);
   });
 });
 

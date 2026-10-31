@@ -1,5 +1,4 @@
 import type { Day, DayLineItem, Meal, RevisionPreview, Stop, SurpriseIdea } from "@/contracts";
-import { PLACE_ID_MOTIF } from "@/contracts/values";
 
 /**
  * Fonctions pures de l'écran « Ajouter un lieu » (tâche M5d-2, ticket 961 ; spécification M5 § 6, M5-PO-12 ; F7,
@@ -58,15 +57,15 @@ export function lireEntree(params: Readonly<Record<string, string | string[] | u
 }
 
 /**
- * Idée « Surprends-moi » désignée par `?idee=` : celle du jour si l'identifiant est le sien et qu'elle a un `placeId`
- * (seul identifiant que l'ajout écrit), sinon `null` (paramètre ignoré, F7-PO-8). Son nom est un contenu maison
- * (décision 0015 § 3) : il préremplit « Nom dans ton programme » (M5-PO-10, F7-PO-10).
+ * Idée « Surprends-moi » désignée par `?idee=` : celle du jour si l'identifiant est le sien, sinon `null` (paramètre
+ * ignoré, F7-PO-8). Une idée n'a pas de `placeId` à reprendre (décision 0154 § 6 point 2) : son nom, contenu maison
+ * (décision 0015 § 3), préremplit « Lieu à ajouter » et « Nom dans ton programme » (M5-PO-10, F7-PO-10) ; le lieu écrit
+ * est le résultat que la personne choisit après « Rechercher ».
  */
-export function ideeDeLEntree(day: Day, entree: EntreeAjout | null): (SurpriseIdea & { readonly placeId: string }) | null {
+export function ideeDeLEntree(day: Day, entree: EntreeAjout | null): SurpriseIdea | null {
   if (entree?.type !== "idee") return null;
   const idee = day.surprise;
-  if (idee?.id !== entree.id || idee.placeId === undefined || !PLACE_ID_MOTIF.test(idee.placeId)) return null;
-  return { ...idee, placeId: idee.placeId };
+  return idee?.id === entree.id ? idee : null;
 }
 
 /** Temps libres et repas pas encore choisis du jour, dans l'ordre de la ligne du jour. */
@@ -144,4 +143,36 @@ export function joursAvecEtapeEcrite(preview: RevisionPreview, stopId: string): 
     ...day,
     items: day.items.map((item) => (item.type === "stop" && item.stop.id === preview.targetStopId ? { ...item, stop: { ...item.stop, id: stopId } } : item)),
   }));
+}
+
+/**
+ * Aperçu d'ajout sur `mock`, reporté sur le jour affiché (décision 0154 § 3, M5d-3) : le jeu simulé ne garde aucun ajout,
+ * son aperçu part donc du jour simulé et ne montre que le dernier lieu ajouté. L'étape de l'aperçu est posée dans le jour
+ * affiché, qui garde les ajouts précédents en mémoire de la page : à la place du repas pas encore choisi de la même heure
+ * (repas), sinon dans le temps libre qui la contient, coupé autour d'elle. Recharger la page rétablit le jeu simulé.
+ * Sans place dans le jour affiché (cas que les moments proposés écartent), l'aperçu est rendu tel quel.
+ */
+export function apercuSurJourAffiche(preview: RevisionPreview, affiche: Day): RevisionPreview {
+  const cible = etapeAjoutee(preview);
+  if (cible === null || cible.day.index !== affiche.index) return preview;
+  const { stop } = cible;
+  const debut = versMinutes(stop.start);
+  const fin = versMinutes(stop.end ?? stop.start);
+  const items: DayLineItem[] = [...affiche.items];
+  const repas = stop.kind === "meal" ? items.findIndex((item) => item.type === "openMeal" && item.time === stop.start) : -1;
+  if (repas !== -1) {
+    items.splice(repas, 1, { type: "stop", stop });
+  } else {
+    const libre = items.findIndex((item) => item.type === "free" && versMinutes(item.from) <= debut && fin <= versMinutes(item.to));
+    const temps = libre === -1 ? undefined : items[libre];
+    if (temps?.type !== "free") return preview;
+    items.splice(
+      libre,
+      1,
+      ...(versMinutes(temps.from) < debut ? [{ type: "free" as const, from: temps.from, to: stop.start }] : []),
+      { type: "stop", stop },
+      ...(fin < versMinutes(temps.to) ? [{ type: "free" as const, from: stop.end ?? stop.start, to: temps.to }] : []),
+    );
+  }
+  return { ...preview, days: preview.days.map((day) => (day.index === affiche.index ? { ...affiche, items } : day)) };
 }

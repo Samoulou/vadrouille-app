@@ -91,6 +91,16 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
             items={day.items}
             getStopHref={(stop) => routes.etape(day.index, stop.id)}
             getIdeasHref={(free) => routes.ajouter(day.index, free)}
+            // « Choisir » d'un repas pas encore choisi (F7-PO-8, M5d-3) : même condition que « Ajouter un lieu » (M5-PO-1).
+            getMealLink={
+              addPlaceHref === null
+                ? undefined
+                : ({ time, meal }) => ({
+                    href: `${addPlaceHref}?de=${time}&repas=${meal}`,
+                    label: t.journee.choisirRepas.libelle,
+                    name: t.journee.choisirRepas[meal],
+                  })
+            }
             highlightedStopIds={highlightedStopIds}
             renderTransfer={(transfer) => (
               <Suspense fallback={null}>
