@@ -234,6 +234,9 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/carte)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/voyages/mock_trip_edimbourg)" = "404"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/voyages/mock_trip_edimbourg/jour/2)" = "404"
+          # M4-suite-carte : carte à plusieurs villes avec la carte simulée (#968, décision 0013 § 1.6).
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/carte/villes/rome-florence)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/carte/villes/rome-florence/jour/3)" = "404"
           # F8b : écran 3 avec la carte simulée (`R3-dev`, décision 0017 § 11.3).
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/dev/voyages/nouveau/logement)" = "404"
           # Paiement simulé fermé dans l'image de production (F9-PO-19, décision 0020 § 5).
