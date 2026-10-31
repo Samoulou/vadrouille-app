@@ -11,13 +11,8 @@ import type { DayMapProps } from "./DayMap";
 /**
  * Bloc du rendu Google chargé à la demande (ticket 991, décision 0152 § 4) : pendant son chargement, puis en cas d'échec
  * du téléchargement. Chaque test recharge `DayMap` (`vi.resetModules`) pour partir d'un composant paresseux neuf.
+ * Le bloc est un double complet : un faux rendu, sans le module réel (module à capacité, règle de confinement).
  */
-
-const loader = vi.hoisted(() => ({ setOptions: vi.fn(), importLibrary: vi.fn() }));
-vi.mock("@googlemaps/js-api-loader", () => ({
-  setOptions: loader.setOptions,
-  importLibrary: loader.importLibrary,
-}));
 
 // Comportement du téléchargement du bloc : servi, refusé, ou retenu jusqu'à `liberer`.
 const bloc = vi.hoisted(() => ({ mode: "servi" as "servi" | "refuse" | "retenu", liberer: () => {}, imports: 0 }));
@@ -25,8 +20,13 @@ const t = messages.carte;
 const FAKE: CarteInjection = { config: { apiKey: "test-key", mapId: "test-map" } };
 const dayProps: DayMapProps = { mode: "day", day: day2, map: map2, listId: "liste", placesFromGoogle: false };
 
+/** Faux rendu Google : seul compte son montage. */
+function FauxRenduGoogle() {
+  return <div data-renderer="google" />;
+}
+
 /** Usine du module simulé, réenregistrée à chaque rendu (`vi.doMock`) pour être appelée à chaque import du bloc. */
-async function blocSimule(importOriginal: () => Promise<unknown>) {
+async function blocSimule() {
   bloc.imports += 1;
   if (bloc.mode === "refuse") {
     throw new Error("bloc introuvable");
@@ -36,12 +36,12 @@ async function blocSimule(importOriginal: () => Promise<unknown>) {
       bloc.liberer = resolve;
     });
   }
-  return importOriginal();
+  return { GoogleMapRenderer: FauxRenduGoogle };
 }
 
 async function renderMap() {
   vi.resetModules();
-  vi.doMock("./GoogleMapRenderer", blocSimule);
+  vi.doMock("./GoogleMapRenderer", () => blocSimule());
   const [{ DayMap }, { CarteProvider }] = await Promise.all([import("./DayMap"), import("./config")]);
   return render(
     <CarteProvider value={FAKE}>
@@ -55,8 +55,6 @@ beforeEach(() => {
   stubOnline(true);
   bloc.mode = "servi";
   bloc.imports = 0;
-  // Le chargement Google ne se termine jamais : seul compte ici le montage du rendu.
-  loader.importLibrary.mockReturnValue(new Promise(() => {}));
 });
 
 afterEach(() => {
@@ -73,12 +71,10 @@ describe("DayMap : bloc du rendu Google chargé à la demande", () => {
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(container.querySelector("[data-renderer='google']")).toBeNull();
     expect(container.querySelector("[data-fallback]")).toBeNull();
-    expect(loader.importLibrary).not.toHaveBeenCalled();
 
     await act(async () => bloc.liberer());
     await waitFor(() => expect(container.querySelector("[data-renderer='google']")).not.toBeNull());
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
-    expect(loader.importLibrary).toHaveBeenCalled();
   });
 
   it("bloc refusé : état « erreur » annoncé avec « Réessayer », aucune exception ; « Réessayer » retélécharge le bloc", async () => {
