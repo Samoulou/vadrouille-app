@@ -183,7 +183,7 @@ La spécification B11 ; les actions de révision sur `api` (verrouiller, revenir
 ## 6. Étape 6 — Pendant le voyage
 
 ### (a) Ce qui existe
-`specs/F10-pendant-le-voyage.md` (écran « Aujourd'hui » et partage simulé), décision 0039 (F10-TL-7 à F10-TL-14). La table `share_links` et la fonction `resolve_share_link` existent (B1). La PR #827 (ticket #825, décision 0135, en revue) ouvre le partage par **lien signé sans stockage** sur le site d'essai ; la révocation y est renvoyée à B12. « Aujourd'hui » lit les jours par n'importe quel `TripAdapter`.
+`specs/F10-pendant-le-voyage.md` (écran « Aujourd'hui » et partage simulé), décision 0039 (F10-TL-7 à F10-TL-14). La table `share_links` et la fonction `resolve_share_link` existent (B1). La PR #827 (ticket #825, décision 0135, fusionnée le 2026-10-28) ouvre le partage par **lien signé sans stockage** sur le site d'essai ; la révocation y est renvoyée à B12. « Aujourd'hui » lit les jours par n'importe quel `TripAdapter`.
 
 ### (b) Ce qui manque
 Le partage sur `api`, avec `share_links` (jeton haché, révocable, expiration à la fin du voyage + 30 jours, handover B12). L'ajout au calendrier : un fichier `.ics` du programme, sans compte externe. Les rappels : la spécification doit trancher le canal (proposition : e-mail la veille de chaque jour, sur accord, une fois l'étape 2 en place ; sinon un rappel dans l'app seulement).
