@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { Day, Stop, Trip } from "@/contracts";
 import { TripSchema } from "@/contracts";
+import { etapesACalendrier } from "@/features/sejour/AjouterAuCalendrier";
 import { tripRoutes } from "@/features/sejour/routes";
-import { edimbourgDebloque } from "@/mocks/edimbourg";
+import { lisbonne, porto } from "@/mocks/autres-voyages";
+import { chevauchement } from "@/mocks/chevauchement";
+import { edimbourg, edimbourgDebloque } from "@/mocks/edimbourg";
+import { compostelleFlorence, romeFlorence } from "@/mocks/rome-florence";
 
 import { entreesDuCalendrier, genererIcs, nettoyer, plier, uidEtape, type TextesCalendrier } from "./ics";
 
@@ -275,6 +279,11 @@ describe("calendrier : SUMMARY, échappement et pliage (critère 6)", () => {
     ]);
   });
 
+  it("nettoyer : U+061C, U+180E et la zone à usage privé U+E000 à U+F8FF retirés ; lettres voisines gardées", () => {
+    const u = (n: number) => String.fromCharCode(n);
+    expect(nettoyer(`a${u(0x061c)}b${u(0x180e)}c${u(0xe000)}d${u(0xf8ff)}e${u(0xf900)}`)).toBe(`abcde${u(0xf900)}`);
+  });
+
   it("nettoyer : contrôles retirés, tabulation et U+000A gardés, CRLF ramené à U+000A", () => {
     expect(nettoyer("a\tb\r\nc\rd\u0007e\u007Ff\u0085g\u200Eh")).toBe("a\tb\ncdefgh");
   });
@@ -394,5 +403,26 @@ describe("calendrier : journées en préparation (critère 10)", () => {
     const tout = { ...edimbourgDebloque, days: edimbourgDebloque.days.map((d) => ({ ...d, generating: true })) };
     expect(entreesDuCalendrier(tout)).toEqual([]);
     expect(evenements(ics(tout))).toEqual([]);
+  });
+});
+
+describe("calendrier : parité de la règle entre le serveur et l'écran (revue de la PR 1007, mineur 2)", () => {
+  it("etapesACalendrier (AjouterAuCalendrier) compte exactement les entrées de entreesDuCalendrier", () => {
+    const programmes: Pick<Trip, "days">[] = [edimbourg, edimbourgDebloque, lisbonne, porto, chevauchement, romeFlorence, compostelleFlorence];
+    // Variantes : tout en préparation, rien en préparation, engagements seulement, programme vide.
+    programmes.push({ days: edimbourgDebloque.days.map((d) => ({ ...d, generating: true })) });
+    programmes.push({ days: edimbourgDebloque.days.map((d) => ({ ...d, generating: false })) });
+    programmes.push({
+      days: [
+        jour(1, "2026-08-29", [
+          etape({ id: "e", name: "[Billet]", start: "10:00", commitment: "ticket" }),
+          etape({ id: "r", name: "[Table]", start: "19:00", commitment: "reservation" }),
+        ]),
+      ],
+    });
+    programmes.push({ days: [] });
+    for (const programme of programmes) expect(etapesACalendrier(programme.days)).toBe(entreesDuCalendrier(programme).length);
+    expect(programmes.some((p) => entreesDuCalendrier(p).length > 0)).toBe(true);
+    expect(programmes.some((p) => p.days.length > 0 && entreesDuCalendrier(p).length === 0)).toBe(true);
   });
 });

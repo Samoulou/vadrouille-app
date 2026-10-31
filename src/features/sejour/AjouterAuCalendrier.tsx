@@ -8,14 +8,14 @@ import type { Day } from "@/contracts";
 import * as messages from "@/i18n/messages";
 import { useOnline } from "@/lib/online";
 
+import { ARIA_DISABLED } from "./aria-disabled";
+
 const t = messages.sejour.sejour.calendrier;
 
-/** Lien en `aria-disabled` (hors ligne) : rendu de l'état désactivé, toujours atteignable au clavier (comme `ARIA_DISABLED`). */
-const INACTIF = "aria-disabled:cursor-not-allowed aria-disabled:border-muted aria-disabled:bg-muted aria-disabled:text-ink-soft";
-
 /**
- * Étapes qui deviennent des entrées du fichier : même règle que `entreesDuCalendrier` (`src/server/calendrier/ics.ts`,
- * que l'écran ne peut pas importer) : éléments `stop` des journées qui ne sont pas en préparation, hors engagements.
+ * Nombre d'étapes qui deviennent des entrées du fichier : même règle que `entreesDuCalendrier`
+ * (`src/server/calendrier/ics.ts`, que l'écran ne peut pas importer) : éléments `stop` des journées qui ne sont pas en
+ * préparation, hors engagements. Parité vérifiée sur plusieurs programmes par `src/server/calendrier/ics.test.ts`.
  */
 export function etapesACalendrier(days: readonly Day[]): number {
   let n = 0;
@@ -30,8 +30,9 @@ export function etapesACalendrier(days: readonly Day[]): number {
  * « Ajouter au calendrier » du Séjour (spécification M6 § 4 et § 7 ; décision 0157 § 1.6 point 1 ; ticket 1005, M6b) : un
  * lien (`<a href>`) vers la route du fichier `.ics`, rendu comme un bouton secondaire. Aucune étape à ajouter (toutes les
  * journées en préparation) : le seul texte « Aucune étape à ajouter pour l'instant. », sans lien. Hors ligne : lien en
- * `aria-disabled="true"`, décrit par le bandeau hors ligne, sans effet au clic. Place et style : provisoires, à valider par
- * l'UX/UI (U1) ; textes du § 7, à valider par l'UX/UI (U3).
+ * `aria-disabled="true"`, décrit par le bandeau hors ligne, sans effet au clic. Place (sous « Jour par jour »), style
+ * (bouton secondaire de 52 px) et textes du § 7 : validés par l'UX/UI à la revue de la PR 1007 (U1, U3), définitifs à la
+ * fusion (décision 0093) ; consignés dans la spécification M6, § 7.
  */
 export function AjouterAuCalendrier({ href, days }: { href: string; days: readonly Day[] }) {
   const online = useOnline();
@@ -64,7 +65,7 @@ export function AjouterAuCalendrier({ href, days }: { href: string; days: readon
         aria-disabled={online ? undefined : true}
         aria-describedby={online ? undefined : offlineId}
         onClick={bloquer}
-        className={buttonClassName({ variant: "secondary" }, `self-start ${INACTIF}`)}
+        className={buttonClassName({ variant: "secondary" }, `self-start ${ARIA_DISABLED}`)}
       >
         {t.bouton}
       </a>

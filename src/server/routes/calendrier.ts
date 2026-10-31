@@ -18,7 +18,8 @@ import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { entreesDuCalendrier, genererIcs } from "@/server/calendrier/ics";
 import { serverEnv } from "@/server/env";
-import { verdictRateLimit, type RateLimitVerdict } from "@/server/rate-limit";
+import { logEvent } from "@/server/log";
+import { verdictRateLimit, type RateLimitRequest, type RateLimitVerdict } from "@/server/rate-limit";
 
 /**
  * Route `GET /api/v1/voyages/[id]/calendrier` (spécification M6 § 4 et § 6.2 ; décision 0157 § 1.6, T6, et § 2.5, S5 ;
@@ -30,12 +31,14 @@ import { verdictRateLimit, type RateLimitVerdict } from "@/server/rate-limit";
  *    Séjour du voyage) ;
  * 4. voyage lu par `getTripReader()` dans l'organisation de la session : inconnu, d'une autre organisation ou non débloqué
  *    → 404 sans contenu ;
- * 5. limite `calendrier` **par voyage** (`src/server/config/limites.ts`), après la session et le contrôle du voyage, avant
- *    la version et la génération ; `api` seulement (le limiteur est en base ; `mock` n'en a pas, comme pour `retouche`) ;
- *    au-delà, 429 sans corps ;
- * 6. aucune étape à ajouter (toutes les journées en préparation) → 404 : un `VCALENDAR` sans composant n'est pas valide
+ * 5. aucune étape à ajouter (toutes les journées en préparation) → 404 : un `VCALENDAR` sans composant n'est pas valide
  *    (RFC 5545 § 3.4), et l'écran ne propose alors pas de téléchargement (critère 10) ;
- * 7. fichier : version courante (`SEQUENCE`), origine de `APP_URL` (nulle : ni `URL` ni lien), textes du § 7.
+ * 6. limite `calendrier` **par voyage** (`src/server/config/limites.ts`) ; `api` seulement (le limiteur est en base ; `mock`
+ *    n'en a pas, comme pour `retouche`) ; au-delà, 429 sans corps. Règle de la recherche de lieu
+ *    (`src/server/lieux/recherche.ts`, 0147 § 6.4) : tous les refus qui ne coûtent rien (forme, accès, déblocage, demande
+ *    vide) passent avant le limiteur, qui n'est débité que par une demande qui produira la réponse ;
+ * 7. fichier : version courante (`SEQUENCE`) ; si elle manque (incohérence de la base), 500 sans corps et une ligne
+ *    `calendrier.version_unavailable` sans champ ; origine de `APP_URL` (nulle : ni `URL` ni lien), textes du § 7.
  * Toute réponse porte `Cache-Control: private, no-store` et `X-Content-Type-Options: nosniff` ; le fichier, en plus,
  * `Content-Type: text/calendar; charset=utf-8` et `Content-Disposition: attachment; filename="programme.ics"` (nom fixe,
  * aucun texte de la personne dans un en-tête). Aucun appel externe, aucun modèle, aucune mesure.
@@ -43,7 +46,17 @@ import { verdictRateLimit, type RateLimitVerdict } from "@/server/rate-limit";
 
 const t = messages.sejour.sejour.calendrier;
 
-const ACTION_LIMITEUR = "calendrier";
+/** Nom d'action du limiteur (`src/server/config/limites.ts`). */
+export const ACTION_LIMITEUR = "calendrier";
+
+/**
+ * Limiteur de la route : action `calendrier`, espèce `trip` (identifiant du voyage contrôlé dans l'organisation avant
+ * l'appel), en-têtes de la requête. `verdict` : `verdictRateLimit` du serveur ; un test passe un limiteur sur pool simulé
+ * avec la configuration réelle, pour exercer ce même branchement.
+ */
+export function limiteurCalendrier(verdict: (request: RateLimitRequest) => Promise<RateLimitVerdict> = verdictRateLimit) {
+  return (request: Request, tripId: string): Promise<RateLimitVerdict> => verdict({ action: ACTION_LIMITEUR, headers: request.headers, tripId });
+}
 
 /** Dépendances de la route, injectables par les tests (aucune base, aucun `process.env`). */
 export type DependancesCalendrier = {
@@ -96,7 +109,7 @@ const PAR_DEFAUT: DependancesCalendrier = {
   adaptateur: () => (isApiAdapter() ? "api" : isMockAdapter() ? "mock" : "autre"),
   contexte: contexteDeLaSession,
   lireVoyage: (ctx, tripId) => getTripReader().getTrip(ctx, tripId),
-  limiteur: (request, tripId) => verdictRateLimit({ action: ACTION_LIMITEUR, headers: request.headers, tripId }),
+  limiteur: limiteurCalendrier(),
   version: versionCourante,
   origine,
   maintenant: () => new Date(),
@@ -119,10 +132,13 @@ export function creerRouteCalendrier(surcharges: Partial<DependancesCalendrier> 
     if (ctx === null) return sansCorps(307, { Location: connexionRoute(tripRoutes("/voyages", id).sejour()) });
     const trip = await d.lireVoyage(ctx, id);
     if (trip === null || !trip.unlocked) return sansCorps(404);
-    if (adaptateur === "api" && !(await d.limiteur(request, id)).ok) return sansCorps(429);
     if (entreesDuCalendrier(trip).length === 0) return sansCorps(404);
+    if (adaptateur === "api" && !(await d.limiteur(request, id)).ok) return sansCorps(429);
     const version = await d.version(ctx, id, adaptateur);
-    if (version === null) return sansCorps(500);
+    if (version === null) {
+      logEvent("calendrier.version_unavailable", {}, "error");
+      return sansCorps(500);
+    }
     const texte = genererIcs({ trip, version }, d.origine(), d.maintenant(), {
       nomCalendrier: format(t.nom, { destination: trip.destination }),
       aReserver: t.aReserver,

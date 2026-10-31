@@ -23,7 +23,10 @@ test.afterEach(() => {
   expect(googleRequests).toEqual([]);
 });
 
-/** Étapes attendues : journées servies (hors J6 en préparation), hors engagements. */
+/**
+ * Étapes attendues : journées servies (hors J6 en préparation), hors engagements. Oracle écrit à part, volontairement
+ * indépendant du code (la parité entre `entreesDuCalendrier` et `etapesACalendrier` est vérifiée par `ics.test.ts`).
+ */
 const ETAPES = edimbourgDebloque.days
   .filter((day) => !day.generating)
   .flatMap((day) => day.items.flatMap((item) => (item.type === "stop" && item.stop.commitment === undefined ? [item.stop.name] : [])));

@@ -45,7 +45,8 @@ const OCTETS_PAR_LIGNE = 75;
  * Étapes qui deviennent des entrées (§ 4 point 3, M6-PO-4) : les éléments `stop` de `Day.items` des journées qui ne sont
  * pas en préparation, sauf les engagements saisis (`commitment` : billets, réservations, que la personne a déjà). Ne
  * sont jamais des entrées : terminus, trajets, temps libres, repas à choisir, changements de ville, « Surprends-moi »
- * (`Day.surprise`) et événements de « Pendant ton séjour » (`Day.events`). Même règle que l'écran (`AjouterAuCalendrier`).
+ * (`Day.surprise`) et événements de « Pendant ton séjour » (`Day.events`). Même règle que l'écran (`etapesACalendrier` de
+ * `AjouterAuCalendrier.tsx`), parité vérifiée par `ics.test.ts`.
  */
 export function entreesDuCalendrier(trip: Pick<Trip, "days">): EntreeCalendrier[] {
   const entrees: EntreeCalendrier[] = [];
@@ -75,7 +76,7 @@ export function uidEtape(tripId: string, stopId: string): string {
 export function nettoyer(texte: string): string {
   return texte
     .replace(/\r\n/g, "\n")
-    .replace(/[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u2028\u2029\u200E\u200F\u202A-\u202E\u2066-\u2069\u200B-\u200D\uFEFF]/g, "");
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u2028\u2029\u200E\u200F\u202A-\u202E\u2066-\u2069\u200B-\u200D\uFEFF\u061C\u180E\uE000-\uF8FF]/g, "");
 }
 
 /** Échappement d'une valeur `TEXT` (RFC 5545 § 3.3.11) : `\`, `;`, `,`, puis U+000A en `\n`. */

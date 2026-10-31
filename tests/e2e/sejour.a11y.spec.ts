@@ -119,14 +119,14 @@ test("fiche: aucune violation axe, fiche à 92 % et à 25 %", async ({ page }) =
   await expectNoViolations(page);
 });
 
-test("calendrier: aucune violation axe, « Ajouter au calendrier » en ligne et hors ligne ; cible de 44 px", async ({ page, context }) => {
+test("calendrier: aucune violation axe, « Ajouter au calendrier » en ligne et hors ligne ; bouton de 52 px (cible de 44 px au moins)", async ({ page, context }) => {
   // M6b (ticket 1005 ; spécification M6 § 6.2, critère 11) : Séjour du voyage débloqué (J6 en préparation).
   await openTrip(page, "/voyages/mock_trip_edimbourg_debloque");
   const lien = sheet(page).getByRole("link", { name: "Ajouter au calendrier", exact: true });
   await lien.scrollIntoViewIfNeeded();
   await expect(lien).toBeVisible();
   const boite = await lien.boundingBox();
-  expect(boite?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(boite?.height ?? 0).toBeGreaterThanOrEqual(52);
   expect(boite?.width ?? 0).toBeGreaterThanOrEqual(44);
   await expectNoViolations(page);
   await context.setOffline(true);

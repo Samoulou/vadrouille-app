@@ -303,7 +303,7 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock, calen
       </section>
 
       {calendrierHref && trip.unlocked ? (
-        // « Ajouter au calendrier » (M6b ; spécification M6 § 4) : voyage débloqué seulement (M6-PO-6). Place provisoire (U1).
+        // « Ajouter au calendrier » (M6b ; spécification M6 § 4) : voyage débloqué seulement (M6-PO-6). Place validée par l'UX/UI (U1, spécification M6 § 7).
         <AjouterAuCalendrier href={calendrierHref} days={trip.days} />
       ) : null}
 

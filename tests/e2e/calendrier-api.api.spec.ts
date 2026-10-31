@@ -6,7 +6,7 @@ import { ADRESSE_A, ADRESSE_B } from "../support/bout-en-bout-api";
 
 import { calendrier, ED_OK, evenementsIcs, expectFichierIcs, lienCalendrier, texteIcs } from "./calendrier-helpers";
 import { codeCells, connexionRoute, emailField, firstCell, pasteCode } from "./connexion-helpers";
-import { R17 } from "./mes-voyages-helpers";
+import { DATES, R17, setClock } from "./mes-voyages-helpers";
 import { sheet } from "./sejour-helpers";
 
 /**
@@ -60,7 +60,14 @@ async function connecter(page: Page, request: APIRequestContext, adresse: string
   await expect(page).toHaveURL((url) => url.pathname === R17);
 }
 
-/** Voyages de « Mes voyages » : `uuid` et suffixe (`/presentation` pour un voyage non débloqué), dans l'ordre de l'écran. */
+/**
+ * Voyages de « Mes voyages » : `uuid` et déblocage, dans l'ordre de l'écran. L'adresse d'une carte dépend de l'horloge
+ * (`reopenTarget` : après les dates, un voyage non débloqué rouvre le Séjour, pas `/presentation`) : le scénario fixe
+ * l'horloge à `DATES.avant` avant de lire les voyages de A, comme `lecture-api.api.spec.ts`, où le voyage non débloqué
+ * d'Édimbourg de l'organisation A mène à `/presentation`. Un voyage peut avoir deux liens (carte mise en avant et ligne) :
+ * il est non débloqué si **l'un** d'eux mène à `/presentation`. L'organisation A n'est débloquée par aucun scénario
+ * (`debloquer-api.api.spec.ts` a ses propres organisations) : son voyage non débloqué l'est de façon déterministe.
+ */
 async function voyages(page: Page): Promise<{ id: string; debloque: boolean }[]> {
   await page.goto(R17);
   await expect(page.getByRole("heading", { level: 1, name: "Mes voyages" })).toBeVisible();
@@ -68,7 +75,7 @@ async function voyages(page: Page): Promise<{ id: string; debloque: boolean }[]>
   const vus = new Map<string, boolean>();
   for (const href of liens) {
     const m = UUID.exec(href);
-    if (m?.[1] && !vus.has(m[1])) vus.set(m[1], m[2] === undefined);
+    if (m?.[1]) vus.set(m[1], (vus.get(m[1]) ?? true) && m[2] === undefined);
   }
   return [...vus].map(([id, debloque]) => ({ id, debloque }));
 }
@@ -93,12 +100,14 @@ test("calendrier: api, fichier du voyage débloqué, même contenu que mock ; no
   expect(urlMock).not.toBe("");
   const api = baseURL ?? "";
 
-  // B : identifiants de ses voyages (autre organisation que A).
+  // B : identifiants de ses voyages (autre organisation que A ; le suffixe ne sert pas ici).
   await connecter(page, request, ADRESSE_B);
   const voyagesB = await voyages(page);
   expect(voyagesB, "données de bout en bout absentes : pnpm test:db les écrit").toHaveLength(4);
 
   await connecter(page, request, ADRESSE_A);
+  // Horloge fixée avant la lecture de l'écran 17 de A, comme dans `lecture-api.api.spec.ts`.
+  await setClock(page, DATES.avant);
   const voyagesA = await voyages(page);
   expect(voyagesA).toHaveLength(4);
   const nonDebloque = voyagesA.find((v) => !v.debloque);
