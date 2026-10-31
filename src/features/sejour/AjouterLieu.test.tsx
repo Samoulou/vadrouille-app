@@ -382,6 +382,7 @@ describe("ajouter: « Ajouter à ma journée » (`?idee=`, F7-PO-8, F7-PO-10 ; d
     const calls = fakeCalls();
     renderScreen(calls, { entree: { type: "idee", id: "j2-surprise-circus-lane" } });
     expect(searchField()).toHaveValue("[Circus Lane]");
+    expect(searchField()).toHaveAccessibleDescription("Idée de « Surprends-moi ». Lance la recherche pour choisir le lieu exact.");
     expect(calls.searchPlaces).not.toHaveBeenCalled();
     // Pas de nom ni de moment tant qu'aucun résultat n'est choisi.
     expect(screen.queryByRole("textbox", { name: "Nom dans ton programme" })).toBeNull();
@@ -442,6 +443,7 @@ describe("ajouter: « Ajouter à ma journée » (`?idee=`, F7-PO-8, F7-PO-10 ; d
     const calls = fakeCalls();
     renderScreen(calls, { entree: { type: "idee", id: "j4-surprise-dunbars-close" } });
     expect(searchField()).toHaveValue("");
+    expect(screen.queryByText(/Idée de « Surprends-moi »/)).toBeNull();
     expect(calls.searchPlaces).not.toHaveBeenCalled();
   });
 });
@@ -496,6 +498,70 @@ describe("ajouter: second ajout du même jour sur `mock` (décision 0154 § 3, M
     unmount();
     render(ecran("recharge"));
     expect(screen.getByTestId("etapes").textContent).toBe(avant);
+  });
+});
+
+/** Demande de focus posée par l'écran pour la Journée (lue par `JourneeView`). */
+function DemandeDeFocus() {
+  const { focusRequest } = useTripShell();
+  return <p data-testid="focus">{focusRequest ? JSON.stringify(focusRequest.originParts ?? null) : ""}</p>;
+}
+
+/** J2 d'Édimbourg dont le dîner (19:00) est un repas pas encore choisi : jeu local du parcours « Choisir » (M5d-3). */
+const REPAS_LIBRE: Trip = {
+  ...DEBLOQUE,
+  days: DEBLOQUE.days.map((jour) =>
+    jour.index !== 2
+      ? jour
+      : { ...jour, items: jour.items.map((item) => (item.type === "stop" && item.stop.kind === "meal" && item.stop.start >= "18:00" ? { type: "openMeal" as const, time: item.stop.start, meal: "dinner" as const } : item)) },
+  ),
+};
+
+describe("ajouter: entrée « Choisir » d'un repas pas encore choisi (`?de=&repas=`, F7-PO-8, M5d-3)", () => {
+  const ecran = (calls: AjouterLieuCalls) => (
+    <TripShell trip={REPAS_LIBRE} maps={[]} base="/voyages" versionable revisionVersion={null}>
+      <AjouterLieuView dayIndex={2} entree={{ type: "repas", time: "19:00", meal: "dinner" }} durees={DUREES} versionSimulee={1} resultatsGoogle={false} calls={calls} />
+      <DemandeDeFocus />
+    </TripShell>
+  );
+
+  it("repas présélectionné ; demande d'un repas à 19:00 ; « Retour à la Journée » rend le focus à « Choisir » du dîner, sinon « Ajouter un lieu »", async () => {
+    const calls = fakeCalls();
+    render(ecran(calls));
+    await rechercher("bouquiniste");
+    fireEvent.click(within(results()).getByRole("radio", { name: `${NOM_GOOGLE} 1, ${ADRESSE_GOOGLE} 1` }));
+    expect(within(moments()).getByRole("radio", { name: "Dîner pas encore choisi" })).toHaveAttribute("aria-checked", "true");
+    fireEvent.change(nameField(), { target: { value: "Mon restaurant" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Voir l'effet" }));
+    });
+    expect(calls.previewAddPlace).toHaveBeenCalledWith(expect.objectContaining({ day: 2, time: "19:00", kind: "meal", name: "Mon restaurant" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retour à la Journée" }));
+    expect(JSON.parse(screen.getByTestId("focus").textContent ?? "null")).toEqual(["choisir-repas-dinner", "ajouter-un-lieu"]);
+    expect(router.replace).toHaveBeenCalledWith("/voyages/mock_trip_edimbourg/jour/2", { scroll: false });
+  });
+
+  it("« Annuler » de l'aperçu : même retour, focus demandé sur « Choisir » du dîner", async () => {
+    const adaptateur = createMockPlaces({ trips: { getTrip: async () => REPAS_LIBRE }, store: { records: [] }, now: () => 0, plafond: 20, durees: DUREES, max: 100 });
+    const ctx = { organizationId: REPAS_LIBRE.organizationId, userId: "user", role: "owner" as const };
+    const calls = {
+      searchPlaces: (input: unknown) => adaptateur.searchPlaces(ctx, input),
+      previewAddPlace: (input: unknown) => adaptateur.previewAddPlace(ctx, input),
+      applyAddPlace: vi.fn((input: unknown) => adaptateur.applyAddPlace(ctx, input)),
+      applyRevert: vi.fn<AjouterLieuCalls["applyRevert"]>(),
+    };
+    render(ecran(calls));
+    await rechercher("bouquiniste");
+    fireEvent.click(within(results()).getByRole("radio", { name: "Lieu simulé 1, Adresse simulée 1" }));
+    fireEvent.change(nameField(), { target: { value: "Mon restaurant" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Voir l'effet" }));
+    });
+    // Aperçu du repas : durée prévue d'un dîner (90 min).
+    expect(screen.getByText("19:00 – 20:30")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    expect(JSON.parse(screen.getByTestId("focus").textContent ?? "null")).toEqual(["choisir-repas-dinner", "ajouter-un-lieu"]);
+    expect(calls.applyAddPlace).not.toHaveBeenCalled();
   });
 });
 

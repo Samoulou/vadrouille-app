@@ -8,7 +8,6 @@ import {
   type AddPlaceRequest,
   type ApiError,
   type Day,
-  type DayLineItem,
   type PatchResult,
   type PlaceSearchResult,
   type Result,
@@ -16,6 +15,8 @@ import {
   type Stop,
   type Trip,
 } from "@/contracts";
+
+import { poserEtapeDansJour, versHeure, versMinutes } from "@/lib/pose-ajout";
 
 import type { AdapterContext, PlaceAdapter, TripAdapter } from "./types";
 
@@ -58,8 +59,6 @@ export type OptionsLieuxSimules = {
 export const VERSION_SIMULEE = 1;
 const FENETRE_MS = 86_400_000;
 
-const versMinutes = (heure: string): number => Number(heure.slice(0, 2)) * 60 + Number(heure.slice(3, 5));
-const versHeure = (minutes: number): string => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
 function refusEntree(issues: readonly { readonly path: readonly PropertyKey[] }[]): Result<never> {
   const champ = issues[0]?.path[0];
@@ -81,8 +80,7 @@ type Pose = { readonly day: Day; readonly stop: Stop };
 /** Pose l'étape ajoutée dans la journée simulée, ou `null` (`no_option`). */
 export function poserAjoutSimule(day: Day, stopId: string, demande: AddPlaceRequest, durees: DureesAjout): Pose | null {
   const debut = versMinutes(demande.time);
-  const repasOuvert = day.items.findIndex((item) => item.type === "openMeal" && item.time === demande.time);
-  const repas = repasOuvert === -1 ? undefined : day.items[repasOuvert];
+  const repas = day.items.find((item) => item.type === "openMeal" && item.time === demande.time);
   const duree =
     demande.kind === "activity" ? durees.activity : repas?.type === "openMeal" ? durees[repas.meal] : debut < 16 * 60 ? durees.lunch : durees.dinner;
   const fin = debut + duree;
@@ -99,21 +97,9 @@ export function poserAjoutSimule(day: Day, stopId: string, demande: AddPlaceRequ
     locked: true,
     addedBy: "person",
   };
-  const items: DayLineItem[] = [...day.items];
-  if (demande.kind === "meal" && repasOuvert !== -1) {
-    items.splice(repasOuvert, 1, { type: "stop", stop });
-    return { day: { ...day, items }, stop };
-  }
-  const libre = items.findIndex((item) => item.type === "free" && versMinutes(item.from) <= debut && fin <= versMinutes(item.to));
-  const temps = libre === -1 ? undefined : items[libre];
-  if (temps?.type !== "free") return null;
-  const remplacants: DayLineItem[] = [
-    ...(versMinutes(temps.from) < debut ? [{ type: "free" as const, from: temps.from, to: demande.time }] : []),
-    { type: "stop", stop },
-    ...(fin < versMinutes(temps.to) ? [{ type: "free" as const, from: versHeure(fin), to: temps.to }] : []),
-  ];
-  items.splice(libre, 1, ...remplacants);
-  return { day: { ...day, items }, stop };
+  // Pose partagée avec l'écran (`apercuSurJourAffiche`) : une seule règle (revue de la PR 973, bloquant 1).
+  const pose = poserEtapeDansJour(day, stop);
+  return pose === null ? null : { day: pose, stop };
 }
 
 export function createMockPlaces(options: OptionsLieuxSimules): PlaceAdapter {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Day, DayLineItem, RevisionPreview, Stop } from "@/contracts";
+import { poserAjoutSimule } from "@/adapters/mock-lieux";
+import type { AddPlaceRequest, Day, DayLineItem, RevisionPreview, Stop } from "@/contracts";
 
 import { apercuSurJourAffiche, demandeDuMoment, ideeDeLEntree, joursAvecEtapeEcrite, lireEntree, momentPropose, momentsDuJour, trajetsCalculesApres } from "./ajouter-lieu";
 
@@ -143,5 +144,35 @@ describe("ajouter: second ajout du même jour sur `mock` (décision 0154 § 3)",
     const apercu = apercuDe(simule, second);
     expect(apercuSurJourAffiche(apercu, { ...affiche, index: 3 } as Day)).toBe(apercu);
     expect(apercuSurJourAffiche(apercu, affiche)).toBe(apercu);
+  });
+});
+
+describe("ajouter: une seule pose pour l'adaptateur `mock` et l'écran (revue de la PR 973, bloquant 1)", () => {
+  const simule = jour([
+    etape("C", "13:00", "14:30"),
+    { type: "free", from: "14:30", to: "18:00" },
+    { type: "openMeal", time: "19:30", meal: "dinner" },
+    { type: "free", from: "21:00", to: "23:00" },
+  ]);
+  const demande = (time: string, kind: "activity" | "meal"): AddPlaceRequest => ({ tripId: "t", baseVersion: 1, day: 2, time, kind, name: "Mon lieu", resultId: "ChIJ-lieu" });
+
+  it.each([
+    ["début du temps libre", demande("14:30", "activity")],
+    ["milieu du temps libre", demande("15:00", "activity")],
+    ["fin exacte du temps libre", demande("16:30", "activity")],
+    ["dîner pas encore choisi", demande("19:30", "meal")],
+    ["repas posé dans un temps libre", demande("21:00", "meal")],
+  ])("%s : `poserAjoutSimule` (adaptateur) et `apercuSurJourAffiche` (écran) rendent le même jour", (_cas, requete) => {
+    const pose = poserAjoutSimule(simule, "ajout-x", requete, DUREES);
+    expect(pose).not.toBeNull();
+    const apercu: RevisionPreview = {
+      kind: "add", id: "a", baseVersion: 1, days: [pose!.day], changes: [], changedStopIds: [pose!.stop.id], targetStopId: pose!.stop.id,
+    };
+    // L'écran repose l'étape de l'aperçu sur le jour d'avant l'ajout : même résultat que l'adaptateur.
+    expect(apercuSurJourAffiche(apercu, simule).days[0]).toEqual(pose!.day);
+  });
+
+  it("aucune place : l'adaptateur refuse (`null`) et l'écran rend l'aperçu tel quel", () => {
+    expect(poserAjoutSimule(simule, "ajout-x", demande("17:00", "activity"), DUREES)).toBeNull();
   });
 });

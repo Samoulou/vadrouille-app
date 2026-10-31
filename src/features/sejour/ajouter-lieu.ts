@@ -1,4 +1,5 @@
 import type { Day, DayLineItem, Meal, RevisionPreview, Stop, SurpriseIdea } from "@/contracts";
+import { poserEtapeDansJour, versMinutes } from "@/lib/pose-ajout";
 
 /**
  * Fonctions pures de l'écran « Ajouter un lieu » (tâche M5d-2, ticket 961 ; spécification M5 § 6, M5-PO-12 ; F7,
@@ -27,7 +28,7 @@ const HEURE = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 /** Identifiant interne d'une idée (jamais un `placeId` ni un nom, F7 § « Données »). */
 const IDEE = /^[A-Za-z0-9_-]{1,128}$/;
 
-export const versMinutes = (heure: string): number => Number(heure.slice(0, 2)) * 60 + Number(heure.slice(3, 5));
+
 
 const premier = (valeur: string | string[] | undefined): string | undefined => (Array.isArray(valeur) ? valeur[0] : valeur);
 
@@ -146,33 +147,19 @@ export function joursAvecEtapeEcrite(preview: RevisionPreview, stopId: string): 
 }
 
 /**
- * Aperçu d'ajout sur `mock`, reporté sur le jour affiché (décision 0154 § 3, M5d-3) : le jeu simulé ne garde aucun ajout,
- * son aperçu part donc du jour simulé et ne montre que le dernier lieu ajouté. L'étape de l'aperçu est posée dans le jour
- * affiché, qui garde les ajouts précédents en mémoire de la page : à la place du repas pas encore choisi de la même heure
- * (repas), sinon dans le temps libre qui la contient, coupé autour d'elle. Recharger la page rétablit le jeu simulé.
- * Sans place dans le jour affiché (cas que les moments proposés écartent), l'aperçu est rendu tel quel.
+ * Aperçu d'ajout sur **`mock` seulement**, reporté sur le jour affiché (décision 0154 § 3, M5d-3) : le jeu simulé ne garde
+ * aucun ajout, son aperçu part donc du jour simulé et ne montre que le dernier lieu ajouté. L'étape de l'aperçu est posée
+ * dans le jour affiché, qui garde les ajouts précédents en mémoire de la page, par la même fonction pure que l'adaptateur
+ * `mock` (`poserEtapeDansJour`, `src/domain/pose-ajout.ts`). Recharger la page rétablit le jeu simulé. Sans place dans le
+ * jour affiché (cas que les moments proposés écartent), l'aperçu est rendu tel quel.
+ *
+ * Jamais sur `api`, et `api` ne doit pas s'en inspirer : son aperçu vient du moteur, qui peut replanifier d'autres étapes,
+ * et fait foi (0154 § 3 ; addendum 0147, A.7).
  */
 export function apercuSurJourAffiche(preview: RevisionPreview, affiche: Day): RevisionPreview {
   const cible = etapeAjoutee(preview);
   if (cible === null || cible.day.index !== affiche.index) return preview;
-  const { stop } = cible;
-  const debut = versMinutes(stop.start);
-  const fin = versMinutes(stop.end ?? stop.start);
-  const items: DayLineItem[] = [...affiche.items];
-  const repas = stop.kind === "meal" ? items.findIndex((item) => item.type === "openMeal" && item.time === stop.start) : -1;
-  if (repas !== -1) {
-    items.splice(repas, 1, { type: "stop", stop });
-  } else {
-    const libre = items.findIndex((item) => item.type === "free" && versMinutes(item.from) <= debut && fin <= versMinutes(item.to));
-    const temps = libre === -1 ? undefined : items[libre];
-    if (temps?.type !== "free") return preview;
-    items.splice(
-      libre,
-      1,
-      ...(versMinutes(temps.from) < debut ? [{ type: "free" as const, from: temps.from, to: stop.start }] : []),
-      { type: "stop", stop },
-      ...(fin < versMinutes(temps.to) ? [{ type: "free" as const, from: stop.end ?? stop.start, to: temps.to }] : []),
-    );
-  }
-  return { ...preview, days: preview.days.map((day) => (day.index === affiche.index ? { ...affiche, items } : day)) };
+  const pose = poserEtapeDansJour(affiche, cible.stop);
+  if (pose === null) return preview;
+  return { ...preview, days: preview.days.map((day) => (day.index === affiche.index ? pose : day)) };
 }

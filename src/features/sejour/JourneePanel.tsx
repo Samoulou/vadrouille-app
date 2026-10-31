@@ -96,7 +96,7 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
               addPlaceHref === null
                 ? undefined
                 : ({ time, meal }) => ({
-                    href: `${addPlaceHref}?de=${time}&repas=${meal}`,
+                    href: routes.ajouter(day.index, { time, meal }),
                     label: t.journee.choisirRepas.libelle,
                     name: t.journee.choisirRepas[meal],
                   })

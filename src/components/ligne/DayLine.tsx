@@ -340,7 +340,8 @@ export interface DayLineOpenMealProps {
 /**
  * Créneau de repas pas encore choisi (F5-PO-13, décision 0015 § 2 ; provisoire UX/UI) : heure, anneau et
  * rail comme un arrêt, « Déjeuner pas encore choisi » ou « Dîner pas encore choisi » en `arret` `ink-2`.
- * Sans lieu : ni fiche, ni marqueur sur la carte ; signalé par son texte, sans badge. Avec `link` (M5d-3, rendu UX/UI) :
+ * Sans lieu : ni fiche, ni marqueur sur la carte ; signalé par son texte, sans badge. Avec `link` (M5d-3, rendu UX/UI
+ * écrit dans `specs/F7-remplacer-ajouter-deplacer.md`, « Rendu de « Choisir » ») :
  * « Choisir » à droite, même rendu que « Idées » d'un temps libre (texte `ink` gras souligné, cible de 44 px), aligné
  * sur la ligne de base du texte du repas ; le texte du repas passe à la ligne avant le lien.
  */
@@ -352,13 +353,16 @@ function OpenMeal({ time, meal, link }: DayLineOpenMealProps) {
       {link === undefined ? (
         <p className="flex min-h-(--touch-target) items-start pb-4 text-arret font-bold text-ink-2">{t.repasNonChoisi[meal]}</p>
       ) : (
-        <div className="flex min-h-(--touch-target) items-baseline justify-between gap-(--ligne-espace-2) pb-4">
-          <p className="min-w-0 text-arret font-bold text-ink-2">{t.repasNonChoisi[meal]}</p>
+        // `pr-1` : même bord droit que « Idées », posé dans le bloc `pl-3 pr-1` du temps libre (revue de la PR 973, mineur 7).
+        // `flex-wrap` et `ml-auto` : texte agrandi (200 %), « Choisir » passe sous le texte du repas, à droite, sans le couvrir.
+        <div className="flex min-h-(--touch-target) flex-wrap items-baseline justify-between gap-x-(--ligne-espace-2) pb-4 pr-1">
+          {/* `flex-1 basis-0` : le texte se plie avant le lien ; il ne passe sous lui que si son plus long mot ne tient plus. */}
+          <p className="flex-1 basis-0 text-arret font-bold text-ink-2">{t.repasNonChoisi[meal]}</p>
           <Link
             href={link.href}
             aria-label={link.name}
             data-part={`choisir-repas-${meal}`}
-            className="inline-flex min-h-(--touch-target) min-w-(--touch-target) shrink-0 justify-center px-2 text-corps-s font-bold text-ink underline underline-offset-2"
+            className="ml-auto inline-flex min-h-(--touch-target) min-w-(--touch-target) shrink-0 justify-center px-2 text-corps-s font-bold text-ink underline underline-offset-2"
           >
             {link.label}
           </Link>

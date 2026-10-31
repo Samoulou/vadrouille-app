@@ -196,6 +196,61 @@ test("ajouter: second ajout du même jour sur `mock` : il s'ajoute au premier ; 
   await expect(listStops(page).filter({ hasText: "Mon café" })).toHaveCount(0);
 });
 
+test("ajouter: « Choisir » du dîner pas encore choisi : repas présélectionné, aperçu, « Annuler » et « Retour » rendent le focus à « Choisir » ; « Appliquer » remplace le repas (M5d-3)", async ({ page }) => {
+  // Jeu de test local de `src/adapters/mock.ts` : Édimbourg débloqué, dîner du J2 (19:00) pas encore choisi.
+  const jour2 = "/voyages/mock_trip_edimbourg_repas_libre/jour/2";
+  const ajouterDiner = `${jour2}/ajouter?de=19:00&repas=dinner`;
+  await page.goto(jour2);
+  const choisir = sheet(page).getByRole("link", { name: "Choisir le dîner" });
+  await expect(choisir).toHaveText("Choisir");
+  await expect(choisir).toHaveAttribute("href", ajouterDiner);
+  await choisir.click();
+  await expect(page).toHaveURL(ajouterDiner);
+  await expect(addTitle(page)).toBeFocused();
+  await search(page, "restaurant");
+  await results(page).getByRole("radio").first().click();
+  await expect(moments(page).getByRole("radio", { name: "Dîner pas encore choisi" })).toHaveAttribute("aria-checked", "true");
+  await nameField(page).fill("Mon restaurant");
+  await sheet(page).getByRole("button", { name: "Voir l'effet" }).click();
+  await expect(sheet(page).getByRole("heading", { level: 2, name: "Mon restaurant" })).toBeFocused();
+  await expect(sheet(page).getByText("19:00 – 20:30")).toBeVisible();
+  await sheet(page).getByRole("button", { name: "Annuler" }).click();
+  await expect(page).toHaveURL(jour2);
+  await expect(sheet(page).getByRole("link", { name: "Choisir le dîner" })).toBeFocused();
+
+  await sheet(page).getByRole("link", { name: "Choisir le dîner" }).click();
+  await expect(addTitle(page)).toBeFocused();
+  await sheet(page).getByRole("button", { name: "Retour à la Journée" }).click();
+  await expect(page).toHaveURL(jour2);
+  await expect(sheet(page).getByRole("link", { name: "Choisir le dîner" })).toBeFocused();
+
+  // « Appliquer » : le repas devient l'étape ajoutée, « Choisir » disparaît, le focus va sur l'étape.
+  await sheet(page).getByRole("link", { name: "Choisir le dîner" }).click();
+  await search(page, "restaurant");
+  await results(page).getByRole("radio").first().click();
+  await nameField(page).fill("Mon restaurant");
+  await sheet(page).getByRole("button", { name: "Voir l'effet" }).click();
+  await sheet(page).getByRole("button", { name: "Appliquer" }).click();
+  await expect(page).toHaveURL(jour2);
+  await expect(listStops(page).filter({ hasText: "Mon restaurant" })).toBeFocused();
+  await expect(sheet(page).getByRole("link", { name: "Choisir le dîner" })).toHaveCount(0);
+});
+
+test("ajouter: après deux ajouts le même jour sur `mock`, « Annuler » retire le second et garde le premier (0154 § 3)", async ({ page }) => {
+  await page.goto(AJOUTER_DEBLOQUE);
+  await previewAdd(page, "Ma librairie");
+  await sheet(page).getByRole("button", { name: "Appliquer" }).click();
+  await expect(page).toHaveURL(JOUR_2_DEBLOQUE);
+  await sheet(page).getByRole("link", { name: "Ajouter un lieu" }).click();
+  await expect(addTitle(page)).toBeFocused();
+  await previewAdd(page, "Mon café");
+  await sheet(page).getByRole("button", { name: "Appliquer" }).click();
+  await expect(listStops(page).filter({ hasText: "Mon café" })).toHaveCount(1);
+  await page.getByRole("button", { name: "Annuler" }).click();
+  await expect(listStops(page).filter({ hasText: "Mon café" })).toHaveCount(0);
+  await expect(listStops(page).filter({ hasText: "Ma librairie" })).toHaveCount(1);
+});
+
 test("ajouter: jour sans moment libre : « Plus aucun moment libre ce jour-là. », pas de « Voir l'effet »", async ({ page }) => {
   await page.goto("/voyages/mock_trip_edimbourg_debloque/jour/3/ajouter");
   await search(page, "librairie");

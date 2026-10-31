@@ -1,4 +1,4 @@
-import type { Stop } from "@/contracts";
+import type { Meal, Stop } from "@/contracts";
 
 /**
  * Adresses des écrans du voyage (décision 0015 § 1) : seul endroit qui connaît le schéma des routes.
@@ -25,8 +25,11 @@ export interface TripRoutes {
   etape(n: number, stopId: Stop["id"]): string;
   /** Écran 14 « Remplacer une étape » (F7). */
   remplacer(n: number, stopId: Stop["id"]): string;
-  /** « Ajouter un lieu » du jour (F7), avec la plage de temps libre proposée. */
-  ajouter(n: number, free?: { from: string; to: string }): string;
+  /**
+   * « Ajouter un lieu » du jour (F7, F7-PO-8) : avec la plage d'un temps libre (lien « Idées », `?de=&a=`) ou le repas pas
+   * encore choisi (« Choisir », `?de=&repas=`, M5d-3). Heures « HH:MM » et repas écrits tels quels, comme pour « Idées ».
+   */
+  ajouter(n: number, moment?: { from: string; to: string } | { time: string; meal: Meal }): string;
   /**
    * Niveau supérieur du Séjour : « Mes voyages » (`R17`). Toujours `/voyages`, quelle que soit la base : `R17`
    * n'a pas de pendant de développement (décision 0021 § 6, qui renomme `retour()`).
@@ -57,7 +60,12 @@ export function tripRoutes(base: TripRoutesBase, tripId: string): TripRoutes {
     jour,
     etape: (n, stopId) => `${jour(n)}?etape=${encodeURIComponent(stopId)}`,
     remplacer: (n, stopId) => `${jour(n)}/remplacer/${encodeURIComponent(stopId)}`,
-    ajouter: (n, free) => (free ? `${jour(n)}/ajouter?de=${free.from}&a=${free.to}` : `${jour(n)}/ajouter`),
+    ajouter: (n, moment) =>
+      moment === undefined
+        ? `${jour(n)}/ajouter`
+        : "meal" in moment
+          ? `${jour(n)}/ajouter?de=${moment.time}&repas=${moment.meal}`
+          : `${jour(n)}/ajouter?de=${moment.from}&a=${moment.to}`,
     mesVoyages: mesVoyagesRoute,
     aujourdhui: () => (base === "/voyages" ? `${trip}/aujourdhui` : null),
     versions: () => (base === "/voyages" ? `${trip}/versions` : null),

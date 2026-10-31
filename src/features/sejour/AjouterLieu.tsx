@@ -168,6 +168,7 @@ export function AjouterLieuView({
   const ids = useId();
   const searchId = `${ids}-recherche`;
   const searchErrorId = `${ids}-recherche-erreur`;
+  const ideeHelpId = `${ids}-recherche-idee`;
   const resultsTitleId = `${ids}-resultats`;
   const nameId = `${ids}-nom`;
   const nameHelpId = `${ids}-nom-aide`;
@@ -183,11 +184,12 @@ export function AjouterLieuView({
   const [momentId, setMomentId] = useState<string | null>(() => (day ? momentPropose(momentsDuJour(day), entree, durees)?.id ?? null : null));
   const [momentError, setMomentError] = useState(false);
 
-  const [query, setQuery] = useState(() => idee?.name.slice(0, PLACE_SEARCH_QUERY_LENGTH.max) ?? "");
+  // Sans troncature (décision 0155 § 3 point 2, revue de la PR 973) : un nom trop long suit la voie d'une saisie.
+  const [query, setQuery] = useState(() => idee?.name ?? "");
   const [queryError, setQueryError] = useState(false);
   const [recherche, setRecherche] = useState<Recherche>({ type: "idle" });
   const [resultId, setResultId] = useState<string | null>(null);
-  const [name, setName] = useState(() => idee?.name.slice(0, NOM_LIEU_MAX) ?? "");
+  const [name, setName] = useState(() => idee?.name ?? "");
   const [nameError, setNameError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>({ type: "idle" });
   const [status, setStatus] = useState<string | null>(null);
@@ -242,6 +244,9 @@ export function AjouterLieuView({
    * d'origine (F7-PO-8 ; handover §§ 7 et 11) : « Ajouter à ma journée » (ou « Surprends-moi », l'idée refermée) pour
    * `?idee=`, « Choisir » du repas pour `?de=&repas=` (M5d-3), sinon « Ajouter un lieu ». Le lien « Idées » n'est pas
    * suivi comme origine (hors de la liste de M5d-3) : le focus va alors sur « Ajouter un lieu ».
+   *
+   * Après « Appliquer », ce n'est pas ce chemin : le focus va sur l'étape écrite (`targetStopId`, F7-PO-1). Pour un repas,
+   * l'étape remplace le repas pas encore choisi, et son « Choisir » n'existe plus.
    */
   const backToDay = () => {
     token.current += 1;
@@ -456,6 +461,12 @@ export function AjouterLieuView({
         <label htmlFor={searchId} className="text-corps font-bold text-ink">
           {t.champRecherche}
         </label>
+        {/* `?idee=` : pourquoi le champ est prérempli (revue de la PR 973, mineur 2). */}
+        {idee ? (
+          <p id={ideeHelpId} data-part="aide-idee" className="text-corps-s text-ink-soft">
+            {t.aideIdee}
+          </p>
+        ) : null}
         <input
           ref={searchRef}
           id={searchId}
@@ -464,7 +475,7 @@ export function AjouterLieuView({
           maxLength={PLACE_SEARCH_QUERY_LENGTH.max}
           autoComplete="off"
           aria-invalid={queryError || undefined}
-          aria-describedby={describedBy(queryError && searchErrorId)}
+          aria-describedby={describedBy(idee !== null && ideeHelpId, queryError && searchErrorId)}
           onChange={(event) => {
             setQuery(event.target.value);
             setQueryError(false);

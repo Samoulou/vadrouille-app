@@ -50,4 +50,9 @@ describe("tripRoutes (décision 0015 § 1)", () => {
     );
     expect(routes.ajouter(2)).toBe("/voyages/mock_trip_edimbourg/jour/2/ajouter");
   });
+
+  it("« Choisir » d'un repas pas encore choisi : de et repas, tels quels (F7-PO-8, M5d-3)", () => {
+    expect(routes.ajouter(2, { time: "19:30", meal: "dinner" })).toBe("/voyages/mock_trip_edimbourg/jour/2/ajouter?de=19:30&repas=dinner");
+    expect(routes.ajouter(1, { time: "12:30", meal: "lunch" })).toBe("/voyages/mock_trip_edimbourg/jour/1/ajouter?de=12:30&repas=lunch");
+  });
 });
