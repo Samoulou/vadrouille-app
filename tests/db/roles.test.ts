@@ -53,7 +53,8 @@ const APPLICATIVE_ROLES = [
   "vadrouille_mail_counter",
   "vadrouille_autocomplete_counter",
 ];
-const SHARED_VIEWS = ["shared_checklist", "shared_trip", "shared_trip_version"];
+// M6a-D (migration 0023_lien_prive_partage, décision 0157 § 1.5, T5) : `shared_checklist` retirée.
+const SHARED_VIEWS = ["shared_trip", "shared_trip_version"];
 const TABLE_PRIVILEGES = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"] as const;
 
 /**
@@ -69,10 +70,13 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     // B9b (migration 0012_creation_voyage) : même modèle que `stays`.
     trip_commitments: SIUD,
     ...Object.fromEntries(
-      ["trips", "briefs", "research_runs", "candidates", "event_occurrences", "share_links"].map(
+      ["trips", "briefs", "research_runs", "candidates", "event_occurrences"].map(
         (t) => [t, ["SELECT", "INSERT", "UPDATE"]],
       ),
     ),
+    // M6a-D (migration 0023, décision 0157 § 1.9, T9) : `INSERT` et `UPDATE` par colonnes seulement (droits par colonne
+    // ci-dessous).
+    share_links: ["SELECT"],
     // M5-D (migration 0022_feedback_signalements, décision 0147 § 2 point 4) : un signalement n'est jamais modifié.
     feedback: ["SELECT", "INSERT"],
     // Migration 0016_restriction_update_generation_runs (décision 0120 S8) : `UPDATE` de table retiré, accordé par colonnes.
@@ -146,6 +150,8 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     generation_runs: {
       UPDATE: ["finished_at", "last_version", "person_retry_request_ids", "phase", "step", "step_seq", "stop_reason", "studio_retries", "updated_at", "workflow_run_id"],
     },
+    // M6a-D (0023, décision 0157 § 1.9, T9) : désactivation seulement ; insertion sans `id`, `created_at` ni `revoked_at`.
+    share_links: { UPDATE: ["revoked_at"], INSERT: ["created_by", "expires_at", "organization_id", "token_hash", "trip_id"] },
   },
   vadrouille_auth: {
     users: { UPDATE: ["email_verified", "updated_at"] },
@@ -162,7 +168,10 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
       SELECT: ["current_version", "destination", "end_date", "id", "organization_id", "start_date", "time_zone", "travellers_adults", "travellers_children"],
     },
     trip_versions: { SELECT: ["created_at", "organization_id", "snapshot", "trip_id", "version"] },
-    checklist_items: { SELECT: ["booking_url", "done", "id", "kind", "label", "moment", "organization_id", "sponsored", "stop_id", "trip_id"] },
+    // M6a-D (0023, décision 0157 § 1.5, T5) : plus aucun droit sur `checklist_items` (la vue `shared_checklist` est retirée).
+    checklist_items: { SELECT: [], INSERT: [], UPDATE: [], REFERENCES: [] },
+    // M6a-D (0023, décision 0158 § 2.1 et § 4.1) : condition du déblocage des vues partagées, trois colonnes seulement.
+    entitlements: { SELECT: ["kind", "organization_id", "trip_id"] },
   },
   vadrouille_fn_checkout: { checkouts: { SELECT: ["organization_id", "stripe_checkout_session_id"] } },
   // B3d (0138 § 11, T1 ; revue de la PR 850, réponse 2) : création de la ligne du jour par sa seule colonne `day` ; mise à
@@ -373,6 +382,55 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
               pg_catalog.has_any_column_privilege('vadrouille_auth', 'public.memberships', 'UPDATE') AS membership_update`,
     );
     expect(checks.rows[0]).toEqual({ status: false, amount: false, deletion: false, org_update: false, membership_update: false });
+  });
+
+  // M6a-D (migration 0023, décision 0157 § 1.9, T9), sur le modèle du test de checkouts.
+  it("droits par colonne : UPDATE de vadrouille_app sur share_links limité à revoked_at ; INSERT sans id, created_at ni revoked_at (0157 § 1.9)", async () => {
+    const { rows } = await app.query(
+      `SELECT a.attname,
+              pg_catalog.has_column_privilege('vadrouille_app', a.attrelid, a.attnum, 'UPDATE') AS maj,
+              pg_catalog.has_column_privilege('vadrouille_app', a.attrelid, a.attnum, 'INSERT') AS insertion
+       FROM pg_catalog.pg_attribute a
+       WHERE a.attrelid = 'public.share_links'::regclass AND a.attnum > 0 AND NOT a.attisdropped
+       ORDER BY a.attname`,
+    );
+    expect(rows.map((r) => r.attname)).toEqual(["created_at", "created_by", "expires_at", "id", "organization_id", "revoked_at", "token_hash", "trip_id"]);
+    expect(rows.filter((r) => r.maj).map((r) => r.attname)).toEqual(["revoked_at"]);
+    expect(rows.filter((r) => r.insertion).map((r) => r.attname)).toEqual(["created_by", "expires_at", "organization_id", "token_hash", "trip_id"]);
+    const table = await app.query(
+      `SELECT pg_catalog.has_table_privilege('vadrouille_app', 'public.share_links', 'UPDATE') AS maj,
+              pg_catalog.has_table_privilege('vadrouille_app', 'public.share_links', 'INSERT') AS insertion,
+              pg_catalog.has_table_privilege('vadrouille_app', 'public.share_links', 'DELETE') AS suppression,
+              pg_catalog.has_table_privilege('vadrouille_app', 'public.share_links', 'SELECT') AS lecture`,
+    );
+    expect(table.rows[0]).toEqual({ maj: false, insertion: false, suppression: false, lecture: true });
+  });
+
+  it("rôles: vadrouille_fn_share_views ne lit d'entitlements que organization_id, trip_id et kind (0158)", async () => {
+    const { rows } = await app.query(
+      `SELECT pg_catalog.has_column_privilege('vadrouille_fn_share_views', 'public.entitlements', 'id', 'SELECT') AS id,
+              pg_catalog.has_column_privilege('vadrouille_fn_share_views', 'public.entitlements', 'billing_id', 'SELECT') AS billing_id,
+              pg_catalog.has_column_privilege('vadrouille_fn_share_views', 'public.entitlements', 'granted_at', 'SELECT') AS granted_at,
+              pg_catalog.has_column_privilege('vadrouille_fn_share_views', 'public.entitlements', 'kind', 'SELECT') AS kind,
+              pg_catalog.has_any_column_privilege('vadrouille_fn_share_views', 'public.entitlements', 'INSERT, UPDATE, REFERENCES') AS ecriture`,
+    );
+    expect(rows[0]).toEqual({ id: false, billing_id: false, granted_at: false, kind: true, ecriture: false });
+    const table = await app.query(
+      `SELECT p AS privilege FROM unnest($1::text[]) AS p
+       WHERE pg_catalog.has_table_privilege('vadrouille_fn_share_views', 'public.entitlements', p)`,
+      [["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE"]],
+    );
+    expect(table.rows).toEqual([]);
+  });
+
+  it("rôles: vadrouille_fn_share_views n'a plus aucun droit sur checklist_items (0157 § 1.5)", async () => {
+    const { rows } = await app.query(
+      `SELECT pg_catalog.has_any_column_privilege('vadrouille_fn_share_views', 'public.checklist_items', 'SELECT, INSERT, UPDATE, REFERENCES') AS colonnes,
+              bool_or(pg_catalog.has_table_privilege('vadrouille_fn_share_views', 'public.checklist_items', p)) AS de_table
+       FROM unnest($1::text[]) AS p`,
+      [TABLE_PRIVILEGES],
+    );
+    expect(rows[0]).toEqual({ colonnes: false, de_table: false });
   });
 
   it("vadrouille_auth n'a aucun droit sur une table métier ; vadrouille_share n'en a sur aucune table, seulement SELECT sur les vues partagées", async () => {

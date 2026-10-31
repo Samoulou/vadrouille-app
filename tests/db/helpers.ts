@@ -265,7 +265,10 @@ export function insertSql(table: BusinessTable, ids: SeedIds): { sql: string; pa
       };
     case "share_links":
       return {
-        sql: "INSERT INTO share_links (organization_id, trip_id, token_hash, created_by, expires_at, revoked_at) VALUES ($1, $2, $3, $4, now() + interval '30 days', now()) RETURNING id",
+        // M6a-D (migration 0023, décision 0157 § 1.9) : `revoked_at` n'est plus fourni à l'insertion (un lien naît actif) ;
+        // sans ce retrait, les insertions croisées des tests d'isolation seraient refusées par un droit de colonne, et non
+        // plus par la RLS.
+        sql: "INSERT INTO share_links (organization_id, trip_id, token_hash, created_by, expires_at) VALUES ($1, $2, $3, $4, now() + interval '30 days') RETURNING id",
         params: [org, trip, token(), owner],
       };
     case "usage_ledger":

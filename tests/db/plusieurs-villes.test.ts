@@ -352,7 +352,11 @@ describe("plusieurs-villes : deux villes sur api (critères 1 à 12)", () => {
       { name: "Rome", start: "2027-05-04", end: "2027-05-05" },
       { name: "Florence", start: "2027-05-05", end: "2027-05-08" },
     ]);
-    // Vue partagée (0148 § 1 point 4 et § 6 point 2 ; S-M4-4) : ni transfer ni cities, sans migration.
+    // Vue partagée (0148 § 1 point 4 et § 6 point 2 ; S-M4-4) : ni transfer ni cities, sans migration. Depuis M6a-D
+    // (migration 0023, décision 0158 § 4.1), les vues ne servent qu'un voyage débloqué : le droit `tripUnlocked` est posé
+    // par la connexion d'administration, comme dans `ouvrirRevision` (`vadrouille_app` n'a que `SELECT` sur
+    // `entitlements`), et la lecture garde une assertion sur un nombre de lignes non nul dans chaque vue.
+    await admin.query("INSERT INTO public.entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [org.org, tripId]);
     const jeton = token();
     await inTx(app, { org: org.org, user: org.owner }, (cl) =>
       cl.query("INSERT INTO share_links (organization_id, trip_id, token_hash, created_by, expires_at) VALUES ($1, $2, $3, $4, now() + interval '30 days')", [org.org, tripId, jeton, org.owner]),
@@ -366,6 +370,7 @@ describe("plusieurs-villes : deux villes sur api (critères 1 à 12)", () => {
       },
       "vadrouille_share",
     );
+    expect(partage.trip).toHaveLength(1);
     expect(partage.version).toHaveLength(1);
     expect(JSON.stringify(partage.version)).not.toMatch(/transfer|Vers Florence|"cities"/);
     expect(JSON.stringify(partage.trip)).not.toMatch(/cities|Florence/);
