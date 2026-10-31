@@ -586,6 +586,8 @@ describe("module de journal", () => {
       // M5d-1 (décision 0147 § 3 et § 14, ticket 939) : recherche d'un lieu à soi, raison fermée, nombre de résultats,
       // code Google et statut HTTP seulement (aucun texte saisi, aucun nom, aucun identifiant de lieu).
       "lieu.recherche",
+      // M5d-4 (décision 0155 § 2.4) : lieux à soi réinjectés par la révision M1b, deux compteurs seulement.
+      "recalcul.lieux_a_soi",
       "log.unknown_event",
     ]);
   });

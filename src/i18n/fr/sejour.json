@@ -34,6 +34,11 @@
       "pastille": "de {de} à {vers}"
     },
     "ajouterUnLieu": "Ajouter un lieu",
+    "choisirRepas": {
+      "libelle": "Choisir",
+      "lunch": "Choisir le déjeuner",
+      "dinner": "Choisir le dîner"
+    },
     "chevauchement": {
       "un": "À {heure}, « {libelle} » tombe pendant que tu te rends à {ville}. Vérifie tes horaires.",
       "unEstime": "À {heure}, « {libelle} » tombe pendant que tu te rends à {ville}, d'après la durée estimée. Vérifie tes horaires.",
@@ -183,6 +188,7 @@
     "retourJournee": "Retour à la Journée",
     "nonDebloque": "Tu pourras ajouter tes propres lieux une fois ton voyage débloqué.",
     "champRecherche": "Lieu à ajouter",
+    "aideIdee": "Idée de « Surprends-moi ». Lance la recherche pour choisir le lieu exact.",
     "rechercher": "Rechercher",
     "deuxLettres": "Écris au moins 2 lettres.",
     "enCours": "Recherche en cours.",

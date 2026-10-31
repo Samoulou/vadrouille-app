@@ -45,6 +45,29 @@ interface MockEntry {
   unlisted?: true;
 }
 
+/** Identifiant du voyage de test « repas pas encore choisi » (M5d-3), servi à son adresse seulement. */
+export const MOCK_REPAS_LIBRE_TRIP_ID = "mock_trip_edimbourg_repas_libre";
+
+/**
+ * Jeu de test local de M5d-3 (revue de la PR 973, bloquant 2) : Édimbourg débloqué dont le dîner du J2 est un repas pas
+ * encore choisi, à la même heure (« Choisir » de la ligne du jour, F7-PO-8). Aucun jeu de `src/mocks` n'en a. Dérivé en
+ * mémoire, sans modifier le jeu simulé ; hors de « Mes voyages », sans positions ni révision simulée.
+ */
+const repasLibre: Trip = {
+  ...edimbourgDebloque,
+  id: MOCK_REPAS_LIBRE_TRIP_ID,
+  days: edimbourgDebloque.days.map((day) =>
+    day.index !== 2
+      ? day
+      : {
+          ...day,
+          items: day.items.map((item) =>
+            item.type === "stop" && item.stop.kind === "meal" && item.stop.start >= "18:00" ? { type: "openMeal" as const, time: item.stop.start, meal: "dinner" as const } : item,
+          ),
+        },
+  ),
+};
+
 const DEFAULT_ENTRIES: MockEntry[] = [
   { trip: edimbourg, proposals: propositions, previewSlots: apercu, maps: edimbourgCarte },
   // Écran 6b (décision 0013, § 3.6) : même voyage, débloqué. Ses positions sont dérivées de celles
@@ -62,6 +85,8 @@ const DEFAULT_ENTRIES: MockEntry[] = [
   // M4-suite (critère 17) : trois villes, un engagement qui chevauche chaque ligne « Vers {ville} » ; bandeau de
   // chevauchement de la Journée, axe et mesures à 390 px. Servi à son adresse seulement.
   { trip: chevauchement, proposals: [], unlisted: true },
+  // M5d-3 (revue de la PR 973) : dîner du J2 pas encore choisi, pour le parcours « Choisir ». Servi à son adresse seulement.
+  { trip: repasLibre, proposals: [], unlisted: true },
 ];
 
 /**

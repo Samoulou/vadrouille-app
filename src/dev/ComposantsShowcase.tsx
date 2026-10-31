@@ -86,6 +86,13 @@ const stopHref = (stop: Stop) => `#arret-${stop.id}`;
 const ideasHref = () => "#idees";
 /** Lien « Idées » par plage (F5-TL-8) : l'adresse de démonstration reprend la plage. */
 const ideasHrefForFree = (free: { from: string; to: string }) => `#idees-${free.from}-${free.to}`;
+/** Lien « Choisir » d'un repas pas encore choisi (F7-PO-8, M5d-3) : textes de `sejour.json`, adresse de démonstration. */
+const choisirRepas = messages.sejour.journee.choisirRepas;
+const mealLink = ({ time, meal }: { time: string; meal: "lunch" | "dinner" }) => ({
+  href: `#ajouter-${time}-${meal}`,
+  label: choisirRepas.libelle,
+  name: choisirRepas[meal],
+});
 
 /** Ajouts de F5b à DayLine : étape verrouillée, repas pas encore choisis, lien « Idées » par plage. */
 const DEMO_ADDITIONS: DayLineItem[] = [
@@ -537,7 +544,7 @@ export function ComposantsShowcase() {
           <ReasonBlock text={pg.raison} sourceLabel={pg.source} sourceUrl="#programme" className="w-full" />
         </State>
         <State label={t.etats.ligneAjouts}>
-          <DayLine items={DEMO_ADDITIONS} getStopHref={stopHref} getIdeasHref={ideasHrefForFree} className="w-full" />
+          <DayLine items={DEMO_ADDITIONS} getStopHref={stopHref} getIdeasHref={ideasHrefForFree} getMealLink={mealLink} className="w-full" />
         </State>
         <State label={t.etats.bandeauTrajet}>
           <StatusBanner kind="travel" message={ex.bandeaux.travel} className="w-full" />

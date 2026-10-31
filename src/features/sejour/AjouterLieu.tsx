@@ -14,13 +14,13 @@ import { PLACE_SEARCH_QUERY_LENGTH } from "@/contracts/values";
 import { describedBy, EMPTY_LIVE_REGION_CLASS, INPUT_CLASS } from "@/features/creation/fields";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
-import { formatFaits } from "@/lib/faits";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 import { applyAddPlace, previewAddPlace, searchPlaces } from "@/server/actions/lieux";
 import { applyRevert } from "@/server/actions/retouches";
 
 import {
+  apercuSurJourAffiche,
   demandeDuMoment,
   etapeAjoutee,
   ideeDeLEntree,
@@ -141,7 +141,8 @@ export interface AjouterLieuViewProps {
 /**
  * « Ajouter un lieu » (spécification M5 § 6, M5-PO-10 à M5-PO-12 ; F7, F7-PO-8 à F7-PO-11 ; décision 0147 § 3, § 11 et
  * addendum A.1 à A.7), dans le panneau du voyage : recherche par nom à la demande, résultats en groupe radio (jamais sur
- * la carte), nom dans ton programme toujours vide à l'ouverture (jamais le nom Google ni la requête), moment du jour avec
+ * la carte), nom dans ton programme vide à l'ouverture (jamais le nom Google ni la requête ; seule exception, le nom d'une idée
+ * de « Surprends-moi » avec `?idee=`, qui préremplit aussi la recherche), moment du jour avec
  * l'heure proposée, aperçu des effets, puis « Appliquer » : toast « Lieu ajouté. » et « Annuler » 5 s.
  *
  * Ni la requête, ni les noms et adresses des résultats ne sortent de la mémoire de l'écran : ni adresse, ni stockage du
@@ -167,6 +168,7 @@ export function AjouterLieuView({
   const ids = useId();
   const searchId = `${ids}-recherche`;
   const searchErrorId = `${ids}-recherche-erreur`;
+  const ideeHelpId = `${ids}-recherche-idee`;
   const resultsTitleId = `${ids}-resultats`;
   const nameId = `${ids}-nom`;
   const nameHelpId = `${ids}-nom-aide`;
@@ -176,12 +178,14 @@ export function AjouterLieuView({
   const offlineId = `${ids}-hors-ligne`;
 
   const moments = useMemo(() => (day ? momentsDuJour(day) : []), [day]);
-  // `?idee=` : l'idée du jour est le lieu choisi, sans recherche ; son nom (contenu maison) préremplit le champ (F7-PO-10).
+  // `?idee=` : le nom de l'idée du jour (contenu maison) préremplit « Lieu à ajouter » et « Nom dans ton programme » ; aucune
+  // recherche n'est lancée avant « Rechercher » (décision 0154 § 6 point 2, M5-PO-10).
   const idee = useMemo(() => (day ? ideeDeLEntree(day, entree) : null), [day, entree]);
   const [momentId, setMomentId] = useState<string | null>(() => (day ? momentPropose(momentsDuJour(day), entree, durees)?.id ?? null : null));
   const [momentError, setMomentError] = useState(false);
 
-  const [query, setQuery] = useState("");
+  // Sans troncature (décision 0155 § 3 point 2, revue de la PR 973) : un nom trop long suit la voie d'une saisie.
+  const [query, setQuery] = useState(() => idee?.name ?? "");
   const [queryError, setQueryError] = useState(false);
   const [recherche, setRecherche] = useState<Recherche>({ type: "idle" });
   const [resultId, setResultId] = useState<string | null>(null);
@@ -238,11 +242,20 @@ export function AjouterLieuView({
   /**
    * Retour à la Journée sans rien appliquer (« Retour à la Journée », « Annuler ») : le focus revient sur l'élément
    * d'origine (F7-PO-8 ; handover §§ 7 et 11) : « Ajouter à ma journée » (ou « Surprends-moi », l'idée refermée) pour
-   * `?idee=`, sinon « Ajouter un lieu ». Les entrées « Idées » et « Choisir » ne sont pas livrées (décision 0154 attendue).
+   * `?idee=`, « Choisir » du repas pour `?de=&repas=` (M5d-3), sinon « Ajouter un lieu ». Le lien « Idées » n'est pas
+   * suivi comme origine (hors de la liste de M5d-3) : le focus va alors sur « Ajouter un lieu ».
+   *
+   * Après « Appliquer », ce n'est pas ce chemin : le focus va sur l'étape écrite (`targetStopId`, F7-PO-1). Pour un repas,
+   * l'étape remplace le repas pas encore choisi, et son « Choisir » n'existe plus.
    */
   const backToDay = () => {
     token.current += 1;
-    shell.requestFocus({ dayIndex, originParts: idee ? ["ajouter-a-ma-journee", "surprise-bouton"] : ["ajouter-un-lieu"] });
+    const originParts = idee
+      ? ["ajouter-a-ma-journee", "surprise-bouton"]
+      : entree?.type === "repas"
+        ? [`choisir-repas-${entree.meal}`, "ajouter-un-lieu"]
+        : ["ajouter-un-lieu"];
+    shell.requestFocus({ dayIndex, originParts });
     router.replace(routes.jour(dayIndex), { scroll: false });
   };
 
@@ -277,7 +290,7 @@ export function AjouterLieuView({
 
   const baseVersion = versionVue ?? versionSimulee ?? shell.revision.version();
   const results = recherche.type === "results" ? recherche.results : [];
-  const chosen: { resultId: string } | null = idee ? { resultId: idee.placeId } : (results.find((result) => result.resultId === resultId) ?? null);
+  const chosen: { resultId: string } | null = results.find((result) => result.resultId === resultId) ?? null;
   const moment = moments.find((candidate) => candidate.id === momentId) ?? null;
 
   const search = async (event: FormEvent) => {
@@ -372,7 +385,9 @@ export function AjouterLieuView({
       showRefus(result.error);
       return;
     }
-    setPhase({ type: "preview", preview: result.value, requestId: pendingId.current ?? requestId() });
+    // `mock` : l'aperçu part du jeu simulé ; il est reporté sur le jour affiché pour garder les ajouts précédents (0154 § 3).
+    const preview = versionSimulee === null ? result.value : apercuSurJourAffiche(result.value, day);
+    setPhase({ type: "preview", preview, requestId: pendingId.current ?? requestId() });
     setStatus(t.pret);
     focus("preview");
   };
@@ -429,7 +444,6 @@ export function AjouterLieuView({
   };
 
   const cible = phase.type === "preview" ? etapeAjoutee(phase.preview) : null;
-  const faitsIdee = idee ? formatFaits(idee.facts) : null;
   const disabled = online ? undefined : true;
   const disabledBy = online ? undefined : offlineId;
 
@@ -443,76 +457,66 @@ export function AjouterLieuView({
         </div>
       )}
 
-      {idee ? (
-        // `?idee=` : pas de recherche ; l'idée du jour (nom et faits, contenu maison) est le lieu choisi (F7, « Ajouter un lieu »).
-        <section aria-labelledby={`${ids}-idee`} data-part="idee" className="flex flex-col gap-1">
-          <h2 id={`${ids}-idee`} className="text-section font-extrabold text-ink">
-            {idee.name}
-          </h2>
-          {faitsIdee ? <p className="text-corps-s text-ink-soft">{faitsIdee}</p> : null}
-          {/* État de l'aperçu : région présente dès le chargement (0018, « Attente »). */}
-          <p role="status" data-part="annonce" className={cn("text-corps-s text-ink-soft", status ? undefined : EMPTY_LIVE_REGION_CLASS)}>
-            {status}
+      <form role="search" onSubmit={search} className="flex flex-col gap-2">
+        <label htmlFor={searchId} className="text-corps font-bold text-ink">
+          {t.champRecherche}
+        </label>
+        {/* `?idee=` : pourquoi le champ est prérempli (revue de la PR 973, mineur 2). */}
+        {idee ? (
+          <p id={ideeHelpId} data-part="aide-idee" className="text-corps-s text-ink-soft">
+            {t.aideIdee}
           </p>
-        </section>
-      ) : (
-        <>
-          <form role="search" onSubmit={search} className="flex flex-col gap-2">
-            <label htmlFor={searchId} className="text-corps font-bold text-ink">
-              {t.champRecherche}
-            </label>
-            <input
-              ref={searchRef}
-              id={searchId}
-              type="search"
-              value={query}
-              maxLength={PLACE_SEARCH_QUERY_LENGTH.max}
-              autoComplete="off"
-              aria-invalid={queryError || undefined}
-              aria-describedby={describedBy(queryError && searchErrorId)}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setQueryError(false);
-              }}
-              className={INPUT_CLASS}
-            />
-            <p id={searchErrorId} role="alert" className={cn("text-corps-s font-semibold text-ink", queryError ? undefined : EMPTY_LIVE_REGION_CLASS)}>
-              {queryError ? t.deuxLettres : null}
-            </p>
-            <Button type="submit" variant="primary" className={cn("w-full", ARIA_DISABLED)} aria-disabled={disabled} aria-describedby={disabledBy} data-part="rechercher">
-              {t.rechercher}
-            </Button>
-          </form>
+        ) : null}
+        <input
+          ref={searchRef}
+          id={searchId}
+          type="search"
+          value={query}
+          maxLength={PLACE_SEARCH_QUERY_LENGTH.max}
+          autoComplete="off"
+          aria-invalid={queryError || undefined}
+          aria-describedby={describedBy(idee !== null && ideeHelpId, queryError && searchErrorId)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setQueryError(false);
+          }}
+          className={INPUT_CLASS}
+        />
+        <p id={searchErrorId} role="alert" className={cn("text-corps-s font-semibold text-ink", queryError ? undefined : EMPTY_LIVE_REGION_CLASS)}>
+          {queryError ? t.deuxLettres : null}
+        </p>
+        <Button type="submit" variant="primary" className={cn("w-full", ARIA_DISABLED)} aria-disabled={disabled} aria-describedby={disabledBy} data-part="rechercher">
+          {t.rechercher}
+        </Button>
+      </form>
 
-          <section aria-labelledby={resultsTitleId} data-part="resultats" aria-busy={recherche.type === "waiting"} className="flex flex-col gap-3">
-            <h2 id={resultsTitleId} className={recherche.type === "results" && results.length > 0 ? "text-section font-extrabold text-ink" : "sr-only"}>
-              {t.resultats}
-            </h2>
-            {/* Nombre de résultats, puis état de l'aperçu : région présente dès le chargement (0018, « Attente »). */}
-            <p role="status" data-part="annonce" className={cn("text-corps-s text-ink-soft", status ? undefined : EMPTY_LIVE_REGION_CLASS)}>
-              {status}
-            </p>
-            {recherche.type === "error" ? <StatusBanner kind="error" message={recherche.message} /> : null}
-            {results.length > 0 ? (
-              <>
-                <SegmentedControl
-                  options={results.map((result) => ({ value: result.resultId, label: libelleResultat(result) }))}
-                  value={resultId}
-                  onChange={(value) => {
-                    setResultId(value);
-                    invalidate();
-                  }}
-                  label={t.resultats}
-                  labelledBy={resultsTitleId}
-                  orientation="vertical"
-                />
-                {/* Noms et adresses de Google à l'écran : mention visible tant qu'ils le sont (F4-PO-9, critère 26). */}
-                <PlacesAttribution placesFromGoogle={resultatsGoogle} />
-              </>
-            ) : null}
-          </section>
-        </>
-      )}
+      <section aria-labelledby={resultsTitleId} data-part="resultats" aria-busy={recherche.type === "waiting"} className="flex flex-col gap-3">
+        <h2 id={resultsTitleId} className={recherche.type === "results" && results.length > 0 ? "text-section font-extrabold text-ink" : "sr-only"}>
+          {t.resultats}
+        </h2>
+        {/* Nombre de résultats, puis état de l'aperçu : région présente dès le chargement (0018, « Attente »). */}
+        <p role="status" data-part="annonce" className={cn("text-corps-s text-ink-soft", status ? undefined : EMPTY_LIVE_REGION_CLASS)}>
+          {status}
+        </p>
+        {recherche.type === "error" ? <StatusBanner kind="error" message={recherche.message} /> : null}
+        {results.length > 0 ? (
+          <>
+            <SegmentedControl
+              options={results.map((result) => ({ value: result.resultId, label: libelleResultat(result) }))}
+              value={resultId}
+              onChange={(value) => {
+                setResultId(value);
+                invalidate();
+              }}
+              label={t.resultats}
+              labelledBy={resultsTitleId}
+              orientation="vertical"
+            />
+            {/* Noms et adresses de Google à l'écran : mention visible tant qu'ils le sont (F4-PO-9, critère 26). */}
+            <PlacesAttribution placesFromGoogle={resultatsGoogle} />
+          </>
+        ) : null}
+      </section>
 
       {chosen ? (
         <>
