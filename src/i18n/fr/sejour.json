@@ -3,7 +3,8 @@
     "sejour": "{destination} · Séjour",
     "jour": "{destination} · Jour {n}",
     "etape": "{name} · Jour {n}",
-    "versions": "{destination} · Versions du programme"
+    "versions": "{destination} · Versions du programme",
+    "ajouter": "Ajouter un lieu · Jour {n}"
   },
   "region": "Programme",
   "retour": "Retour",
@@ -32,6 +33,7 @@
       },
       "pastille": "de {de} à {vers}"
     },
+    "ajouterUnLieu": "Ajouter un lieu",
     "chevauchement": {
       "un": "À {heure}, « {libelle} » tombe pendant que tu te rends à {ville}. Vérifie tes horaires.",
       "unEstime": "À {heure}, « {libelle} » tombe pendant que tu te rends à {ville}, d'après la durée estimée. Vérifie tes horaires.",
@@ -47,7 +49,8 @@
   },
   "surprise": {
     "bouton": "Surprends-moi",
-    "mention": "Une idée pour ta journée, pas encore dans ton programme."
+    "mention": "Une idée pour ta journée, pas encore dans ton programme.",
+    "ajouterAMaJournee": "Ajouter à ma journée"
   },
   "regionFiche": "Fiche étape",
   "fiche": {
@@ -69,7 +72,8 @@
     "toastDeverrouillee": "Verrou retiré.",
     "dejaReserve": "Déjà réservé : cette étape ne bouge pas.",
     "verrouConflit": "Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.",
-    "absente": "Cette étape n'est plus dans ce jour."
+    "absente": "Cette étape n'est plus dans ce jour.",
+    "ajouteParToi": "Ajouté par toi."
   },
   "signaler": {
     "titre": "Signaler une erreur",
@@ -168,5 +172,45 @@
     "erreurApercu": "Les changements n'ont pas pu être calculés. Ton programme est inchangé. Réessaie.",
     "erreurRetour": "Le retour n'a pas pu être appliqué. Ton programme est inchangé. Réessaie.",
     "erreurListe": "Les versions n'ont pas pu être chargées. Réessaie."
+  },
+  "ajouter": {
+    "titre": "Ajouter un lieu",
+    "jour": "Jour {n}",
+    "retourJournee": "Retour à la Journée",
+    "nonDebloque": "Tu pourras ajouter tes propres lieux une fois ton voyage débloqué.",
+    "champRecherche": "Lieu à ajouter",
+    "rechercher": "Rechercher",
+    "deuxLettres": "Écris au moins 2 lettres.",
+    "enCours": "Recherche en cours.",
+    "resultats": "Résultats",
+    "nResultats": "{n} résultats.",
+    "unResultat": "1 résultat.",
+    "aucunResultat": "Aucun lieu trouvé. Essaie un autre nom.",
+    "rechercheIndisponible": "La recherche n'est pas disponible pour le moment. Réessaie plus tard.",
+    "plafondRecherche": "Tu as fait beaucoup de recherches aujourd'hui pour ce voyage. Réessaie demain.",
+    "resultat": "{name}, {address}",
+    "nom": "Nom dans ton programme",
+    "nomAide": "C'est le nom qui apparaîtra dans ton programme.",
+    "nomVide": "Donne un nom à ce lieu.",
+    "nomRefuse": "Écris un nom de 80 caractères au plus, sans adresse web.",
+    "quelMoment": "Quel moment ?",
+    "tempsLibre": "Temps libre {from} – {to}",
+    "dejeuner": "Déjeuner pas encore choisi",
+    "diner": "Dîner pas encore choisi",
+    "choisisMoment": "Choisis un moment.",
+    "aucunMoment": "Plus aucun moment libre ce jour-là. Choisis un autre jour, ou remplace une étape.",
+    "voirEffet": "Voir l'effet",
+    "calcul": "Calcul de l'effet.",
+    "pret": "Effet calculé.",
+    "moment": "{start} – {end}",
+    "trajetsApres": "Temps de trajet calculé après l'ajout",
+    "pasDePlace": "Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour.",
+    "conflit": "Ton programme a changé entre-temps. Rien n'a été modifié.",
+    "revoirEffet": "Revoir l'effet",
+    "calculIndisponible": "Le calcul n'est pas disponible pour le moment. Ton programme est inchangé. Réessaie plus tard.",
+    "tropDeGestes": "Trop de retouches en peu de temps. Ton programme est inchangé. Réessaie dans une heure.",
+    "tropDeVersions": "Tu as fait beaucoup de retouches sur ce voyage. Ton programme est inchangé.",
+    "enPreparation": "Ton programme est en train d'être mis à jour. Réessaie dans un instant.",
+    "ajoute": "Lieu ajouté."
   }
 }

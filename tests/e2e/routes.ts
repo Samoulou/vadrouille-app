@@ -107,6 +107,16 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // M5d-2 (spécification M5 § 6 ; décision 0147 § 14) : « Ajouter un lieu » (F7c), sur le voyage débloqué du jeu simulé
+    // (l'ajout n'est proposé qu'après le déblocage, M5-PO-1). Route à part, chargée seulement depuis la Journée : le
+    // JavaScript initial reste sous le seuil (décision 0152) ; Lighthouse journalisé, comme R14.
+    id: "R-ajouter",
+    path: `/voyages/${INVENTORY_TRIP}_debloque/jour/2/ajouter`,
+    page: "voyages/[id]/(programme)/jour/[n]/ajouter/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "seuil" },
+  },
+  {
     // M5b (spécification M5 § 4 ; décision 0147 § 5.3 point 3) : « Versions du programme », sur le voyage débloqué du jeu
     // simulé (le lien du Séjour et la page n'existent qu'après le déblocage, M5-PO-1) ; budgets en `journal`, comme R14.
     id: "R-versions",

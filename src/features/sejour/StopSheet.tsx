@@ -144,6 +144,12 @@ export function StopSheet({
           {t.evenement}
         </p>
       )}
+      {/* Lieu à soi (décision 0147 § 6.1, M5d-2) : marque stockée dans l'instantané, jamais dans la vue partagée. */}
+      {stop.addedBy === "person" ? (
+        <p data-part="ajoute-par-toi" className="text-corps-s text-ink-2">
+          {t.ajouteParToi}
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-1">
         <p data-part="moment" className="text-corps font-bold text-ink-2 tabular-nums">

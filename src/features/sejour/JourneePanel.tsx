@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { Suspense, lazy, useRef } from "react";
 
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
+import { Button } from "@/components/ligne/Button";
 import { DayLine } from "@/components/ligne/DayLine";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { Day } from "@/contracts";
@@ -33,6 +35,8 @@ export interface JourneePanelProps {
   placesFromGoogle?: boolean;
   /** Étapes surlignées 2 s après une modification (F7, décision 0016 § 9). */
   highlightedStopIds?: readonly string[];
+  /** « Ajouter un lieu » sous la ligne du jour (M5d-2 ; F7-PO-8) : voyage débloqué, adaptateurs `mock` et `api` ; absent sinon. */
+  addPlaceHref?: string | null;
 }
 
 /**
@@ -41,7 +45,7 @@ export interface JourneePanelProps {
  * « Vers {ville} », trajet : spécification M4-suite § 5), ligne du jour, « Événements du jour »,
  * « Surprends-moi », mention d'attribution. Un jour en préparation n'affiche que son bandeau et ses événements.
  */
-export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGLE, highlightedStopIds }: JourneePanelProps) {
+export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGLE, highlightedStopIds, addPlaceHref = null }: JourneePanelProps) {
   const banner = day.generating ? null : travelBannerMessage(day);
   const travelLine = day.generating ? null : dayTravelLine(day);
   // Un chevauchement suppose une ligne « Vers {ville} » et au moins un événement ; jamais pendant la préparation (§ 5).
@@ -97,6 +101,14 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
         </div>
       )}
 
+      {day.generating || addPlaceHref === null ? null : (
+        <Button asChild variant="secondary" size="sm" className="self-start">
+          <Link href={addPlaceHref} data-part="ajouter-un-lieu">
+            {t.journee.ajouterUnLieu}
+          </Link>
+        </Button>
+      )}
+
       {day.events.length > 0 ? (
         // Focusable par script seulement, comme la liste du jour : cible de l'action du bandeau de chevauchement (M4-suite § 5).
         <section ref={evenements} tabIndex={-1} aria-labelledby="evenements-du-jour" className="flex flex-col gap-3 rounded-block">
@@ -107,7 +119,7 @@ export function JourneePanel({ day, routes, placesFromGoogle = PLACES_FROM_GOOGL
         </section>
       ) : null}
 
-      {!day.generating && day.surprise ? <SurpriseBlock idea={day.surprise} /> : null}
+      {!day.generating && day.surprise ? <SurpriseBlock idea={day.surprise} addHref={addPlaceHref === null ? null : `${addPlaceHref}?idee=${encodeURIComponent(day.surprise.id)}`} /> : null}
 
       <PlacesAttribution placesFromGoogle={placesFromGoogle} />
     </div>

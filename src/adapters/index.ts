@@ -17,7 +17,7 @@ import { counterpartOf, getMockRevisionFixtures, mockTripAdapter } from "./mock"
 import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
-import { createMockPlaces } from "./mock-lieux";
+import { createMockPlaces, VERSION_SIMULEE, type DureesAjout } from "./mock-lieux";
 import { createMockStopReports } from "./mock-reports";
 import { createMockTripVersions } from "./mock-versions";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
@@ -550,6 +550,27 @@ export async function ajoutDeLieu(value: string | undefined = process.env.DATA_A
   const choice = adapterChoice(value);
   if (choice === "api") return getTripAdapter(value).places ?? null;
   return lieuxSimules(value, options);
+}
+
+/** Paramètres de l'écran « Ajouter un lieu » (M5d-2), lus côté serveur par la page. */
+export type ParametresAjoutDeLieu = {
+  /** Durées prévues par type (`dureesParDefaut` du moteur) : heure proposée, premier temps libre assez long (M5-PO-12). */
+  readonly durees: DureesAjout;
+  /** `mock` : version fixe du jeu simulé, base de chaque demande ; `api` : `null`, la version courante du voyage sert. */
+  readonly versionSimulee: number | null;
+  /** `api` : noms et adresses des résultats rendus par Google (mention « Données de lieux : Google »). */
+  readonly resultatsGoogle: boolean;
+};
+
+/**
+ * Écran « Ajouter un lieu » (tâche M5d-2, ticket 961 ; décision 0147 § 3 et § 14) : adaptateurs `mock` et `api`
+ * seulement, `null` pour `prototype` (le site d'essai n'a pas d'ajout : la page répond 404). Aucune lecture, aucun appel.
+ */
+export function parametresAjoutDeLieu(value: string | undefined = process.env.DATA_ADAPTER): ParametresAjoutDeLieu | null {
+  const choice = adapterChoice(value);
+  if (choice !== "mock" && choice !== "api") return null;
+  const { activity, lunch, dinner } = CONFIGURATION_MOTEUR.dureesParDefaut;
+  return { durees: { activity, lunch, dinner }, versionSimulee: choice === "mock" ? VERSION_SIMULEE : null, resultatsGoogle: choice === "api" };
 }
 
 /**
