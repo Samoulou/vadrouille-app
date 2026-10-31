@@ -1,13 +1,15 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMockPlaces } from "@/adapters/mock-lieux";
-import { ADDED_STOP_NAME_MAX, type DayLineItem, type PatchResult, type PlaceSearchResult, type Result, type RevisionPreview, type Trip } from "@/contracts";
+import { createMemoryRecorder, type EventRecorder } from "@/analytics/track";
+import type { ApiError, DayLineItem, PatchResult, PlaceSearchResult, Result, RevisionPreview, Trip } from "@/contracts";
+import { ADDED_STOP_NAME_MAX } from "@/contracts/values";
 import { edimbourg } from "@/mocks/edimbourg";
 
 import { axeViolations } from "../../../tests/unit/axe";
 
-import { AjouterLieuView, NOM_LIEU_MAX, type AjouterLieuCalls } from "./AjouterLieu";
+import { AjouterLieuView, type AjouterLieuCalls } from "./AjouterLieu";
 import type { EntreeAjout } from "./ajouter-lieu";
 import { TripShell, useTripShell } from "./TripShell";
 
@@ -80,7 +82,8 @@ function renderScreen(
     resultatsGoogle = api,
     entree = null,
     newRequestId = () => "00000000-0000-4000-8000-000000000001",
-  }: { trip?: Trip; api?: boolean; resultatsGoogle?: boolean; entree?: EntreeAjout | null; newRequestId?: () => string } = {},
+    recorder,
+  }: { trip?: Trip; api?: boolean; resultatsGoogle?: boolean; entree?: EntreeAjout | null; newRequestId?: () => string; recorder?: EventRecorder } = {},
 ) {
   return render(
     <TripShell trip={trip} maps={[]} base="/voyages" versionable revisionVersion={api ? 5 : null}>
@@ -92,6 +95,7 @@ function renderScreen(
         resultatsGoogle={resultatsGoogle}
         calls={calls}
         newRequestId={newRequestId}
+        {...(recorder ? { recorder } : {})}
       />
     </TripShell>,
   );
@@ -189,8 +193,7 @@ describe("ajouter: nom et moment", () => {
     expect(nameField()).toHaveValue("Ma librairie");
   });
 
-  it("nom : 80 caractères au plus, comme le contrat (M5-PO-10)", async () => {
-    expect(NOM_LIEU_MAX).toBe(ADDED_STOP_NAME_MAX);
+  it("nom : `ADDED_STOP_NAME_MAX` caractères au plus, la constante du contrat (M5-PO-10, décision 0155 § 5.1)", async () => {
     renderScreen(fakeCalls());
     await rechercher("librairie");
     fireEvent.click(within(results()).getAllByRole("radio")[0]!);
@@ -226,14 +229,43 @@ describe("ajouter: aperçu et application", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
-  it("tout `no_option` (lieu fermé ou introuvable compris, en attendant la cause dans le contrat) : texte du manque de place (0154 § 1), focus, rien d'écrit", async () => {
-    const calls = fakeCalls({ previewAddPlace: vi.fn(async (): Promise<Result<RevisionPreview>> => ({ ok: false, error: { code: "no_option", retryable: false } })) });
+  it.each<[string, ApiError["cause"], string]>([
+    ["`no_option` sans `cause`", undefined, "Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour."],
+    ["`no_room`", "no_room", "Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour."],
+    ["`place_not_found`", "place_not_found", "Ce lieu est introuvable. Ton programme est inchangé. Choisis un autre résultat ou cherche un autre nom."],
+    ["`place_closed`", "place_closed", "Ce lieu est fermé définitivement. Ton programme est inchangé. Choisis un autre lieu."],
+  ])("%s : texte de sa cause (0154 § 1, 0155 § 1.1) dans le bandeau `noOption`, focus sur lui, aucune action, rien d'écrit", async (_, cause, texte) => {
+    const error: ApiError = cause === undefined ? { code: "no_option", retryable: false } : { code: "no_option", retryable: false, cause };
+    const calls = fakeCalls({ previewAddPlace: vi.fn(async (): Promise<Result<RevisionPreview>> => ({ ok: false, error })) });
     const { container } = renderScreen(calls, { api: true });
     await choisirEtVoir("Ma librairie");
-    const bandeau = container.querySelector("[data-part='bandeau-pas-de-place']");
+    const bandeau = container.querySelector<HTMLElement>("[data-part='bandeau-sans-option']");
     expect(bandeau).toHaveFocus();
-    expect(bandeau).toHaveTextContent("Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour.");
+    expect(bandeau).toHaveTextContent(texte);
+    expect(within(bandeau!).queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Réessayer" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Revoir l'effet" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Appliquer" })).toBeNull();
     expect(calls.applyAddPlace).not.toHaveBeenCalled();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("`provider_error` à l'aperçu (fiches non lues, 0155 § 1.1) : bandeau d'erreur en `role=\"alert\"` avec « Réessayer », pas le bandeau `noOption`", async () => {
+    const preview = vi
+      .fn<AjouterLieuCalls["previewAddPlace"]>()
+      .mockResolvedValueOnce({ ok: false, error: { code: "provider_error", retryable: true } })
+      .mockResolvedValueOnce({ ok: true, value: apercu("Ma librairie") });
+    const { container } = renderScreen(fakeCalls({ previewAddPlace: preview }), { api: true });
+    await choisirEtVoir("Ma librairie");
+    expect(container.querySelector("[data-part='bandeau-sans-option']")).toBeNull();
+    const message = screen.getByText("Le calcul n'est pas disponible pour le moment. Ton programme est inchangé. Réessaie plus tard.");
+    expect(message.closest("[role='alert']")).not.toBeNull();
+    expect(within(message.closest<HTMLElement>("[role='alert']")!).getByRole("button", { name: "Réessayer" })).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    });
+    expect(preview).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "Appliquer" })).toBeInTheDocument();
   });
 
   it("trop de gestes (`rate_limited`) : texte de 0154, sans « Réessayer »", async () => {
@@ -322,6 +354,59 @@ describe("ajouter: aperçu et application", () => {
   });
 });
 
+describe("ajouter: mesure `place_added` (F7-PO-18, décision 0155 § 4.2)", () => {
+  async function appliquer() {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Appliquer" }));
+    });
+  }
+
+  it.each([
+    ["`api`", true],
+    ["`mock`", false],
+  ])("%s : un seul `place_added` { method: \"button\" } après une application aboutie, sans nom ni `placeId`", async (_, api) => {
+    const recorder = createMemoryRecorder();
+    renderScreen(fakeCalls(), { api, recorder });
+    await choisirEtVoir("Ma librairie");
+    expect(recorder.events).toEqual([]);
+    await appliquer();
+    await waitFor(() => expect(recorder.events).toEqual([{ name: "place_added", properties: { method: "button" } }]));
+    const mesure = JSON.stringify(recorder.events);
+    for (const interdit of ["Ma librairie", NOM_GOOGLE, ADRESSE_GOOGLE, "ChIJ-M5D-1", "bouquiniste"]) expect(mesure).not.toContain(interdit);
+  });
+
+  it.each<[string, ApiError]>([
+    ["`no_option` `place_closed`", { code: "no_option", retryable: false, cause: "place_closed" }],
+    ["`no_option` sans `cause`", { code: "no_option", retryable: false }],
+    ["`provider_error`", { code: "provider_error", retryable: true }],
+  ])("refus à l'application (%s) : aucun `place_added`", async (_, error) => {
+    const recorder = createMemoryRecorder();
+    const calls = fakeCalls({ applyAddPlace: vi.fn(async (): Promise<Result<PatchResult>> => ({ ok: false, error })) });
+    renderScreen(calls, { api: true, recorder });
+    await choisirEtVoir("Ma librairie");
+    await appliquer();
+    expect(calls.applyAddPlace).toHaveBeenCalledTimes(1);
+    // Laisse le temps au chargement paresseux de la mesure, s'il avait été déclenché.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(recorder.events).toEqual([]);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("réponse perdue à l'application : aucun `place_added`", async () => {
+    const recorder = createMemoryRecorder();
+    const calls = fakeCalls({ applyAddPlace: vi.fn(async (): Promise<Result<PatchResult>> => Promise.reject(new Error("réseau"))) });
+    renderScreen(calls, { api: true, recorder });
+    await choisirEtVoir("Ma librairie");
+    await appliquer();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(recorder.events).toEqual([]);
+  });
+});
+
 /** Jour du critère 22 sans temps libre assez long : A 09:00 – 10:30, temps libre 10:30 – 11:15, B et D verrouillées, C. */
 const etape = (id: string, start: string, end: string, locked = false): DayLineItem => ({
   type: "stop",
@@ -369,7 +454,7 @@ describe("ajouter: critère 22 sur `mock`", () => {
     });
     expect(calls.previewAddPlace).toHaveBeenCalledWith(expect.objectContaining({ day: 2, time: "10:30", kind: "activity" }));
     expect(await calls.previewAddPlace.mock.results[0]?.value).toMatchObject({ ok: false, error: { code: "no_option" } });
-    const bandeau = container.querySelector("[data-part='bandeau-pas-de-place']");
+    const bandeau = container.querySelector("[data-part='bandeau-sans-option']");
     expect(bandeau).toHaveTextContent("Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour.");
     expect(bandeau).toHaveFocus();
     expect(screen.queryByRole("button", { name: "Appliquer" })).toBeNull();
