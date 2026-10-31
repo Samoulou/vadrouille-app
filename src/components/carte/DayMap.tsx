@@ -1,6 +1,6 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType, type MouseEvent, type ReactNode } from "react";
 
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -8,18 +8,44 @@ import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
 import { isMapConfigComplete, useCarteInjection } from "./config";
+import type { GoogleMapRendererProps } from "./GoogleMapRenderer";
 import { MAP_FALLBACK_TEXTS, MapFallback, type MapFallbackCause } from "./MapFallback";
 import { buildCityOverview, buildDayRoute, buildOverview, type DayRoute, type Moitie, type RouteDay, type RouteMap, type VilleDuJour } from "./route";
 import type { FitPadding, MapView } from "./types";
 
 const t = messages.carte;
 
+/** Props du rendu Google chargé à la demande, plus le rechargement de son bloc (« Réessayer » après un échec du bloc). */
+type RenduGoogleProps = GoogleMapRendererProps & { onReload: () => void };
+
+/**
+ * Bloc du rendu Google qui n'a pas pu être téléchargé (réseau instable, déploiement qui change les blocs) : même état
+ * « erreur de chargement » que l'échec de l'API Google (F4-PO-8), annoncé par la région live, sans texte nouveau ;
+ * « Réessayer » retélécharge le bloc. L'erreur ne remonte jamais à `error.tsx` : la liste reste utilisable.
+ */
+function EchecDuBloc({ placesFromGoogle, onErrorChange, onReload }: RenduGoogleProps) {
+  useEffect(() => {
+    onErrorChange?.(true);
+    return () => onErrorChange?.(false);
+  }, [onErrorChange]);
+  return <MapFallback cause="error" placesFromGoogle={placesFromGoogle} onRetry={onReload} />;
+}
+
 /**
  * Rendu Google chargé à la demande (décision 0152 § 4, ticket 991) : il n'est monté qu'en ligne, avec des positions et
  * une configuration complète. Hors ligne, sans position ou sans configuration, l'écran n'en télécharge rien. Repli
  * `null` pendant le chargement du bloc : la région live reste vide, comme pendant le chargement des scripts Google.
+ * Un échec du téléchargement donne `EchecDuBloc` au lieu d'une exception ; `React.lazy` gardant ce résultat, « Réessayer »
+ * remplace le composant paresseux par un nouveau, qui retente l'import.
  */
-const GoogleMapRenderer = lazy(() => import("./GoogleMapRenderer").then((loaded) => ({ default: loaded.GoogleMapRenderer })));
+const chargerRenduGoogle = () =>
+  lazy<ComponentType<RenduGoogleProps>>(() =>
+    import("./GoogleMapRenderer").then(
+      (loaded) => ({ default: loaded.GoogleMapRenderer }),
+      () => ({ default: EchecDuBloc }),
+    ),
+  );
+let RenduGoogle = chargerRenduGoogle();
 
 export type DayMapProps =
   | {
@@ -103,6 +129,12 @@ export type DayMapProps =
 export function DayMap(props: DayMapProps) {
   const online = useOnline();
   const [loadError, setLoadError] = useState(false);
+  // Nouveau composant paresseux après un échec du bloc (« Réessayer ») : le compteur force le rendu qui le lit.
+  const [, setTentativeDuBloc] = useState(0);
+  const rechargerLeBloc = useCallback(() => {
+    RenduGoogle = chargerRenduGoogle();
+    setTentativeDuBloc((value) => value + 1);
+  }, []);
   const { config, simulated: Simulated } = useCarteInjection();
   const configComplete = isMapConfigComplete(config);
 
@@ -194,11 +226,12 @@ export function DayMap(props: DayMapProps) {
   } else {
     content = (
       <Suspense fallback={null}>
-        <GoogleMapRenderer
+        <RenduGoogle
           view={view}
           config={{ apiKey: config.apiKey ?? "", mapId: config.mapId ?? "" }}
           placesFromGoogle={props.placesFromGoogle}
           onErrorChange={setLoadError}
+          onReload={rechargerLeBloc}
         />
       </Suspense>
     );

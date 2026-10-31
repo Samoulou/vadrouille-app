@@ -40,6 +40,15 @@ beforeEach(() => {
   loader.importLibrary.mockReturnValue(new Promise(() => {}));
 });
 
+/**
+ * Drapeau positif avant une négation sur le chargement Google (ticket 991) : l'état de remplacement attendu est rendu et le
+ * rendu Google, chargé à la demande, n'est pas monté ; une négation ne peut donc pas passer pendant le chargement du bloc.
+ */
+function expectNoGoogleRenderer(cause: "offline" | "unavailable") {
+  expect(document.querySelector(`[data-fallback='${cause}']`)).not.toBeNull();
+  expect(document.querySelector("[data-renderer='google']")).toBeNull();
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
@@ -58,6 +67,7 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
     renderMap(EMPTY);
     act(() => setOnline(true));
     expect(screen.getByRole("status")).toHaveTextContent(t.indisponible);
+    expectNoGoogleRenderer("unavailable");
     expect(loader.importLibrary).not.toHaveBeenCalled();
   });
 
@@ -67,6 +77,7 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
     renderMap(FAKE);
     await act(async () => {});
     expect(screen.getByRole("status")).toHaveTextContent(t.horsLigne);
+    expectNoGoogleRenderer("offline");
     expect(screen.queryByText(t.erreur)).toBeNull();
     expect(loader.setOptions).not.toHaveBeenCalled();
     expect(loader.importLibrary).not.toHaveBeenCalled();
@@ -90,6 +101,7 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
     const { container } = renderMap(injection);
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent(t.indisponible);
+    expectNoGoogleRenderer("unavailable");
     expect(screen.queryByRole("button")).toBeNull();
     expect(loader.setOptions).not.toHaveBeenCalled();
     expect(loader.importLibrary).not.toHaveBeenCalled();
@@ -103,6 +115,7 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
     vi.stubEnv("NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID", "");
     render(<DayMap {...dayProps} />);
     expect(screen.getByRole("status")).toHaveTextContent(t.indisponible);
+    expectNoGoogleRenderer("unavailable");
     expect(loader.importLibrary).not.toHaveBeenCalled();
   });
 
@@ -112,6 +125,7 @@ describe("DayMap : précédence des états de remplacement (rendu Google, biblio
       const { unmount } = renderMap(FAKE, { ...dayProps, map });
       expect(screen.getByRole("status")).toHaveTextContent(t.indisponible);
       expect(screen.queryByRole("button", { name: t.reessayer })).toBeNull();
+      expectNoGoogleRenderer("unavailable");
       unmount();
     }
     expect(loader.importLibrary).not.toHaveBeenCalled();
@@ -174,6 +188,7 @@ describe("DayMap : carte simulée injectée", () => {
     renderMap(SIMULATED_EMPTY);
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(document.querySelector("[data-renderer='simulated']")).not.toBeNull();
+    expect(document.querySelector("[data-renderer='google']")).toBeNull();
     expect(loader.importLibrary).not.toHaveBeenCalled();
   });
 
