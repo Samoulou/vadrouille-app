@@ -217,18 +217,37 @@ function finOccupee(ligne: DayLineItemSnapshot, configuration: ReglesReinjection
 }
 
 /**
- * « Temps libre » réécrit (0155 § 2.2) : entre la fin occupée des lignes datées déjà lues (la plus tardive) et le début de la
- * ligne datée suivante, un « Temps libre » par la règle de l'assemblage (`tempsLibreEntre`), posé juste après la dernière
- * ligne datée (avant un trajet, comme l'assemblage) ; collé à un temps libre qui finit à son début, il le prolonge.
+ * Zone du lieu réinjecté (revue de la PR 980, bloquants 1 et 2) : identifiants des lieux réinjectés du jour et intervalles
+ * `[début, fin)` des lignes retirées parce qu'elles les chevauchaient. Seuls les intervalles qui la touchent reçoivent un
+ * « Temps libre », et seules les paires qui contiennent un lieu réinjecté sont contrôlées en ordre et en chevauchement : le
+ * reste du jour est celui que l'IA a écrit (la chaîne inversée ne rejoue ni R2 ni R8 sur lui).
  */
-function avecTempsLibre(items: readonly DayLineItemSnapshot[], configuration: ReglesReinjection["configuration"]): DayLineItemSnapshot[] {
+export type ZoneDuLieu = {
+  readonly reinjectees: ReadonlySet<string>;
+  readonly liberes: readonly (readonly [number, number])[];
+};
+
+const estReinjectee = (ligne: DayLineItemSnapshot | undefined, zone: ZoneDuLieu): boolean => ligne?.type === "stop" && zone.reinjectees.has(ligne.stop.id);
+
+/**
+ * « Temps libre » réécrit (0155 § 2.2, borné par la revue de la PR 980, bloquant 1 ; amendement de § 2.2 par le Tech Lead,
+ * décision 0156) : entre la fin occupée des lignes datées déjà lues (la plus tardive) et le début de la ligne datée suivante,
+ * un « Temps libre » par la règle de l'assemblage (`tempsLibreEntre`), **seulement** si une borne de l'intervalle est un lieu
+ * réinjecté ou s'il recouvre une ligne retirée (`zone`) ; ailleurs, un écart brut entre deux lignes de l'IA (trajet et marge
+ * compris) n'est jamais un trou. Posé juste après la dernière ligne datée (avant un trajet, comme l'assemblage) ; collé à un
+ * temps libre qui finit à son début, il le prolonge.
+ */
+function avecTempsLibre(items: readonly DayLineItemSnapshot[], configuration: ReglesReinjection["configuration"], zone: ZoneDuLieu): DayLineItemSnapshot[] {
   const sortie: DayLineItemSnapshot[] = [];
   let occupee: number | undefined;
   let derniereDatee = -1;
   for (const ligne of items) {
     const debut = debutDate(ligne);
     if (debut !== undefined && occupee !== undefined) {
-      const libre = tempsLibreEntre(occupee, debut, configuration.seuilTempsLibreMinutes);
+      const [de, a] = [occupee, minutes(debut)];
+      const touche =
+        estReinjectee(sortie[derniereDatee], zone) || estReinjectee(ligne, zone) || zone.liberes.some(([r0, r1]) => de < r1 && r0 < a);
+      const libre = touche ? tempsLibreEntre(occupee, debut, configuration.seuilTempsLibreMinutes) : undefined;
       const precedente = sortie[derniereDatee];
       if (libre !== undefined && precedente?.type === "free" && precedente.to === libre.from) sortie[derniereDatee] = { ...precedente, to: libre.to };
       else if (libre !== undefined) sortie.splice((derniereDatee += 1), 0, libre);
@@ -277,15 +296,19 @@ function avecSegmentsDuLieu(items: readonly DayLineItemSnapshot[], stopId: strin
 
 /**
  * Cohérence de la ligne d'un jour réinjecté (fonction pure ; décision 0155 § 2.3), rejouée avec R3 seule (R1, R2 et R4 à R9
- * ne le sont pas) : lignes datées dans l'ordre et sans chevauchement (sauf entre deux étapes verrouillées dans la base,
- * B5-PO-6), terminus de début en tête et de fin en queue quand le jour en a, au plus un segment entre deux points, aucun
- * segment à travers un changement de ville, aucun trou au sens de 0155 § 2.2 (écart d'au moins `seuilTempsLibreMinutes` entre
- * la fin occupée des lignes datées lues et la suivante). Faux : la version entière n'est pas écrite (`ecritureRevision`).
+ * ne le sont pas). **Sur tout le jour** (structure) : terminus de début en tête et de fin en queue quand le jour en a, au plus
+ * un segment entre deux points, aucun segment à travers un changement de ville. **Dans la zone du lieu** (`zone` ; revue de
+ * la PR 980, bloquants 1 et 2) : chaque lieu réinjecté dans l'ordre des lignes datées et sans chevauchement avec aucune
+ * (sauf entre deux étapes verrouillées dans la base, B5-PO-6), et aucun trou au sens de 0155 § 2.2 (écart d'au moins
+ * `seuilTempsLibreMinutes` entre la fin occupée des lignes datées lues et la suivante) sur un intervalle qui touche la zone.
+ * Un chevauchement ou un écart entre deux lignes de l'IA sans rapport avec le lieu n'est pas contrôlé. Faux : la version
+ * entière n'est pas écrite (`ecritureRevision`).
  */
 export function ligneDuJourCoherente(
   jour: Pick<DaySnapshot, "items">,
   verrouilleesDansLaBase: ReadonlySet<string>,
   configuration: ReglesReinjection["configuration"],
+  zone: ZoneDuLieu,
 ): boolean {
   const { items } = jour;
   // Terminus à leur place.
@@ -309,22 +332,24 @@ export function ligneDuJourCoherente(
       apresChangement = false;
     }
   }
-  // Ordre et chevauchements des lignes datées.
+  // Ordre et chevauchements : paires qui contiennent un lieu réinjecté seulement.
   const datees = items.filter((ligne) => debutDate(ligne) !== undefined);
-  for (const [rang, ligne] of datees.entries()) {
-    const precedente = datees[rang - 1];
-    if (precedente !== undefined && minutes(debutDate(precedente)!) > minutes(debutDate(ligne)!)) return false;
-    const lu = intervalle(ligne);
-    if (lu === null) continue;
-    for (const autre of datees.slice(0, rang)) {
+  const verrouillee = (l: DayLineItemSnapshot) => l.type === "stop" && verrouilleesDansLaBase.has(l.stop.id);
+  for (const [rang, lieu] of datees.entries()) {
+    if (!estReinjectee(lieu, zone)) continue;
+    const debutLieu = minutes(debutDate(lieu)!);
+    const lu = intervalle(lieu)!;
+    for (const [autreRang, autre] of datees.entries()) {
+      if (autreRang === rang) continue;
+      const debutAutre = minutes(debutDate(autre)!);
+      if (autreRang < rang ? debutAutre > debutLieu : debutAutre < debutLieu) return false;
       const deja = intervalle(autre);
       if (deja === null || !(deja[0] < lu[1] && lu[0] < deja[1])) continue;
-      const verrouillee = (l: DayLineItemSnapshot) => l.type === "stop" && verrouilleesDansLaBase.has(l.stop.id);
-      if (!(verrouillee(ligne) && verrouillee(autre))) return false;
+      if (!(verrouillee(lieu) && verrouillee(autre))) return false;
     }
   }
-  // Aucun trou : la règle du temps libre n'ajoute ni ne prolonge rien.
-  const refaite = avecTempsLibre(items, configuration);
+  // Aucun trou dans la zone du lieu : la règle du temps libre n'y ajoute ni ne prolonge rien.
+  const refaite = avecTempsLibre(items, configuration, zone);
   return refaite.length === items.length && refaite.every((ligne, rang) => ligne === items[rang]);
 }
 
@@ -338,8 +363,9 @@ export function ligneDuJourCoherente(
  * - **segments** (§ 2.1, `avecSegmentsDuLieu`) : exactement un entre le lieu et chaque point voisin, au mode `regles.mode` ;
  *   aucune durée n'est écrite (l'instantané n'en porte pas) : la lecture suivante (B8b) la mesure pour le couple réel
  *   (`pointsDesSegments`), `travel_unknown` sinon, jamais une durée d'un autre couple ; deux segments voisins n'en font qu'un ;
- * - **temps libre** (§ 2.2, `avecTempsLibre`) : tout intervalle vide d'au moins le seuil reçoit un « Temps libre » par la
- *   règle de l'assemblage (`tempsLibreEntre`), si bien qu'un temps libre coupé par le lieu donne ses parts qui l'atteignent ;
+ * - **temps libre** (§ 2.2, `avecTempsLibre`) : tout intervalle vide d'au moins le seuil **dans la zone du lieu** (une borne
+ *   est le lieu, ou l'intervalle recouvre une ligne retirée) reçoit un « Temps libre » par la règle de l'assemblage
+ *   (`tempsLibreEntre`), si bien qu'un temps libre coupé par le lieu donne ses parts qui l'atteignent ; ailleurs, rien ;
  * - **cohérence** (§ 2.3, `ligneDuJourCoherente`), lue par `ecritureRevision`.
  * Un jour absent de la révision, ou un lieu déjà présent (même identifiant), est laissé tel quel ; sans lieu à soi réinjecté,
  * la version révisée est rendue telle quelle (même objet). Aucune trace propre à la personne : seuls les compteurs `places`
@@ -374,8 +400,19 @@ export function reinjecterLieuxASoi(base: TripSnapshot, revisee: TripSnapshot, r
       });
     };
     places += aPoser.length;
-    stopsRemoved += jour.items.filter((ligne) => ligne.type === "stop" && chevauche(ligne)).length;
-    let items: DayLineItemSnapshot[] = jour.items.filter((ligne) => !chevauche(ligne));
+    // Un seul passage : lignes gardées, étapes retirées comptées, intervalles libérés (zone du lieu).
+    let items: DayLineItemSnapshot[] = [];
+    const liberes: (readonly [number, number])[] = [];
+    for (const ligne of jour.items) {
+      if (!chevauche(ligne)) {
+        items.push(ligne);
+        continue;
+      }
+      if (ligne.type === "stop") stopsRemoved += 1;
+      const [debut, fin] = intervalle(ligne)!;
+      liberes.push([debut, Math.max(fin, debut + 1)]);
+    }
+    const zone: ZoneDuLieu = { reinjectees: new Set(aPoser.map((stop) => stop.id)), liberes };
     const poses = [...aPoser].sort((x, y) => minutes(x.start) - minutes(y.start));
     for (const stop of poses) {
       const rang = items.findIndex((ligne) => {
@@ -386,14 +423,18 @@ export function reinjecterLieuxASoi(base: TripSnapshot, revisee: TripSnapshot, r
     }
     for (const stop of poses) items = avecSegmentsDuLieu(items, stop.id, regles.mode);
     items = items.filter((ligne, i) => !(ligne.type === "segment" && items[i - 1]?.type === "segment"));
-    items = avecTempsLibre(items, regles.configuration);
-    if (!ligneDuJourCoherente({ items }, verrouilleesDansLaBase, regles.configuration)) coherente = false;
+    items = avecTempsLibre(items, regles.configuration, zone);
+    if (!ligneDuJourCoherente({ items }, verrouilleesDansLaBase, regles.configuration, zone)) coherente = false;
     return { ...jour, items };
   });
   return places === 0 ? inchangee : { instantane: { ...revisee, days }, places, stopsRemoved, coherente };
 }
 
-/** Version réinjectée seule (`reinjecterLieuxASoi`, voir son en-tête). */
+/**
+ * Version réinjectée seule (`reinjecterLieuxASoi`, voir son en-tête). Plus d'appelant de production depuis M5d-4
+ * (`ecritureRevision` passe par `versionDeLaRevision`) : gardée pour les tests, qui construisent avec elle une version de base
+ * ou lisent la seule version réinjectée (`tests/unit/programme/revision.test.ts`, `tests/db/lieu-a-soi.test.ts`).
+ */
 export function lieuxASoiReinjectes(base: TripSnapshot, revisee: TripSnapshot, regles: ReglesReinjection): TripSnapshot {
   return reinjecterLieuxASoi(base, revisee, regles).instantane;
 }
@@ -417,7 +458,8 @@ export function versionDeLaRevision(
  * Trace des lieux à soi réinjectés (décision 0155 § 2.4) : `recalcul.lieux_a_soi`, niveau `info`, une fois par passage de
  * l'étape `e` qui réinjecte au moins un lieu, après `verrousReportes`, par `ecritureRevision` seule. **Compteurs seulement**
  * (`places`, `stopsRemoved`) ; le compte peut inclure un passage dont la publication n'écrit rien (R3, cohérence, version
- * dépassée). Aucun lieu réinjecté : rien n'est écrit.
+ * dépassée), et un rejeu du lot peut compter deux fois le même lieu (revue de la PR 980, mineur 7 de la Sécurité) : biais de
+ * mesure seulement, aucune donnée de la personne. Aucun lieu réinjecté : rien n'est écrit.
  */
 export function journaliserReinjection(compteurs: { readonly places: number; readonly stopsRemoved: number }): void {
   if (compteurs.places === 0) return;

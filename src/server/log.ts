@@ -166,7 +166,8 @@ export const LOG_EVENTS = [
   // par passage qui en réinjecte au moins un, après R3 ; niveau `info`. **Compteurs seulement** (`CHAMPS_ADMIS_PAR_EVENEMENT`) :
   // `places` (lieux à soi réinjectés) et `stopsRemoved` (étapes de l'IA retirées parce qu'elles les chevauchaient). Jamais
   // `tripId`, `organizationId`, `generationRunId`, un nom, un `placeId` ni une heure. Le compte peut inclure un passage dont
-  // la publication n'écrit rien (R3, jour incohérent, version de base dépassée).
+  // la publication n'écrit rien (R3, jour incohérent, version de base dépassée), et un rejeu du lot peut compter deux fois le
+  // même lieu (biais de mesure seulement).
   "recalcul.lieux_a_soi",
   "log.unknown_event",
 ] as const;
