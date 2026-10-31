@@ -402,7 +402,7 @@ describe("ajouter: « Ajouter à ma journée » (`?idee=`, F7-PO-8, F7-PO-10 ; d
   });
 
   it("verdict Sécurité S2 (décision 0155, PR n° 972), nom sentinelle : rien avant « Rechercher », même envoi qu'une saisie, adresse sans le nom, stockage du navigateur vide", async () => {
-    const SENTINELLE = "SENTINELLE-IDEE-M5D3";
+    const SENTINELLE = "SENTINELLE-NOM-IDEE-M5D3";
     const avecSentinelle: Trip = {
       ...DEBLOQUE,
       days: DEBLOQUE.days.map((jour) => (jour.index === 2 && jour.surprise ? { ...jour, surprise: { ...jour.surprise, name: SENTINELLE } } : jour)),

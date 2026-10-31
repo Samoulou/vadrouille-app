@@ -135,18 +135,22 @@ test("ajouter: « Ajouter à ma journée » de « Surprends-moi » : « Lieu à 
   await sheet(page).getByRole("button", { name: "Surprends-moi" }).click();
   const lien = sheet(page).getByRole("link", { name: "Ajouter à ma journée" });
   await expect(lien).toHaveAttribute("href", `${AJOUTER_DEBLOQUE}?idee=j2-surprise-circus-lane`);
-  const recherches: string[] = [];
+  // Verdict Sécurité S2 (décision 0155, PR n° 972) : aucune action serveur avant « Rechercher » (en-tête `next-action`),
+  // puis une seule, dont le corps ne porte que `tripId`, `day` et `query` égal au champ.
+  const actions: string[] = [];
   page.on("request", (request) => {
-    if (request.method() === "POST" && (request.postData() ?? "").includes("query")) recherches.push(request.postData() ?? "");
+    if (request.headers()["next-action"] !== undefined) actions.push(request.postData() ?? "");
   });
   await lien.click();
   await expect(addTitle(page)).toBeFocused();
   await expect(searchField(page)).toHaveValue("[Circus Lane]");
   await expect(nameField(page)).toHaveCount(0);
-  expect(recherches).toEqual([]);
+  await searchField(page).focus();
+  expect(actions).toEqual([]);
   await searchField(page).press("Enter");
   await expect(sheet(page).locator("[data-part='annonce']")).toHaveText(/résultat/);
-  expect(recherches).toHaveLength(1);
+  expect(actions).toHaveLength(1);
+  expect(JSON.parse(actions[0] ?? "null")).toEqual([{ tripId: "mock_trip_edimbourg_debloque", day: 2, query: "[Circus Lane]" }]);
   await results(page).getByRole("radio").first().click();
   await expect(nameField(page)).toHaveValue("[Circus Lane]");
   await sheet(page).getByRole("button", { name: "Voir l'effet" }).click();
