@@ -215,6 +215,8 @@
     "moment": "{start} – {end}",
     "trajetsApres": "Temps de trajet calculé après l'ajout",
     "pasDePlace": "Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour.",
+    "lieuIntrouvable": "Ce lieu est introuvable. Ton programme est inchangé. Choisis un autre résultat ou cherche un autre nom.",
+    "lieuFerme": "Ce lieu est fermé définitivement. Ton programme est inchangé. Choisis un autre lieu.",
     "conflit": "Ton programme a changé entre-temps. Rien n'a été modifié.",
     "revoirEffet": "Revoir l'effet",
     "calculIndisponible": "Le calcul n'est pas disponible pour le moment. Ton programme est inchangé. Réessaie plus tard.",

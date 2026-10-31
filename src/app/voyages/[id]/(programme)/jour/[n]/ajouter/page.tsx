@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { devPagesEnabled } from "@/dev/flags";
 import { exigerSession } from "@/features/compte/session";
 import { DAY_PARAM_PATTERN, tripRoutes } from "@/features/sejour/routes";
 import { AjouterScreen, ajouterMetadata } from "@/features/sejour/screen-ajouter";
@@ -23,5 +24,5 @@ export default async function AjouterPage({ params, searchParams }: { params: Pa
   const { id, n } = await params;
   const routes = tripRoutes("/voyages", id);
   await exigerSession(DAY_PARAM_PATTERN.test(n) ? routes.jour(Number(n)) : routes.sejour());
-  return <AjouterScreen tripId={id} n={n} searchParams={await searchParams} />;
+  return <AjouterScreen tripId={id} n={n} searchParams={await searchParams} recorderKind={devPagesEnabled() ? "console" : "none"} />;
 }

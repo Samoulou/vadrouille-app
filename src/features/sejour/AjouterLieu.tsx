@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 
+import { createLazyTrack } from "@/analytics/lazy";
+import type { EventRecorder, RecorderKind } from "@/analytics/track";
 import { PlacesAttribution } from "@/components/carte/PlacesAttribution";
 import { Button } from "@/components/ligne/Button";
 import { IconButton } from "@/components/ligne/IconButton";
@@ -10,7 +12,7 @@ import { IconCroix } from "@/components/ligne/icons";
 import { SegmentedControl } from "@/components/ligne/SegmentedControl";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { ApiError, PatchResult, PlaceSearchResult, Result, RevisionPreview as RevisionPreviewData } from "@/contracts";
-import { PLACE_SEARCH_QUERY_LENGTH } from "@/contracts/values";
+import { ADDED_STOP_NAME_MAX, PLACE_SEARCH_QUERY_LENGTH } from "@/contracts/values";
 import { describedBy, EMPTY_LIVE_REGION_CLASS, INPUT_CLASS } from "@/features/creation/fields";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -38,12 +40,6 @@ import { useTripShell } from "./TripShell";
 const t = messages.sejour.ajouter;
 const rv = messages.revision;
 
-/**
- * Longueur maximale du nom saisi : `ADDED_STOP_NAME_MAX` de `src/contracts/patch.ts` (M5-PO-10), recopiée ici parce que
- * le navigateur n'importe que `@/contracts/values` (décision 0016 § 3.1) ; l'égalité est vérifiée par un test.
- */
-export const NOM_LIEU_MAX = 80;
-
 /** Actions serveur injectées (tests) ; celles de `@/server/actions/lieux` et `@/server/actions/retouches` par défaut. */
 export type AjouterLieuCalls = {
   searchPlaces(input: unknown): Promise<Result<PlaceSearchResult[]>>;
@@ -62,11 +58,16 @@ type Recherche =
   | { type: "error"; message: string };
 
 /**
- * Refus d'un aperçu ou d'une application, affichés par un bandeau, avec les textes de la décision 0154 (§ 1 et § 7) : tout
- * `no_option` dit le manque de place tant que le contrat ne dit pas la cause (lieu introuvable ou fermé : tâche de suivi,
- * prérequis de M1h) ; « trop de gestes » et le nombre maximal de versions n'ont pas de « Réessayer ».
+ * Refus d'un `no_option`, selon sa cause (`ApiError.cause`, décision 0155 § 1.1) : un texte par cause dans le même bandeau
+ * `noOption`, focus posé sur lui, aucune action (0154 § 1). `cause` absente se lit comme `no_room` (manque de place).
  */
-type Refus = "noOption" | "conflict" | "indisponible" | "tropDeGestes" | "tropDeVersions" | "enPreparation" | "nonDebloque" | "error";
+type RefusSansOption = "pasDePlace" | "lieuIntrouvable" | "lieuFerme";
+
+/**
+ * Refus d'un aperçu ou d'une application, affichés par un bandeau, avec les textes de la décision 0154 (§ 1 et § 7) ;
+ * « trop de gestes » et le nombre maximal de versions n'ont pas de « Réessayer ».
+ */
+type Refus = RefusSansOption | "conflict" | "indisponible" | "tropDeGestes" | "tropDeVersions" | "enPreparation" | "nonDebloque" | "error";
 
 type Phase =
   | { type: "idle" }
@@ -79,7 +80,7 @@ type Phase =
 function refusDe(error: ApiError): Refus {
   switch (error.code) {
     case "no_option":
-      return "noOption";
+      return error.cause === "place_not_found" ? "lieuIntrouvable" : error.cause === "place_closed" ? "lieuFerme" : "pasDePlace";
     case "version_conflict":
       return "conflict";
     case "provider_error":
@@ -98,7 +99,17 @@ function refusDe(error: ApiError): Refus {
   }
 }
 
-const TEXTE_REFUS: Readonly<Record<Exclude<Refus, "noOption" | "conflict">, string>> = {
+const TEXTE_SANS_OPTION: Readonly<Record<RefusSansOption, string>> = {
+  pasDePlace: t.pasDePlace,
+  lieuIntrouvable: t.lieuIntrouvable,
+  lieuFerme: t.lieuFerme,
+};
+
+function sansOption(refus: Refus): refus is RefusSansOption {
+  return refus === "pasDePlace" || refus === "lieuIntrouvable" || refus === "lieuFerme";
+}
+
+const TEXTE_REFUS: Readonly<Record<Exclude<Refus, RefusSansOption | "conflict">, string>> = {
   indisponible: t.calculIndisponible,
   tropDeGestes: t.tropDeGestes,
   tropDeVersions: t.tropDeVersions,
@@ -136,6 +147,10 @@ export interface AjouterLieuViewProps {
   calls?: AjouterLieuCalls;
   /** Identifiant de demande (tests) ; `crypto.randomUUID` par défaut. */
   newRequestId?: () => string;
+  /** Enregistreur des événements de mesure (`place_added`) ; aucun par défaut. */
+  recorderKind?: RecorderKind;
+  /** Enregistreur explicite (tests). */
+  recorder?: EventRecorder;
 }
 
 /**
@@ -158,12 +173,16 @@ export function AjouterLieuView({
   resultatsGoogle,
   calls = APPELS,
   newRequestId,
+  recorderKind = "none",
+  recorder,
 }: AjouterLieuViewProps) {
   const shell = useTripShell();
   const { day, routes, trip } = shell;
   const router = useRouter();
   const online = useOnline();
   const requestId = useMemo(() => newRequestId ?? (() => crypto.randomUUID()), [newRequestId]);
+  // Validation de la mesure chargée au premier événement seulement (hors du JavaScript initial, décision 0022 § 4).
+  const track = useMemo(() => createLazyTrack(recorderKind, recorder), [recorderKind, recorder]);
 
   const ids = useId();
   const searchId = `${ids}-recherche`;
@@ -347,7 +366,7 @@ export function AjouterLieuView({
     const refus = refusDe(error);
     setPhase({ type: "banner", refus });
     setStatus(null);
-    if (refus === "noOption") focus("noOption");
+    if (sansOption(refus)) focus("noOption");
   };
 
   const ask = async () => {
@@ -440,6 +459,8 @@ export function AjouterLieuView({
           }
         : {}),
     });
+    // Une mesure par application aboutie, sur `mock` comme sur `api` ; jamais sur un refus (décision 0155 § 4.2, F7-PO-18).
+    track({ name: "place_added", properties: { method: "button" } }).catch(() => {});
     router.push(routes.jour(dayIndex), { scroll: false });
   };
 
@@ -533,7 +554,7 @@ export function AjouterLieuView({
               id={nameId}
               type="text"
               value={name}
-              maxLength={NOM_LIEU_MAX}
+              maxLength={ADDED_STOP_NAME_MAX}
               required
               autoComplete="off"
               aria-invalid={nameError !== null || undefined}
@@ -623,12 +644,12 @@ export function AjouterLieuView({
             <RevisionPreview preview={phase.preview} onApply={apply} onCancel={backToDay} disabledBy={disabledBy} />
           </>
         ) : null}
-        {phase.type === "banner" && phase.refus === "noOption" ? (
-          <div ref={noOptionRef} tabIndex={-1} data-part="bandeau-pas-de-place" className="rounded-block">
-            <StatusBanner kind="noOption" message={t.pasDePlace} />
+        {phase.type === "banner" && sansOption(phase.refus) ? (
+          <div ref={noOptionRef} tabIndex={-1} data-part="bandeau-sans-option" className="rounded-block">
+            <StatusBanner kind="noOption" message={TEXTE_SANS_OPTION[phase.refus]} />
           </div>
         ) : null}
-        <div role="alert" className={phase.type === "banner" && phase.refus !== "noOption" ? undefined : EMPTY_LIVE_REGION_CLASS}>
+        <div role="alert" className={phase.type === "banner" && !sansOption(phase.refus) ? undefined : EMPTY_LIVE_REGION_CLASS}>
           {phase.type === "banner" && phase.refus === "conflict" ? (
             <StatusBanner
               kind="conflict"
@@ -641,7 +662,7 @@ export function AjouterLieuView({
               }
             />
           ) : null}
-          {phase.type === "banner" && phase.refus !== "noOption" && phase.refus !== "conflict" ? (
+          {phase.type === "banner" && !sansOption(phase.refus) && phase.refus !== "conflict" ? (
             <StatusBanner
               kind="error"
               announce={false}
