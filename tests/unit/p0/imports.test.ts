@@ -2118,6 +2118,14 @@ const FRONTIERE_P0R3B = {
       fichier: "src/server/routes/stripe-webhook.ts",
       admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
     },
+    // M6b (ticket 1005 ; décision 0157 § 1.6 point 1) : fichier `.ics`, seul module importé par le route handler
+    // `src/app/api/v1/voyages/[id]/calendrier/route.ts` (`ligne/route-handlers`), sur le modèle des webhooks ; module
+    // `server-only` sans directive, qui lit `serverEnv()` (origine de `APP_URL`) et le limiteur en base. Entrée relevée
+    // par `pnpm test` : verdict Sécurité à rendre à la revue de M6b.
+    {
+      fichier: "src/server/routes/calendrier.ts",
+      admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
+    },
     {
       fichier: "src/server/p0/page-acces.ts",
       admise: (f: string, source: string) => {
@@ -2368,6 +2376,7 @@ describe("p0: clé côté serveur seulement", () => {
       "src/server/actions/lieux.ts",
       "src/server/routes/simulated-webhook.ts",
       "src/server/routes/stripe-webhook.ts",
+      "src/server/routes/calendrier.ts",
       "src/server/p0/page-acces.ts",
     ]);
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);

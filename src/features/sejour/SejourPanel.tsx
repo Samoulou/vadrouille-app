@@ -25,6 +25,7 @@ import { accessUntil, formatTitreJour } from "@/lib/dates";
 import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
+import { AjouterAuCalendrier } from "./AjouterAuCalendrier";
 import { EventLines, eventRange } from "./EventLines";
 import type { LigneDuJour } from "./JoursParVille";
 import { useSejourOrigin } from "./SejourOrigin";
@@ -41,6 +42,11 @@ export interface SejourPanelProps {
   recorder?: EventRecorder;
   /** Horloge injectable (tests) ; `Date.now` par défaut. Fonction stable. */
   now?: () => number;
+  /**
+   * Adresse du fichier `.ics` (« Ajouter au calendrier », M6b, ticket 1005), décidée par la page serveur : adaptateurs
+   * `mock` et `api` et base `/voyages` seulement ; le lien n'est montré que pour un voyage débloqué (M6-PO-6).
+   */
+  calendrierHref?: string | null;
 }
 
 /** Nom accessible du compteur : « 1 réservation à faire », « 4 réservations à faire ». */
@@ -76,7 +82,7 @@ const JoursParVille = lazy(() => import("./JoursParVille").then((loaded) => ({ d
  * l'autre, en mémoire seulement (F5-PO-16). La validation de la mesure est chargée au premier cochage
  * (`createLazyTrack`), hors du JavaScript initial du Séjour.
  */
-export function SejourPanel({ recorderKind = "none", recorder, now: clock }: SejourPanelProps) {
+export function SejourPanel({ recorderKind = "none", recorder, now: clock, calendrierHref = null }: SejourPanelProps) {
   const { trip, routes, actions, placesFromGoogle, unlockHref, versionsHref } = useTripShell();
   // Journées « À débloquer » seulement avec un lien de déblocage (voyage non débloqué, routes `/voyages`, paiement simulé
   // disponible) : sans lui, la liste ne montre que les journées servies, comme avant.
@@ -295,6 +301,11 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
           </Button>
         ) : null}
       </section>
+
+      {calendrierHref && trip.unlocked ? (
+        // « Ajouter au calendrier » (M6b ; spécification M6 § 4) : voyage débloqué seulement (M6-PO-6). Place provisoire (U1).
+        <AjouterAuCalendrier href={calendrierHref} days={trip.days} />
+      ) : null}
 
       {versionsHref ? (
         // « Versions du programme » (M5b ; spécification M5 § 4) : en bas du Séjour, voyage débloqué seulement (M5-PO-1).

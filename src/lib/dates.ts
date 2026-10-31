@@ -100,3 +100,49 @@ export function accessUntil(end: string, days: number): string {
   const date = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, (day ?? 1) + days));
   return date.toISOString().slice(0, 10);
 }
+
+const DATE_ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
+const HEURE_HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const JOUR_MS = 86_400_000;
+const formateursDeFuseau = new Map<string, Intl.DateTimeFormat>();
+
+/** Heure murale de `instant` dans `timeZone`, rendue comme un instant UTC de même lecture (secondes, sans millisecondes). */
+function heureMurale(instant: number, timeZone: string): number {
+  let formateur = formateursDeFuseau.get(timeZone);
+  if (formateur === undefined) {
+    formateur = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    formateursDeFuseau.set(timeZone, formateur);
+  }
+  const valeurs: Record<string, number> = {};
+  for (const part of formateur.formatToParts(new Date(instant))) valeurs[part.type] = Number(part.value);
+  return Date.UTC(valeurs.year ?? 0, (valeurs.month ?? 1) - 1, valeurs.day ?? 1, valeurs.hour ?? 0, valeurs.minute ?? 0, valeurs.second ?? 0);
+}
+
+/**
+ * Instant d'une heure locale (décision 0157 § 1.6 point 5, M6b ; réutilisée par M6c) : `date` « AAAA-MM-JJ » et `heure`
+ * « HH:MM » lues dans le fuseau `timeZone` (IANA), par `Intl` seulement. Heure inexistante (passage à l'heure d'été) :
+ * décalée de la durée du saut ; heure ambiguë (retour à l'heure d'hiver) : la première occurrence (règle « compatible » de
+ * `Temporal`). Lève une `RangeError` pour une date, une heure ou un fuseau mal formés.
+ */
+export function instantLocal(date: string, heure: string, timeZone: string): Date {
+  const d = DATE_ISO.exec(date);
+  const h = HEURE_HHMM.exec(heure);
+  if (d === null || h === null) throw new RangeError("instantLocal : date ou heure mal formée");
+  const murale = Date.UTC(Number(d[1]), Number(d[2]) - 1, Number(d[3]), Number(h[1]), Number(h[2]));
+  if (new Date(murale).toISOString().slice(0, 10) !== date) throw new RangeError("instantLocal : date inexistante");
+  // Décalages de la veille et du lendemain : un fuseau change de décalage au plus une fois en 48 heures.
+  const decalageAvant = heureMurale(murale - JOUR_MS, timeZone) - (murale - JOUR_MS);
+  const decalageApres = heureMurale(murale + JOUR_MS, timeZone) - (murale + JOUR_MS);
+  const candidats = [murale - decalageAvant, murale - decalageApres].filter((instant) => heureMurale(instant, timeZone) === murale);
+  // Deux lectures (heure ambiguë) : la première ; aucune (saut) : décalage d'avant le saut, donc heure décalée du saut.
+  return new Date(candidats.length > 0 ? Math.min(...candidats) : murale - decalageAvant);
+}
