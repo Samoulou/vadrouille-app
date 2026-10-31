@@ -3,9 +3,7 @@ import "server-only";
 import {
   AddPlaceApplySchema,
   AddPlaceRequestSchema,
-  ApiErrorSchema,
   TripPatchSchema,
-  type ApiError,
   type Day,
   type DayLineItemSnapshot,
   type DaySnapshot,
@@ -29,6 +27,7 @@ import { lireDroitVoyage } from "@/server/payment/paiements";
 import { SQL_VERROU_TRI } from "@/server/presentation/etat";
 import { checkRateLimit } from "@/server/rate-limit";
 import { BaseDeVersionDepassee, ecrireVersion, lireLignesAFaire, verrouillerVersions } from "@/server/versions/ecrire";
+import { conflit, refus, type Issue } from "@/server/versions/issue";
 import { contexteVoyage, entreeMoteurDeRevision, refuserPendantUnRecalcul, SQL_PAR_DEMANDE, type ContexteVoyage } from "@/server/versions/remplacement";
 import { ACTION_LIMITEUR_RETOUCHE, erreurDuMoteur, patchDeLaPersonne, SQL_DERNIERE_VERSION } from "@/server/versions/retouches";
 import { executerActionVoyage, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
@@ -146,10 +145,6 @@ function etapesChangees(avant: TripSnapshot, apres: TripSnapshot, jours: readonl
 class AjoutIncoherent extends Error {
   override name = "AjoutIncoherent";
 }
-
-type Issue<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: ApiError };
-const refus = (error: ApiError): Issue<never> => ({ ok: false, error: ApiErrorSchema.parse(error) });
-const conflit = (currentVersion: number): Issue<never> => refus({ code: "version_conflict", retryable: true, currentVersion });
 
 /** Contexte lu dans la première transaction : le voyage, ses lignes « À faire » (aperçu seulement). */
 type Prepare = { readonly contexte: ContexteVoyage; readonly jour: DaySnapshot; readonly lignes: readonly LigneAFaire[] };
