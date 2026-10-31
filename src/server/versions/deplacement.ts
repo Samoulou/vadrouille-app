@@ -3,7 +3,6 @@ import "server-only";
 import { z } from "zod";
 
 import {
-  ApiErrorSchema,
   MoveDraftSchema,
   MoveOptionsSchema,
   TripPatchSchema,
@@ -38,6 +37,7 @@ import type { VersionDeChaine } from "@/server/voyages/conversion";
 import { lireBaseDeRevision, recomposerJourDeRevision, relireRevision, type BaseDeRevision } from "@/server/voyages/lecture";
 
 import { BaseDeVersionDepassee, ecrireVersion, lireLignesAFaire, verrouillerVersions } from "./ecrire";
+import { conflit, refus, type Issue } from "./issue";
 import { contexteVoyage, entreeMoteurDeRevision, lireVersion, refuserPendantUnRecalcul, SQL_PAR_DEMANDE, type ContexteVoyage } from "./remplacement";
 import { ACTION_LIMITEUR_RETOUCHE, erreurDuMoteur, patchDeLaPersonne, SQL_DERNIERE_VERSION } from "./retouches";
 
@@ -291,10 +291,6 @@ export function changementsDuRejeu(avant: TripSnapshot, apres: TripSnapshot, cib
 
 // --- Cas d'usage -----------------------------------------------------------------------------------------------
 
-type Refus = { readonly ok: false; readonly error: ApiError };
-type Issue<T> = { readonly ok: true; readonly value: T } | Refus;
-const refus = (error: ApiError): Refus => ({ ok: false, error: ApiErrorSchema.parse(error) });
-const conflit = (currentVersion: number): Refus => refus({ code: "version_conflict", retryable: true, currentVersion });
 const NON_DEBLOQUE: ApiError = { code: "not_unlocked", retryable: false };
 const ETAPE_REFUSEE: ApiError = { code: "validation_failed", field: "stopId" };
 

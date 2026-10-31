@@ -3,10 +3,8 @@ import "server-only";
 import type { AdapterContext } from "@/adapters/types";
 import {
   AddPlaceUndoSchema,
-  ApiErrorSchema,
   PatchResultSchema,
   TripPatchSchema,
-  type ApiError,
   type PatchResult,
   type Result,
 } from "@/contracts";
@@ -14,7 +12,9 @@ import type { ConfigurationMoteur } from "@/domain/configuration";
 import { lireDroitVoyage } from "@/server/payment/paiements";
 import { SQL_VERROU_TRI } from "@/server/presentation/etat";
 import { BaseDeVersionDepassee, ecrireVersion, verrouillerVersions } from "@/server/versions/ecrire";
+import { ajoutVerrouille } from "@/server/versions/formes";
 import { moteurDuRetour, patchDuRetour } from "@/server/versions/historique";
+import { conflit, refus, type Issue } from "@/server/versions/issue";
 import { contexteVoyage, lireVersion, refuserPendantUnRecalcul, SQL_PAR_DEMANDE, versionCourante } from "@/server/versions/remplacement";
 import { erreurDuMoteur } from "@/server/versions/retouches";
 import { executerActionVoyage, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
@@ -56,16 +56,15 @@ export type DependancesAnnulationAjout = DependancesAction & {
   readonly configuration?: ConfigurationMoteur;
 };
 
-type Issue<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: ApiError };
-const refus = (error: ApiError): Issue<never> => ({ ok: false, error: ApiErrorSchema.parse(error) });
-const conflit = (currentVersion: number): Issue<never> => refus({ code: "version_conflict", retryable: true, currentVersion });
-
-/** (h) Patch d'un ajout d'une personne : exactement `[add, lock]` sur un même `stopId` de la forme `ajout-…`. */
+/**
+ * (h) Patch d'un ajout d'une personne : exactement `[add, lock]` sur un même `stopId` (`ajoutVerrouille`, partagée avec
+ * `formeAdmise`, ticket 998) de la forme `ajout-…`, écrit par l'auteur `user`.
+ */
 export function estUnAjout(auteur: unknown, patch: unknown): boolean {
   const lu = TripPatchSchema.safeParse(patch);
-  if (!lu.success || auteur !== "user" || lu.data.operations.length !== 2) return false;
-  const [ajout, verrou] = lu.data.operations;
-  return ajout?.op === "add" && verrou?.op === "lock" && ajout.stopId === verrou.stopId && ajout.stopId.startsWith(PREFIXE_ETAPE_AJOUTEE);
+  if (!lu.success || auteur !== "user") return false;
+  const ajout = ajoutVerrouille(lu.data);
+  return ajout !== null && ajout.stopId.startsWith(PREFIXE_ETAPE_AJOUTEE);
 }
 
 /**

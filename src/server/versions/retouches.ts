@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import type { AdapterContext } from "@/adapters/types";
-import { ApiErrorSchema, TripPatchSchema, type ApiError, type PatchResult, type Result, type StopSnapshot, type TripPatch, type TripSnapshot } from "@/contracts";
+import { TripPatchSchema, type ApiError, type PatchResult, type Result, type StopSnapshot, type TripPatch, type TripSnapshot } from "@/contracts";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { appliquerPatch, type ResultatPatch } from "@/domain/patch";
 import { erreurDeVersion } from "@/domain/version";
@@ -14,6 +14,8 @@ import { checkRateLimit } from "@/server/rate-limit";
 import { executerActionVoyage, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
 
 import { BaseDeVersionDepassee, ecrireVersion, verrouillerVersions } from "./ecrire";
+import { ajoutVerrouille } from "./formes";
+import { conflit, refus, type Issue } from "./issue";
 import {
   contexteVoyage,
   entreeMoteurDeRevision,
@@ -63,13 +65,12 @@ export class PatchHorsForme extends Error {
   override name = "PatchHorsForme";
 }
 
-/** Vrai si le patch a l'une des formes de `FORMES_PATCH_PERSONNE` (`[add, lock]` : même étape). */
+/** Vrai si le patch a l'une des formes de `FORMES_PATCH_PERSONNE` (`[add, lock]` : même étape, `ajoutVerrouille`). */
 export function formeAdmise(patch: TripPatch): boolean {
   const ops = patch.operations.map((operation) => operation.op);
   const forme = FORMES_PATCH_PERSONNE.find((candidate) => candidate.length === ops.length && candidate.every((op, rang) => ops[rang] === op));
   if (forme === undefined) return false;
-  const [premiere, seconde] = patch.operations;
-  if (premiere?.op === "add") return seconde?.op === "lock" && seconde.stopId === premiere.stopId;
+  if (patch.operations[0]?.op === "add") return ajoutVerrouille(patch) !== null;
   return true;
 }
 
@@ -170,11 +171,6 @@ export type DependancesRetouche = DependancesAction & {
   readonly configuration?: ConfigurationMoteur;
 };
 
-type Issue = { readonly ok: true; readonly value: PatchResult } | { readonly ok: false; readonly error: ApiError };
-
-const refus = (error: ApiError): Issue => ({ ok: false, error: ApiErrorSchema.parse(error) });
-const conflit = (currentVersion: number): Issue => refus({ code: "version_conflict", retryable: true, currentVersion });
-
 /**
  * Rejeu d'une demande déjà écrite (même `requestId`) : la même réponse si c'est bien un verrou de la même sorte, sur la même
  * étape (revue de la PR 923, mineur 6), écrit par une personne (recalculée par le moteur depuis l'instantané de sa version de base : le patch stocké se rejoue tel quel),
@@ -187,7 +183,7 @@ async function rejeu(
   op: OperationDeVerrou,
   ligne: Record<string, unknown>,
   configuration?: ConfigurationMoteur,
-): Promise<Issue | null> {
+): Promise<Issue<PatchResult> | null> {
   const { tripId, stopId } = demande;
   const contexte = await contexteVoyage(executeur, ctx, tripId);
   if (contexte === null) return null;
@@ -210,7 +206,7 @@ async function rejeu(
 export async function basculerVerrou(dependances: DependancesRetouche, op: OperationDeVerrou, entree: unknown): Promise<Result<PatchResult>> {
   const limiteur = dependances.limiteur ?? limiteurParDefaut;
   const nom = op === "lock" ? "lock-stop" : "unlock-stop";
-  const lu = await executerActionVoyage(nom, dependances, DemandeVerrouSchema, entree, async (executeur, ctx, valeur): Promise<Issue | null> => {
+  const lu = await executerActionVoyage(nom, dependances, DemandeVerrouSchema, entree, async (executeur, ctx, valeur): Promise<Issue<PatchResult> | null> => {
     const org = ctx.organizationId;
     // (d) Déblocage, avant toute relecture (0147 § 8 point 2).
     // Lecture partagée avec B4a (`lireDroitVoyage`, revue de la PR 923, mineur 4) : organisation de la transaction par la RLS.

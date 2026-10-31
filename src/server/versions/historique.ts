@@ -2,7 +2,6 @@ import "server-only";
 
 import type { AdapterContext } from "@/adapters/types";
 import {
-  ApiErrorSchema,
   PatchResultSchema,
   RevertApplySchema,
   RevertPreviewRequestSchema,
@@ -32,6 +31,7 @@ import { checkRateLimit } from "@/server/rate-limit";
 import { executerActionVoyage, type ExecuteurAction } from "@/server/voyages/actions";
 
 import { BaseDeVersionDepassee, ecrireVersion, lireLignesAFaire, verrouillerVersions } from "./ecrire";
+import { conflit, refus, type Issue } from "./issue";
 import { contexteVoyage, entreeMoteurDeRevision, lireVersion, refuserPendantUnRecalcul, RELECTURES_INCONNUES, SQL_PAR_DEMANDE, versionCourante, type ContexteVoyage } from "./remplacement";
 import { ACTION_LIMITEUR_RETOUCHE, erreurDuMoteur, patchDeLaPersonne, SQL_DERNIERE_VERSION, type DependancesRetouche } from "./retouches";
 
@@ -211,10 +211,6 @@ export function moteurDuRetour(contexte: ContexteVoyage, patch: TripPatch, base:
 
 // --- Cas d'usage -----------------------------------------------------------------------------------------------
 
-type Issue<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: ApiError };
-
-const refus = (error: ApiError): Issue<never> => ({ ok: false, error: ApiErrorSchema.parse(error) });
-const conflit = (currentVersion: number): Issue<never> => refus({ code: "version_conflict", retryable: true, currentVersion });
 const versionNonProposee: ApiError = { code: "validation_failed", field: "toVersion" };
 
 const limiteurParDefaut = async (): Promise<Result<void>> => {
