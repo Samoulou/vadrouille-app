@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { isMapConfigComplete, useCarteInjection } from "./config";
 import { GoogleMapRenderer } from "./GoogleMapRenderer";
 import { MAP_FALLBACK_TEXTS, MapFallback, type MapFallbackCause } from "./MapFallback";
-import { buildDayRoute, buildOverview, type RouteDay, type RouteMap } from "./route";
+import { buildCityOverview, buildDayRoute, buildOverview, type Moitie, type RouteDay, type RouteMap, type VilleDuJour } from "./route";
 import type { FitPadding, MapView } from "./types";
 
 const t = messages.carte;
@@ -44,6 +44,13 @@ export type DayMapProps =
       visibleInsets?: FitPadding;
       /** Appelée quand le lien d'évitement est activé, avant que le focus aille sur la liste (F5 : relever le panneau). */
       onSkipToList?: () => void;
+      /**
+       * Journée d'un changement de ville (décision 0150 § 3) : villes quittée et d'arrivée (noms maison de `Trip.cities`).
+       * Avec un `transfer` dans `day.items`, les deux terminus sont nommés et étiquetés, et la carte cadre `moitie`.
+       */
+      transferCities?: { de: string; vers: string };
+      /** Moitié cadrée (« avant » ou « après » le `transfer`) ; absente : toute la journée. */
+      moitie?: Moitie;
       /** Contrôles posés sur la carte (« Retour »), après le lien d'évitement dans l'ordre de tabulation. */
       controls?: ReactNode;
       /** F4-PO-9 ; `false` avec l'adaptateur mock. */
@@ -60,6 +67,16 @@ export type DayMapProps =
       fitPadding?: FitPadding;
       /** Voir le mode « day » : son changement recadre la carte. */
       fitScope?: string;
+      /**
+       * Voyage à 2 villes ou plus (décision 0150 § 2) : noms de `Trip.cities` dans l'ordre, et ville de chaque jour de `days`
+       * (`villesDeLaDate`). Absents pour une ville : carte inchangée.
+       */
+      cities?: readonly string[];
+      citiesOfDays?: readonly VilleDuJour[];
+      /** Ville choisie dans « Afficher sur la carte » (nom maison) ; absente : toutes les villes. */
+      cityView?: string;
+      /** Partie de la carte couverte par le panneau : cadrage d'une ville réduite à une position (0150 § 3 bis). */
+      visibleInsets?: FitPadding;
       placesFromGoogle: boolean;
       className?: string;
     };
@@ -82,34 +99,66 @@ export function DayMap(props: DayMapProps) {
   const dayMap = props.mode === "day" ? props.map : null;
   const maps = props.mode === "overview" ? props.maps : null;
   const route = useMemo(() => (day ? buildDayRoute(day, dayMap) : null), [day, dayMap]);
-  const rings = useMemo(() => (maps ? buildOverview(maps) : null), [maps]);
+  const cityNames = props.mode === "overview" ? props.cities : undefined;
+  const citiesOfDays = props.mode === "overview" ? props.citiesOfDays : undefined;
+  const overviewDays = props.mode === "overview" ? props.days : null;
+  const multiCity = cityNames !== undefined && cityNames.length >= 2 && citiesOfDays !== undefined;
+  const rings = useMemo(() => (maps && !multiCity ? buildOverview(maps) : null), [maps, multiCity]);
+  const cityOverview = useMemo(
+    () => (maps && overviewDays && multiCity ? buildCityOverview(overviewDays, maps, citiesOfDays, cityNames) : null),
+    [maps, overviewDays, multiCity, citiesOfDays, cityNames],
+  );
 
   const selectedStopId = props.mode === "day" ? props.selectedStopId : undefined;
   const onMarkerPress = props.mode === "day" ? props.onMarkerPress : undefined;
   const fitPadding = props.fitPadding;
   const scope = props.fitScope ? `:${props.fitScope}` : "";
-  const visibleInsets = props.mode === "day" ? props.visibleInsets : undefined;
+  const visibleInsets = props.visibleInsets;
   const interactive = props.mode === "day" ? (props.interactiveMarkers ?? true) : true;
+  const transferDe = props.mode === "day" ? props.transferCities?.de : undefined;
+  const transferVers = props.mode === "day" ? props.transferCities?.vers : undefined;
+  // Journée d'un changement de ville : seulement avec un `transfer` dans la ligne et les deux villes connues.
+  const transfer = route?.moities && transferDe !== undefined && transferVers !== undefined ? { de: transferDe, vers: transferVers } : undefined;
+  const moitie = transfer && props.mode === "day" ? props.moitie : undefined;
+  const cityView = props.mode === "overview" && cityOverview ? props.cityView : undefined;
   const view = useMemo<MapView | null>(() => {
     if (route && day) {
       return {
         mode: "day",
-        fitKey: `jour-${day.index}${scope}`,
+        fitKey: transfer ? `jour-${day.index}:${moitie ?? "journee"}${scope}` : `jour-${day.index}${scope}`,
         route,
         selectedStopId,
         onMarkerPress,
         fitPadding,
         visibleInsets,
         ...(interactive ? {} : { interactive: false }),
+        ...(transfer ? { transferCities: transfer, ...(moitie ? { moitie } : {}) } : {}),
+      };
+    }
+    if (cityOverview) {
+      return {
+        mode: "overview",
+        fitKey: `sejour:${cityView === undefined ? "toutes" : `ville:${cityView}`}${scope}`,
+        rings: [],
+        cities: cityOverview,
+        ...(cityView === undefined ? {} : { cityView }),
+        fitPadding,
+        visibleInsets,
       };
     }
     if (rings) {
       return { mode: "overview", fitKey: `sejour${scope}`, rings, fitPadding };
     }
     return null;
-  }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding, visibleInsets, scope, interactive]);
+    // `transfer` est recréé à chaque rendu : ses deux noms suffisent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, day, rings, cityOverview, cityView, selectedStopId, onMarkerPress, fitPadding, visibleInsets, scope, interactive, transferDe, transferVers, moitie]);
 
-  const hasPositions = view ? (view.mode === "day" ? view.route.positions.length > 0 : view.mode === "overview" && view.rings.length > 0) : false;
+  const hasPositions = view
+    ? view.mode === "day"
+      ? view.route.positions.length > 0
+      : view.mode === "overview" && (view.rings.length > 0 || (view.cities?.all.length ?? 0) > 0)
+    : false;
   const needsConfig = !Simulated;
 
   useEffect(() => {

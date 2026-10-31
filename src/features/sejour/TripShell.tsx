@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -11,11 +13,13 @@ import {
   useReducer,
   useRef,
   useState,
+  type FocusEvent,
   type ReactNode,
 } from "react";
 import { flushSync } from "react-dom";
 
 import { DayMap } from "@/components/carte/DayMap";
+import { buildDayRoute, moitieInitiale, type Moitie } from "@/components/carte/route";
 import { DayTabs } from "@/components/ligne/DayTabs";
 import { IconRetour } from "@/components/ligne/icons";
 import { Sheet } from "@/components/ligne/Sheet";
@@ -26,6 +30,7 @@ import { weekdayOf } from "@/contracts/values";
 import * as messages from "@/i18n/messages";
 import { ShareButton } from "@/features/partage/ShareButton";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
+import { aPlusieursVilles, estChangementDeVille, villeDeLaDate } from "@/features/voyage/villes";
 import { cn } from "@/lib/utils";
 
 import { villeDeLaPastille } from "./pastille-ville";
@@ -48,8 +53,16 @@ import { tripRoutes, type TripRoutes, type TripRoutesBase } from "./routes";
 
 const t = messages.sejour;
 
+// Choix « Afficher sur la carte » (décision 0150) : rendu seulement à plusieurs villes ; chargé à la demande (décision 0152 § 4).
+const SegmentedControl = lazy(() => import("@/components/ligne/SegmentedControl").then((loaded) => ({ default: loaded.SegmentedControl })));
+
 /** Hauteur du panneau relevée par un marqueur, une fiche ou le lien d'évitement quand il est au plus bas (F5-PO-7, F5-PO-8). */
 const LOWEST: SnapPoint = 0.25;
+/** Option « Toutes les villes » du choix « Afficher sur la carte » (décision 0150 § 2 point 4). */
+const TOUTES_LES_VILLES = "toutes";
+/** Préfixe des options d'une ville : un nom de ville ne se confond jamais avec « toutes ». */
+const OPTION_VILLE = "ville:";
+
 /** Hauteur la plus haute du panneau : son bord est alors à hauteur de « Retour », posé sur la carte. */
 const HIGHEST: SnapPoint = Math.max(...SNAP_POINTS) as SnapPoint;
 
@@ -377,9 +390,27 @@ export function TripShell({
         : undefined
       : undefined;
 
+  // Carte à plusieurs villes (décision 0150) : ville de chaque jour (`villesDeLaDate`), noms maison de `Trip.cities`.
+  const cities = trip.cities;
+  const villes = useMemo(() => (aPlusieursVilles(cities) ? cities.map((city) => city.name) : undefined), [cities]);
+  const villesParJour = useMemo(
+    () => (villes ? trip.days.map((candidate) => villeDeLaDate(cities, candidate.date)) : undefined),
+    [villes, cities, trip.days],
+  );
+  const sejourAPositions = maps.some((map) => map.points.length > 0);
+  const dayMapData = day ? (maps.find((candidate) => candidate.dayIndex === day.index) ?? null) : null;
+  const villeDuJour = day ? villeDeLaDate(cities, day.date) : undefined;
+  const changement = estChangementDeVille(villeDuJour) ? villeDuJour : undefined;
+  const jourDeChangement = changement !== undefined;
+  // Journée d'un changement de ville : moitiés de la journée (étapes avant et après le `transfer`).
+  const routeDuJour = useMemo(() => (day && jourDeChangement ? buildDayRoute(day, dayMapData) : null), [day, jourDeChangement, dayMapData]);
+  const moities = routeDuJour?.moities && routeDuJour.positions.length > 0 ? routeDuJour : null;
+  // Étiquettes de ville dessinées : Séjour à 2 villes ou plus, Journée d'un changement de ville à deux terminus distincts.
+  const etiquettes = day ? (moities?.termini.length ?? 0) === 2 : villes !== undefined && sejourAPositions;
+
   // Hauteur du panneau, mesures de `main`, marge du cadrage et partie couverte de la carte (module commun).
   const [snap, setSnap] = useState<SnapPoint>(DEFAULT_SNAP);
-  const { mainRef, largeScreen, visibleInsets, fitPadding, fitScope } = useMapLayout(snap);
+  const { mainRef, largeScreen, visibleInsets, fitPadding, fitScope } = useMapLayout(snap, etiquettes);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Fiche : ouverte depuis le panneau du jour (« Fermer » revient dans l'historique) ou directement.
@@ -451,6 +482,23 @@ export function TripShell({
         : !fiche && markerSelection && markerSelection.dayIndex === dayIndex
           ? markerSelection.stopId
           : undefined;
+
+  // Vue de la carte (décision 0150, état d'écran, ni dans l'adresse ni stocké). Séjour : « Toutes les villes » à chaque
+  // affichage. Journée d'un changement de ville : moitié initiale à chaque changement de jour (§ 3 point 4), puis celle de
+  // l'étape sélectionnée quand elle est dans l'autre moitié (§ 3 point 5).
+  const [vueSejour, setVueSejour] = useState<{ dayIndex?: number; ville?: string }>({});
+  if (dayIndex !== vueSejour.dayIndex) setVueSejour({ dayIndex });
+  const villeChoisie = dayIndex === vueSejour.dayIndex ? vueSejour.ville : undefined;
+  const [moitieSuivie, setMoitieSuivie] = useState<{ dayIndex?: number; selection?: string; moitie: Moitie | null }>({ moitie: null });
+  let moitie = moitieSuivie.moitie;
+  if (dayIndex !== moitieSuivie.dayIndex) {
+    moitie = moities ? moitieInitiale(moities, selectedStopId) : null;
+    setMoitieSuivie({ dayIndex, selection: selectedStopId, moitie });
+  } else if (selectedStopId !== moitieSuivie.selection) {
+    const autre = moities?.stops.find((stop) => stop.stopId === selectedStopId)?.moitie;
+    if (autre) moitie = autre;
+    setMoitieSuivie({ dayIndex, selection: selectedStopId, moitie });
+  }
 
   // Marqueur touché : panneau relevé à 55 % s'il était à 25 %, liste défilée jusqu'à l'étape, focus laissé
   // sur le marqueur, adresse inchangée (F5-PO-7, F4-PO-4). Fiche ouverte : elle se ferme (adresse du jour
@@ -750,6 +798,60 @@ export function TripShell({
     />
   );
 
+  // Choix « Afficher sur la carte » (décision 0150 § 2 point 4 et § 3 point 4) : dans l'en-tête du panneau, sous les
+  // onglets, sur le Séjour à 2 villes ou plus et sur la Journée d'un changement de ville ; hors de la carte.
+  const choixCarte =
+    !day && !onVersions && villes && sejourAPositions
+      ? {
+          options: [
+            { value: TOUTES_LES_VILLES, label: t.carteCadrage.toutes },
+            ...villes.filter((ville, index) => villes.indexOf(ville) === index).map((ville) => ({ value: `${OPTION_VILLE}${ville}`, label: ville })),
+          ],
+          value: villeChoisie === undefined ? TOUTES_LES_VILLES : `${OPTION_VILLE}${villeChoisie}`,
+          onChange: (value: string) =>
+            setVueSejour({ dayIndex, ville: value.startsWith(OPTION_VILLE) ? value.slice(OPTION_VILLE.length) : undefined }),
+        }
+      : day && moities && changement
+        ? {
+            options: [
+              { value: "avant", label: changement.de },
+              { value: "apres", label: changement.vers },
+            ],
+            value: moitie,
+            onChange: (value: string) => setMoitieSuivie({ dayIndex, selection: selectedStopId, moitie: value === "apres" ? "apres" : "avant" }),
+          }
+        : null;
+  // Focus clavier sur une option, panneau au plus bas (mobile) : le panneau remonte à 55 % pour que l'option ne soit
+  // jamais masquée (WCAG 2.4.11) ; un toucher ou un clic sur une option visible ne le fait pas bouger.
+  const onChoixFocus = (event: FocusEvent<HTMLDivElement>) => {
+    if (largeScreen || snap !== LOWEST) return;
+    let clavier = false;
+    try {
+      clavier = event.target.matches(":focus-visible");
+    } catch {
+      clavier = false;
+    }
+    if (clavier) setSnap(DEFAULT_SNAP);
+  };
+  const header = choixCarte ? (
+    <>
+      {tabs}
+      <div data-part="choix-carte" className="px-4" onFocus={onChoixFocus}>
+        <Suspense fallback={null}>
+          <SegmentedControl
+            wrap
+            label={t.carteCadrage.nom}
+            options={choixCarte.options}
+            value={choixCarte.value}
+            onChange={choixCarte.onChange}
+          />
+        </Suspense>
+      </div>
+    </>
+  ) : (
+    tabs
+  );
+
   // Panneau au plus haut : le toast, posé au-dessus du panneau, est décalé à droite de « Retour »
   // (`left-3`, une cible tactile, puis `space-2`) pour ne jamais le recouvrir pendant ses 5 s. En grand écran,
   // il est posé sous le contenu du panneau latéral (il ne masque aucun élément focalisable, WCAG 2.4.11) ; sans
@@ -788,7 +890,7 @@ export function TripShell({
             <DayMap
               mode="day"
               day={day}
-              map={maps.find((candidate) => candidate.dayIndex === day.index) ?? null}
+              map={dayMapData}
               selectedStopId={selectedStopId}
               onMarkerPress={onMarkerPress}
               listId={DAY_LIST_ID}
@@ -798,6 +900,7 @@ export function TripShell({
               onSkipToList={onSkipToList}
               controls={controls}
               placesFromGoogle={placesFromGoogle}
+              {...(changement ? { transferCities: changement, ...(moitie ? { moitie } : {}) } : {})}
             />
           ) : (
             <DayMap
@@ -808,6 +911,9 @@ export function TripShell({
               fitPadding={fitPadding}
               fitScope={fitScope}
               placesFromGoogle={placesFromGoogle}
+              {...(villes && villesParJour
+                ? { cities: villes, citiesOfDays: villesParJour, visibleInsets, ...(villeChoisie === undefined ? {} : { cityView: villeChoisie }) }
+                : {})}
             />
           )}
         </div>
@@ -815,7 +921,7 @@ export function TripShell({
           label={fiche ? t.regionFiche : t.region}
           snap={snap}
           onSnapChange={setSnap}
-          header={tabs}
+          header={header}
           bodyRef={bodyRef}
           above={toastRegion}
           sideOnLargeScreen

@@ -1,17 +1,35 @@
 "use client";
 
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { StopMarker } from "@/components/ligne/StopMarker";
 
+import { DECALAGES_JOURNEE, DECALAGES_SEJOUR, nomRepere, nomTerminus, texteEtiquette } from "./city-names";
 import type { MapConfig } from "./config";
 import { cssLength, cssVar, defaultFitPadding, prefersReducedMotion } from "./css";
+import type { PlaceEtiquette } from "./etiquettes";
 import { MapFallback } from "./MapFallback";
 import { MarkerButton } from "./MarkerButton";
-import { areaCorners, boundsOf, offsetCenter, type LatLng, type StopMarkerSpec } from "./route";
-import type { MapView } from "./types";
+import { anneauVisible, areaCorners, boundsOf, offsetCenter, ZOOM_POSITION_SEULE, type LatLng, type StopMarkerSpec } from "./route";
+import { fitTargetOf, type MapView } from "./types";
+
+// Repères et étiquettes de ville (décision 0150) : chargés seulement à plusieurs villes (décision 0152 § 4).
+const CityMark = lazy(() => import("./CityLabel").then((loaded) => ({ default: loaded.CityMark })));
+
+/** Places des étiquettes de ville, mesurées à chaque `idle` ; la mesure est chargée à la demande. */
+function useLabelPlaces(): { places: Readonly<Record<string, PlaceEtiquette>>; measure: (container: HTMLElement | null) => void } {
+  const [places, setPlaces] = useState<Readonly<Record<string, PlaceEtiquette>>>({});
+  const measure = useCallback((container: HTMLElement | null) => {
+    if (!container) return;
+    void import("./CityLabel").then(({ mesurerEtiquettes }) => {
+      const next = Object.fromEntries(mesurerEtiquettes(container).map((place) => [place.key, place]));
+      setPlaces((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
+    });
+  }, []);
+  return { places, measure };
+}
 
 /**
  * Seules bibliothèques de la Maps JavaScript API chargées par F4 : aucune de Places, Routes,
@@ -39,15 +57,38 @@ async function loadLibraries(apiKey: string): Promise<Libraries> {
   return { maps: maps as google.maps.MapsLibrary, marker: marker as google.maps.MarkerLibrary };
 }
 
+/** Anneaux par ville attachés ou détachés selon le zoom et la vue choisie (décision 0150 § 2 point 3), sans reconstruction. */
+function attachRings(
+  rings: readonly { marker: google.maps.marker.AdvancedMarkerElement; city: string }[],
+  map: google.maps.Map,
+  zoom: number | null,
+  cityView: string | undefined,
+) {
+  for (const { marker, city } of rings) {
+    const target = anneauVisible(zoom, city, cityView) ? map : null;
+    if (marker.map !== target) marker.map = target;
+  }
+}
+
 /** Le marqueur sélectionné est dessiné au-dessus des autres. */
 function raise(marker: google.maps.marker.AdvancedMarkerElement, selected: boolean) {
   marker.zIndex = selected ? 2 : 1;
 }
 
+/** Repère de ville (décision 0150) : terminus nommé ou masqué, avec ou sans étiquette, dans un même hôte. */
+interface RepereHost {
+  key: string;
+  position: LatLng;
+  element: HTMLElement;
+  name?: string;
+  label?: { text: string; decalagesMax: number };
+}
+
 interface Hosts {
   stops: { spec: StopMarkerSpec; element: HTMLElement }[];
   termini: { position: LatLng; key: string; element: HTMLElement }[];
-  rings: { position: LatLng; element: HTMLElement }[];
+  rings: { position: LatLng; element: HTMLElement; city?: string }[];
+  reperes: RepereHost[];
 }
 
 /** Éléments hôtes des marqueurs avancés en HTML : React y rend `StopMarker` par des portails. */
@@ -55,19 +96,43 @@ function createHosts(view: MapView): Hosts {
   const host = () => document.createElement("div");
   if (view.mode === "area") {
     // Zone d'un quartier : un cercle, aucun marqueur en phase 0 (décision 0017 § 7).
-    return { stops: [], termini: [], rings: [] };
+    return { stops: [], termini: [], rings: [], reperes: [] };
   }
   if (view.mode === "overview") {
-    return { stops: [], termini: [], rings: view.rings.map((position) => ({ position, element: host() })) };
+    if (view.cities) {
+      // Plusieurs villes (décision 0150 § 2) : un repère par logement, dans l'ordre des villes ; anneaux par ville.
+      return {
+        stops: [],
+        termini: [],
+        rings: view.cities.rings.map(({ position, city }) => ({ position, city, element: host() })),
+        reperes: view.cities.markers.map((marker) => ({
+          key: marker.key,
+          position: marker.position,
+          element: host(),
+          ...(marker.primary ? { name: nomRepere(marker), label: { text: texteEtiquette(marker), decalagesMax: DECALAGES_SEJOUR } } : {}),
+        })),
+      };
+    }
+    return { stops: [], termini: [], rings: view.rings.map((position) => ({ position, element: host() })), reperes: [] };
   }
+  const transfer = view.transferCities;
+  const termini = view.route.termini.map((terminus) => ({ terminus, key: terminus.roles.join("-") }));
   return {
     stops: view.route.stops.map((spec) => ({ spec, element: host() })),
-    termini: view.route.termini.map((terminus) => ({
-      position: terminus.position,
-      key: terminus.roles.join("-"),
-      element: host(),
-    })),
+    termini: transfer ? [] : termini.map(({ terminus, key }) => ({ position: terminus.position, key, element: host() })),
     rings: [],
+    // Journée d'un changement de ville (décision 0150 § 3 point 1) : deux terminus nommés et étiquetés.
+    reperes: transfer
+      ? termini.map(({ terminus, key }) => {
+          const nom = nomTerminus(terminus, transfer);
+          return {
+            key,
+            position: terminus.position,
+            element: host(),
+            ...(nom ? { name: nom.name, label: { text: nom.city, decalagesMax: DECALAGES_JOURNEE } } : {}),
+          };
+        })
+      : [],
   };
 }
 
@@ -96,7 +161,16 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
   const lastSelection = useRef(selectedStopId);
   const onMarkerPressRef = useRef(view.mode === "day" ? view.onMarkerPress : undefined);
   // Lu au recentrage seulement : changer la zone couverte ne recadre ni ne recentre (décision 0015 § 4).
-  const visibleInsetsRef = useRef(view.mode === "day" ? view.visibleInsets : undefined);
+  const visibleInsetsRef = useRef(view.mode === "day" || view.mode === "overview" ? view.visibleInsets : undefined);
+  // Anneaux par ville (décision 0150 § 2 point 3) : attachés ou détachés au passage du zoom 10, sans reconstruction.
+  const ringMarkersRef = useRef<{ marker: google.maps.marker.AdvancedMarkerElement; city: string }[]>([]);
+  // Zoom lu après le premier cadrage (premier `idle`), puis à chaque `zoom_changed` ; `null` tant qu'il est inconnu.
+  const zoomRef = useRef<number | null>(null);
+  const cityViewRef = useRef(view.mode === "overview" ? view.cityView : undefined);
+  // Cadrage en cours (vue d'une ville ou moitié) : un recentrage demandé avant le prochain `idle` attend cet `idle`.
+  const fitInFlightRef = useRef(false);
+  const pendingPanRef = useRef<(() => void) | null>(null);
+  const labels = useLabelPlaces();
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
   const ready = status === "ready";
@@ -108,14 +182,18 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
   const areaRadius = view.mode === "area" ? view.radiusM : null;
   const fitKey = view.fitKey;
   const fitPadding = view.fitPadding;
-  // Les hôtes ne changent qu'avec le contenu (changement de jour), pas avec la sélection.
+  const cities = view.mode === "overview" ? view.cities : undefined;
+  const transferKey = view.mode === "day" && view.transferCities ? `${view.transferCities.de}|${view.transferCities.vers}` : "";
+  // Les hôtes ne changent qu'avec le contenu (changement de jour), pas avec la sélection ni avec la vue choisie.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const hosts = useMemo(() => (typeof document === "undefined" ? null : createHosts(view)), [route, rings, areaLat, areaLng, areaRadius]);
+  const hosts = useMemo(() => (typeof document === "undefined" ? null : createHosts(view)), [route, rings, cities, transferKey, areaLat, areaLng, areaRadius]);
 
   useEffect(() => {
     onMarkerPressRef.current = view.mode === "day" ? view.onMarkerPress : undefined;
-    visibleInsetsRef.current = view.mode === "day" ? view.visibleInsets : undefined;
+    visibleInsetsRef.current = view.mode === "day" || view.mode === "overview" ? view.visibleInsets : undefined;
   });
+  const multiCity = (view.mode === "overview" && view.cities !== undefined) || (view.mode === "day" && view.transferCities !== undefined);
+  const cityView = view.mode === "overview" ? view.cityView : undefined;
 
   // L'état d'erreur est annoncé par l'enveloppe ; au démontage, il n'y a plus d'erreur à annoncer.
   const onErrorChangeRef = useRef(onErrorChange);
@@ -179,8 +257,20 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
     const markers: google.maps.marker.AdvancedMarkerElement[] = [];
     const stopMarkers = stopMarkersRef.current;
     stopMarkers.clear();
-    for (const { position, element } of [...hosts.termini, ...hosts.rings]) {
+    const ringMarkers: { marker: google.maps.marker.AdvancedMarkerElement; city: string }[] = [];
+    for (const { position, element } of hosts.termini) {
       markers.push(new AdvancedMarkerElement({ map, position, content: element, zIndex: 0 }));
+    }
+    for (const { position, element, city } of hosts.rings) {
+      const visible = city === undefined || anneauVisible(zoomRef.current, city, cityViewRef.current);
+      const marker = new AdvancedMarkerElement({ map: visible ? map : null, position, content: element, zIndex: 0 });
+      if (city !== undefined) ringMarkers.push({ marker, city });
+      markers.push(marker);
+    }
+    ringMarkersRef.current = ringMarkers;
+    // Repères de ville, dans l'ordre des villes, au-dessus des anneaux (décision 0150 § 5).
+    for (const { position, element } of hosts.reperes) {
+      markers.push(new AdvancedMarkerElement({ map, position, content: element, zIndex: 1 }));
     }
     for (const { spec, element } of hosts.stops) {
       const marker = new AdvancedMarkerElement({ map, position: spec.position, content: element, zIndex: 1 });
@@ -230,21 +320,89 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
         })
       : null;
 
-    if (lastFitKey.current !== fitKey) {
-      lastFitKey.current = fitKey;
-      const box = boundsOf(route ? route.positions : area ? areaCorners(area.center, area.radiusM) : (rings ?? []));
-      if (box) {
-        map.fitBounds(box, fitPadding ?? defaultFitPadding());
-      }
-    }
-
     return () => {
       for (const marker of markers) marker.map = null;
       for (const polyline of polylines) polyline.setMap(null);
       circle?.setMap(null);
       stopMarkers.clear();
+      ringMarkersRef.current = [];
     };
-  }, [ready, hosts, route, rings, areaLat, areaLng, areaRadius, fitKey, fitPadding]);
+  }, [ready, hosts, route, areaLat, areaLng, areaRadius]);
+
+  // Anneaux par ville et étiquettes (décision 0150 § 2 point 3 et § 4) : zoom lu au premier `idle` puis à chaque
+  // `zoom_changed` ; place des étiquettes recalculée à chaque `idle` (après tout cadrage, glissement ou zoom).
+  const measureLabels = labels.measure;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !multiCity || typeof map.addListener !== "function") {
+      return;
+    }
+    const updateRings = () => attachRings(ringMarkersRef.current, map, zoomRef.current, cityViewRef.current);
+    const idle = map.addListener("idle", () => {
+      zoomRef.current = map.getZoom() ?? null;
+      updateRings();
+      measureLabels(containerRef.current);
+    });
+    const zoom = map.addListener("zoom_changed", () => {
+      if (zoomRef.current === null) return;
+      zoomRef.current = map.getZoom() ?? null;
+      updateRings();
+    });
+    return () => {
+      idle.remove();
+      zoom.remove();
+    };
+  }, [ready, multiCity, measureLabels]);
+
+  // Vue d'une ville choisie : ses anneaux toujours attachés, les autres selon le zoom (sans reconstruction).
+  useEffect(() => {
+    cityViewRef.current = cityView;
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    attachRings(ringMarkersRef.current, map, zoomRef.current, cityView);
+  }, [ready, cityView, hosts]);
+
+  // Cadrage au premier affichage, à chaque changement de jour et, à plusieurs villes, à chaque changement de vue.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !hosts || lastFitKey.current === fitKey) {
+      return;
+    }
+    lastFitKey.current = fitKey;
+    const target = fitTargetOf(view);
+    const area = areaLat !== null && areaLng !== null && areaRadius !== null ? { lat: areaLat, lng: areaLng } : null;
+    const positions = target
+      ? target.positions
+      : route
+        ? route.positions
+        : area && areaRadius !== null
+          ? areaCorners(area, areaRadius)
+          : (rings ?? []);
+    const box = boundsOf(positions);
+    if (!box) {
+      return;
+    }
+    if (target?.single && box.north === box.south && box.east === box.west) {
+      // Une seule position (décision 0150 § 3 bis) : au milieu de la zone non couverte par le panneau, zoom 15.
+      map.setZoom(ZOOM_POSITION_SEULE);
+      map.setCenter(offsetCenter({ lat: box.north, lng: box.east }, visibleInsetsRef.current, ZOOM_POSITION_SEULE));
+    } else {
+      map.fitBounds(box, fitPadding ?? defaultFitPadding());
+    }
+    if (target && typeof map.addListener === "function") {
+      // Un recentrage demandé dans le même rendu (sélection dans l'autre moitié) attend que le cadrage soit appliqué.
+      fitInFlightRef.current = true;
+      const listener = map.addListener("idle", () => {
+        listener.remove();
+        fitInFlightRef.current = false;
+        const pan = pendingPanRef.current;
+        pendingPanRef.current = null;
+        pan?.();
+      });
+    }
+    // La vue est lue au moment du changement de `fitKey` seulement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, hosts, fitKey]);
 
   // Sélection : marqueur au-dessus des autres ; recentrage sans changer le zoom quand elle change.
   useEffect(() => {
@@ -263,12 +421,20 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
     if (!target) {
       return;
     }
-    // Un seul appel : l'étape au milieu de la zone non couverte par le panneau (pas panTo puis panBy).
-    const center = offsetCenter(target.position, visibleInsetsRef.current, map.getZoom() ?? 0);
-    if (prefersReducedMotion()) {
-      map.setCenter(center);
+    // Un seul appel : l'étape au milieu de la zone non couverte par le panneau (pas panTo puis panBy). Après un
+    // recadrage du même rendu (autre moitié, décision 0150 § 3 point 5), au zoom lu après son `idle`.
+    const pan = () => {
+      const center = offsetCenter(target.position, visibleInsetsRef.current, map.getZoom() ?? 0);
+      if (prefersReducedMotion()) {
+        map.setCenter(center);
+      } else {
+        map.panTo(center);
+      }
+    };
+    if (fitInFlightRef.current) {
+      pendingPanRef.current = pan;
     } else {
-      map.panTo(center);
+      pan();
     }
   }, [ready, selectedStopId, route, hosts]);
 
@@ -309,6 +475,18 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
                 </span>,
                 element,
                 `terminus-${key}`,
+              ),
+            ),
+            ...hosts.reperes.map(({ key, element, name, label }) =>
+              createPortal(
+                <Suspense fallback={null}>
+                  <CityMark
+                    name={name}
+                    label={label ? { placeKey: key, text: label.text, place: labels.places[key], decalagesMax: label.decalagesMax } : undefined}
+                  />
+                </Suspense>,
+                element,
+                `repere-${key}`,
               ),
             ),
             ...hosts.rings.map(({ element }, index) =>

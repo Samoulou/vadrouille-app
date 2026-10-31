@@ -31,6 +31,12 @@ export interface SegmentedControlProps<T extends string> {
    */
   orientation?: "horizontal" | "vertical";
   /**
+   * Horizontal seulement (décision 0150 § 2 point 4) : les options gardent leur largeur naturelle (au moins une cible
+   * tactile) et passent sur une rangée suivante quand elles ne tiennent pas ; un libellé plus large que la rangée passe
+   * à la ligne, jamais tronqué. Sans elle, rendu inchangé.
+   */
+  wrap?: boolean;
+  /**
    * Valeur déduite (brief raconté, décision 0017 § 6, F8-TL-4) : son option porte la marque « déduit » tant
    * qu'elle est choisie. L'écran la retire dès que la personne touche au groupe. Sans elle, rien ne change.
    */
@@ -61,6 +67,7 @@ export function SegmentedControl<T extends string>({
   label,
   labelledBy,
   orientation = "horizontal",
+  wrap = false,
   inferredValue,
   describedBy,
   invalid = false,
@@ -82,6 +89,7 @@ export function SegmentedControl<T extends string>({
   const inferred = inferredValue !== undefined && value === inferredValue;
   const description = [inferred ? inferredId : undefined, describedBy].filter(Boolean).join(" ") || undefined;
   const vertical = orientation === "vertical";
+  const wrapped = wrap && !vertical;
 
   return (
     <div
@@ -100,6 +108,7 @@ export function SegmentedControl<T extends string>({
         // l'anneau de focus (`outline`) que le groupe reçoit avec l'erreur.
         "aria-invalid:ring-(length:--ligne-trait-controle) aria-invalid:ring-ink aria-invalid:ring-inset",
         vertical && "flex-col",
+        wrapped && "flex-wrap",
         className,
       )}
     >
@@ -119,7 +128,11 @@ export function SegmentedControl<T extends string>({
             onKeyDown={(event) => radio.onKeyDown(event, index)}
             className={cn(
               "inline-flex min-h-(--touch-target) cursor-pointer items-center gap-1 rounded-control text-corps",
-              vertical ? "w-full justify-start px-4 text-left" : "flex-1 justify-center px-3",
+              vertical
+                ? "w-full justify-start px-4 text-left"
+                : wrapped
+                  ? "min-w-(--touch-target) flex-auto justify-center px-3 text-center wrap-anywhere"
+                  : "flex-1 justify-center px-3",
               marked
                 ? "border-(length:--ligne-trait-controle) border-dashed border-ink bg-raised bg-clip-padding font-bold text-ink"
                 : checked
