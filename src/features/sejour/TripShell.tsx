@@ -402,9 +402,9 @@ export function TripShell({
   const villeDuJour = day ? villeDeLaDate(cities, day.date) : undefined;
   const changement = estChangementDeVille(villeDuJour) ? villeDuJour : undefined;
   const jourDeChangement = changement !== undefined;
-  // Journée d'un changement de ville : moitiés de la journée (étapes avant et après le `transfer`).
-  const routeDuJour = useMemo(() => (day && jourDeChangement ? buildDayRoute(day, dayMapData) : null), [day, jourDeChangement, dayMapData]);
-  const moities = routeDuJour?.moities && routeDuJour.positions.length > 0 ? routeDuJour : null;
+  // Tracé du jour, calculé une fois et passé à la carte ; un changement de ville y lit ses moitiés (avant et après le `transfer`).
+  const routeDuJour = useMemo(() => (day ? buildDayRoute(day, dayMapData) : null), [day, dayMapData]);
+  const moities = jourDeChangement && routeDuJour?.moities && routeDuJour.positions.length > 0 ? routeDuJour : null;
   // Étiquettes de ville dessinées : Séjour à 2 villes ou plus, Journée d'un changement de ville à deux terminus distincts.
   const etiquettes = day ? (moities?.termini.length ?? 0) === 2 : villes !== undefined && sejourAPositions;
 
@@ -837,7 +837,14 @@ export function TripShell({
     <>
       {tabs}
       <div data-part="choix-carte" className="px-4" onFocus={onChoixFocus}>
-        <Suspense fallback={null}>
+        {/* Repli : le rail vide d'une rangée (`p-1`, une cible tactile), pour que l'en-tête ne grandisse pas au chargement. */}
+        <Suspense
+          fallback={
+            <div aria-hidden="true" data-part="choix-carte-reserve" className="rounded-control bg-muted p-1">
+              <div className="min-h-(--touch-target)" />
+            </div>
+          }
+        >
           <SegmentedControl
             wrap
             label={t.carteCadrage.nom}
@@ -891,6 +898,7 @@ export function TripShell({
               mode="day"
               day={day}
               map={dayMapData}
+              {...(routeDuJour ? { route: routeDuJour } : {})}
               selectedStopId={selectedStopId}
               onMarkerPress={onMarkerPress}
               listId={DAY_LIST_ID}

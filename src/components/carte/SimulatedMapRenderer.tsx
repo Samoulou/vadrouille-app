@@ -5,8 +5,9 @@ import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent as Re
 import { StopMarker } from "@/components/ligne/StopMarker";
 import { useElementSize } from "@/lib/use-element-size";
 
-import { CityMark, DECALAGES_JOURNEE, DECALAGES_SEJOUR, nomRepere, nomTerminus, texteEtiquette, useCityLabelPlaces } from "./CityLabel";
+import { CityMark, DECALAGES_JOURNEE, DECALAGES_SEJOUR, mesurerEtiquettes, nomRepere, nomTerminus, texteEtiquette } from "./CityLabel";
 import { defaultFitPadding } from "./css";
+import { useLabelPlaces } from "./label-places";
 import { MarkerButton } from "./MarkerButton";
 import { anneauVisible, areaRadiusDegrees, boundsOf, ZOOM_POSITION_SEULE, type LatLng } from "./route";
 import { drag, fitCamera, offsetCamera, project, scaleAt, type Camera, type Size } from "./simulated-model";
@@ -128,7 +129,7 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
   const ready = camera !== null && size !== null;
 
   // Étiquettes de ville : côté et décalage recalculés à chaque rendu (décision 0150 § 4).
-  const labels = useCityLabelPlaces();
+  const labels = useLabelPlaces(mesurerEtiquettes);
   const measureLabels = labels.measure;
   const containerElement = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {

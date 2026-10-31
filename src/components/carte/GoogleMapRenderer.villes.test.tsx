@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { applyTokens } from "../../../tests/unit/carte-fixtures";
 import { carteDe, jourDe, parisBerlin, romeFlorence, sansEtapes, villesParJour } from "../../../tests/unit/carte-villes-fixtures";
 
-import { GoogleMapRenderer, MAPS_LIBRARIES } from "./GoogleMapRenderer";
+import { CADRAGE_IDLE_MAX_MS, GoogleMapRenderer, MAPS_LIBRARIES } from "./GoogleMapRenderer";
 import { boundsOf, buildCityOverview, buildDayRoute, offsetCenter } from "./route";
 import type { FitPadding, MapView } from "./types";
 
@@ -200,6 +200,33 @@ describe("M4-suite-carte: sélection dans l'autre moitié (rendu Google)", () =>
     act(() => map().emit("idle"));
     expect(map().panTo).toHaveBeenCalledTimes(1);
     expect(map().panTo).toHaveBeenCalledWith(offsetCenter(route.stops[2]!.position, INSETS, 16));
+  });
+
+  it("cadrage sans idle (vue inchangée) : le recentrage en attente part après CADRAGE_IDLE_MAX_MS", async () => {
+    const { rerender } = render(<GoogleMapRenderer view={journee(romeFlorence, { moitie: "avant" })} config={CONFIG} placesFromGoogle={false} />);
+    await act(async () => {});
+    act(() => map().emit("idle"));
+    vi.useFakeTimers();
+    try {
+      rerender(
+        <GoogleMapRenderer view={journee(romeFlorence, { moitie: "apres", selectedStopId: "cv-j3-arrivee" })} config={CONFIG} placesFromGoogle={false} />,
+      );
+      expect(map().panTo).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(CADRAGE_IDLE_MAX_MS));
+      expect(map().panTo).toHaveBeenCalledTimes(1);
+      // L'écoute du cadrage est retirée : un idle plus tard ne recentre pas une seconde fois.
+      act(() => map().emit("idle"));
+      expect(map().panTo).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("démontage avant l'idle du cadrage : l'écoute est retirée", async () => {
+    const { unmount } = render(<GoogleMapRenderer view={journee(romeFlorence, { moitie: "apres" })} config={CONFIG} placesFromGoogle={false} />);
+    await act(async () => {});
+    unmount();
+    expect(map().listeners.filter((entry) => entry.event === "idle").every((entry) => entry.removed)).toBe(true);
   });
 
   it("étape de la moitié affichée : recentrage immédiat sans changer le zoom", async () => {

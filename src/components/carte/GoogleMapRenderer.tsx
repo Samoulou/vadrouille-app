@@ -1,7 +1,7 @@
 "use client";
 
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { StopMarker } from "@/components/ligne/StopMarker";
@@ -9,7 +9,7 @@ import { StopMarker } from "@/components/ligne/StopMarker";
 import { DECALAGES_JOURNEE, DECALAGES_SEJOUR, nomRepere, nomTerminus, texteEtiquette } from "./city-names";
 import type { MapConfig } from "./config";
 import { cssLength, cssVar, defaultFitPadding, prefersReducedMotion } from "./css";
-import type { PlaceEtiquette } from "./etiquettes";
+import { useLabelPlaces } from "./label-places";
 import { MapFallback } from "./MapFallback";
 import { MarkerButton } from "./MarkerButton";
 import { anneauVisible, areaCorners, boundsOf, offsetCenter, ZOOM_POSITION_SEULE, type LatLng, type StopMarkerSpec } from "./route";
@@ -18,18 +18,14 @@ import { fitTargetOf, type MapView } from "./types";
 // Repères et étiquettes de ville (décision 0150) : chargés seulement à plusieurs villes (décision 0152 § 4).
 const CityMark = lazy(() => import("./CityLabel").then((loaded) => ({ default: loaded.CityMark })));
 
-/** Places des étiquettes de ville, mesurées à chaque `idle` ; la mesure est chargée à la demande. */
-function useLabelPlaces(): { places: Readonly<Record<string, PlaceEtiquette>>; measure: (container: HTMLElement | null) => void } {
-  const [places, setPlaces] = useState<Readonly<Record<string, PlaceEtiquette>>>({});
-  const measure = useCallback((container: HTMLElement | null) => {
-    if (!container) return;
-    void import("./CityLabel").then(({ mesurerEtiquettes }) => {
-      const next = Object.fromEntries(mesurerEtiquettes(container).map((place) => [place.key, place]));
-      setPlaces((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
-    });
-  }, []);
-  return { places, measure };
-}
+/** Mesure des étiquettes, chargée avec `CityLabel` au premier `idle` (décision 0152 § 4). */
+const mesurerALaDemande = (container: HTMLElement) => import("./CityLabel").then(({ mesurerEtiquettes }) => mesurerEtiquettes(container));
+
+/**
+ * Délai au-delà duquel un cadrage est tenu pour appliqué sans `idle` (cadrage qui ne change pas la vue) : un recentrage en
+ * attente part alors quand même.
+ */
+export const CADRAGE_IDLE_MAX_MS = 1000;
 
 /**
  * Seules bibliothèques de la Maps JavaScript API chargées par F4 : aucune de Places, Routes,
@@ -170,7 +166,7 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
   // Cadrage en cours (vue d'une ville ou moitié) : un recentrage demandé avant le prochain `idle` attend cet `idle`.
   const fitInFlightRef = useRef(false);
   const pendingPanRef = useRef<(() => void) | null>(null);
-  const labels = useLabelPlaces();
+  const labels = useLabelPlaces(mesurerALaDemande);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
   const ready = status === "ready";
@@ -389,17 +385,28 @@ export function GoogleMapRenderer({ view, config, placesFromGoogle, onErrorChang
     } else {
       map.fitBounds(box, fitPadding ?? defaultFitPadding());
     }
-    if (target && typeof map.addListener === "function") {
-      // Un recentrage demandé dans le même rendu (sélection dans l'autre moitié) attend que le cadrage soit appliqué.
-      fitInFlightRef.current = true;
-      const listener = map.addListener("idle", () => {
-        listener.remove();
-        fitInFlightRef.current = false;
-        const pan = pendingPanRef.current;
-        pendingPanRef.current = null;
-        pan?.();
-      });
+    if (!target || typeof map.addListener !== "function") {
+      return;
     }
+    // Un recentrage demandé dans le même rendu (sélection dans l'autre moitié) attend que le cadrage soit appliqué : au
+    // prochain `idle`, ou après `CADRAGE_IDLE_MAX_MS` si la vue n'a pas changé et qu'aucun `idle` ne vient.
+    fitInFlightRef.current = true;
+    const applique = () => {
+      listener.remove();
+      clearTimeout(timer);
+      fitInFlightRef.current = false;
+      const pan = pendingPanRef.current;
+      pendingPanRef.current = null;
+      pan?.();
+    };
+    const listener = map.addListener("idle", applique);
+    const timer = setTimeout(applique, CADRAGE_IDLE_MAX_MS);
+    return () => {
+      listener.remove();
+      clearTimeout(timer);
+      fitInFlightRef.current = false;
+      pendingPanRef.current = null;
+    };
     // La vue est lue au moment du changement de `fitKey` seulement.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, hosts, fitKey]);

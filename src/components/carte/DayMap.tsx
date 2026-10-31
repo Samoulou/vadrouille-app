@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { isMapConfigComplete, useCarteInjection } from "./config";
 import { GoogleMapRenderer } from "./GoogleMapRenderer";
 import { MAP_FALLBACK_TEXTS, MapFallback, type MapFallbackCause } from "./MapFallback";
-import { buildCityOverview, buildDayRoute, buildOverview, type Moitie, type RouteDay, type RouteMap, type VilleDuJour } from "./route";
+import { buildCityOverview, buildDayRoute, buildOverview, type DayRoute, type Moitie, type RouteDay, type RouteMap, type VilleDuJour } from "./route";
 import type { FitPadding, MapView } from "./types";
 
 const t = messages.carte;
@@ -51,6 +51,11 @@ export type DayMapProps =
       transferCities?: { de: string; vers: string };
       /** Moitié cadrée (« avant » ou « après » le `transfer`) ; absente : toute la journée. */
       moitie?: Moitie;
+      /**
+       * `buildDayRoute(day, map)` déjà calculée par l'appelant (`TripShell`, qui en lit les moitiés) : la carte ne la
+       * recalcule pas. Absente : calculée ici.
+       */
+      route?: DayRoute;
       /** Contrôles posés sur la carte (« Retour »), après le lien d'évitement dans l'ordre de tabulation. */
       controls?: ReactNode;
       /** F4-PO-9 ; `false` avec l'adaptateur mock. */
@@ -98,7 +103,8 @@ export function DayMap(props: DayMapProps) {
   const day = props.mode === "day" ? props.day : null;
   const dayMap = props.mode === "day" ? props.map : null;
   const maps = props.mode === "overview" ? props.maps : null;
-  const route = useMemo(() => (day ? buildDayRoute(day, dayMap) : null), [day, dayMap]);
+  const routeFournie = props.mode === "day" ? props.route : undefined;
+  const route = useMemo(() => routeFournie ?? (day ? buildDayRoute(day, dayMap) : null), [routeFournie, day, dayMap]);
   const cityNames = props.mode === "overview" ? props.cities : undefined;
   const citiesOfDays = props.mode === "overview" ? props.citiesOfDays : undefined;
   const overviewDays = props.mode === "overview" ? props.days : null;

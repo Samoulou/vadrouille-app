@@ -1,6 +1,8 @@
 export { CarteProvider, isMapConfigComplete, readMapConfig, type CarteInjection, type MapConfig, type SimulatedRenderer } from "./config";
 export { AreaMap, type AreaMapProps } from "./AreaMap";
-export { CityLabel, CityMark, type CityLabelProps, type CityMarkProps } from "./CityLabel";
+// `CityLabel` et `CityMark` ne sont pas exportés ici : ils se chargent à la demande (`React.lazy(() => import("./CityLabel"))`,
+// décision 0152 § 4), et un import statique par l'index les remettrait dans le JavaScript initial. Types seulement.
+export type { CityLabelProps, CityMarkProps } from "./CityLabel";
 export { nomRepere, nomTerminus, texteEtiquette } from "./city-names";
 export { DayMap, type DayMapProps } from "./DayMap";
 export { GoogleMapRenderer, LOAD_TIMEOUT_MS, MAPS_LIBRARIES, type GoogleMapRendererProps } from "./GoogleMapRenderer";

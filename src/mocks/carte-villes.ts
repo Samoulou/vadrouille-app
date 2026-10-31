@@ -249,13 +249,42 @@ export function voyage(id: string, villes: readonly VilleFixture[]): { trip: Tri
   };
 }
 
+/**
+ * Variante d'un jeu où le jour `index` (un changement de ville) n'a plus d'étape avant le `transfer` : la moitié « avant »
+ * se réduit au logement quitté, cadré seul au zoom 15 (décision 0150 § 3 bis).
+ */
+function sansEtapesAvant(jeu: { trip: Trip; maps: DayMap[] }, index: number): { trip: Trip; maps: DayMap[] } {
+  const retirees = new Set([`cv-j${index}-depart-1`, `cv-j${index}-depart-2`]);
+  return {
+    trip: {
+      ...jeu.trip,
+      days: jeu.trip.days.map((day) =>
+        day.index !== index
+          ? day
+          : {
+              ...day,
+              // Avant le `transfer`, ne restent que le départ du logement et le temps libre (ni étape ni trajet à pied).
+              items: day.items.filter(
+                (item, rang) =>
+                  rang >= day.items.findIndex((candidate) => candidate.type === "transfer") || (item.type !== "stop" && item.type !== "segment"),
+              ),
+            },
+      ),
+    },
+    maps: jeu.maps.map((map) =>
+      map.dayIndex !== index ? map : { ...map, points: map.points.filter((point) => !(point.ref.type === "stop" && retirees.has(point.ref.stopId))) },
+    ),
+  };
+}
+
 /** Villes des jeux, réutilisées par les tests (variantes : même ville deux fois, logement déplacé). */
 export const VILLES_CARTE = { ROME, FLORENCE, VENISE, PARIS, BERLIN, VERSAILLES, COMPOSTELLE, VILLEFRANCHE, CASTELNUOVO } as const;
 
 /**
  * Jeux de la page `/dev/carte/villes/[jeu]` (fixtures des critères 4 à 10 de 0150) : Rome puis Florence (J3 = changement
  * de ville), Paris puis Berlin (villes éloignées), Paris puis Versailles (villes voisines), trois villes, quatre options
- * dont « Saint-Jacques-de-Compostelle », trois villes aux noms longs.
+ * dont « Saint-Jacques-de-Compostelle », trois villes aux noms longs, Rome-Florence-Rome (même logement, « 1 et 3 »),
+ * Rome puis Florence sans étape avant le `transfer` de J3 (moitié réduite à une position).
  */
 export const CARTE_VILLES: Readonly<Record<string, { trip: Trip; maps: DayMap[] }>> = {
   "rome-florence": voyage("rome-florence", [ROME, FLORENCE]),
@@ -264,4 +293,6 @@ export const CARTE_VILLES: Readonly<Record<string, { trip: Trip; maps: DayMap[] 
   "rome-florence-venise": voyage("rome-florence-venise", [ROME, FLORENCE, VENISE]),
   "rome-compostelle-florence": voyage("rome-compostelle-florence", [ROME, COMPOSTELLE, FLORENCE]),
   "noms-longs": voyage("noms-longs", [COMPOSTELLE, VILLEFRANCHE, CASTELNUOVO]),
+  "rome-florence-rome": voyage("rome-florence-rome", [ROME, FLORENCE, ROME]),
+  "rome-florence-sans-etape-avant": sansEtapesAvant(voyage("rome-florence-sans-etape-avant", [ROME, FLORENCE]), 3),
 };

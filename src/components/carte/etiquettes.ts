@@ -87,7 +87,10 @@ export function placerEtiquettes(
     for (let k = 1; k <= etiquette.decalagesMax; k += 1) {
       candidates.push(place(premier.cote, k * pas, premier.largeurMax), place(premier.cote, -k * pas, premier.largeurMax));
     }
-    const dansLaCarte = (box: Box) => box.x >= 0 && box.y >= 0 && box.x + box.width <= taille.width && box.y + box.height <= taille.height;
+    // Même marge au bord (`space-2`) que la règle de côté, sur les quatre bords.
+    const { marge } = ecarts;
+    const dansLaCarte = (box: Box) =>
+      box.x >= marge && box.y >= marge && box.x + box.width <= taille.width - marge && box.y + box.height <= taille.height - marge;
     const libre = candidates.find(
       (candidate) =>
         dansLaCarte(candidate.box) &&

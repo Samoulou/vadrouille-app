@@ -216,6 +216,14 @@ describe("M4-suite-carte: étiquette de ville", () => {
     expect(recoupe(droite!.box, partager)).toBe(false);
   });
 
+  it("marge au bord : une place qui laisse moins de `space-2` au bord de la carte n'est pas libre", () => {
+    // Terminus collé au bord haut : la place (1) centrée sur lui laisserait 1 px au bord haut ; elle passe plus bas.
+    const t = box(150, 4);
+    const [place] = placerEtiquettes([], [etiquette("a", t)], TAILLE, ECARTS);
+    expect(place!.box.y).toBeGreaterThanOrEqual(ECARTS.marge);
+    expect(place!.dy).toBeGreaterThan(0);
+  });
+
   it("jour du changement de ville : au plus une hauteur de décalage (places 5 et suivantes jamais utilisées)", () => {
     const t = box(150, 300);
     // Bloque les places (1) à (4) : seule la place (5), deux hauteurs plus bas, serait libre.

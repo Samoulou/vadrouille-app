@@ -1,7 +1,5 @@
 "use client";
 
-import { useCallback, useState } from "react";
-
 import { StopMarker } from "@/components/ligne/StopMarker";
 import { cn } from "@/lib/utils";
 
@@ -113,18 +111,4 @@ export function mesurerEtiquettes(container: HTMLElement): PlaceEtiquette[] {
   }
   const marge = cssLength("--ligne-espace-2");
   return placerEtiquettes(obstacles, etiquettes, { width: container.clientWidth, height: container.clientHeight }, { ecart: marge / 2, marge });
-}
-
-/** Places des étiquettes, recalculées par `measure` (carte simulée : à chaque rendu ; rendu Google : à chaque `idle`). */
-export function useCityLabelPlaces(): {
-  places: Readonly<Record<string, PlaceEtiquette>>;
-  measure: (container: HTMLElement | null) => void;
-} {
-  const [places, setPlaces] = useState<Readonly<Record<string, PlaceEtiquette>>>({});
-  const measure = useCallback((container: HTMLElement | null) => {
-    if (!container) return;
-    const next = Object.fromEntries(mesurerEtiquettes(container).map((place) => [place.key, place]));
-    setPlaces((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
-  }, []);
-  return { places, measure };
 }

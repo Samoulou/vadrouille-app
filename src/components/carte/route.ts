@@ -1,5 +1,6 @@
 import type { MapPointRef } from "@/contracts";
 import { mapPointKey } from "@/contracts/values";
+import type { VilleDeLaDate } from "@/domain/villes-du-voyage";
 
 /**
  * Construction du contenu de la carte à partir de `Day.items` et de `DayMap` (spécification F4).
@@ -203,8 +204,8 @@ export const ZOOM_ANNEAUX_PAR_VILLE = 10;
 /** Zoom d'un cadrage réduit à une seule position (décision 0150 § 3 bis). */
 export const ZOOM_POSITION_SEULE = 15;
 
-/** Ville d'un jour telle que la carte la lit : forme de `villesDeLaDate` (`src/domain/villes-du-voyage.ts`). */
-export type VilleDuJour = { readonly ville: string } | { readonly de: string; readonly vers: string } | undefined;
+/** Ville d'un jour telle que la carte la lit : résultat de `villesDeLaDate` (`src/domain/villes-du-voyage.ts`), jamais recalculé ici. */
+export type VilleDuJour = VilleDeLaDate | undefined;
 
 /**
  * Repère de ville (décision 0150 § 2 point 1) : terminus du logement d'une ville. Le premier (`primary`) porte l'étiquette
