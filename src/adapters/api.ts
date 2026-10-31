@@ -3,6 +3,8 @@ import {
   DayMapSchema,
   DaySchema,
   DeckSessionSchema,
+  MoveDraftSchema,
+  MoveOptionsSchema,
   PatchResultSchema,
   PreviewSlotsSchema,
   RevisionPreviewSchema,
@@ -18,6 +20,7 @@ import {
 import { appliquerAjout, proposerAjout } from "@/server/lieux/ajout";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
 import { annulerRemplacement, appliquerRemplacement, proposerRemplacement, versionDuVoyage, type DependancesRemplacement } from "@/server/versions/remplacement";
+import { appliquerDeplacement, optionsDeDeplacement, proposerDeplacement } from "@/server/versions/deplacement";
 import { appliquerRetour, listerVersions, proposerRetour } from "@/server/versions/historique";
 import { deverrouillerEtape, verrouillerEtape, type DependancesRetouche } from "@/server/versions/retouches";
 import { basculerAFaire } from "@/server/voyages/a-faire";
@@ -43,8 +46,10 @@ export type OptionsAdaptateurApi = DependancesLecture;
  * Révision enregistrée (M1g, ticket 869) : cas d'usage de `src/server/versions/remplacement.ts`, dans le même processus,
  * avec le contexte de la session reçu de l'action serveur et **le même port de relectures** que la lecture (un appel par
  * aperçu ou application, hors transaction). Chaque réponse est validée par son contrat. Le cochage d'une ligne « À faire »
- * (`toggleChecklistItem`, B6b, branché sur l'écran 11 par M5e) et le verrou de la fiche (`lockStop`, `unlockStop`, M5a,
- * `src/server/versions/retouches.ts`, sans relecture) passent par le même adaptateur.
+ * (`toggleChecklistItem`, B6b, branché sur l'écran 11 par M5e), le verrou de la fiche (`lockStop`, `unlockStop`, M5a,
+ * `src/server/versions/retouches.ts`, sans relecture) et le déplacement (`getMoveOptions`, `previewMove`, `applyMove`, ticket
+ * 947, `src/server/versions/deplacement.ts`, même port de relectures ; décision 0153, PR #959) passent par le même
+ * adaptateur.
  */
 function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
   const { withOrg, relectures } = options;
@@ -60,6 +65,10 @@ function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
     // M5a (ticket 919) : verrou de la fiche ; aucun appel du port de relectures (décision 0147 § 9).
     lockStop: async (ctx, input) => valide(PatchResultSchema)(await verrouillerEtape(dependances(ctx), input)),
     unlockStop: async (ctx, input) => valide(PatchResultSchema)(await deverrouillerEtape(dependances(ctx), input)),
+    // Ticket 947 : déplacer une étape ; un appel du port de relectures par aperçu ou application (décision 0153, PR #959).
+    getMoveOptions: async (ctx, input) => valide(MoveOptionsSchema)(await optionsDeDeplacement(dependances(ctx), input)),
+    previewMove: async (ctx, input) => valide(MoveDraftSchema)(await proposerDeplacement(dependances(ctx), input)),
+    applyMove: async (ctx, input) => valide(PatchResultSchema)(await appliquerDeplacement(dependances(ctx), input)),
   };
 }
 

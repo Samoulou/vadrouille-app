@@ -126,6 +126,7 @@ function MoveContent({
   const applied = useRef(false);
 
   const [options, setOptions] = useState<MoveOptions | null>(null);
+  const [optionsFailed, setOptionsFailed] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [point, setPoint] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>({ type: "idle" });
@@ -142,7 +143,11 @@ function MoveContent({
         if ((loaded.days.find((day) => day.index === dayIndex)?.points.length ?? 0) > 0) setSelectedDay(dayIndex);
       },
       () => {
-        if (current) setOptions({ stopId: stop.id, days: [] });
+        // Points indisponibles (refus ou panne) : aucun jour proposé, et le bandeau d'erreur plutôt que « Aucun jour ».
+        if (!current) return;
+        setOptions({ stopId: stop.id, days: [] });
+        setOptionsFailed(true);
+        setPhase({ type: "banner", kind: "error" });
       },
     );
     return () => {
@@ -332,17 +337,20 @@ function MoveContent({
           </div>
         )}
 
-        <section aria-labelledby={titleId} className="flex flex-col gap-3">
-          <h3 id={titleId} className={BLOC}>
-            {d.versQuelJour}
-          </h3>
-          <DayBadgeGroup days={days} value={selectedDay} onChange={chooseDay} labelledBy={titleId} />
-          {allFull ? (
-            <p data-part="aucun-jour" className="text-corps text-ink-2">
-              {d.aucunJour}
-            </p>
-          ) : null}
-        </section>
+        {/* Points indisponibles (ticket 947) : ni pastilles « complet » ni « Aucun jour », seulement le bandeau d'erreur. */}
+        {optionsFailed ? null : (
+          <section aria-labelledby={titleId} className="flex flex-col gap-3">
+            <h3 id={titleId} className={BLOC}>
+              {d.versQuelJour}
+            </h3>
+            <DayBadgeGroup days={days} value={selectedDay} onChange={chooseDay} labelledBy={titleId} />
+            {allFull ? (
+              <p data-part="aucun-jour" className="text-corps text-ink-2">
+                {d.aucunJour}
+              </p>
+            ) : null}
+          </section>
+        )}
 
         {shownDay ? (
           <section aria-label={format(messages.sejour.journee.etapes, { n: shownDay.index })} data-part="ligne-compacte">
