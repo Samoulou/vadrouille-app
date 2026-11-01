@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { expect, test as base, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test as base, type APIRequestContext, type APIResponse, type Page } from "@playwright/test";
 
 import { ADRESSE_A, ADRESSE_B } from "../support/bout-en-bout-api";
 
@@ -80,6 +80,23 @@ async function voyages(page: Page): Promise<{ id: string; debloque: boolean }[]>
   return [...vus].map(([id, debloque]) => ({ id, debloque }));
 }
 
+/**
+ * Téléchargement avec la session du navigateur (ticket 1012). Le cookie de session de `better-auth` porte l'attribut
+ * `Secure` (nom préfixé par `__Secure-`) : Chromium l'envoie à `http://127.0.0.1` (origine de confiance), mais le
+ * contexte de requêtes de Playwright (`page.request`) ne joint pas un cookie `Secure` à une requête `http`. Sans lui, la
+ * route répondait 307 vers l'écran 4, que `page.request` suivait jusqu'à une page HTML (200). Le cookie de la session
+ * est donc joint tel que le navigateur l'enverrait, et la redirection n'est jamais suivie : un 307 reste un 307.
+ */
+async function telecharger(page: Page, url: string): Promise<APIResponse> {
+  const { hostname } = new URL(url);
+  const cookies = (await page.context().cookies()).filter((c) => c.domain === hostname);
+  expect(
+    cookies.some((c) => c.name.includes("session")),
+    "cookie de session absent du navigateur",
+  ).toBe(true);
+  return page.request.get(url, { headers: { cookie: cookies.map((c) => `${c.name}=${c.value}`).join("; ") }, maxRedirects: 0 });
+}
+
 /** Entrées comparables entre `mock` et `api` : nom, début, fin, « À réserver. ». */
 const comparables = (ics: string) =>
   evenementsIcs(ics).map((e) => ({
@@ -118,7 +135,7 @@ test("calendrier: api, fichier du voyage débloqué, même contenu que mock ; no
   const attendu = comparables(fichierMock);
   let trouve: string | null = null;
   for (const { id, debloque } of voyagesA.filter((v) => v.debloque)) {
-    const reponse = await page.request.get(`${api}${calendrier(id)}`);
+    const reponse = await telecharger(page, `${api}${calendrier(id)}`);
     if (reponse.status() !== 200) continue;
     const texte = await expectFichierIcs(reponse);
     if (texte.includes("X-WR-CALNAME:Édimbourg · Programme") && debloque) {
@@ -133,7 +150,7 @@ test("calendrier: api, fichier du voyage débloqué, même contenu que mock ; no
         expect(url.startsWith(`${api}/voyages/${id}/jour/`), url).toBe(true);
         expect(url.slice(`${api}/voyages/${id}/jour/`.length)).toMatch(/^[1-9][0-9]*$/);
       }
-      const second = evenementsIcs(await (await page.request.get(`${api}${calendrier(id)}`)).text());
+      const second = evenementsIcs(await (await telecharger(page, `${api}${calendrier(id)}`)).text());
       expect(second.map((e) => e.UID?.[0])).toEqual(evenements.map((e) => e.UID?.[0]));
 
       // Bouton du Séjour : un lien vers la même adresse.
@@ -146,14 +163,14 @@ test("calendrier: api, fichier du voyage débloqué, même contenu que mock ; no
 
   // Voyage non débloqué : pas de bouton, et 404 sans contenu.
   const idNonDebloque = nonDebloque?.id as string;
-  const refus = await page.request.get(`${api}${calendrier(idNonDebloque)}`);
+  const refus = await telecharger(page, `${api}${calendrier(idNonDebloque)}`);
   expect(refus.status()).toBe(404);
   expect(await refus.text()).not.toContain("BEGIN:VCALENDAR");
   expect(refus.headers()["cache-control"]).toMatch(/no-store/);
 
   // Autre organisation : 404 sans contenu, pour chacun des voyages de B.
   for (const { id } of voyagesB) {
-    const reponse = await page.request.get(`${api}${calendrier(id)}`);
+    const reponse = await telecharger(page, `${api}${calendrier(id)}`);
     expect(reponse.status(), id).toBe(404);
     expect(await reponse.text(), id).not.toContain("BEGIN:VCALENDAR");
   }
