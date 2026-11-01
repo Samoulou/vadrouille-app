@@ -118,6 +118,22 @@ vi.mock("@/server/photos/api", () => ({
   photosApiOuvertes: () => photosApi.ouvertes(),
 }));
 
+// Ticket 1013 (M6a) : branchement du partage `api` (doubles : aucune base, aucun limiteur, aucun en-tête).
+const brancherPartage = vi.fn();
+const casLiens = { creer: vi.fn(), desactiver: vi.fn(), etat: vi.fn() };
+const lectureVue = { lire: vi.fn() };
+let echecPartage: Error | null = null;
+vi.mock("@/adapters/api-share-instance", () => ({
+  brancherPartageApi: (partage: unknown) => brancherPartage(partage),
+}));
+vi.mock("@/server/partage/liens", () => ({
+  get creerCasLiens() {
+    if (echecPartage) throw echecPartage;
+    return () => casLiens;
+  },
+}));
+vi.mock("@/server/partage/vue", () => ({ creerLectureVue: () => lectureVue }));
+
 // B4b : branchement du paiement simulé en base (doubles : aucune composition réelle, aucune base, aucune clé).
 const brancherPaiement = vi.fn();
 const composerPaiementSimule = vi.fn(() => ({ adaptateur: "simule" }));
@@ -157,6 +173,10 @@ beforeEach(() => {
   photosApi.photo.mockClear();
   photosApi.ouvertes.mockClear();
   echecPhotos = null;
+  brancherPartage.mockClear();
+  casLiens.creer.mockClear();
+  lectureVue.lire.mockClear();
+  echecPartage = null;
   logEvent.mockClear();
   brancher.mockClear();
   brancherApi.mockClear();
@@ -418,6 +438,39 @@ describe("instrumentation : branchement des photos du tri api (PR 879, M1e)", ()
     expect(brancherPhotos).not.toHaveBeenCalled();
     expect(brancherTri).toHaveBeenCalledTimes(1);
     expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-photos", errorName: "TypeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
+  });
+});
+
+describe("instrumentation : branchement du partage api (ticket 1013, M6a)", () => {
+  it("DATA_ADAPTER=api : partage branché une fois, rien n'est lu au démarrage", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    await register();
+    expect(brancherPartage).toHaveBeenCalledTimes(1);
+    expect(casLiens.creer).not.toHaveBeenCalled();
+    expect(lectureVue.lire).not.toHaveBeenCalled();
+    const branche = brancherPartage.mock.calls[0]?.[0] as { creer: unknown; desactiver: unknown; etat: unknown; lireVue: (t: string, c: string) => unknown };
+    expect(branche.creer).toBe(casLiens.creer);
+    expect(branche.desactiver).toBe(casLiens.desactiver);
+    expect(branche.etat).toBe(casLiens.etat);
+    branche.lireVue("jeton", "/p/jeton");
+    expect(lectureVue.lire).toHaveBeenCalledWith("jeton", "/p/jeton");
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "mock", "prototype"])("DATA_ADAPTER=%j : partage api non branché", async (valeur) => {
+    vi.stubEnv("DATA_ADAPTER", valeur);
+    await register();
+    expect(brancherPartage).not.toHaveBeenCalled();
+  });
+
+  it("échec du branchement : voyages.action_failed (branchement-partage) avec le seul nom d'erreur, photos toujours branchées", async () => {
+    vi.stubEnv("DATA_ADAPTER", "api");
+    echecPartage = Object.assign(new TypeError("secret du module"), { cause: "secret" });
+    await register();
+    expect(brancherPartage).not.toHaveBeenCalled();
+    expect(brancherPhotos).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-partage", errorName: "TypeError" }, "error");
     expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
   });
 });

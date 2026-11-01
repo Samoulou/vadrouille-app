@@ -29,6 +29,8 @@ export interface DayTabsProps {
   sejourHref: string;
   /** Proposition : nom du repère, « Jours du séjour » (fr.json) par défaut ; à changer seulement si deux rangées coexistent. */
   label?: string;
+  /** Préchargement des liens de la rangée (`DayBadge`) ; absent : comportement par défaut. Vue partagée : `false`. */
+  prefetch?: false;
   className?: string;
 }
 
@@ -37,7 +39,7 @@ export interface DayTabsProps {
  * « Séjour », handover § 10). Seule la rangée défile horizontalement ; la pastille active est rendue
  * visible au montage, sans animation.
  */
-export function DayTabs({ days, current, sejourHref, label = t.navigation, className }: DayTabsProps) {
+export function DayTabs({ days, current, sejourHref, label = t.navigation, prefetch, className }: DayTabsProps) {
   const scroller = useRef<HTMLUListElement>(null);
 
   useLayoutEffect(() => {
@@ -67,6 +69,7 @@ export function DayTabs({ days, current, sejourHref, label = t.navigation, class
         <li className="shrink-0">
           <Link
             href={sejourHref}
+            prefetch={prefetch}
             aria-current={sejourActive ? "page" : undefined}
             className={cn(
               "inline-flex min-h-(--touch-target) items-center border-b-(length:--ligne-trait-onglet) px-(--ligne-espace-2) text-corps",
@@ -84,6 +87,7 @@ export function DayTabs({ days, current, sejourHref, label = t.navigation, class
               ville={day.ville}
               disabled={day.disabled}
               href={day.href}
+              prefetch={prefetch}
               active={current === day.index}
               currentValue="page"
             />

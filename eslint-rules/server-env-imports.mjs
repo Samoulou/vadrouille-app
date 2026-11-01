@@ -60,6 +60,10 @@ export const IMPORTATEURS_ADMIS = new Map([
       // M6b (ticket 1005 ; décision 0157 § 1.6 point 9) : route du fichier `.ics`, origine de `APP_URL` pour `URL` et
       // `DESCRIPTION` (`serverEnv().betterAuth.appUrl`), aucune clé lue.
       "src/server/routes/calendrier.ts",
+      // M6a (ticket 1013 ; décision 0157 § 2.1 points 4 et 5) : limite de la vue partagée et en-tête « compté »
+      // (`serverEnv()` puis `rateLimitSettings` : environnement, en-tête de confiance, clé du limiteur dont la sous-clé
+      // HKDF est dérivée). Jamais journalisée ni renvoyée.
+      "src/server/partage/limite-vue.ts",
     ],
   ],
   ["resolve", ["db/connection.ts", "tests/unit/server/env.test.ts"]],

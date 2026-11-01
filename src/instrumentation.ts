@@ -47,6 +47,14 @@
  * branchement est journalisé (`voyages.action_failed`, action `branchement-photos`) sans arrêter le serveur : les cartes
  * gardent leur emplacement « Photo du lieu ».
  *
+ * M6a (ticket 1013 ; décision 0157 § 1.2 à § 1.4, sur le modèle de B10a) : environnement valide et `DATA_ADAPTER=api`,
+ * les cas d'usage du partage (`creerCasLiens`, `src/server/partage/liens.ts` : `share_links` ; `creerLectureVue`,
+ * `src/server/partage/vue.ts` : vue partagée lue par les vues de la base) sont branchés sur
+ * `src/adapters/api-share-instance.ts`. Rien n'est lu ni connecté ici ; la garde (`apiShareAvailable`, puis
+ * `assertApiAdapter`) reste vérifiée à chaque `getShareAdapter()`. Un échec du branchement est journalisé
+ * (`voyages.action_failed`, action `branchement-partage`) sans arrêter le serveur : chaque action du partage échoue et la
+ * vue partagée mène à la page d'erreur commune.
+ *
  * B4b (spécification B4, B4b point 1 ; décision 0097 B4-TL-5, sur le modèle de B10a) : environnement valide et
  * `PAYMENT_ADAPTER=simulated` (admis par `parseServerEnv` en `local` et `ci` seulement, avec `DATA_ADAPTER=api`,
  * `AUTH_ADAPTER=better-auth` et le webhook simulé ouvert, B4-TL-7), la composition du paiement simulé
@@ -75,6 +83,7 @@ export async function register(): Promise<void> {
       await brancherCreationApi(logEvent, errorNameOf);
       await brancherTriApi(logEvent, errorNameOf);
       await brancherPhotosApi(logEvent, errorNameOf);
+      await brancherPartageApi(logEvent, errorNameOf);
       await brancherPaiementSimule(logEvent, errorNameOf);
       await brancherPaiementStripe(logEvent, errorNameOf);
       return;
@@ -227,6 +236,26 @@ async function brancherPhotosApi(
   } catch (error) {
     const errorName = errorNameOf(error);
     logEvent("voyages.action_failed", { action: "branchement-photos", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
+/** Branche les cas d'usage du partage sur l'adaptateur `api` (ticket 1013, M6a ; décision 0157 § 1.2 à § 1.4). */
+async function brancherPartageApi(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { isMockAdapter, isPrototypeAdapter } = await import("@/adapters");
+    if (isMockAdapter() || isPrototypeAdapter()) return;
+    const { brancherPartageApi: brancher } = await import("@/adapters/api-share-instance");
+    const { creerCasLiens } = await import("@/server/partage/liens");
+    const { creerLectureVue } = await import("@/server/partage/vue");
+    const liens = creerCasLiens();
+    const vue = creerLectureVue();
+    brancher({ creer: liens.creer, desactiver: liens.desactiver, etat: liens.etat, lireVue: (token, chemin) => vue.lire(token, chemin) });
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-partage", ...(errorName === undefined ? {} : { errorName }) }, "error");
   }
 }
 
