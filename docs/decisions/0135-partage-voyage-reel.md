@@ -1,5 +1,7 @@
 # 0135 — Partage d'un voyage réel du site d'essai par lien signé, sans connexion
 
+> **Textes amendés** (renvoi ajouté par M6a, ticket 1013) : sur l'adaptateur `api`, ce texte se lit avec la décision **0157** (« Textes amendés » : § 3, destination « B12 et l'adaptateur `api` » de `VADROUILLE_SHARE_SECRET` tombée sous réserve de S3 ; § 7, « vérifie la signature **puis** l'empreinte », et § 11, « Rotation future vers `VADROUILLE_SHARE_SECRET` », sans objet pour `api`, qui n'a que des jetons aléatoires) et la décision **0158** (« Textes amendés » : § 5, dernière phrase, inchangée pour le site d'essai, mais sur `api` un lien n'atteste aucun déblocage, relu par la base à chaque lecture ; § 6, sur `api`, le voyage doit aussi avoir son droit `tripUnlocked` au moment de la lecture). Rien ne change pour le site d'essai.
+
 Statut : **acceptée**, décision **déléguée du Tech Lead** (architecture, outillage, tests : `docs/CONTEXT.md`, « Qui décide quoi »), définitive à sa fusion, sans délai de veto (0093). À lister dans la prochaine note de version (« Décisions prises par le studio »), avec les risques du point 11. Verdicts de la Sécurité et de l'UX/UI dans la revue consolidée de la PR de code (0123, points 2 et 3).
 
 Date : 2026-10-28 · Décideur : Tech Lead · Ticket : #825 · Décisions liées : 0039 (F10-TL-7, F10-TL-8, F10-TL-10, F10-TL-14), 0123, 0124 § 2, 0055 (code d'accès), 0074, 0092, 0109, 0034, 0027, 0011, 0046 (D16), 0093.
