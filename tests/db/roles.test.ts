@@ -77,9 +77,10 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     // M6a-D (migration 0023, décision 0157 § 1.9, T9) : `INSERT` et `UPDATE` par colonnes seulement (droits par colonne
     // ci-dessous).
     share_links: ["SELECT"],
-    // M6c-D (migration 0024_rappels, décision 0157 § 1.8) : un accord n'est modifié que par son retrait (droit par
-    // colonne ci-dessous) ; une réclamation jamais. Ni DELETE ni TRUNCATE.
-    reminder_consents: ["SELECT", "INSERT"],
+    // M6c-D (migration 0024_rappels, décision 0157 § 1.8 ; revue de la PR M6c-D, bloquant 1) : un accord s'insère et se
+    // retire par colonnes seulement (droits par colonne ci-dessous) ; une réclamation n'est jamais modifiée. Ni DELETE
+    // ni TRUNCATE.
+    reminder_consents: ["SELECT"],
     reminder_sends: ["SELECT", "INSERT"],
     // M5-D (migration 0022_feedback_signalements, décision 0147 § 2 point 4) : un signalement n'est jamais modifié.
     feedback: ["SELECT", "INSERT"],
@@ -158,8 +159,9 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     },
     // M6a-D (0023, décision 0157 § 1.9, T9) : désactivation seulement ; insertion sans `id`, `created_at` ni `revoked_at`.
     share_links: { UPDATE: ["revoked_at"], INSERT: ["created_by", "expires_at", "organization_id", "token_hash", "trip_id"] },
-    // M6c-D (0024, décision 0157 § 1.8) : retrait d'un accord seulement ; une réclamation n'est jamais modifiée.
-    reminder_consents: { UPDATE: ["withdrawn_at"] },
+    // M6c-D (0024, décision 0157 § 1.8 ; revue de la PR M6c-D, bloquant 1) : insertion sans `id`, `consented_at` ni
+    // `withdrawn_at` (instants posés par la base) ; retrait seulement ; une réclamation n'est jamais modifiée.
+    reminder_consents: { UPDATE: ["withdrawn_at"], INSERT: ["organization_id", "trip_id", "user_id"] },
     reminder_sends: { UPDATE: [] },
   },
   vadrouille_auth: {

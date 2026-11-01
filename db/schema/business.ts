@@ -782,7 +782,9 @@ export const shareLinks = pgTable(
 /**
  * Accords aux rappels de voyage (M6c-D, migration 0024, décision 0157 § 1.8) : une ligne par accord, jamais réécrite
  * une fois retiré (déclencheur `reminder_consents_withdraw_once`, migration) ; réactiver crée une ligne. Au plus un
- * accord actif par voyage et par personne. Aucune adresse, aucun texte, aucune donnée Google.
+ * accord actif par voyage et par personne. `consented_at` et `withdrawn_at` sont posés par la base, jamais par
+ * l'application (`INSERT` par colonnes, instant du retrait posé par le déclencheur). Aucune adresse, aucun texte, aucune
+ * donnée Google.
  */
 export const reminderConsents = pgTable(
   "reminder_consents",
@@ -830,6 +832,12 @@ export const reminderSends = pgTable(
   (t) => [
     primaryKey({ name: "reminder_sends_pkey", columns: [t.organizationId, t.tripId, t.userId, t.dayIndex] }),
     tripFk("reminder_sends_trip_fk", t),
+    // Revue de la PR M6c-D, mineur 2 : la réclamation ne vise qu'un membre de l'organisation du voyage.
+    foreignKey({
+      name: "reminder_sends_membership_fk",
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [memberships.organizationId, memberships.userId],
+    }),
     check("reminder_sends_day_index_check", sql`${t.dayIndex} >= 1`),
   ],
 );

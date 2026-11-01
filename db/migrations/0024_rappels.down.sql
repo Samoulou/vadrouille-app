@@ -1,7 +1,7 @@
 -- Migration inverse de 0024_rappels (plan du MVP, M6c-D, ticket 1014 ; décision 0157 § 1.8). Règle du rôle `data` :
 -- **aucune suppression de données**. Elle ferme donc seulement les écritures et les lectures des rappels par
--- `vadrouille_app` : droits sur `reminder_consents` (`SELECT, INSERT`, `UPDATE (withdrawn_at)`) et sur `reminder_sends`
--- (`SELECT, INSERT`) retirés. Aucune ligne n'est lue, modifiée ni supprimée.
+-- `vadrouille_app` : droits sur `reminder_consents` (`SELECT`, `INSERT (organization_id, trip_id, user_id)`,
+-- `UPDATE (withdrawn_at)`) et sur `reminder_sends` (`SELECT, INSERT`) retirés. Aucune ligne n'est lue, modifiée ni supprimée.
 --
 -- **Restent** (modèle de 0014_tri_enregistre.down.sql) : les deux tables, leurs lignes (accords et retraits datés,
 -- preuve de l'accord, 0157 § 1.8), leurs clés, `CHECK` et index, leur RLS, leurs politiques, les droits de
@@ -14,9 +14,9 @@
 -- migration corrective vers l'avant qui rend les droits de `vadrouille_app`.
 SET LOCAL ROLE vadrouille_owner;
 --> statement-breakpoint
-REVOKE UPDATE (withdrawn_at) ON public.reminder_consents FROM vadrouille_app;
+REVOKE INSERT (organization_id, trip_id, user_id), UPDATE (withdrawn_at) ON public.reminder_consents FROM vadrouille_app;
 --> statement-breakpoint
-REVOKE SELECT, INSERT ON public.reminder_consents FROM vadrouille_app;
+REVOKE SELECT ON public.reminder_consents FROM vadrouille_app;
 --> statement-breakpoint
 REVOKE SELECT, INSERT ON public.reminder_sends FROM vadrouille_app;
 --> statement-breakpoint

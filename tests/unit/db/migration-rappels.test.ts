@@ -60,8 +60,8 @@ describe("migration 0024 : retour arrière sans suppression de données", () => 
       .filter(Boolean);
     expect(instructions).toEqual([
       "SET LOCAL ROLE vadrouille_owner;",
-      "REVOKE UPDATE (withdrawn_at) ON public.reminder_consents FROM vadrouille_app;",
-      "REVOKE SELECT, INSERT ON public.reminder_consents FROM vadrouille_app;",
+      "REVOKE INSERT (organization_id, trip_id, user_id), UPDATE (withdrawn_at) ON public.reminder_consents FROM vadrouille_app;",
+      "REVOKE SELECT ON public.reminder_consents FROM vadrouille_app;",
       "REVOKE SELECT, INSERT ON public.reminder_sends FROM vadrouille_app;",
       "RESET ROLE;",
     ]);

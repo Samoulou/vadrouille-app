@@ -98,7 +98,7 @@ describe("rappels (0024) : forme", () => {
     ]);
   });
 
-  it("RLS activée et forcée ; deux politiques par table (vadrouille_app et vadrouille_fn_purge), bornées à l'organisation de la transaction", async () => {
+  it("RLS activée et forcée ; politiques de vadrouille_app et de vadrouille_fn_purge bornées à l'organisation, écriture d'un accord bornée à la personne de la transaction", async () => {
     const tables = await app.query(
       "SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class WHERE relnamespace = 'public'::regnamespace AND relname = ANY($1::text[]) ORDER BY relname",
       [[...REMINDER_TABLES]],
@@ -108,19 +108,20 @@ describe("rappels (0024) : forme", () => {
       "SELECT tablename, policyname, roles::text[] AS roles, cmd, qual, with_check FROM pg_catalog.pg_policies WHERE schemaname = 'public' AND tablename = ANY($1::text[]) ORDER BY tablename, policyname",
       [[...REMINDER_TABLES]],
     );
-    expect(politiques.rows.map((p) => [p.tablename, p.policyname, p.roles, p.cmd])).toEqual([
-      ["reminder_consents", "reminder_consents_app", ["vadrouille_app"], "ALL"],
-      ["reminder_consents", "reminder_consents_fn_purge", ["vadrouille_fn_purge"], "ALL"],
-      ["reminder_sends", "reminder_sends_app", ["vadrouille_app"], "ALL"],
-      ["reminder_sends", "reminder_sends_fn_purge", ["vadrouille_fn_purge"], "ALL"],
+    const ORG = "(organization_id = app_current_org())";
+    const PERSONNE = "((organization_id = app_current_org()) AND (user_id = app_current_user()))";
+    // Revue de la PR M6c-D, mineur 1 : un accord ne s'écrit et ne se retire que pour la personne de la transaction.
+    expect(politiques.rows.map((p) => [p.tablename, p.policyname, p.roles, p.cmd, p.qual, p.with_check])).toEqual([
+      ["reminder_consents", "reminder_consents_app_insert", ["vadrouille_app"], "INSERT", null, PERSONNE],
+      ["reminder_consents", "reminder_consents_app_select", ["vadrouille_app"], "SELECT", ORG, null],
+      ["reminder_consents", "reminder_consents_app_update", ["vadrouille_app"], "UPDATE", PERSONNE, PERSONNE],
+      ["reminder_consents", "reminder_consents_fn_purge", ["vadrouille_fn_purge"], "ALL", ORG, ORG],
+      ["reminder_sends", "reminder_sends_app", ["vadrouille_app"], "ALL", ORG, ORG],
+      ["reminder_sends", "reminder_sends_fn_purge", ["vadrouille_fn_purge"], "ALL", ORG, ORG],
     ]);
-    for (const p of politiques.rows) {
-      expect(p.qual, p.policyname).toBe("(organization_id = app_current_org())");
-      expect(p.with_check, p.policyname).toBe("(organization_id = app_current_org())");
-    }
   });
 
-  it("clés étrangères toutes en NO ACTION : organisation, personne, voyage composé ; adhésion composée pour un accord", async () => {
+  it("clés étrangères toutes en NO ACTION : organisation, personne, voyage composé, adhésion composée", async () => {
     const { rows } = await app.query(
       `SELECT conrelid::regclass::text AS t, conname, pg_catalog.pg_get_constraintdef(oid) AS def, confdeltype
        FROM pg_catalog.pg_constraint WHERE contype = 'f' AND conrelid = ANY($1::regclass[]) ORDER BY 1, 2`,
@@ -131,11 +132,43 @@ describe("rappels (0024) : forme", () => {
       ["reminder_consents", "FOREIGN KEY (organization_id) REFERENCES organizations(id)"],
       ["reminder_consents", "FOREIGN KEY (organization_id, trip_id) REFERENCES trips(organization_id, id)"],
       ["reminder_consents", "FOREIGN KEY (user_id) REFERENCES users(id)"],
+      ["reminder_sends", "FOREIGN KEY (organization_id, user_id) REFERENCES memberships(organization_id, user_id)"],
       ["reminder_sends", "FOREIGN KEY (organization_id) REFERENCES organizations(id)"],
       ["reminder_sends", "FOREIGN KEY (organization_id, trip_id) REFERENCES trips(organization_id, id)"],
       ["reminder_sends", "FOREIGN KEY (user_id) REFERENCES users(id)"],
     ]);
     expect(rows.every((r) => r.confdeltype === "a")).toBe(true);
+  });
+});
+
+describe("rappels (0024) : droits par colonnes de vadrouille_app (revue de la PR M6c-D, bloquant 1)", () => {
+  it("accord : INSERT de organization_id, trip_id et user_id seulement (ni id, ni consented_at, ni withdrawn_at) ; UPDATE de withdrawn_at seulement", async () => {
+    const { rows } = await app.query(
+      `SELECT a.attname,
+              pg_catalog.has_column_privilege('vadrouille_app', a.attrelid, a.attnum, 'INSERT') AS insertion,
+              pg_catalog.has_column_privilege('vadrouille_app', a.attrelid, a.attnum, 'UPDATE') AS maj
+       FROM pg_catalog.pg_attribute a
+       WHERE a.attrelid = 'public.reminder_consents'::regclass AND a.attnum > 0 AND NOT a.attisdropped
+       ORDER BY a.attname`,
+    );
+    expect(rows.filter((r) => r.insertion).map((r) => r.attname)).toEqual(["organization_id", "trip_id", "user_id"]);
+    expect(rows.filter((r) => r.maj).map((r) => r.attname)).toEqual(["withdrawn_at"]);
+    const table = await app.query(
+      `SELECT p AS privilege FROM unnest($1::text[]) AS p WHERE pg_catalog.has_table_privilege('vadrouille_app', 'public.reminder_consents', p)`,
+      [["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE"]],
+    );
+    expect(table.rows.map((r) => r.privilege)).toEqual(["SELECT"]);
+  });
+
+  it("INSERT d'un accord avec consented_at, withdrawn_at ou id explicite refusé (42501)", async () => {
+    const o = await organisation(app, auth);
+    for (const [colonne, valeur] of [["consented_at", "now() - interval '1 day'"], ["withdrawn_at", "now()"], ["id", "gen_random_uuid()"]] as const) {
+      expect(
+        await codeSous(o, `INSERT INTO reminder_consents (organization_id, trip_id, user_id, ${colonne}) VALUES ($1, $2, $3, ${valeur})`, [o.org, o.trip, o.owner]),
+        colonne,
+      ).toBe("42501");
+    }
+    expect(await countAs(app, ctx(o), "reminder_consents")).toBe(0);
   });
 });
 
@@ -181,7 +214,10 @@ describe("rappels (0024) : isolation entre deux organisations", () => {
   it("un accord ou une réclamation ne vise jamais le voyage d'une autre organisation ; un accord, jamais une personne hors de l'organisation", async () => {
     expect(await codeSous(a, INSERT_ACCORD, [a.org, b.trip, a.owner])).toBe("23503");
     expect(await codeSous(a, INSERT_RECLAMATION, [a.org, b.trip, a.owner, 3])).toBe("23503");
-    expect(await codeSous(a, INSERT_ACCORD, [a.org, a.trip, b.owner])).toBe("23503");
+    // Accord pour une autre personne : refusé par la politique (mineur 1) avant la clé étrangère.
+    expect(await codeSous(a, INSERT_ACCORD, [a.org, a.trip, b.owner])).toBe("42501");
+    // Réclamation pour une personne hors de l'organisation : refusée par la clé vers memberships (mineur 2).
+    expect(await codeSous(a, INSERT_RECLAMATION, [a.org, a.trip, b.owner, 3])).toBe("23503");
   });
 
   it("vadrouille_owner (pris par vadrouille_migrator) lit zéro ligne, même avec le contexte d'une organisation remplie", async () => {
@@ -213,21 +249,42 @@ describe("rappels (0024) : accords", () => {
     });
   });
 
-  it("un autre membre de l'organisation a son propre accord actif sur le même voyage", async () => {
-    expect(await codeSous(a, INSERT_ACCORD, [a.org, a.trip, a.members[0]])).toBeUndefined();
+  it("un autre membre de l'organisation a son propre accord actif sur le même voyage ; il ne pose ni ne retire celui d'un autre", async () => {
+    const membre = { org: a.org, user: a.members[0] };
+    await inTx(app, membre, async (c) => {
+      expect((await attempt(c, INSERT_ACCORD, [a.org, a.trip, a.members[0]])).code).toBeUndefined();
+      expect((await attempt(c, INSERT_ACCORD, [a.org, a.trip, a.owner])).code, "accord pour la personne propriétaire").toBe("42501");
+      const retrait = await attempt(c, "UPDATE reminder_consents SET withdrawn_at = now() WHERE id = $1", [accordA]);
+      expect(retrait, "retrait de l'accord d'une autre personne").toEqual({ rowCount: 0 });
+    });
+    const accord = await inTx(app, ctx(a), async (c) => (await c.query("SELECT withdrawn_at FROM reminder_consents WHERE id = $1", [accordA])).rows);
+    expect(accord).toEqual([{ withdrawn_at: null }]);
   });
 
-  it("accord retiré : aucune modification, retrait compris ; accord actif : seule withdrawn_at est modifiable", async () => {
+  it("accord retiré : aucune modification, retrait compris ; accord actif : seule withdrawn_at est modifiable, jamais remise à nul", async () => {
     const o = await organisation(app, auth);
     await inTx(app, ctx(o), async (c) => {
       const id = (await c.query(INSERT_ACCORD, [o.org, o.trip, o.owner])).rows[0].id as string;
       for (const set of ["consented_at = now()", "user_id = user_id", "trip_id = trip_id", "id = id"]) {
         await expectRefused(c, `UPDATE reminder_consents SET ${set} WHERE id = $1`, [id]);
       }
+      expect((await attempt(c, "UPDATE reminder_consents SET withdrawn_at = NULL WHERE id = $1", [id])).code, "retrait nul").toBe("42501");
       expect((await attempt(c, "UPDATE reminder_consents SET withdrawn_at = now() WHERE id = $1", [id])).code).toBeUndefined();
       for (const set of ["withdrawn_at = NULL", "withdrawn_at = now()", "withdrawn_at = withdrawn_at"]) {
         expect((await attempt(c, `UPDATE reminder_consents SET ${set} WHERE id = $1`, [id])).code, set).toBe("42501");
       }
+    });
+  });
+
+  it("retrait : withdrawn_at est l'instant de la transaction, quelle que soit la valeur fournie (revue de la PR M6c-D, bloquant 1)", async () => {
+    const o = await organisation(app, auth);
+    await inTx(app, ctx(o), async (c) => {
+      const id = (await c.query(INSERT_ACCORD, [o.org, o.trip, o.owner])).rows[0].id as string;
+      const pose = await c.query(
+        "UPDATE reminder_consents SET withdrawn_at = now() + interval '30 days' WHERE id = $1 RETURNING withdrawn_at = now() AS instant, consented_at = now() AS accord",
+        [id],
+      );
+      expect(pose.rows).toEqual([{ instant: true, accord: true }]);
     });
   });
 
@@ -246,15 +303,16 @@ describe("rappels (0024) : accords", () => {
     }
   });
 
-  it("CHECK : un retrait ne précède jamais l'accord", async () => {
+  it("CHECK : un retrait ne précède jamais l'accord (éprouvée par l'administration, seule à pouvoir fournir ces instants)", async () => {
     const o = await organisation(app, auth);
-    await inTx(app, ctx(o), async (c) => {
-      const id = (await c.query(INSERT_ACCORD, [o.org, o.trip, o.owner])).rows[0].id as string;
-      expect((await attempt(c, "UPDATE reminder_consents SET withdrawn_at = consented_at - interval '1 second' WHERE id = $1", [id])).code).toBe("23514");
+    await admin.query("BEGIN");
+    try {
       expect(
-        (await attempt(c, "INSERT INTO reminder_consents (organization_id, trip_id, user_id, consented_at, withdrawn_at) VALUES ($1, $2, $3, now(), now() - interval '1 day')", [o.org, o.trip, o.owner])).code,
+        (await attempt(admin, "INSERT INTO public.reminder_consents (organization_id, trip_id, user_id, consented_at, withdrawn_at) VALUES ($1, $2, $3, now(), now() - interval '1 day')", [o.org, o.trip, o.owner])).code,
       ).toBe("23514");
-    });
+    } finally {
+      await admin.query("ROLLBACK");
+    }
   });
 });
 
@@ -330,13 +388,13 @@ describe("0024 : retour arrière (base jetable)", () => {
                    WHERE m.roleid = 'vadrouille_fn_purge'::regrole AND m.member = 'vadrouille_migrator'::regrole AND (m.set_option OR m.inherit_option)) AS appartenance`,
         )
       ).rows[0];
-    expect(await etat()).toEqual({ app_accords: true, app_reclamations: true, purge_droits: true, lignes: 2, declencheur: 1, politiques: 4, purge_0024: true, appartenance: 0 });
+    expect(await etat()).toEqual({ app_accords: true, app_reclamations: true, purge_droits: true, lignes: 2, declencheur: 1, politiques: 6, purge_0024: true, appartenance: 0 });
 
     await migrateur.query("BEGIN");
     await migrateur.query(DOWN_0024);
     expect((await migrateur.query("SELECT current_user::text AS u")).rows[0].u).toBe("vadrouille_migrator");
     await migrateur.query("COMMIT");
-    expect(await etat()).toEqual({ app_accords: false, app_reclamations: false, purge_droits: true, lignes: 2, declencheur: 1, politiques: 4, purge_0024: true, appartenance: 0 });
+    expect(await etat()).toEqual({ app_accords: false, app_reclamations: false, purge_droits: true, lignes: 2, declencheur: 1, politiques: 6, purge_0024: true, appartenance: 0 });
 
     // Après la descente, la purge du compte passe encore (réclamations et accords avant le voyage).
     await inTx(appJ, ctx(o), (c) => c.query("SELECT purge_organization_data($1)", [o.org]), "vadrouille_account_admin");

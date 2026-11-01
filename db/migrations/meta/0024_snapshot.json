@@ -3570,6 +3570,21 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "reminder_sends_membership_fk": {
+          "name": "reminder_sends_membership_fk",
+          "tableFrom": "reminder_sends",
+          "tableTo": "memberships",
+          "columnsFrom": [
+            "organization_id",
+            "user_id"
+          ],
+          "columnsTo": [
+            "organization_id",
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {

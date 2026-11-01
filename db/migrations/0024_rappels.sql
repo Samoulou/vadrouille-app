@@ -18,16 +18,25 @@
 --      par personne » ;
 --   2. `reminder_sends` (0157 § 1.8) : la réclamation d'une journée est l'insertion de sa ligne ; clé primaire
 --      `(organization_id, trip_id, user_id, day_index)` ; `CHECK (day_index >= 1)` ; clés étrangères vers
---      `organizations`, `users` et `trips (organization_id, id)` ;
+--      `organizations`, `users`, `trips (organization_id, id)` et `memberships (organization_id, user_id)` (revue de la
+--      PR M6c-D, mineur 2, arbitrage du CEO : une réclamation ne vise qu'un membre de l'organisation) ;
 --      toutes les clés étrangères des deux tables en `ON DELETE NO ACTION` : aucune suppression en cascade ; les lignes
 --      partent par `purge_organization_data` (point 6) ;
---   3. RLS activée et forcée sur les deux tables ; politique type de `vadrouille_app` et politique de purge de
---      `vadrouille_fn_purge` (organisation de la transaction, modèle de `deck_closures`, 0014) ;
---   4. droits : `vadrouille_app` : `reminder_consents` `SELECT, INSERT, UPDATE (withdrawn_at)`, `reminder_sends`
---      `SELECT, INSERT` ; ni `DELETE` ni `TRUNCATE`. `vadrouille_fn_purge` : `SELECT (organization_id)`, `DELETE` ;
+--   3. RLS activée et forcée sur les deux tables ; politique de purge de `vadrouille_fn_purge` (organisation de la
+--      transaction, modèle de `deck_closures`, 0014) ; `reminder_sends` : politique type de `vadrouille_app` ;
+--      `reminder_consents` (revue de la PR M6c-D, mineur 1) : trois politiques de `vadrouille_app`, lecture dans
+--      l'organisation de la transaction, insertion et retrait seulement pour la personne de la transaction
+--      (`user_id = app_current_user()`, en `WITH CHECK` et, pour le retrait, en `USING`) ;
+--   4. droits : `vadrouille_app` : `reminder_consents` `SELECT`, `INSERT (organization_id, trip_id, user_id)`,
+--      `UPDATE (withdrawn_at)` ; `reminder_sends` `SELECT, INSERT` ; ni `DELETE` ni `TRUNCATE`. Ni `id`, ni
+--      `consented_at`, ni `withdrawn_at` à l'insertion : un accord naît actif, à l'instant de la base (revue de la PR
+--      M6c-D, bloquant 1, modèle de T9 pour `share_links`, 0023). `vadrouille_fn_purge` : `SELECT (organization_id)`,
+--      `DELETE` ;
 --   5. accord retiré définitif : déclencheur `BEFORE UPDATE` (fonction ordinaire, propriétaire `vadrouille_owner`,
 --      `search_path` fixé, modèle de `share_links_revoke_once`, 0023) qui refuse toute mise à jour d'un accord dont
---      `withdrawn_at` est posé ; il s'applique à tout rôle, propriétaire et administrateur compris ;
+--      `withdrawn_at` est posé, refuse `withdrawn_at` nul dans la nouvelle ligne et pose `withdrawn_at = now()`
+--      (l'instant du retrait vient de la base, jamais de l'appelant) ; il s'applique à tout rôle, propriétaire et
+--      administrateur compris, et ne couvre ni `DELETE` ni `TRUNCATE` (seule la purge supprime) ;
 --   6. `purge_organization_data` recréée sous son propriétaire `vadrouille_fn_purge` (même forme que 0015, point 4) :
 --      réclamations puis accords supprimés **avant** `trips` (clés étrangères `NO ACTION`), le reste à l'identique de
 --      0015 ; appartenance temporaire de `vadrouille_migrator` retirée.
@@ -80,14 +89,25 @@ ALTER TABLE "reminder_sends" ADD CONSTRAINT "reminder_sends_user_id_users_id_fk"
 --> statement-breakpoint
 ALTER TABLE "reminder_sends" ADD CONSTRAINT "reminder_sends_trip_fk" FOREIGN KEY ("organization_id","trip_id") REFERENCES "public"."trips"("organization_id","id") ON DELETE no action ON UPDATE no action;
 --> statement-breakpoint
+-- Même cible que l'accord : la réclamation ne vise qu'un membre de l'organisation du voyage.
+ALTER TABLE "reminder_sends" ADD CONSTRAINT "reminder_sends_membership_fk" FOREIGN KEY ("organization_id","user_id") REFERENCES "public"."memberships"("organization_id","user_id") ON DELETE no action ON UPDATE no action;
+--> statement-breakpoint
 
 -- 3. RLS (0001_securite, 5.1 ; modèle de `deck_closures`, 0014).
 ALTER TABLE public.reminder_consents ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
 ALTER TABLE public.reminder_consents FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
-CREATE POLICY reminder_consents_app ON public.reminder_consents AS PERMISSIVE FOR ALL TO vadrouille_app
-  USING (organization_id = public.app_current_org()) WITH CHECK (organization_id = public.app_current_org());
+-- Lecture dans l'organisation ; écriture seulement pour la personne de la transaction (l'accord est le sien).
+CREATE POLICY reminder_consents_app_select ON public.reminder_consents AS PERMISSIVE FOR SELECT TO vadrouille_app
+  USING (organization_id = public.app_current_org());
+--> statement-breakpoint
+CREATE POLICY reminder_consents_app_insert ON public.reminder_consents AS PERMISSIVE FOR INSERT TO vadrouille_app
+  WITH CHECK (organization_id = public.app_current_org() AND user_id = public.app_current_user());
+--> statement-breakpoint
+CREATE POLICY reminder_consents_app_update ON public.reminder_consents AS PERMISSIVE FOR UPDATE TO vadrouille_app
+  USING (organization_id = public.app_current_org() AND user_id = public.app_current_user())
+  WITH CHECK (organization_id = public.app_current_org() AND user_id = public.app_current_user());
 --> statement-breakpoint
 CREATE POLICY reminder_consents_fn_purge ON public.reminder_consents AS PERMISSIVE FOR ALL TO vadrouille_fn_purge
   USING (organization_id = public.app_current_org()) WITH CHECK (organization_id = public.app_current_org());
@@ -103,19 +123,21 @@ CREATE POLICY reminder_sends_fn_purge ON public.reminder_sends AS PERMISSIVE FOR
   USING (organization_id = public.app_current_org()) WITH CHECK (organization_id = public.app_current_org());
 --> statement-breakpoint
 
--- 4. Droits (0157 § 1.8). Le retrait est la seule écriture d'un accord après sa création ; une réclamation n'est jamais
--- modifiée. Aucune suppression par l'application.
-GRANT SELECT, INSERT ON public.reminder_consents TO vadrouille_app;
+-- 4. Droits (0157 § 1.8 ; revue de la PR M6c-D, bloquant 1). Un accord s'insère par ses trois colonnes d'identité :
+-- `id`, `consented_at` et `withdrawn_at` viennent de la base. Le retrait est la seule écriture d'un accord après sa
+-- création ; une réclamation n'est jamais modifiée. Aucune suppression par l'application.
+GRANT SELECT ON public.reminder_consents TO vadrouille_app;
 --> statement-breakpoint
-GRANT UPDATE (withdrawn_at) ON public.reminder_consents TO vadrouille_app;
+GRANT INSERT (organization_id, trip_id, user_id), UPDATE (withdrawn_at) ON public.reminder_consents TO vadrouille_app;
 --> statement-breakpoint
 GRANT SELECT, INSERT ON public.reminder_sends TO vadrouille_app;
 --> statement-breakpoint
 GRANT SELECT (organization_id), DELETE ON public.reminder_consents, public.reminder_sends TO vadrouille_fn_purge;
 --> statement-breakpoint
 
--- 5. Accord retiré définitif (0157 § 1.8). Fonction ordinaire (ni `SECURITY DEFINER` ni droit nouveau) : aucun droit
--- d'exécution n'est nécessaire au déclenchement, et les droits par défaut de 0000 retirent celui de `PUBLIC`.
+-- 5. Accord retiré définitif (0157 § 1.8) ; instant du retrait posé par la base (revue de la PR M6c-D, bloquant 1).
+-- Fonction ordinaire (ni `SECURITY DEFINER` ni droit nouveau) : aucun droit d'exécution n'est nécessaire au
+-- déclenchement, et les droits par défaut de 0000 retirent celui de `PUBLIC`.
 CREATE FUNCTION public.reminder_consents_withdraw_once() RETURNS trigger
   LANGUAGE plpgsql
   SET search_path = pg_catalog, pg_temp
@@ -124,6 +146,10 @@ BEGIN
   IF OLD.withdrawn_at IS NOT NULL THEN
     RAISE EXCEPTION 'reminder_consents : accord déjà retiré, aucune modification' USING ERRCODE = 'insufficient_privilege';
   END IF;
+  IF NEW.withdrawn_at IS NULL THEN
+    RAISE EXCEPTION 'reminder_consents : withdrawn_at nul refusé' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  NEW.withdrawn_at := pg_catalog.now();
   RETURN NEW;
 END
 $$;
