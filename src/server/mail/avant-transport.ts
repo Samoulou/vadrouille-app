@@ -1,13 +1,14 @@
 import "server-only";
 
 import { PRODUCT_NAME } from "@/config/site";
+import { DAY_PARAM_PATTERN, tripRoutes } from "@/features/sejour/routes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
 import { logEvent } from "@/server/log";
 
 import { checkEnvelope, type DonneesMessage, type MessageControle } from "./enveloppe";
-import { type ApercuPretMessage, CodeMailerRefusalError, type LoginCodeMessage } from "./port";
+import { type ApercuPretMessage, CodeMailerRefusalError, type LoginCodeMessage, type RappelVeilleMessage } from "./port";
 
 /**
  * Chemin d'avant-transport du port d'envoi du code, **commun** aux implémentations SMTP (`./smtp.ts`) et Resend
@@ -28,6 +29,13 @@ import { type ApercuPretMessage, CodeMailerRefusalError, type LoginCodeMessage }
  * (forme `URL.origin` exacte, `http:` ou `https:`) et l'identifiant du voyage (`uuid`) au lieu du code, et l'étape 3
  * construit le lien `<origine>/voyages/<id>/presentation` (handover § 7 : l'e-mail ouvre la présentation) et le texte de
  * `src/i18n/fr/emailApercu.json`. Les étapes 1 et 4 sont **les mêmes fonctions** que pour le code (`controler`).
+ *
+ * `preparerMessageRappel` (M6c, ticket 1021 ; décision 0157 § 2.6) suit encore le même ordre pour le « rappel la veille » :
+ * l'étape 2 contrôle l'origine, l'identifiant du voyage et le numéro de journée (entier de 1 à 999, forme de
+ * `DAY_PARAM_PATTERN`) ; l'étape 3 construit le lien de la Journée du lendemain (`<origine>/voyages/<id>/jour/<n>`) et celui
+ * du Séjour (pour arrêter les rappels), par `tripRoutes` (seul endroit qui connaît le schéma des adresses), et le texte de
+ * `src/i18n/fr/emailRappel.json` : ni destination, ni date, ni nom d'étape, ni heure, ni donnée Google (spécification M6
+ * § 5.4).
  */
 
 export type AvantTransportDeps = {
@@ -109,6 +117,38 @@ export function preparerMessageApercu(message: ApercuPretMessage, expediteur: st
     to,
     subject: messages.emailApercu.objet,
     text: format(messages.emailApercu.corps, { lien: lienApercu(message.origine, message.tripId), produit: PRODUCT_NAME }),
+  };
+  return controler(donnees, expediteur, to, deps);
+}
+
+/**
+ * Liens du « rappel la veille » (M6c) : la Journée du lendemain et le Séjour (arrêt des rappels), à l'origine de l'application.
+ * Exporté pour les tests et le test sur Mailpit ; le chemin d'envoi ne l'appelle que par `preparerMessageRappel`.
+ */
+export function liensRappel(origine: string, tripId: string, dayIndex: number): { readonly journee: string; readonly sejour: string } {
+  const routes = tripRoutes("/voyages", tripId.toLowerCase());
+  return { journee: `${origine}${routes.jour(dayIndex)}`, sejour: `${origine}${routes.sejour()}` };
+}
+
+export function preparerMessageRappel(message: RappelVeilleMessage, expediteur: string, deps: AvantTransportDeps = {}): MessageControle {
+  const to: CanonicalEmail = message.to;
+  adresseControlee(to, deps);
+  if (
+    typeof message.tripId !== "string" ||
+    !FORME_UUID.test(message.tripId) ||
+    typeof message.origine !== "string" ||
+    !origineAdmise(message.origine) ||
+    !Number.isSafeInteger(message.dayIndex) ||
+    !DAY_PARAM_PATTERN.test(String(message.dayIndex))
+  ) {
+    throw new CodeMailerRefusalError();
+  }
+  const liens = liensRappel(message.origine, message.tripId, message.dayIndex);
+  const donnees: DonneesMessage = {
+    from: expediteur,
+    to,
+    subject: messages.emailRappel.objet,
+    text: format(messages.emailRappel.corps, { lien: liens.journee, produit: PRODUCT_NAME, lienSejour: liens.sejour }),
   };
   return controler(donnees, expediteur, to, deps);
 }

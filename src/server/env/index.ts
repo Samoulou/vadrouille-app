@@ -85,6 +85,10 @@ const VARIABLES = {
   // préfixe `NEXT_PUBLIC_` dont le nom contient `RESEND` (casse ignorée), refusée partout (jamais le nom exact).
   RESEND_API_KEY: 0,
   "NEXT_PUBLIC_*RESEND*": 0,
+  // M6c (ticket 1021 ; revue de la PR 1024, bloquant 2 du Tech Lead ; décision 0157 § 1.7 point 11) : accélération des
+  // durées des rappels pour le test sur le monde local du Workflow SDK, entier de 1 à 86 400, **`local` et `ci`
+  // seulement** (`forbidden` ailleurs) ; absente : 1.
+  RAPPELS_ACCELERATION: 0,
 } as const;
 export type ServerEnvVariable = keyof typeof VARIABLES;
 export const SERVER_ENV_VARIABLES: readonly ServerEnvVariable[] = Object.freeze(Object.keys(VARIABLES) as ServerEnvVariable[]);
@@ -188,7 +192,15 @@ export type ServerEnv = {
    * nom de champ n'apparaît que dans ce module, `./payment.ts` et leurs tests (test de graphe du confinement).
    */
   readonly simulatedWebhookSecret: Buffer | null;
+  /**
+   * Accélération des durées des rappels (M6c ; `RAPPELS_ACCELERATION`), entier de 1 à `ACCELERATION_RAPPELS_MAX` ;
+   * différente de 1 en `local` et `ci` seulement. Lue par la composition des rappels (`rappelsDuServeur`).
+   */
+  readonly rappelsAcceleration: number;
 };
+
+/** Plus grande accélération des rappels admise : un jour par seconde. */
+export const ACCELERATION_RAPPELS_MAX = 86_400;
 
 /** Transports du code de connexion (B3d, M2a ; décision 0138 § 10.4). */
 export type EmailTransport = "disabled" | "smtp" | "resend";
@@ -336,6 +348,7 @@ const ServerEnvSchema = z.object({
   DATA_ADAPTER: z.string().optional(),
   P0_REAL_RUNS: z.string().optional(),
   P0_RUN_TOKEN: z.string().optional(),
+  RAPPELS_ACCELERATION: z.string().optional(),
 });
 
 /** URL absolue `http:` ou `https:`, sans identifiants ni fragment ; rendue normalisée (`URL#origin`), ou `null`. */
@@ -458,6 +471,7 @@ export function parseServerEnv(env: Env): ServerEnv {
     DATA_ADAPTER: env.DATA_ADAPTER,
     P0_REAL_RUNS: env.P0_REAL_RUNS,
     P0_RUN_TOKEN: env.P0_RUN_TOKEN,
+    RAPPELS_ACCELERATION: env.RAPPELS_ACCELERATION,
   });
   // Une issue de Zod peut porter l'entrée reçue : seul le nom de la variable est gardé, jamais le message.
   if (!lu.success) {
@@ -664,6 +678,16 @@ export function parseServerEnv(env: Env): ServerEnv {
     if (rateLimitHmacSecret === null) throw new ServerEnvError(V.RATE_LIMIT_HMAC_SECRET, "missing");
   }
 
+  // RAPPELS_ACCELERATION (M6c ; revue de la PR 1024, bloquant 2 du Tech Lead) : `local` et `ci` seulement ; entier écrit en
+  // chiffres, sans zéro de tête, de 1 à `ACCELERATION_RAPPELS_MAX`. Absente ou vide : 1 (durées réelles).
+  let rappelsAcceleration = 1;
+  if (brut.RAPPELS_ACCELERATION !== undefined && brut.RAPPELS_ACCELERATION !== "") {
+    if (environment !== "local" && environment !== "ci") throw new ServerEnvError(V.RAPPELS_ACCELERATION, "forbidden");
+    const facteur = /^[1-9][0-9]{0,5}$/.test(brut.RAPPELS_ACCELERATION) ? Number(brut.RAPPELS_ACCELERATION) : Number.NaN;
+    if (!(facteur <= ACCELERATION_RAPPELS_MAX)) throw new ServerEnvError(V.RAPPELS_ACCELERATION, "invalid_value");
+    rappelsAcceleration = facteur;
+  }
+
   return Object.freeze({
     environment,
     authAdapter: choix,
@@ -676,6 +700,7 @@ export function parseServerEnv(env: Env): ServerEnv {
     dataAdapter,
     simulatedWebhookFlag,
     simulatedWebhookSecret,
+    rappelsAcceleration,
   });
 }
 

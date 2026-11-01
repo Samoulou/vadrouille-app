@@ -141,6 +141,15 @@
       "nom": "{destination} · Programme",
       "aReserver": "À réserver."
     },
+    "rappels": {
+      "interrupteur": "Rappel par e-mail la veille",
+      "aide": "Chaque soir vers 18:00, heure de ta destination, un e-mail avec le lien de ta journée du lendemain. Tu peux l'arrêter à tout moment.",
+      "actives": "Rappels activés.",
+      "arretes": "Rappels arrêtés.",
+      "erreur": "Impossible de modifier les rappels pour le moment.",
+      "reessayer": "Réessayer",
+      "horsLigne": "Tu es hors ligne. Modifier les rappels demande une connexion."
+    },
     "villes": {
       "separateur": " · ",
       "titre": {

@@ -266,6 +266,7 @@ Tutoiement, phrases courtes, sans point d'exclamation (handover § 10). Vocabula
 - Hors ligne : « Tu es hors ligne. Modifier les rappels demande une connexion. »
 - E-mail, objet : « Ta journée de demain »
 - E-mail, corps : « Ta journée de demain est prête.\n\nPour la voir : {lien}\n\nTu reçois ce message parce que tu as demandé un rappel la veille de chaque journée sur {produit}. Pour l'arrêter, ouvre ton Séjour : {lienSejour} »
+- **Décision UX/UI (U2, U3) : à confirmer par la revue** (PR 1024, M6c) : interrupteur dans le Séjour seulement (pas l'écran 15), sous « Ajouter au calendrier » ; piste en tokens de Ligne (allumé : aplat `line`) ; enregistrement visible (interrupteur atténué) ; hors ligne : interrupteur et « Réessayer » inactifs (`aria-disabled`), décrits par le bandeau hors ligne ; erreur : bandeau effacé à chaque nouvel essai ; textes ci-dessus tels quels.
 
 ---
 

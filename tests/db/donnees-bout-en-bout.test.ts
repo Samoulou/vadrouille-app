@@ -9,6 +9,7 @@ import {
   ADRESSE_DEBLOQUER_REFUS,
   ADRESSE_PARTAGE,
   ADRESSE_PARTAGE_CREATION,
+  ADRESSE_RAPPELS,
   ADRESSE_REMPLACER,
   ADRESSE_PHOTOS,
   JETON_PARTAGE_REVERROUILLE,
@@ -208,5 +209,23 @@ describe("données de bout en bout de la création d'un lien sur api (M6a)", () 
     expect(await nombreDeVoyages(id)).toBe(1);
     const liens = await admin.query("SELECT count(*)::int AS n FROM public.share_links s JOIN public.trips t ON t.id = s.trip_id WHERE t.organization_id = $1 AND s.revoked_at IS NULL", [id.org]);
     expect(liens.rows[0].n).toBe(0);
+  });
+
+  it(`${ADRESSE_RAPPELS} : un voyage débloqué à venir, sans accord aux rappels (M6c)`, async () => {
+    const id = await identite(ADRESSE_RAPPELS);
+    if ((await nombreDeVoyages(id)) === 0) {
+      const converti = convertirVoyagesSimules().find((v) => v.mockId === EDIMBOURG_DEBLOQUE_TRIP_ID);
+      expect(converti).toBeDefined();
+      const donnees = converti!.donnees;
+      const debut = new Date(Date.now() + 20 * JOUR_MS).toISOString().slice(0, 10);
+      const ecart = Math.round((Date.parse(`${debut}T00:00:00Z`) - Date.parse(`${donnees.start}T00:00:00Z`)) / JOUR_MS);
+      const decale: DonneesVoyage = decaler(donnees, ecart);
+      expect(decale.start).toBe(debut);
+      expect(decale.entitlements).toEqual(["tripUnlocked"]);
+      await ecrireVoyage(app, id, decale);
+    }
+    expect(await nombreDeVoyages(id)).toBe(1);
+    const accords = await admin.query("SELECT count(*)::int AS n FROM public.reminder_consents c JOIN public.trips t ON t.id = c.trip_id WHERE t.organization_id = $1 AND c.withdrawn_at IS NULL", [id.org]);
+    expect(accords.rows[0].n).toBe(0);
   });
 });

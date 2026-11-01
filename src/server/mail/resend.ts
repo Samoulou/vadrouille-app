@@ -6,10 +6,18 @@ import { logEvent } from "@/server/log";
 
 import type { EmailUsage } from "@/server/config/email";
 
-import { type AvantTransportDeps, preparerMessageApercu, preparerMessageCode } from "./avant-transport";
+import { type AvantTransportDeps, preparerMessageApercu, preparerMessageCode, preparerMessageRappel } from "./avant-transport";
 import type { MessageControle } from "./enveloppe";
 import { purgeEmailCounts, reserveEmail, type ReserveEmail } from "./plafond";
-import { type ApercuPretMessage, CodeMailerCapError, type CodeMailer, type LoginCodeMessage, type NotificationMailer, PlafondIndisponibleError } from "./port";
+import {
+  type ApercuPretMessage,
+  CodeMailerCapError,
+  type CodeMailer,
+  type LoginCodeMessage,
+  type NotificationMailer,
+  PlafondIndisponibleError,
+  type RappelVeilleMessage,
+} from "./port";
 import {
   ECHEC_DELAI,
   ECHEC_RESEAU,
@@ -230,6 +238,11 @@ export function createResendNotificationMailer(deps: ResendDeps = {}): Notificat
   return Object.freeze({
     async sendApercuPret(message: ApercuPretMessage): Promise<void> {
       await envoyerControle(preparerMessageApercu(message, RESEND_SENDER_ADDRESS, deps), "notification", deps);
+    },
+    // M6c (ticket 1021 ; décision 0157 § 2.6, S6) : même chemin contrôlé. Jamais composé pour les rappels tant que
+    // `RAPPELS_ENVOI_REEL` est faux (`rappelsDuServeur`, `src/server/auth/index.ts`).
+    async sendRappelVeille(message: RappelVeilleMessage): Promise<void> {
+      await envoyerControle(preparerMessageRappel(message, RESEND_SENDER_ADDRESS, deps), "notification", deps);
     },
   });
 }

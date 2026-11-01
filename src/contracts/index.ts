@@ -277,6 +277,8 @@ export type {
   SharedTrip,
   SharedTripView,
 } from "./share";
+// Rappels par e-mail (M6c, ticket 1021) : types seulement ; les schémas se lisent dans `./rappels`.
+export type { TripRemindersRequest, TripRemindersStatus, TripRemindersUpdate } from "./rappels";
 export { ApiErrorCodeSchema, ApiErrorSchema, fail, ok } from "./errors";
 export type { ApiError, Result } from "./errors";
 // Recherche de ville de l'écran 1 (décision 0141 § 6.1 point 5) : types par adaptateur.

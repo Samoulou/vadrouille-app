@@ -551,6 +551,9 @@ describe("module de journal", () => {
       "email.purge_failed",
       // M7a : e-mail « propositions prêtes » non envoyé (base, composition ou transport), nom d'erreur seulement.
       "email.notification_failed",
+      // M6c : relais du workflow 7 en échec, fin sur pannes répétées ; nom seul.
+      "rappels.relay_failed",
+      "rappels.abandoned",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",
