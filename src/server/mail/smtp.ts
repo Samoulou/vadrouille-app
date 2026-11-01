@@ -7,7 +7,7 @@ import type { CanonicalEmail } from "@/server/email";
 
 import { logEvent } from "@/server/log";
 
-import { preparerMessageApercu, preparerMessageCode } from "./avant-transport";
+import { preparerMessageApercu, preparerMessageCode, preparerMessageRappel } from "./avant-transport";
 import { purgeEmailCounts, reserveEmail, type ReserveEmail } from "./plafond";
 import {
   type ApercuPretMessage,
@@ -17,6 +17,7 @@ import {
   type LoginCodeMessage,
   type NotificationMailer,
   PlafondIndisponibleError,
+  type RappelVeilleMessage,
 } from "./port";
 
 /**
@@ -143,29 +144,36 @@ export function createSmtpNotificationMailer(cible: SmtpTarget, deps: SmtpNotifi
   const reserver = deps.reserver ?? reserveEmail;
   const purger = deps.purger ?? purgeEmailCounts;
 
+  /** Chemin commun aux deux notifications, après la préparation : réservation, un `sendMail`, purge, `email.sent`. */
+  async function envoyer(to: CanonicalEmail, envoi: ReturnType<typeof preparerMessageApercu>): Promise<void> {
+    const reservation = await reserver("notification");
+    if (!reservation.ok) {
+      if (reservation.reason === "cap_reached") {
+        logEvent("email.cap_reached", { usage: "notification" }, "warn");
+        throw new CodeMailerCapError();
+      }
+      throw new PlafondIndisponibleError();
+    }
+    let envoye = false;
+    try {
+      transport ??= creerTransportSmtp(cible);
+      await transport.sendMail({ ...envoi, envelope: { from: SENDER_ADDRESS, to: [to] }, maxRecipients: 1 });
+      envoye = true;
+    } catch {
+      // Message de la bibliothèque perdu à dessein (adresse, adresse IP) ; la purge court quand même.
+    }
+    await purger();
+    if (!envoye) throw new SmtpEnvoiError();
+    logEvent("email.sent", { usage: "notification" }, "info");
+  }
+
   return Object.freeze({
     async sendApercuPret(message: ApercuPretMessage): Promise<void> {
-      const to: CanonicalEmail = message.to;
-      const envoi = preparerMessageApercu(message, SENDER_ADDRESS, deps);
-      const reservation = await reserver("notification");
-      if (!reservation.ok) {
-        if (reservation.reason === "cap_reached") {
-          logEvent("email.cap_reached", { usage: "notification" }, "warn");
-          throw new CodeMailerCapError();
-        }
-        throw new PlafondIndisponibleError();
-      }
-      let envoye = false;
-      try {
-        transport ??= creerTransportSmtp(cible);
-        await transport.sendMail({ ...envoi, envelope: { from: SENDER_ADDRESS, to: [to] }, maxRecipients: 1 });
-        envoye = true;
-      } catch {
-        // Message de la bibliothèque perdu à dessein (adresse, adresse IP) ; la purge court quand même.
-      }
-      await purger();
-      if (!envoye) throw new SmtpEnvoiError();
-      logEvent("email.sent", { usage: "notification" }, "info");
+      await envoyer(message.to, preparerMessageApercu(message, SENDER_ADDRESS, deps));
+    },
+    // M6c (ticket 1021 ; décision 0157 § 2.6) : même chemin, préparation `preparerMessageRappel`.
+    async sendRappelVeille(message: RappelVeilleMessage): Promise<void> {
+      await envoyer(message.to, preparerMessageRappel(message, SENDER_ADDRESS, deps));
     },
   });
 }

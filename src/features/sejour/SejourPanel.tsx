@@ -47,6 +47,12 @@ export interface SejourPanelProps {
    * `mock` et `api` et base `/voyages` seulement ; le lien n'est montré que pour un voyage débloqué (M6-PO-6).
    */
   calendrierHref?: string | null;
+  /**
+   * Interrupteur « Rappel par e-mail la veille » (M6c, ticket 1021) : état de l'accord lu par la page serveur
+   * (`getTripReminders`), présent seulement si les rappels sont disponibles (adaptateur `api`, port des notifications
+   * branché, personne propriétaire) ; `null` : pas d'interrupteur, sans texte de remplacement (spécification M6 § 5.2 point 4).
+   */
+  rappels?: { readonly active: boolean } | null;
 }
 
 /** Nom accessible du compteur : « 1 réservation à faire », « 4 réservations à faire ». */
@@ -72,6 +78,9 @@ export function joursADebloquer(trip: { unlocked: boolean; start: string; end: s
   return jours;
 }
 
+/** Interrupteur des rappels (M6c) : chargé à la demande, seulement quand la page en rend l'état (adaptateur `api`). */
+const RappelsInterrupteur = lazy(() => import("./RappelsInterrupteur").then((loaded) => ({ default: loaded.RappelsInterrupteur })));
+
 /** « Jour par jour » groupé par ville : chargé à la demande, pour un voyage à plusieurs villes seulement. */
 const JoursParVille = lazy(() => import("./JoursParVille").then((loaded) => ({ default: loaded.JoursParVille })));
 
@@ -82,7 +91,7 @@ const JoursParVille = lazy(() => import("./JoursParVille").then((loaded) => ({ d
  * l'autre, en mémoire seulement (F5-PO-16). La validation de la mesure est chargée au premier cochage
  * (`createLazyTrack`), hors du JavaScript initial du Séjour.
  */
-export function SejourPanel({ recorderKind = "none", recorder, now: clock, calendrierHref = null }: SejourPanelProps) {
+export function SejourPanel({ recorderKind = "none", recorder, now: clock, calendrierHref = null, rappels = null }: SejourPanelProps) {
   const { trip, routes, actions, placesFromGoogle, unlockHref, versionsHref } = useTripShell();
   // Journées « À débloquer » seulement avec un lien de déblocage (voyage non débloqué, routes `/voyages`, paiement simulé
   // disponible) : sans lui, la liste ne montre que les journées servies, comme avant.
@@ -305,6 +314,15 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock, calen
       {calendrierHref && trip.unlocked ? (
         // « Ajouter au calendrier » (M6b ; spécification M6 § 4) : voyage débloqué seulement (M6-PO-6). Place validée par l'UX/UI (U1, spécification M6 § 7).
         <AjouterAuCalendrier href={calendrierHref} days={trip.days} />
+      ) : null}
+
+      {rappels && (trip.unlocked || rappels.active) ? (
+        // « Rappel par e-mail la veille » (M6c ; spécification M6 § 5.2) : voyage débloqué ; un accord actif reste toujours
+        // retirable, même si le voyage n'est plus débloqué (décision 0157 § 1.7 point 5). Place : décision UX/UI (U2) au § 7 de
+        // la spécification M6, à confirmer par la revue de la PR 1024. Réserve de hauteur pendant le chargement (mineur 14).
+        <Suspense fallback={<div aria-hidden="true" data-part="rappels-reserve" className="min-h-22" />}>
+          <RappelsInterrupteur tripId={trip.id} active={rappels.active} />
+        </Suspense>
       ) : null}
 
       {versionsHref ? (

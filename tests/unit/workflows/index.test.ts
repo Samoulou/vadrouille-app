@@ -5,7 +5,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GardeOuverte } from "@/server/p0/garde";
-import { demarrerApercu, demarrerRecalcul, demarrerVoyageComplet, getRun, P0RUN_COMPLET, REGION_WORKFLOWS, startWorkflow } from "@/workflows";
+import { demarrerApercu, demarrerRappels, demarrerRecalcul, demarrerVoyageComplet, getRun, P0RUN_COMPLET, REGION_WORKFLOWS, startWorkflow } from "@/workflows";
 
 /** Interface stable des workflows (décision 0009 point 2 ; décision 0063 points 5 et 10), SDK simulé. */
 
@@ -15,6 +15,7 @@ vi.mock("@/workflows/p0-run", () => ({ p0Run: vi.fn() }));
 vi.mock("@/workflows/apercu", () => ({ generatePreview: vi.fn() }));
 vi.mock("@/workflows/voyage-complet", () => ({ generateFullTrip: vi.fn() }));
 vi.mock("@/workflows/recalcul", () => ({ batchRecompute: vi.fn() }));
+vi.mock("@/workflows/rappels", () => ({ rappelsVeille: vi.fn() }));
 /** Interrupteur simulé à faux : le refus reste prouvé alors que la valeur commitée est vraie (PR dédiée après P0r3d). */
 vi.mock("@/workflows/complet", () => ({ P0RUN_COMPLET: false }));
 
@@ -51,7 +52,10 @@ describe("src/workflows/index.ts", () => {
     expect(source).toContain("start(p0Revision, [entree], { region: REGION_WORKFLOWS })");
     // M1a-2 (décision 0136 § 2) : le sixième est celui de `generateProgramme` (chaîne inversée), région fra1, même état.
     expect(source).toContain("start(generateProgramme, [entree], { region: REGION_WORKFLOWS })");
-    expect(source.match(/\bstart\(/g)).toHaveLength(6);
+    // M6c (ticket 1021 ; décision 0157 § 1.7 point 1) : le septième est celui des rappels (`rappelsVeille`), région fra1,
+    // entrée revalidée par `EtatRappelSchema` avant l'appel (identifiants seulement).
+    expect(source).toContain("start(rappelsVeille, [entree], { region: REGION_WORKFLOWS })");
+    expect(source.match(/\bstart\(/g)).toHaveLength(7);
   });
 
   it("getRun : statut seul, ni entrée ni sortie relue", async () => {
@@ -100,5 +104,19 @@ describe("src/workflows/index.ts", () => {
     expect(await demarrerRecalcul(generationRunId, organizationId)).toEqual({ ok: false, code: "start_failed" });
     d.start.mockResolvedValueOnce({});
     expect(await demarrerRecalcul(generationRunId, organizationId)).toEqual({ ok: false, code: "start_failed" });
+  });
+
+  it("demarrerRappels (M6c, ticket 1021) : entrée réduite aux identifiants, région fra1 ; une erreur du SDK ne sort que par un code", async () => {
+    const entree = {
+      organizationId: "0a000000-0000-4000-8000-00000000000a",
+      tripId: "0b000000-0000-4000-8000-00000000000b",
+      userId: "0c000000-0000-4000-8000-00000000000c",
+      consentId: "0d000000-0000-4000-8000-00000000000d",
+    };
+    d.start.mockResolvedValueOnce({ runId: "wrun_12" });
+    expect(await demarrerRappels(entree)).toEqual({ ok: true, workflowRunId: "wrun_12" });
+    expect(d.start).toHaveBeenCalledWith(expect.anything(), [entree], { region: "fra1" });
+    d.start.mockRejectedValueOnce(new Error("message du SDK avec test_place_fuite"));
+    expect(await demarrerRappels(entree)).toEqual({ ok: false, code: "start_failed" });
   });
 });

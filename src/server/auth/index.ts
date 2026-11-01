@@ -9,6 +9,7 @@ import type { MemberRole } from "@/adapters/types";
 import { type CanonicalEmail, isCanonicalEmail } from "@/server/email";
 import { serverEnv } from "@/server/env";
 import { errorNameOf, logEvent } from "@/server/log";
+import { RAPPELS_ENVOI_REEL } from "@/server/config/rappels";
 import type { CompositionNotifications } from "@/server/mail/apercu-pret";
 import { disabledCodeMailer, disabledNotificationMailer } from "@/server/mail/disabled";
 import type { CodeMailer } from "@/server/mail/port";
@@ -392,6 +393,20 @@ export function notificationsDuServeur(): CompositionNotifications {
         ? createSmtpNotificationMailer(env.smtp)
         : disabledNotificationMailer;
   return { mailer, origine: env.betterAuth.appUrl };
+}
+
+/**
+ * Composition des rappels par e-mail (M6c, ticket 1021 ; décision 0157 § 1.7 point 10 et § 2.6, S6) : celle des
+ * notifications (`notificationsDuServeur`, même port, même origine), **sauf** Resend tant que `RAPPELS_ENVOI_REEL` est faux :
+ * port désactivé et origine nulle, donc ni interrupteur, ni workflow, ni appel de `resend.ts` pour un rappel. Mailpit
+ * (`EMAIL_TRANSPORT=smtp`, `local` et `ci`) reste branché. Lue à chaque appel ; lève une `ServerEnvError` (sans valeur) si la
+ * configuration est refusée.
+ */
+export function rappelsDuServeur(): CompositionNotifications & { readonly acceleration: number } {
+  const env = serverEnv();
+  // Accélération des durées (`RAPPELS_ACCELERATION`, `local` et `ci` seulement, contrôlée par `serverEnv`) : 1 ailleurs.
+  if (!RAPPELS_ENVOI_REEL && env.emailTransport === "resend") return { mailer: disabledNotificationMailer, origine: null, acceleration: 1 };
+  return { ...notificationsDuServeur(), acceleration: env.rappelsAcceleration };
 }
 
 /** Le rappel d'envoi n'a pas été appelé ; ne porte aucune valeur. */

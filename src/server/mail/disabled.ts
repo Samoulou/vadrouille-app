@@ -34,4 +34,8 @@ export const disabledNotificationMailer: NotificationMailer = Object.freeze({
     logEvent("email.transport_disabled", {}, "warn");
     throw new CodeMailerDisabledError();
   },
+  async sendRappelVeille(): Promise<void> {
+    logEvent("email.transport_disabled", {}, "warn");
+    throw new CodeMailerDisabledError();
+  },
 });

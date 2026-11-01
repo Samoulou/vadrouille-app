@@ -46,3 +46,11 @@ export const JETON_PARTAGE_REVERROUILLE = "m6aPartageApiReverrouille".padEnd(43,
  * lien**, le voyage débloqué d'Édimbourg du jeu simulé, décalé pour commencer 20 jours après l'écriture.
  */
 export const ADRESSE_PARTAGE_CREATION = "m6a-partage-creation@exemple.test";
+
+/**
+ * Rappels par e-mail sur `api` (M6c, ticket 1021 ; revue de la PR 1024, bloquant 2 du Tech Lead ;
+ * `tests/e2e/rappels-api.api.spec.ts`) : une organisation propre, un seul voyage débloqué (Édimbourg du jeu simulé, décalé
+ * pour commencer 20 jours après l'écriture), sans accord. Le scénario donne l'accord, reçoit les rappels dans Mailpit sur
+ * le monde local du Workflow SDK (durées accélérées, `RAPPELS_ACCELERATION`), puis le retire.
+ */
+export const ADRESSE_RAPPELS = "m6c-rappels@exemple.test";

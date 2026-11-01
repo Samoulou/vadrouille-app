@@ -5,9 +5,9 @@ import { PRODUCT_NAME } from "@/config/site";
 import { RESEND_SENDER_ADDRESS, SENDER_ADDRESS } from "@/server/config/email";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
 
-import { lienApercu, preparerMessageApercu } from "./avant-transport";
+import { lienApercu, liensRappel, preparerMessageApercu, preparerMessageRappel } from "./avant-transport";
 import type { EmailReservation, ReserveEmail } from "./plafond";
-import { type ApercuPretMessage, CodeMailerCapError, CodeMailerRefusalError, PlafondIndisponibleError } from "./port";
+import { type ApercuPretMessage, CodeMailerCapError, CodeMailerRefusalError, PlafondIndisponibleError, type RappelVeilleMessage } from "./port";
 import { createResendNotificationMailer, RESEND_API_URL, ResendRefusError, type TransportResend } from "./resend";
 import { createSmtpNotificationMailer, type MessageSmtp, SmtpEnvoiError } from "./smtp";
 
@@ -165,5 +165,108 @@ describe("email: port Resend des notifications, sur un double (PR 870)", () => {
     await expect(refuse.mailer.sendApercuPret(MESSAGE)).rejects.toBeInstanceOf(ResendRefusError);
     expect(refuse.plafond.appels).toEqual([]);
     expect(refuse.transport).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * « Rappel la veille » (M6c, ticket 1021 ; spécification M6 § 5.4, § 6.3 critère 10 et § 7 ; décision 0157 § 2.6) : même
+ * chemin contrôlé que « propositions prêtes », message réduit à l'adresse, l'origine, le voyage et le numéro de journée.
+ */
+describe("email: « rappel la veille » (M6c)", () => {
+  const RAPPEL: RappelVeilleMessage = {
+    to: A,
+    origine: "https://essai.exemple.test",
+    tripId: TRIP,
+    dayIndex: 4,
+  };
+  const JOURNEE = `https://essai.exemple.test/voyages/${TRIP}/jour/4`;
+  const SEJOUR = `https://essai.exemple.test/voyages/${TRIP}`;
+
+  it("critère 10 : objet et corps du § 7, lien de la Journée du lendemain et du Séjour ; ni destination, ni date, ni nom d'étape, ni Google", () => {
+    const envoi = preparerMessageRappel(RAPPEL, SENDER_ADDRESS);
+    expect(envoi).toEqual({
+      from: SENDER_ADDRESS,
+      to: A,
+      subject: "Ta journée de demain",
+      text:
+        `Ta journée de demain est prête.\n\nPour la voir : ${JOURNEE}\n\nTu reçois ce message parce que tu as demandé un rappel la veille de ` +
+        `chaque journée sur ${PRODUCT_NAME}. Pour l'arrêter, ouvre ton Séjour : ${SEJOUR}`,
+    });
+    expect(liensRappel(RAPPEL.origine, TRIP.toUpperCase(), 4)).toEqual({
+      journee: JOURNEE,
+      sejour: SEJOUR,
+    });
+    expect(`${envoi.subject}${envoi.text}`).not.toMatch(/!|ChIJ|google|Édimbourg|2026|18:00/i);
+  });
+
+  it.each([
+    ["origine avec chemin", { ...RAPPEL, origine: "https://essai.exemple.test/x" }],
+    ["origine sans schéma web", { ...RAPPEL, origine: "javascript:alert(1)" }],
+    ["voyage qui n'est pas un uuid", { ...RAPPEL, tripId: "../../compte" }],
+    ["journée nulle", { ...RAPPEL, dayIndex: 0 }],
+    ["journée non entière", { ...RAPPEL, dayIndex: 1.5 }],
+    ["journée au-delà de trois chiffres", { ...RAPPEL, dayIndex: 1000 }],
+    ["journée en texte", { ...RAPPEL, dayIndex: "4/../../x" as unknown as number }],
+  ])("%s : refus avant tout envoi, sans valeur", (_cas, message) => {
+    expect(() => preparerMessageRappel(message, SENDER_ADDRESS)).toThrow(CodeMailerRefusalError);
+  });
+
+  it("SMTP (Mailpit) : réservation notification, un seul sendMail du message préparé, purge, email.sent", async () => {
+    const sendMail = vi.fn<(message: MessageSmtp) => Promise<object>>(async () => ({}));
+    const plafond = compteur();
+    const purger = vi.fn(async () => undefined);
+    await createSmtpNotificationMailer(CIBLE, {
+      transport: { sendMail },
+      reserver: plafond.reserver,
+      purger,
+    }).sendRappelVeille(RAPPEL);
+    expect(plafond.appels).toEqual(["notification"]);
+    expect(sendMail.mock.calls).toEqual([
+      [
+        {
+          ...preparerMessageRappel(RAPPEL, SENDER_ADDRESS),
+          envelope: { from: SENDER_ADDRESS, to: [A] },
+          maxRecipients: 1,
+        },
+      ],
+    ]);
+    expect(purger).toHaveBeenCalledTimes(1);
+    expect(evenements()).toEqual([{ level: "info", event: "email.sent", usage: "notification" }]);
+  });
+
+  it("SMTP : seuil atteint, CodeMailerCapError et email.cap_reached usage notification, aucun sendMail", async () => {
+    const sendMail = vi.fn<(message: MessageSmtp) => Promise<object>>(async () => ({}));
+    const plafond = compteur({ ok: false, reason: "cap_reached" });
+    const mailer = createSmtpNotificationMailer(CIBLE, {
+      transport: { sendMail },
+      reserver: plafond.reserver,
+      purger: async () => undefined,
+    });
+    await expect(mailer.sendRappelVeille(RAPPEL)).rejects.toBeInstanceOf(CodeMailerCapError);
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(evenements()).toEqual([{ level: "warn", event: "email.cap_reached", usage: "notification" }]);
+  });
+
+  it("Resend sur un double : même chemin contrôlé (clé, réservation notification, un POST) ; jamais composé pour les rappels sans RAPPELS_ENVOI_REEL", async () => {
+    const transport = vi.fn<TransportResend>(async () => new Response(null, { status: 200 }));
+    const plafond = compteur();
+    const mailer = createResendNotificationMailer({
+      transport,
+      lireCle: () => ({
+        ok: true as const,
+        cle: "re_SENTINELLE_exemple_0000000000",
+      }),
+      reserver: plafond.reserver,
+      purger: async () => undefined,
+    });
+    await mailer.sendRappelVeille(RAPPEL);
+    expect(plafond.appels).toEqual(["notification"]);
+    const envoi = preparerMessageRappel(RAPPEL, RESEND_SENDER_ADDRESS);
+    expect(JSON.parse(String(transport.mock.calls[0]?.[1]?.body))).toEqual({
+      from: RESEND_SENDER_ADDRESS,
+      to: [A],
+      subject: envoi.subject,
+      text: envoi.text,
+    });
   });
 });

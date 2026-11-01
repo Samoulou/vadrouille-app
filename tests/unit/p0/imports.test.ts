@@ -1979,7 +1979,7 @@ function importsExecutesDe(fichier: string, source: string): string[] {
  * (B9d, workflow 4), `./recalcul` (B10b, workflow 5, décision 0119 § 1.8) et `./programme` (M1a-2, `generateProgramme`,
  * décision 0136 § 2.1), même forme : un pont de `"use step"` vers `src/server/generation/`, jamais dans un paquet client.
  */
-const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./programme", "./recalcul", "./voyage-complet"];
+const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./programme", "./rappels", "./recalcul", "./region", "./voyage-complet"];
 
 /**
  * Seuls imports exécutés admis dans le terminal `src/server/composition/villes.ts` (recherche de ville du site d'essai,
@@ -2038,6 +2038,21 @@ const IMPORTS_TERMINAL_LIEUX_API: readonly string[] = [
   "@/server/rate-limit",
   "@/server/villes/compteurs",
   "@/server/lieux/recherche",
+];
+
+/**
+ * Seuls imports exécutés admis dans le terminal `src/server/composition/rappels.ts` (rappels par e-mail de `api`, M6c,
+ * ticket 1021 ; décision 0157 § 1.7), sur le modèle de `IMPORTS_TERMINAL_LIEUX_API` : composition des notifications
+ * (`rappelsDuServeur`), port désactivé, limiteur, décompte par espèce et démarrage du workflow 7 (le cœur
+ * `src/server/rappels/accord.ts` n'y est lu que pour son type) ; ni client Google, ni module d'IA.
+ */
+const IMPORTS_TERMINAL_RAPPELS: readonly string[] = [
+  "server-only",
+  "@/server/auth",
+  "@/server/mail/disabled",
+  "@/server/rate-limit",
+  "@/server/rappels/demarrage",
+  "@/server/rappels/limiteurs",
 ];
 
 /**
@@ -2103,6 +2118,9 @@ const FRONTIERE_P0R3B = {
     { fichier: "src/server/actions/retouches.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // Recherche d'un lieu à soi de api (décision 0147 § 3 ; M5d-1, ticket 939) : `searchPlaces`, `previewAddPlace`, `applyAddPlace`.
     { fichier: "src/server/actions/lieux.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Rappels par e-mail de api (M6c, ticket 1021 ; décision 0157 § 1.7 point 5) : `setTripReminders`, `getTripReminders`.
+    // Entrée relevée par `pnpm test`, au-delà de 0157 : verdict Sécurité à rendre à la revue de M6c.
+    { fichier: "src/server/actions/rappels.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
     // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
@@ -2169,6 +2187,14 @@ const FRONTIERE_P0R3B = {
       fichier: "src/server/composition/lieux-api.ts",
       admis: (f: string, source: string) => {
         const bornes = importsExecutesDe(f, source).every((i) => IMPORTS_TERMINAL_LIEUX_API.includes(i));
+        return directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source) && bornes;
+      },
+    },
+    {
+      // Rappels par e-mail de api (M6c, ticket 1021) : non parcouru, imports exécutés bornés par nom.
+      fichier: "src/server/composition/rappels.ts",
+      admis: (f: string, source: string) => {
+        const bornes = importsExecutesDe(f, source).every((i) => IMPORTS_TERMINAL_RAPPELS.includes(i));
         return directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source) && bornes;
       },
     },
@@ -2374,6 +2400,7 @@ describe("p0: clé côté serveur seulement", () => {
       "src/server/actions/villes.ts",
       "src/server/actions/retouches.ts",
       "src/server/actions/lieux.ts",
+      "src/server/actions/rappels.ts",
       "src/server/routes/simulated-webhook.ts",
       "src/server/routes/stripe-webhook.ts",
       "src/server/routes/calendrier.ts",
@@ -2385,9 +2412,10 @@ describe("p0: clé côté serveur seulement", () => {
       "src/server/composition/villes.ts",
       "src/server/composition/villes-api.ts",
       "src/server/composition/lieux-api.ts",
+      "src/server/composition/rappels.ts",
     ]);
     for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
-    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./programme", "./recalcul", "./voyage-complet", "server-only", "workflow/api"]);
+    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./programme", "./rappels", "./recalcul", "./region", "./voyage-complet", "server-only", "workflow/api"]);
     // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
     const versIndex = (f: string) => importsClientDe(f, lireDepot(f)).includes("@/workflows");
     expect(versIndex("src/server/p0/lancement.ts") && versIndex("src/server/p0/page-acces.ts")).toBe(true);

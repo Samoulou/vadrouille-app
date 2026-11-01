@@ -19,5 +19,5 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function SejourPage({ params }: { params: Params }) {
   const { id } = await params;
   await exigerSession(tripRoutes("/voyages", id).sejour());
-  return <SejourScreen tripId={id} recorderKind={devPagesEnabled() ? "console" : "none"} calendrier />;
+  return <SejourScreen tripId={id} recorderKind={devPagesEnabled() ? "console" : "none"} calendrier rappels />;
 }

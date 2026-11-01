@@ -59,7 +59,8 @@ function base(options: { publiee?: boolean; email?: unknown; echoue?: "connect" 
 
 function port(comportement: (message: ApercuPretMessage) => Promise<void> = async () => undefined) {
   const sendApercuPret = vi.fn(comportement);
-  const mailer: NotificationMailer = { sendApercuPret };
+  // M6c (ticket 1021) : le port a une seconde opération, jamais appelée ici.
+  const mailer: NotificationMailer = { sendApercuPret, sendRappelVeille: vi.fn() };
   const composer = vi.fn((): CompositionNotifications => ({ mailer, origine: ORIGINE }));
   return { sendApercuPret, composer };
 }
@@ -147,7 +148,7 @@ describe("email: « propositions prêtes », issues sans envoi (PR 870)", () => 
     const { pool, etat } = base();
     expect(await envoyerApercuPret(ENTREE, { pool, composer: () => ({ mailer: disabledNotificationMailer, origine: ORIGINE }) })).toBe("disabled");
     const { sendApercuPret } = port();
-    expect(await envoyerApercuPret(ENTREE, { pool, composer: () => ({ mailer: { sendApercuPret }, origine: null }) })).toBe("disabled");
+    expect(await envoyerApercuPret(ENTREE, { pool, composer: () => ({ mailer: { sendApercuPret, sendRappelVeille: vi.fn() }, origine: null }) })).toBe("disabled");
     expect(etat.transactions).toEqual([]);
     expect(sendApercuPret).not.toHaveBeenCalled();
     expect(evenements().map((e) => e.event)).toEqual(["email.transport_disabled", "email.transport_disabled"]);
