@@ -68,6 +68,14 @@ export const RATE_LIMITS: RateLimitConfig = {
   // compte ne se partage pas entre personnes. Vérifié après la session et le contrôle du voyage dans l'organisation, avant
   // la lecture de la version ; `api` seulement (limiteur en base).
   calendrier: [{ kind: "trip", windowSeconds: 3600, threshold: 30 }],
+  // M6c (ticket 1021 ; décision 0157 § 1.7 point 5 et § 2.6, S6 confirmée) : interrupteur des rappels par e-mail, 20 par
+  // heure et par adresse IP, puis 6 par voyage et par 24 heures (fenêtre fixe). Seule l'activation est refusée au-delà ; le
+  // retrait est compté (verdict ignoré, panne comprise) et **jamais refusé** (RGPD art. 7 (3)). Espèce `trip` après le
+  // contrôle du voyage (activation) ou de la ligne d'accord (retrait), 0147 § 6.4 point 1 ; `api` seulement.
+  "rappels-accord": [
+    { kind: "ip", windowSeconds: 3600, threshold: 20 },
+    { kind: "trip", windowSeconds: 86_400, threshold: 6 },
+  ],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

@@ -170,6 +170,11 @@ const COMPOSITION_LIEUX_API =
   "sur le cœur `src/server/lieux/recherche.ts`, sur le modèle de M1f (0141) : garde `SEUILS_LIEUX_VALIDES` non validée, barrière B9-TL-8 " +
   "et crochet `accesReelApi` fermé, limiteur `lieu-recherche` (espèces `ip` et `trip`), compteur du jour `lieux` de " +
   "`autocomplete_daily_counts` ; aucune donnée Google conservée hors du `placeId` (0011, 0027) ; verdict Sécurité : attendu";
+const COMPOSITION_RAPPELS =
+  "rappels par e-mail de `api` (décision 0157 § 1.7 ; plan du MVP, ligne M6c, ticket 1021) : terminal mince sur le cœur " +
+  "`src/server/rappels/accord.ts`, sur le modèle de M5d-1 : composition des notifications (`rappelsDuServeur`, garde " +
+  "`RAPPELS_ENVOI_REEL`), limiteur `rappels-accord` (espèces `ip` et `trip`), démarrage du workflow 7 ; aucune donnée " +
+  "Google ; verdict Sécurité : attendu";
 const SERVER_ONLY_P0R3C4 =
   "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
   "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
@@ -542,6 +547,14 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/rate-limit", noms: ["verdictRateLimit"], motif: COMPOSITION_LIEUX_API },
   { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/villes/compteurs", noms: ["purgerAutocompletion", "reserverAutocompletion"], motif: COMPOSITION_LIEUX_API },
   { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/lieux/recherche", noms: ["rechercherLieux", "type:DependancesRechercheLieux", "type:PortsRechercheLieux"], motif: COMPOSITION_LIEUX_API },
+  // Rappels par e-mail de `api` (M6c, ticket 1021) : les lignes que l'analyseur relève pour `composition/rappels.ts`.
+  { fichier: "src/server/composition/rappels.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/auth", noms: ["rappelsDuServeur"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/mail/disabled", noms: ["disabledNotificationMailer"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/rate-limit", noms: ["verdictRateLimit"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/rappels/accord", noms: ["type:DependancesRappels"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/rappels/demarrage", noms: ["demarrerRappelsReel"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/rappels/limiteurs", noms: ["compterEspeceRappels"], motif: COMPOSITION_RAPPELS },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.
   ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/workflows/apercu.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({
@@ -569,6 +582,13 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     specificateur: "server-only",
     noms: ["effet"],
     motif: "marqueur `server-only` (sans capacité) du workflow `generateProgramme` (chaîne inversée), exigé par `ligne/require-server-only` ; M1a-2, ticket 851, décision 0136 § 2.1 ; admis par le verdict Sécurité de la revue du head 3536d13 de la PR 854 (amende 0139 § 6 point 1 d'une ligne, précédent 0120 S9 point 1)",
+  },
+  {
+    fichier: "src/workflows/rappels.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du workflow 7 `rappelsVeille`, exigé par `ligne/require-server-only` ; M6c, ticket 1021, décision 0157 § 1.7 ; verdict Sécurité demandé dans la PR (précédent 0120 S9 point 1)",
   },
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.

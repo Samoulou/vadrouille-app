@@ -59,7 +59,8 @@ describe("exports", () => {
     expect(Object.keys(operations).sort()).toEqual(["readSession", "requestCode", "signOut", "verifyCode"]);
     expect(Object.isFrozen(operations)).toBe(true);
     // M7a (PR 870) : composition du port des notifications (`notificationsDuServeur`), qui rend le port et l'origine, jamais `auth`.
-    expect(Object.keys(moduleAuth).sort()).toEqual(["AuthNotConfiguredError", "authOperations", "createAuthOperations", "notificationsDuServeur"]);
+    // M6c (ticket 1021 ; décision 0157 § 1.7 point 10) : composition des rappels (`rappelsDuServeur`), même forme.
+    expect(Object.keys(moduleAuth).sort()).toEqual(["AuthNotConfiguredError", "authOperations", "createAuthOperations", "notificationsDuServeur", "rappelsDuServeur"]);
     // Revue consolidée du head `ed79edb` (PR 446), mineur 4 ; B3c (ticket 447) : clés exportées des modules voisins.
     // `executeurSql` : export ajouté par B7c (ticket 449, PR 454), conservé à la fusion de main.
     expect(Object.keys(moduleWithOrg).sort()).toEqual(["WithOrgContextError", "creerWithOrg", "executeurSql", "withOrg"]);

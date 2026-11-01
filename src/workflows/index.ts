@@ -5,11 +5,13 @@ import { getRun as runDuSdk, start } from "workflow/api";
 import type { GardeOuverte } from "@/server/p0/garde";
 
 import type { EtatComplet, EtatEtape, EtatLot, EtatProgramme } from "@/server/generation/etat";
+import type { EtatRappel } from "@/server/rappels/etat";
 
 import { generatePreview } from "./apercu";
 import { P0RUN_COMPLET } from "./complet";
 import { choixRevisionValides, p0Revision, p0Run } from "./p0-run";
 import { generateProgramme } from "./programme";
+import { rappelsVeille } from "./rappels";
 import { batchRecompute } from "./recalcul";
 import { generateFullTrip } from "./voyage-complet";
 
@@ -171,6 +173,23 @@ export async function demarrerRecalcul(generationRunId: string, organizationId: 
   let workflowRunId: unknown;
   try {
     const run = await start(batchRecompute, [entree], { region: REGION_WORKFLOWS });
+    workflowRunId = run.runId;
+  } catch {
+    return { ok: false, code: "start_failed" };
+  }
+  return typeof workflowRunId === "string" ? { ok: true, workflowRunId } : { ok: false, code: "start_failed" };
+}
+
+/**
+ * Démarre `rappelsVeille` (workflow 7, M6c, ticket 1021 ; décision 0157 § 1.7 point 1) pour un accord écrit et validé par
+ * `setTripReminders` : entrée `{ organizationId, tripId, userId, consentId }` (identifiants seulement, revalidée par
+ * `EtatRappelSchema` dans `src/server/rappels/demarrage.ts` avant l'appel), région `fra1`. Une erreur du SDK rend
+ * `start_failed`, jamais son message ; l'appelant retire alors l'accord (0157 § 1.7 point 6).
+ */
+export async function demarrerRappels(entree: EtatRappel): Promise<ResultatDemarrage> {
+  let workflowRunId: unknown;
+  try {
+    const run = await start(rappelsVeille, [entree], { region: REGION_WORKFLOWS });
     workflowRunId = run.runId;
   } catch {
     return { ok: false, code: "start_failed" };

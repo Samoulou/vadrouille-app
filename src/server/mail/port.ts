@@ -80,12 +80,28 @@ export type ApercuPretMessage = {
 };
 
 /**
- * Port d'envoi des notifications (M7a) : une opération, l'e-mail « propositions prêtes ». Mêmes règles que `CodeMailer` :
- * un refus ou une panne **lève** une erreur de nom fixe, sans valeur ; `CodeMailerCapError` dit le plafond atteint.
- * Implémentations : `createSmtpNotificationMailer` (`./smtp.ts`, Mailpit en `local` et `ci`) et
+ * Message « rappel la veille » (M6c, ticket 1021 ; décision 0157 § 2.6, S6 ; spécification M6 § 5.4) : la forme canonique de
+ * l'adresse du compte, l'origine de l'application, l'identifiant du voyage (`uuid`) et le numéro de la journée du lendemain
+ * (entier ≥ 1), **et rien d'autre**. Les liens (Journée du lendemain, Séjour pour arrêter) sont construits par la préparation
+ * commune (`preparerMessageRappel`), jamais reçus tout faits ; ni destination, ni date, ni nom d'étape, ni heure, ni donnée
+ * Google.
+ */
+export type RappelVeilleMessage = {
+  readonly to: CanonicalEmail;
+  readonly origine: string;
+  readonly tripId: string;
+  readonly dayIndex: number;
+};
+
+/**
+ * Port d'envoi des notifications (M7a ; M6c) : deux opérations, l'e-mail « propositions prêtes » et le « rappel la veille ».
+ * Mêmes règles que `CodeMailer` : un refus ou une panne **lève** une erreur de nom fixe, sans valeur ; `CodeMailerCapError`
+ * dit le plafond atteint. Implémentations : `createSmtpNotificationMailer` (`./smtp.ts`, Mailpit en `local` et `ci`) et
  * `createResendNotificationMailer` (`./resend.ts`, cas admis de 0138 § 3 seulement), choisies par la composition de
- * `src/server/auth/index.ts` comme le port du code ; `disabledNotificationMailer` (`./disabled.ts`) sans transport.
+ * `src/server/auth/index.ts` comme le port du code ; `disabledNotificationMailer` (`./disabled.ts`) sans transport. Les deux
+ * opérations suivent le même chemin contrôlé (préparation commune, réservation de l'usage `notification`, un envoi).
  */
 export interface NotificationMailer {
   sendApercuPret(message: ApercuPretMessage): Promise<void>;
+  sendRappelVeille(message: RappelVeilleMessage): Promise<void>;
 }
