@@ -752,6 +752,32 @@ describe("lecture: logements, trajets, toConfirm, jour en préparation", () => {
     expect(exceptions).toEqual({ zero: ["toConfirm"], une: ["toReserve", "toConfirm"], deux: ["toReserve", "unconfirmed"] });
   });
 
+  // Ticket 1019 (question 4 de la PR M6a) : « À confirmer » n'est pas une valeur stockée. Elle est tirée des horaires
+  // Google (décision 0011, point 5) et recalculée à chaque lecture ; la base ne garde que `toReserve` et `unconfirmed`.
+  it("lecture: une étape « À confirmer » créée sur api ressort toConfirm à la lecture, sans que la base la stocke ni la partage", async () => {
+    const items = [term("start", "09:00"), seg("walk"), etape("a-confirmer", "10:00", "11:00", P[0], ["unconfirmed"]), seg("walk"), term("end", "18:00")];
+    const id = await ecrire(a, voyage([jour(1, "2027-12-02", items)], { destination: "À confirmer" }));
+    // Écrit : l'instantané stocké ne porte que l'exception stockable.
+    const stocke = await admin.query(
+      "SELECT snapshot -> 'days' -> 0 -> 'items' -> 2 -> 'stop' -> 'exceptions' AS exceptions FROM public.trip_versions WHERE trip_id = $1",
+      [id],
+    );
+    expect(stocke.rows).toEqual([{ exceptions: ["unconfirmed"] }]);
+    // Lu : horaires du lieu inconnus pour la date → « À confirmer » recalculée, après les exceptions stockées.
+    const durees = { [`${L1}|${P[0]}|walk`]: 5, [`${P[0]}|${L1}|walk`]: 5 };
+    const day = await banc({ table: table(durees, [], [P[0] ?? ""]) }).adapter.getDay(ctxA, id, 1);
+    const etapeLue = (day?.items ?? []).flatMap((i) => (i.type === "stop" ? [i.stop] : []))[0];
+    expect(etapeLue?.exceptions).toEqual(["unconfirmed", "toConfirm"]);
+    // Relu une seconde fois : même résultat, rien n'a été écrit entre-temps.
+    const relu = await banc({ table: table(durees, [], [P[0] ?? ""]) }).adapter.getDay(ctxA, id, 1);
+    expect(relu).toEqual(day);
+    const apres = await admin.query("SELECT count(*)::int AS n FROM public.trip_versions WHERE trip_id = $1 AND snapshot::text LIKE '%toConfirm%'", [id]);
+    expect(apres.rows[0].n).toBe(0);
+    // Vue partagée (fonction de 0001_securite, lue par l'instantané partagé) : `toConfirm` n'y passe jamais, même fourni.
+    const partage = await admin.query(`SELECT public.shared_exceptions('["toConfirm", "unconfirmed", "toReserve"]'::jsonb) AS e`);
+    expect(partage.rows[0].e).toEqual(["unconfirmed", "toReserve"]);
+  });
+
   it("lecture: jour en préparation (exécution batch non terminée), puis aucun après finished_at", async () => {
     const days = [
       jour(1, "2028-01-01", [term("start", "09:00"), seg("walk"), etape("p", "10:00", "11:00", P[0]), seg("walk"), term("end", "18:00")]),
