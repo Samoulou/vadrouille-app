@@ -6,7 +6,7 @@ import { ADRESSE_PARTAGE_CREATION, JETON_PARTAGE_REVERROUILLE, JETON_PARTAGE_VAL
 
 import { codeCells, connexionRoute, emailField, firstCell, pasteCode } from "./connexion-helpers";
 import { R17 } from "./mes-voyages-helpers";
-import { createLink, openShareSheet, revokeLink, RP, RPJ } from "./partage-helpers";
+import { createLink, openShareSheet, revokeLink, RP, RPJ, sheetButton } from "./partage-helpers";
 
 /**
  * Vue partagée sur l'adaptateur `api` (ticket 1013, M6a ; spécification M6 § 3.3 et § 6.1 ; décisions 0157 § 2.1 et
@@ -144,6 +144,8 @@ test("partage: api, créer depuis la feuille, ouvrir sans session, désactiver, 
   // Séjour du voyage débloqué : feuille « Partager », création d'un lien.
   await page.goto(`/voyages/${ids[0]}`);
   await openShareSheet(page);
+  // Nouvel essai (`retries`) sur la même base : un lien laissé actif par l'essai précédent est d'abord désactivé.
+  if (await sheetButton(page, "Désactiver le lien").isVisible()) await revokeLink(page);
   const jeton = await createLink(page);
 
   // Visiteur sans session (contexte neuf, sans cookie) : la vue du voyage.
@@ -156,7 +158,11 @@ test("partage: api, créer depuis la feuille, ouvrir sans session, désactiver, 
     expectEnTetesConfidentialite(vue, "lien créé");
     expect(await visiteur.cookies()).toEqual([]);
 
-    // La personne désactive le lien ; le visiteur reçoit le 404 commun, dès la requête suivante.
+    // La personne désactive le lien ; le visiteur reçoit le 404 commun, dès la requête suivante. Juste après la création,
+    // la feuille montre le lien créé (champ et « Copier ») ; « Désactiver le lien » est dans l'état « lien actif », qu'elle
+    // montre à sa réouverture (comme `partage.e2e.spec.ts`).
+    await sheetButton(page, "Fermer").click();
+    await openShareSheet(page);
     await revokeLink(page);
     const apres = await anonyme.goto(RP(jeton));
     expect(apres?.status()).toBe(404);
