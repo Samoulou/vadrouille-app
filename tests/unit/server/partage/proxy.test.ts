@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DecisionVue } from "@/server/partage/limite-vue";
 
+import { nextConfig } from "../../../../next.config";
 import { ROUTES } from "../../../e2e/routes";
 
 /**
@@ -82,6 +83,16 @@ describe("proxy : adresses couvertes (config.matcher)", () => {
     for (const chemin of [...autres, "/pp", "/prototype/executions", "/api/calendrier/x", "/x/p/y"]) {
       expect(unstable_doesMiddlewareMatch({ config, url: chemin }), chemin).toBe(false);
     }
+  });
+});
+
+describe("proxy : garde du réglage skipProxyUrlNormalize (ticket 1029, décision 0161)", () => {
+  it("garde de configuration : skipProxyUrlNormalize reste à true dans next.config.ts", () => {
+    // Garde du réglage seulement : ce test ne vérifie que sa valeur. Pourquoi il faut : `next/dist/server/web/adapter.js`
+    // retire les en-têtes de `FLIGHT_HEADERS` (dont `Next-Router-Prefetch`) de la requête du proxy, sauf si
+    // `__NEXT_NO_MIDDLEWARE_URL_NORMALIZE` (posé au build par `skipProxyUrlNormalize`) est vrai. Le comportement réel est
+    // éprouvé par `tests/e2e/partage-api.api.spec.ts` (« préchargement du routeur : 204 sans corps, sans lecture »).
+    expect(nextConfig.skipProxyUrlNormalize).toBe(true);
   });
 });
 
