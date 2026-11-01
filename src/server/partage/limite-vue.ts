@@ -18,6 +18,7 @@ import { verdictRateLimit, type RateLimitRequest, type RateLimitVerdict } from "
  * 2. forme du jeton (`SHARE_TOKEN_PATTERN`) : autre forme → la requête passe **sans compter**, la page répond 404 sans
  *    lire (critère 13 de M6a pour le jeton signé) ;
  * 3. préchargement (`Next-Router-Prefetch: 1` ou `Purpose: prefetch`) : 204 sans corps, sans compter ni lire ;
+ *    `Next-Router-Prefetch` n'atteint le proxy que grâce à `skipProxyUrlNormalize` (`next.config.ts`, ticket 1029) ;
  * 4. hors de `local` et `ci`, requête sans clé d'adresse lisible (`trustedIpKey` nul) : la requête passe **sans compter**
  *    et sans l'en-tête « compté », donc la page répond le 404 commun sans lire (0157 § 2.1 point 3 : le compartiment
  *    commun `no-trusted-ip` n'est jamais atteint par `partage-vue` sur un déploiement) ;

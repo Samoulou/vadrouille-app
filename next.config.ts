@@ -56,6 +56,13 @@ export const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+  // Ticket 1029 (M6a ; décision 0157 § 2.1 point 4) : sans ce réglage, Next.js retire les en-têtes « flight » de la requête
+  // (`rsc`, `next-router-prefetch`, `next-router-state-tree`… ; `FLIGHT_HEADERS` de `next/dist/server/web/adapter.js`)
+  // avant `src/proxy.ts`, puis les rend à la page : le proxy ne voyait jamais `Next-Router-Prefetch: 1` et comptait un
+  // préchargement du routeur comme une vue. Avec lui, le proxy (seul de l'application, matcher `/p/:path*`) reçoit la
+  // requête telle qu'envoyée : en-têtes « flight » et adresse non normalisée (`_rsc` gardé dans la requête). Aucun autre
+  // effet : il ne touche que l'entrée du proxy.
+  skipProxyUrlNormalize: true,
   // Décision 0005 : le build vérifie les types sans les tests (absents de l'image Docker).
   // `pnpm typecheck` garde le tsconfig.json complet.
   typescript: { tsconfigPath: "tsconfig.build.json" },
