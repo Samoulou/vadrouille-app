@@ -46,8 +46,11 @@ interface HandoverStop {
   locked: boolean;
   /** Ajout signalé (décision 0015, § 9) : engagement saisi par la personne. */
   commitment?: "ticket" | "reservation";
-  /** Ajout signalé (décision 0147 § 6.1, M5-C) : lieu à soi, écrit par l'opération `add`. */
-  addedBy?: "person";
+  /**
+   * Ajout signalé (décision 0147 § 6.1, M5-C) : lieu à soi, écrit par l'opération `add` ; `"discovered"` ajouté par la
+   * décision 0160 § 1.4 (PR de contrat M8-C) : adresse découverte sur place.
+   */
+  addedBy?: "person" | "discovered";
 }
 /** `minutes` et `Day.travelMinutes` : `null` pour un temps indisponible (prototype seulement, décision 0092 § 4). */
 interface HandoverSegment { mode: "walk" | "transit" | "car"; minutes: number | null; estimated: boolean }
