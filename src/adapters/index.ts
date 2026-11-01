@@ -34,7 +34,8 @@ import {
 } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
-import { realShareAvailable, shareAvailable } from "./share-guard";
+import { apiShareAdapter } from "./api-share-instance";
+import { apiShareAvailable, realShareAvailable, shareAvailable } from "./share-guard";
 import { createSignedShareAdapter } from "./signed-share";
 import { paiementSimule } from "./simulated-payment-instance";
 import { paiementStripe } from "./stripe-payment-instance";
@@ -89,7 +90,7 @@ export { authAdapterChoice, betterAuthAllowed, mockAuthAllowed } from "./auth-gu
 export { assertApiAdapter } from "./api-guard";
 export { getRequestContext, SessionRequiseError } from "./context";
 export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
-export { realShareAvailable, shareAvailable, shareDemoAvailable } from "./share-guard";
+export { apiShareAvailable, realShareAvailable, shareAvailable, shareDemoAvailable } from "./share-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";
 export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype-instance";
 
@@ -620,7 +621,9 @@ export async function getRevisionVersion(ctx: AdapterContext, tripId: string, va
  * mémoire de la portée, voyages lus par `getTripReader()` de la même portée, durée du partage lue dans la
  * configuration serveur. **Partage réel du site d'essai** (`realShareAvailable`, décision 0135) : jeton signé sans
  * stockage, lien créé depuis la session vérifiée (`getTripReader()` de la requête), vue partagée lue par un lecteur du
- * seul voyage du lien, dans l'organisation du jeton. **Filet de sécurité** : lève une erreur si `shareAvailable()` est
+ * seul voyage du lien, dans l'organisation du jeton. **Partage sur `api`** (`apiShareAvailable`, décision 0157 § 1.2 ;
+ * ticket 1013, M6a) : garde `assertApiAdapter`, puis les cas d'usage branchés au démarrage (`api-share-instance.ts` :
+ * `share_links`, vue lue par les vues de la base), sans repli vers `mock`. **Filet de sécurité** : lève une erreur si `shareAvailable()` est
  * faux ; les pages et les actions consultent la garde avant et ne l'atteignent jamais dans ce cas.
  */
 export function getShareAdapter(options: { scope?: SimulationScope } = {}): ShareAdapter {
@@ -628,6 +631,9 @@ export function getShareAdapter(options: { scope?: SimulationScope } = {}): Shar
     throw new Error("partage indisponible : shareAvailable() est faux (spécification F10, F10-TL-7)");
   }
   const scope = options.scope ?? defaultScope();
+  if (apiShareAvailable()) {
+    return apiShareAdapter(() => scope.clock.now());
+  }
   if (realShareAvailable()) {
     return createSignedShareAdapter({
       creatorTrips: getTripReader({ scope }),

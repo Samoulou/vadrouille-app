@@ -51,6 +51,8 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/server/routes/webhook-commun.ts", "@/server/env"],
     // M6b (ticket 1005 ; décision 0157 § 1.6 point 9) : route du fichier `.ics`, pour `index` seulement (origine de `APP_URL`).
     ["src/server/routes/calendrier.ts", "@/server/env"],
+    // M6a (ticket 1013 ; décision 0157 § 2.1 points 4 et 5) : limite de la vue partagée, pour `index` seulement.
+    ["src/server/partage/limite-vue.ts", "@/server/env"],
     // P0r3b (décision 0055, section 1 point 2) : module étroit du mode réel, deux importateurs nommés.
     ["src/server/p0/garde.ts", "@/server/env/p0"],
     ["src/server/p0/acces.ts", "@/server/env/p0"],
@@ -101,6 +103,9 @@ describe("p0: modules d'environnement étroits (lint des imports)", () => {
     ["src/ai/exemple.ts", "@/server/env/autre"],
     // B3a : index, resolve, payment hors de leurs importateurs nommés.
     ["src/server/actions/compte.ts", "@/server/env"],
+    // M6a (ticket 1013) : ni le proxy, ni la lecture de la vue partagée (seule la limite de la vue est admise).
+    ["src/proxy.ts", "@/server/env"],
+    ["src/server/partage/vue.ts", "@/server/env"],
     ["src/server/actions/compte.ts", "@/server/env/index"],
     ["src/app/page.tsx", "../server/env/index.ts"],
     ["tests/unit/autre.test.ts", "@/server/env"],

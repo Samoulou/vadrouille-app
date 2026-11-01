@@ -23,6 +23,11 @@ export interface DayBadgeProps {
   disabled?: boolean;
   /** Sans `href`, pastille non interactive. */
   href?: string;
+  /**
+   * Préchargement du lien par le routeur de Next.js (`prefetch` de `next/link`) ; absent : comportement par défaut. La
+   * vue partagée passe `false` (décision 0157 § 2.1 point 5 : aucune requête de `/p/` sans visite).
+   */
+  prefetch?: false;
   /** Proposition (Q18) : « sm » = pastille réduite non interactive (26 px). */
   size?: "md" | "sm";
   /** Proposition : valeur d'aria-current quand la pastille est active ; « true » par défaut (handover § 5). */
@@ -77,6 +82,7 @@ export function DayBadge({
   active = false,
   disabled = false,
   href,
+  prefetch,
   size = "md",
   currentValue = "true",
   className,
@@ -97,7 +103,7 @@ export function DayBadge({
   }
   if (href && !small) {
     return (
-      <Link href={href} aria-current={current} data-day={day} className={classes}>
+      <Link href={href} prefetch={prefetch} aria-current={current} data-day={day} className={classes}>
         {content}
       </Link>
     );
