@@ -137,6 +137,10 @@ function ShareContent({
       busy.current = true;
       setPending(operation);
       setAnnounce(null);
+      // Après un refus par la limite (bandeau sans « Réessayer », nouvel essai par le bouton de l'action), le bandeau est
+      // retiré au début de l'essai : un nouveau refus est ré-annoncé (revue du ticket 1013, UX mineur 7). Après une
+      // autre erreur, le bandeau et son « Réessayer », qui a le focus, restent en place pendant l'essai.
+      if (limited) setFailed(null);
       let refusParLimite = false;
       try {
         if (operation === "read") {
@@ -178,7 +182,7 @@ function ShareContent({
         setPending(null);
       }
     },
-    [actions, input],
+    [actions, input, limited],
   );
 
   // Lecture de l'état du lien à l'ouverture (une feuille neuve à chaque ouverture : `ShareContent` est remonté).

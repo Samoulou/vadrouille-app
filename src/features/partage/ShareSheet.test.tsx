@@ -296,6 +296,8 @@ describe("erreur d'une action (C37, C41)", () => {
     // « Réessayer » contredirait le texte : masqué ; « Créer un lien » reste le moyen d'un nouvel essai.
     expect(within(alert).queryByRole("button", { name: "Réessayer" })).toBeNull();
     fireEvent.click(button("Créer un lien"));
+    // Bandeau de la limite retiré au début du nouvel essai (ré-annoncé si la limite refuse encore).
+    await waitFor(() => expect(alert).not.toBeInTheDocument());
     await waitFor(() => expect(createShareLink).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Impossible de modifier le partage pour le moment."));
   });

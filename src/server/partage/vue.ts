@@ -22,9 +22,10 @@ import { requeteComptee } from "./limite-vue";
  *    `src/proxy.ts` pour ce chemin ; sinon `null` (404 commun) **sans rien lire**. C'est la protection contre une requête
  *    qui n'est pas passée par le proxy (CVE-2025-29927 comprise). **En `local` et `ci`, elle n'existe pas** :
  *    `requeteComptee` admet la requête sans vérifier l'en-tête (postes et CI, sans exposition ; le proxy y compte
- *    quand même). Ces deux valeurs ne sont jamais atteintes sur un déploiement : `resolveServerEnvironment` rend
- *    `staging` ou `production` dès que `VERCEL_ENV` vaut `preview` ou `production` (la plus restrictive des valeurs
- *    déclarées l'emporte) ; équivalence éprouvée par `tests/unit/server/env.test.ts`.
+ *    quand même). Ces deux valeurs ne sont jamais atteintes sur un déploiement Vercel, où `VERCEL_ENV` est toujours
+ *    posé : `resolveServerEnvironment` rend `staging` ou `production` dès que `VERCEL_ENV` vaut `preview` ou
+ *    `production` (la plus restrictive des valeurs déclarées l'emporte) ; équivalence éprouvée par
+ *    `tests/unit/server/env.test.ts`.
  * 2. **Transaction 1, chemin unique** (0158 § 3 point 1) : sous `vadrouille_app`, sans organisation, en lecture seule,
  *    **toujours la même suite de requêtes**, quel que soit l'état du lien : `resolve_share_link(empreinte)` (qui pose
  *    l'empreinte dans la transaction), `SET LOCAL ROLE vadrouille_share`, lecture de `shared_trip`, puis de

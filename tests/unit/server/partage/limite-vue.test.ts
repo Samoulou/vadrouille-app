@@ -256,9 +256,4 @@ describe("cardinalité d'action_rate_limits : 1 000 adresses sur deux fenêtres"
     }
     expect(t.maximum()).toBe(1001);
   });
-
-  it("à 60 requêtes par minute et par adresse, 1 000 adresses restent loin du plafond surveillé", () => {
-    // Plafond d'alerte (amendement de 0007, point 5) : 50 000 lignes ; partage-vue + partage-lien, 1 000 adresses.
-    expect(1000 + 1001).toBeLessThan(50_000);
-  });
 });

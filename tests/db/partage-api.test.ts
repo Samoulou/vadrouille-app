@@ -226,7 +226,8 @@ describe("partage api : vue partagée, un seul chemin de lecture (0158 § 3 et �
 
     // Lien expiré, posé par l'administration (0157 § 1.9 : `created_at` doit précéder `expires_at`).
     const x = await voyage();
-    const expire = "Y".repeat(43);
+    // Jeton tiré à chaque exécution : rejouer le fichier sur la même base ne heurte pas l'unicité de `token_hash`.
+    const expire = randomBytes(32).toString("base64url");
     await admin.query(
       "INSERT INTO public.share_links (organization_id, trip_id, token_hash, created_by, created_at, expires_at) VALUES ($1, $2, sha256(convert_to($3, 'UTF8')), $4, now() - interval '2 days', now() - interval '1 day')",
       [x.org, x.trip, expire, x.owner],
@@ -260,12 +261,15 @@ describe("partage api : revue du ticket 1013 (points 3 à 6)", () => {
     expect(rows[0]).toEqual({ total: 2, desactives: 1 });
     const actifs = (await admin.query("SELECT count(*)::int AS n FROM public.share_links WHERE trip_id = $1 AND revoked_at IS NULL", [v.trip])).rows[0].n;
     expect(actifs).toBe(1);
-    // Exactement l'un des deux jetons est lisible.
-    const lus = await Promise.all(resultats.map(async (r) => (r.ok ? (await lire(r.value.token)).lu !== null : false)));
+    // Exactement l'un des deux jetons est lisible. Lectures l'une après l'autre : `lire` compte les transactions du
+    // journal commun (deux lectures simultanées l'auraient fait croître de deux).
+    const lus: boolean[] = [];
+    for (const r of resultats) lus.push(r.ok ? (await lire(r.value.token)).lu !== null : false);
     expect(lus.filter(Boolean)).toHaveLength(1);
-    // Dix créations simultanées : toujours un seul lien actif.
+    // Dix créations simultanées : toutes admises, sans `internal` (le verrou les sérialise, aucun rejeu `23505` épuisé),
+    // et toujours un seul lien actif.
     const dix = await Promise.all(Array.from({ length: 10 }, () => cas.creer(v.ctx, v.trip, Date.now())));
-    expect(dix.every((r) => r.ok || r.error.code === "internal")).toBe(true);
+    expect(dix.map((r) => (r.ok ? "ok" : r.error.code))).toEqual(Array.from({ length: 10 }, () => "ok"));
     const apres = (await admin.query("SELECT count(*)::int AS n FROM public.share_links WHERE trip_id = $1 AND revoked_at IS NULL", [v.trip])).rows[0].n;
     expect(apres).toBe(1);
   });
