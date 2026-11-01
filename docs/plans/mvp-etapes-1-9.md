@@ -226,10 +226,16 @@ La spécification B12 (après) ; l'avis rapide sur `api` ; « adresse découvert
 ### (c) Tâches
 | ID | Tâche | Rôle | Prérequis |
 |---|---|---|---|
-| M8-spec | Spécification B12 (après le voyage) | product-owner | M5d |
-| M8a | Avis rapide (écran de fin de voyage, `feedback`) | backend avec frontend | M8-spec |
-| M8b | Adresse découverte | backend avec frontend | M8-spec, M5d |
-| M8c | Mémoire des goûts sur accord, révocable, transmise au prompt du voyage suivant | backend, ia-recherche | M8-spec ; textes et durées validés par Samuel (Q150, action S6) avant l'essai par d'autres testeurs |
+| M8-spec | Spécification B12 (après le voyage) : `specs/M8-apres-le-voyage-api.md` (#1026, fusionnée) | product-owner | M5d |
+| M8-TL | Décision du Tech Lead 0160 (T1 à T8 : table `stop_reviews`, contrats, `preferences` durcie, marque `discovered`, écran 16, goûts à l'écran 2, candidats) | tech-lead | M8-spec |
+| M8-C | Contrats (`TripReview`, `STOP_RATINGS`, `RetainedTaste`, projections) | data ou backend | M8-TL |
+| M8-D | Migration (table `stop_reviews`, `preferences` durcie, `.down.sql`) ; une tâche par cycle sur `db/migrations` | data | M8-TL, M8-C ; verdict S1 de la Sécurité |
+| M8a | Avis rapide (écran 16, table `stop_reviews`) | backend avec frontend | M8-C, M8-D |
+| M8b | Adresse découverte (`addedBy: "discovered"`, `estLieuASoi`) | backend avec frontend | M8-C, M5d ; Q682 (seuils) pour la voir sur `api` |
+| M8c-1 | Retenir et retirer ses goûts, sur accord explicite et révocable | backend avec frontend | M8-C, M8-D ; verdicts S2 et S3 |
+| M8c-2 | Goûts proposés au voyage suivant (écran 2), transmis au prompt par `envies` et `aEviter` | backend, ia-recherche | M8c-1 ; textes et durées validés par Samuel (Q150, Q824, action S6) avant l'essai par d'autres testeurs |
+
+Ordre tranché par le CEO (Q826, 258e cycle) : M8-TL, puis M8-C et M8-D, puis M8a, M8b, M8c-1, M8c-2. Une spécification porte toutes les tâches de l'étape, comme pour M6.
 
 ---
 
