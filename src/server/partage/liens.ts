@@ -11,7 +11,10 @@ import { accessUntil } from "@/lib/dates";
 import { OFFER_CONFIG } from "@/server/config/offer";
 import type { HeadersLike } from "@/server/ip";
 import { verdictRateLimit, type RateLimitRequest, type RateLimitVerdict } from "@/server/rate-limit";
+import { identifiantLisible } from "@/server/voyages/conversion";
 import { executeurSql, withOrg as withOrgParDefaut, type OrgTransaction } from "@/server/with-org";
+
+import { sansDetail } from "./erreurs";
 
 /**
  * Lien privé sur `api` : création, remplacement, désactivation et état (spécification M6 § 3.2 ; décision 0157 § 1.2,
@@ -130,9 +133,6 @@ function codeSql(erreur: unknown): string | undefined {
   return lire(erreur) ?? lire((erreur as { cause?: unknown } | null)?.cause);
 }
 
-/** Uuid d'un voyage du MVP : un autre identifiant (simulé, d'essai) ne désigne aucun voyage en base. */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 const enTetesDeLaRequete = async (): Promise<HeadersLike> => headers();
 
 export function creerCasLiens(dependances: DependancesLiens = {}): CasLiens {
@@ -146,85 +146,98 @@ export function creerCasLiens(dependances: DependancesLiens = {}): CasLiens {
 
   return {
     async creer(ctx, tripId, maintenant) {
-      if (!UUID.test(tripId)) return fail("not_found");
-      return withOrg(ctx, async (tx) => {
-        const executeur = executeurSql(tx);
-        const voyage = await voyageDeLaPersonne(executeur, ctx, tripId, SQL_VOYAGE_VERROU);
-        if (voyage === null || !voyage.debloque) return fail("not_found");
-        // 0157 § 1.3 point 1 et § 1.9 : fin calculée par la seule implémentation ; refus avant l'écriture, sans jamais
-        // atteindre les `CHECK` de la base, si la fin est passée ou au-delà de la borne (3 ans moins 2 jours).
-        const expiresOn = accessUntil(voyage.fin, jours);
-        const aujourdhui = localDateAt(maintenant, voyage.timeZone);
-        if (aujourdhui > expiresOn || expiresOn > borneDeFin(aujourdhui)) return fail("not_found");
-        if (!(await verdict(tripId)).ok) return fail("rate_limited");
-        const token = jeton();
-        const empreinte = Buffer.from(hashShareToken(token), "hex");
-        const ecrire = async () => {
-          await executeur.query(SQL_DESACTIVER, [ctx.organizationId, tripId]);
-          return (await executeur.query(SQL_INSERER, [ctx.organizationId, tripId, empreinte, ctx.userId, expiresOn])).rows[0];
-        };
-        // 0157 § 1.3 point 6 : une violation `23505` malgré le verrou est rejouée une fois (point de sauvegarde) ; au
-        // second échec, `internal` (jamais une page 500).
-        let ligne: Record<string, unknown> | undefined;
-        await executeur.query("SAVEPOINT partage_lien");
-        try {
-          ligne = await ecrire();
-        } catch (erreur) {
-          if (codeSql(erreur) !== "23505") throw erreur;
-          await executeur.query("ROLLBACK TO SAVEPOINT partage_lien");
-          try {
-            ligne = await ecrire();
-          } catch (second) {
-            if (codeSql(second) !== "23505") throw second;
-            await executeur.query("ROLLBACK TO SAVEPOINT partage_lien");
-            return fail("internal");
-          }
-        }
-        if (ligne === undefined) {
-          // Fin hors des bornes de la base : rien n'est désactivé ni écrit.
-          await executeur.query("ROLLBACK TO SAVEPOINT partage_lien");
-          return fail("not_found");
-        }
-        const creeMs = Number(ligne.cree_ms);
-        if (!Number.isFinite(creeMs)) return fail("internal");
-        return ok(CreatedShareLinkSchema.parse({ token, createdAt: new Date(creeMs).toISOString(), expiresOn }));
-      });
+      // Identifiant lisible en base (`identifiantLisible`, règle de la lecture du voyage) : sinon inconnu, sans requête.
+      if (!identifiantLisible(tripId)) return fail("not_found");
+      return sansDetail(
+        () =>
+          withOrg(ctx, async (tx) => {
+            const executeur = executeurSql(tx);
+            const voyage = await voyageDeLaPersonne(executeur, ctx, tripId, SQL_VOYAGE_VERROU);
+            if (voyage === null || !voyage.debloque) return fail("not_found");
+            // 0157 § 1.3 point 1 et § 1.9 : fin calculée par la seule implémentation ; refus avant l'écriture, sans jamais
+            // atteindre les `CHECK` de la base, si la fin est passée ou au-delà de la borne (3 ans moins 2 jours).
+            const expiresOn = accessUntil(voyage.fin, jours);
+            const aujourdhui = localDateAt(maintenant, voyage.timeZone);
+            if (aujourdhui > expiresOn || expiresOn > borneDeFin(aujourdhui)) return fail("not_found");
+            if (!(await verdict(tripId)).ok) return fail("rate_limited");
+            const token = jeton();
+            const empreinte = Buffer.from(hashShareToken(token), "hex");
+            const ecrire = async () => {
+              await executeur.query(SQL_DESACTIVER, [ctx.organizationId, tripId]);
+              return (await executeur.query(SQL_INSERER, [ctx.organizationId, tripId, empreinte, ctx.userId, expiresOn])).rows[0];
+            };
+            // 0157 § 1.3 point 6 : une violation `23505` malgré le verrou est rejouée une fois (point de sauvegarde) ; au
+            // second échec, `internal` (jamais une page 500).
+            let ligne: Record<string, unknown> | undefined;
+            await executeur.query("SAVEPOINT partage_lien");
+            try {
+              ligne = await ecrire();
+            } catch (erreur) {
+              if (codeSql(erreur) !== "23505") throw erreur;
+              await executeur.query("ROLLBACK TO SAVEPOINT partage_lien");
+              try {
+                ligne = await ecrire();
+              } catch (second) {
+                if (codeSql(second) !== "23505") throw second;
+                await executeur.query("ROLLBACK TO SAVEPOINT partage_lien");
+                return fail("internal");
+              }
+            }
+            if (ligne === undefined) {
+              // Fin hors des bornes de la base : rien n'est désactivé ni écrit.
+              await executeur.query("ROLLBACK TO SAVEPOINT partage_lien");
+              return fail("not_found");
+            }
+            const creeMs = Number(ligne.cree_ms);
+            if (!Number.isFinite(creeMs)) return fail("internal");
+            return ok(CreatedShareLinkSchema.parse({ token, createdAt: new Date(creeMs).toISOString(), expiresOn }));
+          }),
+        "partage : création impossible",
+      );
     },
 
     async desactiver(ctx, tripId) {
-      if (!UUID.test(tripId)) return fail("not_found");
-      return withOrg(ctx, async (tx) => {
-        const executeur = executeurSql(tx);
-        // Ni déblocage ni fin du partage contrôlés (0157 § 1.2, 0158 § 3 point 6) : un lien reste toujours désactivable.
-        const voyage = await voyageDeLaPersonne(executeur, ctx, tripId, SQL_VOYAGE);
-        if (voyage === null) return fail("not_found");
-        // Comptée, jamais refusée (0157 § 1.2, § 2.1 point 1) : verdict et panne du limiteur ignorés.
-        await verdict(tripId).catch(() => undefined);
-        await executeur.query(SQL_DESACTIVER, [ctx.organizationId, tripId]);
-        return ok(ShareStatusSchema.parse({ active: false }));
-      });
+      if (!identifiantLisible(tripId)) return fail("not_found");
+      return sansDetail(
+        () =>
+          withOrg(ctx, async (tx) => {
+            const executeur = executeurSql(tx);
+            // Ni déblocage ni fin du partage contrôlés (0157 § 1.2, 0158 § 3 point 6) : un lien reste toujours désactivable.
+            const voyage = await voyageDeLaPersonne(executeur, ctx, tripId, SQL_VOYAGE);
+            if (voyage === null) return fail("not_found");
+            // Comptée, jamais refusée (0157 § 1.2, § 2.1 point 1) : verdict et panne du limiteur ignorés.
+            await verdict(tripId).catch(() => undefined);
+            await executeur.query(SQL_DESACTIVER, [ctx.organizationId, tripId]);
+            return ok(ShareStatusSchema.parse({ active: false }));
+          }),
+        "partage : désactivation impossible",
+      );
     },
 
     async etat(ctx, tripId, maintenant) {
-      if (!UUID.test(tripId)) return fail("not_found");
-      return withOrg(ctx, async (tx) => {
-        const executeur = executeurSql(tx);
-        await executeur.query("SET TRANSACTION READ ONLY");
-        // « Voyage débloqué » requis (0157 § 1.2 ; 0158 § 3 point 7 : après un reverrouillage, `not_found`).
-        const voyage = await voyageDeLaPersonne(executeur, ctx, tripId, SQL_VOYAGE);
-        if (voyage === null || !voyage.debloque) return fail("not_found");
-        const lien = (await executeur.query(SQL_LIEN_ACTIF, [ctx.organizationId, tripId])).rows[0];
-        const inactif = ok(ShareStatusSchema.parse({ active: false }));
-        if (lien === undefined || lien.en_cours !== true || typeof lien.fin_stockee !== "string") return inactif;
-        // Les deux règles, la plus proche l'emporte (0157 § 1.3 points 2 et 4) : borne stockée et fin recalculée sur le
-        // voyage tel qu'il est lu ; un lien expiré non désactivé se lit `{ active: false }`.
-        const recalculee = accessUntil(voyage.fin, jours);
-        const valableJusquAu = recalculee < lien.fin_stockee ? recalculee : lien.fin_stockee;
-        if (localDateAt(maintenant, voyage.timeZone) > valableJusquAu) return inactif;
-        const creeMs = Number(lien.cree_ms);
-        if (!Number.isFinite(creeMs)) return fail("internal");
-        return ok(ShareStatusSchema.parse({ active: true, createdAt: new Date(creeMs).toISOString(), expiresOn: valableJusquAu }));
-      });
+      if (!identifiantLisible(tripId)) return fail("not_found");
+      return sansDetail(
+        () =>
+          withOrg(ctx, async (tx) => {
+            const executeur = executeurSql(tx);
+            await executeur.query("SET TRANSACTION READ ONLY");
+            // « Voyage débloqué » requis (0157 § 1.2 ; 0158 § 3 point 7 : après un reverrouillage, `not_found`).
+            const voyage = await voyageDeLaPersonne(executeur, ctx, tripId, SQL_VOYAGE);
+            if (voyage === null || !voyage.debloque) return fail("not_found");
+            const lien = (await executeur.query(SQL_LIEN_ACTIF, [ctx.organizationId, tripId])).rows[0];
+            const inactif = ok(ShareStatusSchema.parse({ active: false }));
+            if (lien === undefined || lien.en_cours !== true || typeof lien.fin_stockee !== "string") return inactif;
+            // Les deux règles, la plus proche l'emporte (0157 § 1.3 points 2 et 4) : borne stockée et fin recalculée sur le
+            // voyage tel qu'il est lu ; un lien expiré non désactivé se lit `{ active: false }`.
+            const recalculee = accessUntil(voyage.fin, jours);
+            const valableJusquAu = recalculee < lien.fin_stockee ? recalculee : lien.fin_stockee;
+            if (localDateAt(maintenant, voyage.timeZone) > valableJusquAu) return inactif;
+            const creeMs = Number(lien.cree_ms);
+            if (!Number.isFinite(creeMs)) return fail("internal");
+            return ok(ShareStatusSchema.parse({ active: true, createdAt: new Date(creeMs).toISOString(), expiresOn: valableJusquAu }));
+          }),
+        "partage : état impossible",
+      );
     },
   };
 }

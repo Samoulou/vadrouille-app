@@ -67,6 +67,7 @@ export function SharedTripScreen({ token, trip, placesFromGoogle }: SharedTripSc
             <li key={day.index} className="border-b border-hairline last:border-b-0">
               <Link
                 href={routes.jour(day.index)}
+                prefetch={false}
                 data-part="jour"
                 className="flex min-h-(--touch-target) items-center gap-3 rounded-control py-2"
               >

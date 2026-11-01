@@ -43,7 +43,11 @@ import { verdictRateLimit, type RateLimitRequest, type RateLimitVerdict } from "
 /** En-tête interne posé par le proxy sur la requête transmise (jamais sur la réponse). */
 export const EN_TETE_COMPTE = "x-vadrouille-partage-compte";
 
-/** En-tête de contournement du proxy (CVE-2025-29927) : supprimé de toute requête reçue, en plus du correctif de Next.js. */
+/**
+ * En-tête interne de Next.js (`x-middleware-subrequest`), retiré par le proxy par hygiène. Ce retrait ne protège pas
+ * contre CVE-2025-29927 (corrigée dans Next.js 15.2.3, donc 16.4.1) : la protection de la vue est la vérification de
+ * l'en-tête « compté » par `requeteComptee`, avant toute lecture.
+ */
 export const EN_TETE_SOUS_REQUETE = "x-middleware-subrequest";
 
 /** Nom d'action du limiteur (`src/server/config/limites.ts`). */
@@ -65,9 +69,23 @@ export const EN_TETES_CONFIDENTIALITE: Readonly<Record<string, string>> = Object
   "X-Robots-Tag": "noindex, nofollow",
 });
 
+/**
+ * Sous-clés dérivées pour le dernier secret vu, par étiquette (revue du ticket 1013, mineur 1 : une dérivation par
+ * étiquette et par secret, et non trois par lecture). Un autre secret (rotation, tests) vide le cache.
+ */
+let derivees: { readonly secret: Buffer; readonly parEtiquette: Map<string, Buffer> } | undefined;
+
 /** Sous-clé de l'en-tête « compté » (HKDF-SHA-256, sel vide, 32 octets) pour l'étiquette donnée. */
 export function sousCleCompte(secret: Buffer, etiquette: string = ETIQUETTE_EMISE): Buffer {
-  return Buffer.from(hkdfSync("sha256", secret, SEL, `vadrouille/partage/compte/${etiquette}`, LONGUEUR_SOUS_CLE));
+  if (derivees === undefined || derivees.secret.length !== secret.length || !timingSafeEqual(derivees.secret, secret)) {
+    derivees = { secret: Buffer.from(secret), parEtiquette: new Map() };
+  }
+  let sousCle = derivees.parEtiquette.get(etiquette);
+  if (sousCle === undefined) {
+    sousCle = Buffer.from(hkdfSync("sha256", secret, SEL, `vadrouille/partage/compte/${etiquette}`, LONGUEUR_SOUS_CLE));
+    derivees.parEtiquette.set(etiquette, sousCle);
+  }
+  return Buffer.from(sousCle);
 }
 
 /** Chemin canonique d'une adresse de `/p/` : sans barre finale. */

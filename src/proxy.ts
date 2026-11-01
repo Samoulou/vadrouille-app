@@ -16,8 +16,13 @@ import {
  * `eslint.config.mjs` : ce fichier n'importe de `src/server` que `@/server/partage/limite-vue`, et de `src/adapters` que
  * `@/adapters/share-guard`.
  *
- * Toujours : l'en-tête interne « compté » et `x-middleware-subrequest` (contournement du proxy, CVE-2025-29927, en plus
- * du correctif de Next.js) sont retirés de la requête reçue ; aucune valeur d'un client n'atteint la page.
+ * Toujours : l'en-tête interne « compté » est retiré de la requête reçue (aucune valeur d'un client n'atteint la page),
+ * ainsi que `x-middleware-subrequest` par simple hygiène. Ce retrait **ne protège pas** contre CVE-2025-29927
+ * (GHSA-f82v-jwr5-mffw, « Authorization Bypass in Next.js Middleware », publiée le 21 mars 2025 ; versions corrigées
+ * 12.3.5, 13.5.9, 14.2.25 et 15.2.3, donc 16.4.1 aussi) : ce contournement faisait sauter le proxy **avant** son code.
+ * La protection de la vue contre une requête qui n'est pas passée par ce proxy est ailleurs : hors de `local` et `ci`,
+ * `RP` et `RPJ` exigent l'en-tête « compté » valide (HMAC du chemin et de la minute, `requeteComptee`) avant toute
+ * lecture (`src/server/partage/vue.ts`) ; sans lui, 404 commun sans rien lire.
  * Garde fermée (`apiShareAvailable()` faux : `mock`, site d'essai, ou déploiement sans `TRUSTED_IP_HEADER`) : la requête
  * passe telle quelle, sans compter ; la page garde son comportement d'aujourd'hui.
  * Garde ouverte : `decisionVuePartagee` (ordre de F10-PO-15, limite `partage-vue`) ; 204 pour un préchargement, 429 pour
@@ -50,5 +55,5 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ["/p", "/p/:path*"],
+  matcher: ["/p/:path*"],
 };

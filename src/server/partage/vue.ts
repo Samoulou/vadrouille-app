@@ -10,6 +10,7 @@ import { carteDeLaVuePartagee } from "@/server/voyages/carte-partagee";
 import { executeurSql, type OrgTransaction } from "@/server/with-org";
 
 import { createDatabase, type Database } from "../../../db/index.ts";
+import { sansDetail } from "./erreurs";
 import { requeteComptee } from "./limite-vue";
 
 /**
@@ -18,7 +19,12 @@ import { requeteComptee } from "./limite-vue";
  * branché par `src/instrumentation.ts`), dans le même processus, après la garde et la forme du jeton.
  *
  * 1. **En-tête « compté »** (0157 § 2.1 point 5) : hors de `local` et `ci`, la requête doit porter l'en-tête posé par
- *    `src/proxy.ts` pour ce chemin ; sinon `null` (404 commun) **sans rien lire**.
+ *    `src/proxy.ts` pour ce chemin ; sinon `null` (404 commun) **sans rien lire**. C'est la protection contre une requête
+ *    qui n'est pas passée par le proxy (CVE-2025-29927 comprise). **En `local` et `ci`, elle n'existe pas** :
+ *    `requeteComptee` admet la requête sans vérifier l'en-tête (postes et CI, sans exposition ; le proxy y compte
+ *    quand même). Ces deux valeurs ne sont jamais atteintes sur un déploiement : `resolveServerEnvironment` rend
+ *    `staging` ou `production` dès que `VERCEL_ENV` vaut `preview` ou `production` (la plus restrictive des valeurs
+ *    déclarées l'emporte) ; équivalence éprouvée par `tests/unit/server/env.test.ts`.
  * 2. **Transaction 1, chemin unique** (0158 § 3 point 1) : sous `vadrouille_app`, sans organisation, en lecture seule,
  *    **toujours la même suite de requêtes**, quel que soit l'état du lien : `resolve_share_link(empreinte)` (qui pose
  *    l'empreinte dans la transaction), `SET LOCAL ROLE vadrouille_share`, lecture de `shared_trip`, puis de
@@ -187,14 +193,18 @@ export function creerLectureVue(dependances: DependancesVue = {}): LectureVue {
       if (!comptee(await entetes(), chemin)) return null;
       const empreinte = createHash("sha256").update(token, "utf8").digest();
       const [lectureSeule, resoudre, role, sqlVoyage, sqlVersion] = SQL_TRANSACTION_VUE;
-      const lu = await transaction(async (executeur) => {
-        await executeur.query(lectureSeule);
-        const etat = (await executeur.query(resoudre, [empreinte])).rows[0]?.state;
-        await executeur.query(role);
-        const voyages = (await executeur.query(sqlVoyage)).rows;
-        const versions = (await executeur.query(sqlVersion)).rows;
-        return { etat, voyages, versions };
-      });
+      const lu = await sansDetail(
+        () =>
+          transaction(async (executeur) => {
+            await executeur.query(lectureSeule);
+            const etat = (await executeur.query(resoudre, [empreinte])).rows[0]?.state;
+            await executeur.query(role);
+            const voyages = (await executeur.query(sqlVoyage)).rows;
+            const versions = (await executeur.query(sqlVersion)).rows;
+            return { etat, voyages, versions };
+          }),
+        "vue partagée : lecture impossible",
+      );
       // 0158 § 3 point 2 : état `valid` et une ligne (exactement) dans chaque vue.
       if (lu.etat !== "valid" || lu.voyages.length !== 1 || lu.versions.length !== 1) return null;
       const [voyage] = lu.voyages;

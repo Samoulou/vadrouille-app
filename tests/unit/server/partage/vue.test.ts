@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 import { projectSharedTrip } from "@/adapters/share-projection";
 import { SharedTripViewSchema } from "@/contracts/share";
 import type { HeadersLike } from "@/server/ip";
+import { apiShareAvailable } from "@/adapters/share-guard";
+import { type DependancesLimiteVue, EN_TETE_COMPTE, requeteComptee, valeurCompte } from "@/server/partage/limite-vue";
 import { creerLectureVue, projeterVuePartagee, SQL_TRANSACTION_VUE, type ExecuteurVue, type TransactionVue } from "@/server/partage/vue";
 import { edimbourgDebloque } from "@/mocks/edimbourg";
 
@@ -62,6 +64,16 @@ function client(scenario: Scenario) {
 
 const entetes: HeadersLike = { get: () => null };
 
+/** Environnement validé, par le type des dépendances (le module d'environnement ne s'importe pas ici). */
+type ServerEnv = ReturnType<NonNullable<DependancesLimiteVue["env"]>>;
+const SECRET = Buffer.alloc(32, 9);
+const STAGING = { environment: "staging", trustedIpHeader: "x-vercel-forwarded-for", rateLimitHmacSecret: SECRET } as unknown as ServerEnv;
+const MAINTENANT = Date.parse("2026-11-01T10:00:30Z");
+const avecEnTetes = (valeurs: Record<string, string>): HeadersLike => {
+  const h = new Headers(valeurs);
+  return { get: (nom: string) => h.get(nom) };
+};
+
 describe("vue partagée : un seul chemin de lecture (0158 § 3 et § 4.2)", () => {
   it.each(Object.keys(SCENARIOS))("%s : même suite de requêtes, mêmes paramètres", async (nom) => {
     const scenario = SCENARIOS[nom] as Scenario;
@@ -93,6 +105,53 @@ describe("vue partagée : un seul chemin de lecture (0158 § 3 et § 4.2)", () =
     const sql = SQL_TRANSACTION_VUE.join("\n");
     expect(sql).not.toMatch(/\bentitlements\b|\bshared_checklist\b|public\.(trips|trip_versions|share_links|place_coordinates)\b/);
     expect(SQL_TRANSACTION_VUE[2]).toBe("SET LOCAL ROLE vadrouille_share");
+  });
+
+  it("sans en-tête compté, hors local/ci, garde ouverte : 404 sans lecture (revue du ticket 1013, Sécurité point 9)", async () => {
+    // Garde ouverte hors de local et ci : préversion déclarée, en-tête de confiance posé, ouverture de M1h simulée.
+    const preview = { DATA_ADAPTER: "api", AUTH_ADAPTER: "better-auth", VERCEL_ENV: "preview", TRUSTED_IP_HEADER: "x-vercel-forwarded-for" } as unknown as NodeJS.ProcessEnv;
+    expect(apiShareAvailable(preview, true)).toBe(true);
+    // Vérification réelle (`requeteComptee`), environnement `staging` : seule la requête passée par le proxy est lue.
+    const comptee = (h: HeadersLike, chemin: string) => requeteComptee(h, chemin, { env: () => STAGING, maintenant: () => MAINTENANT });
+    const autreChemin = valeurCompte(SECRET, `${CHEMIN}/jour/1`, MAINTENANT);
+    const autreSecret = valeurCompte(Buffer.alloc(32, 1), CHEMIN, MAINTENANT);
+    const essais: Record<string, string>[] = [{}, { [EN_TETE_COMPTE]: "" }, { [EN_TETE_COMPTE]: "v1.0.forge" }, { [EN_TETE_COMPTE]: autreChemin }, { [EN_TETE_COMPTE]: autreSecret }, { "x-middleware-subrequest": "src/proxy" }];
+    for (const valeurs of essais) {
+      const { transaction, appels, requetes } = client(SCENARIOS["lien valide"] as Scenario);
+      const h = avecEnTetes(valeurs);
+      expect(await creerLectureVue({ transaction, entetes: async () => h, comptee }).lire(JETON, CHEMIN), JSON.stringify(valeurs)).toBeNull();
+      expect(appels, JSON.stringify(valeurs)).not.toHaveBeenCalled();
+      expect(requetes).toEqual([]);
+    }
+    // Témoin : avec l'en-tête posé par le proxy pour ce chemin, la vue est lue.
+    const { transaction, appels } = client(SCENARIOS["lien valide"] as Scenario);
+    const h = avecEnTetes({ [EN_TETE_COMPTE]: valeurCompte(SECRET, CHEMIN, MAINTENANT) });
+    expect(await creerLectureVue({ transaction, entetes: async () => h, comptee }).lire(JETON, CHEMIN)).not.toBeNull();
+    expect(appels).toHaveBeenCalledTimes(1);
+  });
+
+  it("erreur de la base, jeton sentinelle : message fixe, sans cause, ni jeton ni empreinte (critère 16 ; revue, point 4)", async () => {
+    const empreinte = createHash("sha256").update(JETON, "utf8").digest();
+    const executeur: ExecuteurVue = {
+      async query(texte, valeurs = []) {
+        if (texte !== SQL_TRANSACTION_VUE[1]) return { rows: [] };
+        // À la façon de Drizzle (`DrizzleQueryError`) : texte, paramètres en clair, cause de `pg`.
+        const parametres = valeurs.map((v) => (Buffer.isBuffer(v) ? v.toString("hex") : String(v))).join(",");
+        throw Object.assign(new Error(`Failed query: ${texte}\nparams: ${parametres}`), {
+          cause: Object.assign(new Error("canceling statement"), { code: "57014", detail: parametres, parameters: valeurs }),
+        });
+      },
+    };
+    const erreur = await creerLectureVue({ transaction: (fn) => fn(executeur), entetes: async () => entetes, comptee: () => true })
+      .lire(JETON, CHEMIN)
+      .then(
+        () => undefined,
+        (e: unknown) => e as Error & { cause?: unknown },
+      );
+    expect(erreur?.message).toBe("vue partagée : lecture impossible");
+    expect(erreur?.cause).toBeUndefined();
+    const texte = [String(erreur), erreur?.stack ?? "", JSON.stringify(erreur)].join("\n");
+    for (const interdit of [JETON, empreinte.toString("hex"), "Failed query", "params", "resolve_share_link"]) expect(texte, interdit).not.toContain(interdit);
   });
 
   it("requête non comptée (0157 § 2.1 point 5) : null sans aucune lecture", async () => {
@@ -148,6 +207,52 @@ describe("vue partagée : projection champ par champ, sans carte (0157 § 1.4, Q
     expect(jours.map((j) => j.generating)).toEqual([true, false, true]);
     expect(jours[1]?.items[0]?.stop).toEqual({ kind: "activity", name: "Château", start: "10:00", end: "11:00", facts: {}, key: "1", exceptions: ["toConfirm", "unconfirmed"] });
     expect(jours[2]?.items).toEqual([]);
+  });
+
+  it("instantané sentinelle complet (critères 11 et 12 ; revue, point 6) : aucun champ hors de la vue n'est recopié", () => {
+    const SENTINELLES = ["SENTINELLE_LOGEMENT", "SENTINELLE_AJOUT", "SENTINELLE_RAISON", "SENTINELLE_CLE", "SENTINELLE_A_FAIRE", "SENTINELLE_PLACE", "SENTINELLE_BUDGET", "SENTINELLE_SOURCE"];
+    const { trip } = projeterVuePartagee(VOYAGE, {
+      snapshot: {
+        sentinelle: "SENTINELLE_CLE",
+        checklist: [{ label: "SENTINELLE_A_FAIRE", status: "todo" }],
+        budget: { note: "SENTINELLE_BUDGET" },
+        days: [
+          {
+            index: 1,
+            date: "2026-11-10",
+            cleEnTrop: "SENTINELLE_CLE",
+            items: [
+              { type: "terminus", role: "start", time: "09:00", label: "SENTINELLE_LOGEMENT", lodging: { name: "SENTINELLE_LOGEMENT" } },
+              {
+                type: "stop",
+                cleEnTrop: "SENTINELLE_CLE",
+                stop: {
+                  id: "SENTINELLE_CLE",
+                  placeId: "SENTINELLE_PLACE",
+                  kind: "activity",
+                  name: "[Vieille ville]",
+                  start: "09:30",
+                  end: "11:00",
+                  addedBy: "SENTINELLE_AJOUT",
+                  reason: "SENTINELLE_RAISON",
+                  source: "SENTINELLE_SOURCE",
+                  facts: { area: "Centre", tip: "SENTINELLE_CLE", lodging: "SENTINELLE_LOGEMENT" },
+                  exceptions: ["toReserve", "unconfirmed"],
+                  locked: true,
+                },
+              },
+              { type: "segment", segment: { mode: "walk", minutes: 12, estimated: false, polyline: "SENTINELLE_CLE" } },
+              { type: "terminus", role: "end", time: "18:00", label: "SENTINELLE_LOGEMENT" },
+            ],
+            events: [{ id: "e", kind: "event", name: "Concert", start: "20:00", end: "22:00", addedBy: "SENTINELLE_AJOUT", facts: {}, exceptions: [] }],
+          },
+        ],
+      },
+    });
+    const texte = JSON.stringify(trip);
+    for (const interdit of SENTINELLES) expect(texte, interdit).not.toContain(interdit);
+    expect(texte).toContain("[Vieille ville]");
+    expect(() => SharedTripViewSchema.parse({ trip, maps: [{ index: 1, points: [] }] })).not.toThrow();
   });
 
   it("voyage sans fuseau ni destination : erreur (page d'erreur commune), jamais un 404", () => {

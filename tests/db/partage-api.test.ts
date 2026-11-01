@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -6,6 +6,9 @@ import type { AdapterContext } from "@/adapters/types";
 import { SharedTripSchema } from "@/contracts/share";
 import { creerCasLiens } from "@/server/partage/liens";
 import { creerLectureVue, creerTransactionVue, type TransactionVue } from "@/server/partage/vue";
+import { RATE_LIMITS } from "@/server/config/limites";
+import { ipAddressKey } from "@/server/ip";
+import { createRateLimiter, rateLimitKey, rateLimitMessage } from "@/server/rate-limit";
 import { creerWithOrg } from "@/server/with-org";
 
 import { createDatabase } from "../../db/index";
@@ -51,11 +54,11 @@ let client: DbClient;
 type Voyage = { org: string; owner: string; trip: string; ctx: AdapterContext; debut: string; fin: string };
 
 /** Voyage d'une version, dates à venir, fuseau de Paris ; droit `tripUnlocked` posé par l'administration si demandé. */
-async function voyage(debloque = true): Promise<Voyage> {
+async function voyage(debloque = true, instantane?: (debut: string) => Record<string, unknown>): Promise<Voyage> {
   const { org, owner } = await createOrg(auth);
   const debut = isoDans(10);
   const fin = isoDans(12);
-  const snapshot = {
+  const snapshot = instantane?.(debut) ?? {
     days: [
       {
         index: 1,
@@ -245,4 +248,133 @@ describe("partage api : vue partagée, un seul chemin de lecture (0158 § 3 et �
     const { rows } = await admin.query("SELECT count(*)::int AS actifs FROM public.share_links WHERE trip_id = $1 AND revoked_at IS NULL", [v.trip]);
     expect(rows[0].actifs).toBe(0);
   });
+});
+
+describe("partage api : revue du ticket 1013 (points 3 à 6)", () => {
+  it("verrou FOR UPDATE sous RLS : deux créations simultanées, un seul lien actif (critère 7 ; point 5)", async () => {
+    const v = await voyage();
+    // Deux transactions concurrentes sur deux connexions du pool : la seconde attend le verrou de la ligne du voyage.
+    const resultats = await Promise.all([cas.creer(v.ctx, v.trip, Date.now()), cas.creer(v.ctx, v.trip, Date.now())]);
+    expect(resultats.map((r) => r.ok)).toEqual([true, true]);
+    const { rows } = await admin.query("SELECT count(*)::int AS total, count(*) FILTER (WHERE revoked_at IS NOT NULL)::int AS desactives FROM public.share_links WHERE trip_id = $1", [v.trip]);
+    expect(rows[0]).toEqual({ total: 2, desactives: 1 });
+    const actifs = (await admin.query("SELECT count(*)::int AS n FROM public.share_links WHERE trip_id = $1 AND revoked_at IS NULL", [v.trip])).rows[0].n;
+    expect(actifs).toBe(1);
+    // Exactement l'un des deux jetons est lisible.
+    const lus = await Promise.all(resultats.map(async (r) => (r.ok ? (await lire(r.value.token)).lu !== null : false)));
+    expect(lus.filter(Boolean)).toHaveLength(1);
+    // Dix créations simultanées : toujours un seul lien actif.
+    const dix = await Promise.all(Array.from({ length: 10 }, () => cas.creer(v.ctx, v.trip, Date.now())));
+    expect(dix.every((r) => r.ok || r.error.code === "internal")).toBe(true);
+    const apres = (await admin.query("SELECT count(*)::int AS n FROM public.share_links WHERE trip_id = $1 AND revoked_at IS NULL", [v.trip])).rows[0].n;
+    expect(apres).toBe(1);
+  });
+
+  it("instantané sentinelle complet lu par les vraies vues (critères 11 et 12 ; point 6)", async () => {
+    const v = await voyage(true, (debut) => ({
+      sentinelle: "SENTINELLE_CLE",
+      checklist: [{ label: "SENTINELLE_A_FAIRE" }],
+      days: [
+        {
+          index: 1,
+          date: debut,
+          cleEnTrop: "SENTINELLE_CLE",
+          items: [
+            { type: "terminus", role: "start", time: "09:00", label: "SENTINELLE_LOGEMENT" },
+            {
+              type: "stop",
+              stop: {
+                id: "SENTINELLE_ID",
+                kind: "activity",
+                placeId: "SENTINELLE_PLACE",
+                name: "[Vieille ville]",
+                start: "09:30",
+                end: "11:00",
+                addedBy: "SENTINELLE_AJOUT",
+                reason: "SENTINELLE_RAISON",
+                source: "SENTINELLE_SOURCE",
+                facts: { area: "Centre", tip: "SENTINELLE_CLE" },
+                exceptions: ["toReserve", "unconfirmed"],
+                locked: true,
+                cleEnTrop: "SENTINELLE_CLE",
+              },
+            },
+            { type: "terminus", role: "end", time: "18:00", label: "SENTINELLE_LOGEMENT" },
+          ],
+          events: [],
+        },
+      ],
+    }));
+    // Lignes métier sentinelles : élément « À faire » et logement (jamais dans la vue partagée).
+    await inTx(client, { org: v.org, user: v.owner }, async (c) => {
+      await c.query(`INSERT INTO checklist_items (organization_id, trip_id, kind, label, moment) VALUES ($1, $2, 'other', 'SENTINELLE_A_FAIRE_LIGNE', '{"type": "beforeDeparture"}')`, [v.org, v.trip]);
+      await c.query("INSERT INTO stays (organization_id, trip_id, kind, label, from_date, to_date) VALUES ($1, $2, 'lodging', 'SENTINELLE_LOGEMENT_LIGNE', $3, $4)", [v.org, v.trip, v.debut, v.fin]);
+    });
+    const jeton = await creer(v);
+    const { lu } = await lire(jeton);
+    expect(lu).not.toBeNull();
+    const texte = JSON.stringify(lu);
+    for (const interdit of ["SENTINELLE", "toReserve", "placeId", "addedBy", "locked", '"id"', "cleEnTrop", "checklist"]) expect(texte, interdit).not.toContain(interdit);
+    const trip = SharedTripSchema.parse(lu?.trip);
+    expect(trip.days[0]?.items).toEqual([
+      { type: "terminus", role: "start", time: "09:00" },
+      { type: "stop", stop: { kind: "activity", name: "[Vieille ville]", start: "09:30", end: "11:00", facts: { area: "Centre" }, key: "1", exceptions: ["unconfirmed"] } },
+      { type: "terminus", role: "end", time: "18:00" },
+    ]);
+  });
+
+  it("erreur réelle de la base, jeton sentinelle : message fixe, sans cause, ni jeton ni empreinte (critère 16 ; point 4)", async () => {
+    const jeton = `sentinelle${randomBytes(8).toString("hex")}`.padEnd(43, "S");
+    const empreinte = createHash("sha256").update(jeton, "utf8").digest("hex");
+    // Requête fautive sur la vraie base (fonction absente) avec l'empreinte en paramètre : erreur de Drizzle et de `pg`.
+    const enPanne = creerLectureVue({
+      transaction: (fn) =>
+        base((executeur) =>
+          fn({ query: (texte, valeurs) => executeur.query(texte.replace("public.resolve_share_link(", "public.resolve_share_link_absente("), valeurs) }),
+        ),
+      entetes: async () => entetes,
+      comptee: () => true,
+    });
+    const erreur = await enPanne.lire(jeton, `/p/${jeton}`).then(
+      () => undefined,
+      (e: unknown) => e as Error & { cause?: unknown },
+    );
+    expect(erreur?.message).toBe("vue partagée : lecture impossible");
+    expect(erreur?.cause).toBeUndefined();
+    const texte = [String(erreur), erreur?.stack ?? "", JSON.stringify(erreur)].join("\n");
+    for (const interdit of [jeton, empreinte, "resolve_share_link", "params"]) expect(texte, interdit).not.toContain(interdit);
+  });
+
+  it("cardinalité d'action_rate_limits : 1 000 adresses sur deux fenêtres de partage-vue, 1 000 lignes (point 3)", async () => {
+    const [HMAC = ""] = Object.keys({ RATE_LIMIT_HMAC_SECRET: 0 });
+    const secret = randomBytes(32);
+    const pool = createDatabase("vadrouille_app").$client;
+    try {
+      const limiteur = createRateLimiter({
+        config: { "partage-vue": RATE_LIMITS["partage-vue"] ?? [] },
+        env: { VADROUILLE_ENV: "ci", TRUSTED_IP_HEADER: "x-vercel-forwarded-for", [HMAC]: secret.toString("base64url") },
+        pool,
+      });
+      // Un préfixe /64 distinct par adresse simulée (`trustedIpKey` compte une adresse IPv6 par préfixe /64).
+      const adresses = Array.from({ length: 1000 }, (_, i) => `2001:db8:6b:${i.toString(16)}::1`);
+      const cles = adresses.map((a) => rateLimitKey(secret, rateLimitMessage("partage-vue", 60, `ip/${ipAddressKey(a)}`)));
+      const lignes = async () => (await admin.query("SELECT count(*)::int AS n, max(count)::int AS max FROM action_rate_limits WHERE key = ANY($1::text[])", [cles])).rows[0];
+      for (const fenetre of [1, 2]) {
+        for (let lot = 0; lot < adresses.length; lot += 50) {
+          const verdicts = await Promise.all(
+            adresses.slice(lot, lot + 50).map((a) => {
+              const h = new Headers({ "x-vercel-forwarded-for": a });
+              return limiteur.verdict({ action: "partage-vue", headers: { get: (nom: string) => h.get(nom) } });
+            }),
+          );
+          expect(verdicts.every((d) => d.ok), `fenêtre ${fenetre}`).toBe(true);
+        }
+        expect(await lignes(), `fenêtre ${fenetre}`).toEqual({ n: 1000, max: 1 });
+        // Fenêtre suivante : échéances reculées par SQL (jamais l'horloge du processus).
+        await admin.query("UPDATE action_rate_limits SET expires_at = expires_at - interval '2 minutes', window_start = window_start - interval '2 minutes' WHERE key = ANY($1::text[])", [cles]);
+      }
+    } finally {
+      await pool.end();
+    }
+  }, 180_000);
 });

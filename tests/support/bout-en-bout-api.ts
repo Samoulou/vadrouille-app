@@ -39,3 +39,10 @@ export const ADRESSE_PHOTOS = "m1e-photos@exemple.test";
 export const ADRESSE_PARTAGE = "m6a-partage@exemple.test";
 export const JETON_PARTAGE_VALIDE = "m6aPartageApiValide".padEnd(43, "A");
 export const JETON_PARTAGE_REVERROUILLE = "m6aPartageApiReverrouille".padEnd(43, "B");
+
+/**
+ * Création d'un lien sur `api` depuis la feuille (revue du ticket 1013, point 7 ; `tests/e2e/partage-api.api.spec.ts`,
+ * scénario « créer, ouvrir sans session, désactiver, 404 ») : une organisation propre, un seul voyage débloqué **sans
+ * lien**, le voyage débloqué d'Édimbourg du jeu simulé, décalé pour commencer 20 jours après l'écriture.
+ */
+export const ADRESSE_PARTAGE_CREATION = "m6a-partage-creation@exemple.test";

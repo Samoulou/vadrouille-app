@@ -176,7 +176,7 @@
           ]
         }
       ],
-      "ecart": "ligne ordinaire de portée application (M6a, ticket 1013 ; décision 0157 § 1.2), modèle accepté par 0040 D4 et par la ligne de `api-photos-instance.ts` ; verdict Sécurité à rendre"
+      "ecart": "ligne ordinaire de portée application (M6a, ticket 1013 ; décision 0157 § 1.2), modèle accepté par 0040 D4 et par la ligne de `api-photos-instance.ts` ; verdict Sécurité : approuvé (revue de la PR #1018)"
     },
     {
       "fichier": "src/adapters/simulated-payment-instance.ts",

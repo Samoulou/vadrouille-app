@@ -101,7 +101,8 @@ export const LECTURES_ENV = [
   // F10c (décision 0039, F10-TL-7) : garde du partage simulé, alignée sur `payment-guard.ts`. Verdict Sécurité : approuvé (PR #236, a1463f6).
   { fichier: "src/adapters/share-guard.ts", noms: ["VADROUILLE_DEMO_SHARE", "DATA_ADAPTER"] },
   // M6a (ticket 1013 ; décision 0157 § 1.2 et § 2.1 point 3) : partage `api`, environnement déclaré comparé à une liste
-  // fermée et en-tête de confiance comparé à sa seule valeur admise ; valeurs jamais rendues. Verdict Sécurité à rendre.
+  // fermée et en-tête de confiance comparé à sa seule valeur admise ; valeurs jamais rendues. Verdict Sécurité :
+  // approuvé (revue de la PR #1018).
   { fichier: "src/adapters/share-guard.ts", noms: ["VADROUILLE_ENV", "VERCEL_ENV", "TRUSTED_IP_HEADER"] },
   // F8b (décision 0017 § 11.2, F8-TL-10) : garde de la connexion simulée, même forme que `share-guard.ts`. Verdict Sécurité : à venir (PR F8b, ticket 259).
   { fichier: "src/adapters/auth-guard.ts", noms: ["AUTH_ADAPTER", "VADROUILLE_DEMO_AUTH"] },
@@ -279,7 +280,7 @@ export const ENV_ENTIER = [
       "argument:realShareAvailable",
       "argument:prototypeAdapterAllowed",
       // M6a (ticket 1013 ; décision 0157 § 1.2) : partage `api`, même forme (garde de `api` et de `better-auth`, jamais
-      // en production, liste fermée d'environnements). Verdict Sécurité à rendre.
+      // en production, liste fermée d'environnements). Verdict Sécurité : approuvé (revue de la PR #1018).
       "defaut:environnementLocalOuCi",
       "argument:betterAuthAllowed",
       "defaut:apiShareAvailable",

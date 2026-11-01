@@ -277,17 +277,21 @@ function ShareContent({
             kind="error"
             message={limited ? t.limite : t.erreur}
             action={
-              <Button
-                variant="text"
-                data-part="reessayer"
-                className={ARIA_DISABLED}
-                aria-disabled={pending !== null ? true : undefined}
-                onClick={() => {
-                  if (pending === null) void run(failed);
-                }}
-              >
-                {t.reessayer}
-              </Button>
+              // Limite atteinte : « Réessayer » contredirait « Réessaie plus tard » (revue du ticket 1013, UX mineur 7) ;
+              // le bouton de l'action reste disponible pour un nouvel essai.
+              limited ? undefined : (
+                <Button
+                  variant="text"
+                  data-part="reessayer"
+                  className={ARIA_DISABLED}
+                  aria-disabled={pending !== null ? true : undefined}
+                  onClick={() => {
+                    if (pending === null) void run(failed);
+                  }}
+                >
+                  {t.reessayer}
+                </Button>
+              )
             }
           />
         ) : null}

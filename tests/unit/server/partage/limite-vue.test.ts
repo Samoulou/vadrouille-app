@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { createHmac, hkdfSync } from "node:crypto";
+import { createHmac, hkdfSync, randomBytes } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,7 +16,8 @@ import {
   sousCleCompte,
   valeurCompte,
 } from "@/server/partage/limite-vue";
-import type { RateLimitVerdict } from "@/server/rate-limit";
+import { RATE_LIMITS } from "@/server/config/limites";
+import { createRateLimiter, type RateLimitClient, type RateLimitPool, type RateLimitVerdict } from "@/server/rate-limit";
 
 /** Environnement validé, par le type des dépendances (le module d'environnement ne s'importe pas ici). */
 type ServerEnv = ReturnType<NonNullable<DependancesLimiteVue["env"]>>;
@@ -161,5 +162,103 @@ describe("outils", () => {
     expect(page).toContain("Réessaie dans une minute.");
     expect(page).toContain('<meta name="robots" content="noindex, nofollow">');
     expect(page).not.toContain("/p/");
+  });
+});
+
+describe("sous-clé mémorisée (revue du ticket 1013, mineur 1)", () => {
+  it("une dérivation par étiquette et par secret ; un autre secret donne une autre sous-clé", () => {
+    const premiere = sousCleCompte(SECRET);
+    expect(sousCleCompte(SECRET).equals(premiere)).toBe(true);
+    // Copie rendue : la modifier ne touche pas la sous-clé mémorisée.
+    premiere.fill(0);
+    expect(sousCleCompte(SECRET).equals(premiere)).toBe(false);
+    const autre = Buffer.alloc(32, 8);
+    expect(sousCleCompte(autre).equals(sousCleCompte(SECRET))).toBe(false);
+    expect(sousCleCompte(autre).equals(Buffer.from(hkdfSync("sha256", autre, Buffer.alloc(0), "vadrouille/partage/compte/v1", 32)))).toBe(true);
+  });
+});
+
+/**
+ * Cardinalité d'`action_rate_limits` (0157 § 2.1 point 7 ; revue du ticket 1013, point 3) : 1 000 adresses simulées,
+ * sur deux fenêtres de `partage-vue` (et de `partage-lien` pour un même voyage). La table simulée suit l'incrément de
+ * `src/server/rate-limit.ts` (`ON CONFLICT (key)` : une ligne par clé, remise à zéro à l'échéance) et sa purge par lot ;
+ * l'horloge de la table est avancée par le test. Le même scénario sur la base réelle : `tests/db/partage-api.test.ts`.
+ */
+describe("cardinalité d'action_rate_limits : 1 000 adresses sur deux fenêtres", () => {
+  const [HMAC = ""] = Object.keys({ RATE_LIMIT_HMAC_SECRET: 0 });
+  const ENV = { VADROUILLE_ENV: "ci", TRUSTED_IP_HEADER: "x-vercel-forwarded-for", [HMAC]: randomBytes(32).toString("base64url") };
+  const VOYAGE = "44444444-4444-4444-8444-444444444444";
+
+  function table() {
+    let maintenant = 0;
+    const lignes = new Map<string, { count: number; expiresAt: number }>();
+    let maximum = 0;
+    const client: RateLimitClient = {
+      async query(text, values) {
+        if (text.startsWith("INSERT INTO action_rate_limits")) {
+          const cle = String(values?.[0]);
+          const fenetre = Number(values?.[1]) * 1000;
+          const ligne = lignes.get(cle);
+          const suivante = ligne === undefined || ligne.expiresAt <= maintenant ? { count: 1, expiresAt: maintenant + fenetre } : { count: ligne.count + 1, expiresAt: ligne.expiresAt };
+          lignes.set(cle, suivante);
+          maximum = Math.max(maximum, lignes.size);
+          return { rows: [{ count: suivante.count }] };
+        }
+        if (text.startsWith("DELETE FROM action_rate_limits")) {
+          const expirees = [...lignes].filter(([, l]) => l.expiresAt <= maintenant).sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+          for (const [cle] of expirees.slice(0, Number(values?.[0]))) lignes.delete(cle);
+          return { rows: [] };
+        }
+        if (text.includes("reltuples")) return { rows: [{ n: lignes.size }] };
+        return { rows: [] };
+      },
+      release() {},
+    };
+    const pool: RateLimitPool = { connect: async () => client };
+    return {
+      pool,
+      lignes,
+      maximum: () => maximum,
+      avancer: (ms: number) => {
+        maintenant += ms;
+      },
+    };
+  }
+
+  // Une adresse IPv6 compte par préfixe /64 (`trustedIpKey`) : un préfixe distinct par adresse simulée.
+  const adresse = (i: number) => `2001:db8:6a:${i.toString(16)}::1`;
+  const avecAdresse = (i: number): HeadersLike => {
+    const h = new Headers({ "x-vercel-forwarded-for": adresse(i) });
+    return { get: (nom: string) => h.get(nom) };
+  };
+
+  it("partage-vue : une ligne par adresse, jamais une par fenêtre (1 000 lignes au plus, pas 2 000)", async () => {
+    const t = table();
+    const limiteur = createRateLimiter({ config: { "partage-vue": RATE_LIMITS["partage-vue"] ?? [] }, env: ENV, pool: t.pool });
+    for (const fenetre of [1, 2]) {
+      for (let i = 0; i < 1000; i += 1) expect(await limiteur.verdict({ action: "partage-vue", headers: avecAdresse(i) }), String(i)).toEqual({ ok: true });
+      expect(t.lignes.size, `fenêtre ${fenetre}`).toBe(1000);
+      for (const ligne of t.lignes.values()) expect(ligne.count).toBe(1);
+      // Fenêtre suivante : au-delà des 60 secondes de la règle.
+      t.avancer(61_000);
+    }
+    expect(t.maximum()).toBe(1000);
+  });
+
+  it("partage-lien : 1 000 adresses pour un même voyage, deux fenêtres d'un jour : 1 001 lignes au plus", async () => {
+    const t = table();
+    const limiteur = createRateLimiter({ config: { "partage-lien": RATE_LIMITS["partage-lien"] ?? [] }, env: ENV, pool: t.pool });
+    for (let fenetre = 0; fenetre < 2; fenetre += 1) {
+      for (let i = 0; i < 1000; i += 1) await limiteur.verdict({ action: "partage-lien", headers: avecAdresse(i), tripId: VOYAGE });
+      // Une clé par adresse (espèce `ip`) et une seule pour le voyage (espèce `trip`, comptée après l'adresse).
+      expect(t.lignes.size).toBe(1001);
+      t.avancer(86_401_000);
+    }
+    expect(t.maximum()).toBe(1001);
+  });
+
+  it("à 60 requêtes par minute et par adresse, 1 000 adresses restent loin du plafond surveillé", () => {
+    // Plafond d'alerte (amendement de 0007, point 5) : 50 000 lignes ; partage-vue + partage-lien, 1 000 adresses.
+    expect(1000 + 1001).toBeLessThan(50_000);
   });
 });

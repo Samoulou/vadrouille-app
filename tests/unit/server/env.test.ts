@@ -754,6 +754,16 @@ describe("env: lien avec la garde de base et les gardes d'interface (A10, A13)",
     }
   });
 
+  it("partage api : sur un déploiement (VERCEL_ENV=preview ou production), jamais local ni ci ; vue.ts n'y saute donc jamais la vérification de l'en-tête « compté » (revue du ticket 1013, Sécurité point 10)", () => {
+    for (const vercel of ["preview", "production", " Preview ", "PRODUCTION"]) {
+      for (const vadrouille of [undefined, "", "local", "development", "ci", "staging", "production", "inconnue"]) {
+        const env = { VADROUILLE_ENV: vadrouille, VERCEL_ENV: vercel };
+        expect(["local", "ci"], JSON.stringify(env)).not.toContain(resolveServerEnvironment(env));
+        expect(environnementLocalOuCi({ NODE_ENV: "test", ...env } as unknown as NodeJS.ProcessEnv), JSON.stringify(env)).toBe(false);
+      }
+    }
+  });
+
   it("partage api : « hors de local et ci » suit resolveServerEnvironment (décision 0157 § 1.2, mineur 8 de la revue du head `217e389`)", () => {
     const valeurs = [undefined, "", " ", "local", "development", " CI ", "ci", "staging", "preview", "production", " Production", "inconnu", "constructor"];
     const ouverte = true;

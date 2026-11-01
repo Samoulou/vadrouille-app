@@ -42,12 +42,23 @@ type Etat = {
   conflits?: number;
   /** L'insertion ne rend aucune ligne (fin hors des bornes de la base). */
   horsBornes?: boolean;
+  /** Toute requête dont le texte commence ainsi échoue comme une erreur de Drizzle (texte et paramètres dans le message). */
+  panne?: string;
 };
+
+/** Erreur de base à la façon de Drizzle (`DrizzleQueryError`) : texte, paramètres en clair, et cause de `pg`. */
+function erreurDeBase(requete: RequeteNotee): Error {
+  const parametres = requete.valeurs.map((v) => (Buffer.isBuffer(v) ? v.toString("hex") : String(v))).join(",");
+  return Object.assign(new Error(`Failed query: ${requete.texte}\nparams: ${parametres}`), {
+    cause: Object.assign(new Error("deadlock detected"), { code: "40P01", detail: parametres, parameters: requete.valeurs }),
+  });
+}
 
 function monter(etat: Etat = {}, verdict: RateLimitVerdict | Error = { ok: true }) {
   const { createdBy = MOI, fin = "2026-11-10", timeZone = "Europe/Paris", debloque = true, lien } = etat;
   let conflits = etat.conflits ?? 0;
   const { tx, requetes } = fausseTransaction((requete: RequeteNotee) => {
+    if (etat.panne !== undefined && requete.texte.startsWith(etat.panne)) throw erreurDeBase(requete);
     if (requete.texte.includes("FROM public.trips t WHERE t.organization_id = $1 AND t.id = $2") && requete.texte.startsWith("SELECT t.created_by")) {
       return [{ created_by: createdBy, fin, time_zone: timeZone, debloque }];
     }
@@ -154,7 +165,7 @@ describe("création du lien (0157 § 1.2 et § 1.3)", () => {
 
   it("panne du limiteur à la création : l'erreur remonte (fermé), rien n'est écrit", async () => {
     const { cas, requetes } = monter({}, new Error("panne"));
-    await expect(cas.creer(CTX, VOYAGE, midi("2026-11-01"))).rejects.toThrow("panne");
+    await expect(cas.creer(CTX, VOYAGE, midi("2026-11-01"))).rejects.toThrow("partage : création impossible");
     expect(ecritures(requetes)).toEqual([]);
   });
 
@@ -235,5 +246,40 @@ describe("état (0157 § 1.3 points 2 et 4)", () => {
     for (const etat of [{ debloque: false, lien: lien("2026-12-10") }, { createdBy: AUTRE, lien: lien("2026-12-10") }]) {
       expect(await monter(etat).cas.etat(CTX, VOYAGE, midi("2026-11-02"))).toEqual({ ok: false, error: { code: "not_found" } });
     }
+  });
+});
+
+describe("erreurs de la base sans détail (spécification M6, critère 16 ; revue du ticket 1013, point 4)", () => {
+  const EMPREINTE = createHash("sha256").update(JETON).digest("hex");
+
+  /** Tout ce qu'une page d'erreur, un journal ou un rapport pourrait sérialiser de l'erreur propagée. */
+  function texteDe(erreur: unknown): string {
+    const e = erreur as Error & { cause?: unknown };
+    return [String(e), e.message, e.stack ?? "", JSON.stringify(e), JSON.stringify(e.cause ?? null), String(e.cause ?? "")].join("\n");
+  }
+
+  it.each([
+    ["création, à l'insertion (empreinte en paramètre)", "INSERT INTO public.share_links", (cas: ReturnType<typeof monter>["cas"]) => cas.creer(CTX, VOYAGE, midi("2026-11-01")), "partage : création impossible"],
+    ["désactivation", "UPDATE public.share_links", (cas: ReturnType<typeof monter>["cas"]) => cas.desactiver(CTX, VOYAGE), "partage : désactivation impossible"],
+    ["état", "SET TRANSACTION READ ONLY", (cas: ReturnType<typeof monter>["cas"]) => cas.etat(CTX, VOYAGE, midi("2026-11-02")), "partage : état impossible"],
+  ])("%s : message fixe, sans cause, ni jeton, ni empreinte, ni identifiants", async (_cas, panne, appel, message) => {
+    const { cas, requetes } = monter({ panne });
+    const erreur = await appel(cas).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(erreur).toBeInstanceOf(Error);
+    expect((erreur as Error).message).toBe(message);
+    expect((erreur as { cause?: unknown }).cause).toBeUndefined();
+    // La requête en panne a bien reçu des paramètres sensibles (sinon le test ne prouverait rien).
+    const fautive = requetes.find((r) => r.texte.startsWith(panne));
+    expect(fautive).toBeDefined();
+    const texte = texteDe(erreur);
+    for (const interdit of [JETON, EMPREINTE, ORG, VOYAGE, MOI, "Failed query", "params"]) expect(texte, interdit).not.toContain(interdit);
+  });
+
+  it("l'erreur de la base simulée porte bien l'empreinte : sans l'enveloppe, elle fuirait", () => {
+    const brute = erreurDeBase({ texte: "INSERT INTO public.share_links", valeurs: [ORG, VOYAGE, createHash("sha256").update(JETON).digest()] });
+    expect(texteDe(brute)).toContain(EMPREINTE);
   });
 });

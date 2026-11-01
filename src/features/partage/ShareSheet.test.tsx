@@ -282,7 +282,7 @@ describe("erreur d'une action (C37, C41)", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Impossible de modifier le partage pour le moment.");
   });
 
-  it("créer, limite atteinte (rate_limited, spécification M6 § 7) : texte de la limite ; une autre erreur au nouvel essai : texte commun", async () => {
+  it("créer, limite atteinte (rate_limited, spécification M6 § 7) : texte de la limite, sans « Réessayer » ; une autre erreur au nouvel essai : texte commun", async () => {
     const createShareLink = vi
       .fn<ShareActions["createShareLink"]>()
       .mockResolvedValueOnce({ ok: false, error: { code: "rate_limited" } })
@@ -291,8 +291,11 @@ describe("erreur d'une action (C37, C41)", () => {
     await loaded();
     fireEvent.click(button("Créer un lien"));
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("Tu as créé beaucoup de liens pour ce voyage. Réessaie demain.");
-    fireEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
+    // Texte plus large (limite par voyage et par adresse IP ; U3 proposée, revue du ticket 1013, UX mineur 8).
+    expect(alert).toHaveTextContent("Tu as créé beaucoup de liens ces derniers temps. Réessaie plus tard.");
+    // « Réessayer » contredirait le texte : masqué ; « Créer un lien » reste le moyen d'un nouvel essai.
+    expect(within(alert).queryByRole("button", { name: "Réessayer" })).toBeNull();
+    fireEvent.click(button("Créer un lien"));
     await waitFor(() => expect(createShareLink).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Impossible de modifier le partage pour le moment."));
   });
