@@ -228,6 +228,8 @@ export const APP_TRIAL_TRIP_ID_PATTERN = /^proto_([a-z0-9-]{1,24})_([0-9a-f]{32}
 /**
  * Exceptions montrées par la vue partagée (spécification F10, F10-PO-14 ; décision 0039, F10-TL-1) : « À réserver »
  * est une action de la personne qui voyage, jamais montrée au visiteur. Sous-ensemble de `ExceptionSchema` (test).
+ * Valeurs admises, pas garanties : `toConfirm` n'est jamais stockée (horaires Google, décision 0011 point 5) ; elle
+ * vient d'une lecture qui la recalcule, ou d'une donnée de démonstration (décision 0159).
  */
 export const SHARED_EXCEPTIONS = ["toConfirm", "unconfirmed"] as const;
 export type SharedException = (typeof SHARED_EXCEPTIONS)[number];
