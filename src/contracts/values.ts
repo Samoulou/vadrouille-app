@@ -9,6 +9,7 @@
  * Seuls des `import type` sont permis ici : ils disparaissent à la compilation.
  */
 import type { MapPointRef } from "./map";
+import type { PreferenceSubject } from "./preference";
 
 /**
  * Catégories d'une proposition et vocabulaire des envies du brief (décision 0013 § 3.1 ; codes provisoires de
@@ -48,6 +49,65 @@ export type PreferenceSignalStatus = (typeof PREFERENCE_SIGNAL_STATUSES)[number]
 /** Natures d'une étape (handover § 9). Source de `StopSchema.kind` (décision 0021 § 1.1). */
 export const STOP_KINDS = ["activity", "meal", "event"] as const;
 export type StopKind = (typeof STOP_KINDS)[number];
+
+/**
+ * Marque d'une étape ajoutée par la personne (`Stop.addedBy`, décision 0147 § 6.1, étendue par 0160 § 1.4) : lieu à soi
+ * (`person`) ou adresse découverte sur place (`discovered`, M8b). Source de `StopSchema.addedBy`. La marque est calculée
+ * par le serveur, jamais choisie par le client (0160 § 1.4 point 4).
+ */
+export const ADDED_BY = ["person", "discovered"] as const;
+export type AddedBy = (typeof ADDED_BY)[number];
+
+/**
+ * Avis rapide sur une étape après le voyage (« J'ai aimé », « Pas pour moi », « Pas fait » ; F11-PO-10). Décision 0160
+ * § 1.2 point 1 : `notDone` en camelCase (amende 0021 § 1.1, `not_done`). Source de `StopReviewSchema.rating`, de la
+ * propriété `rating` de l'événement `stop_reviewed` et du `CHECK` de `stop_reviews.rating` (M8-D).
+ */
+export const STOP_RATINGS = ["liked", "disliked", "notDone"] as const;
+export type StopRating = (typeof STOP_RATINGS)[number];
+
+/**
+ * Sens d'une préférence de catégorie (décision 0021 § 1.1 et § 1.3) : `more` (« Tu aimes… »), `less` (« Tu préfères
+ * éviter… »). Source de `PreferenceSubjectSchema`.
+ */
+export const PREFERENCE_DIRECTIONS = ["more", "less"] as const;
+export type PreferenceDirection = (typeof PREFERENCE_DIRECTIONS)[number];
+
+/** Origine d'une préférence retenue (décision 0021 § 1.1) : confirmée par la personne, ou déduite de ses gestes. */
+export const PREFERENCE_ORIGINS = ["confirmed", "inferred"] as const;
+export type PreferenceOrigin = (typeof PREFERENCE_ORIGINS)[number];
+
+/**
+ * Clé stable d'un sujet de préférence (décision 0021 § 1.1) : `category:museum:less`, `distance`. Identifiant de
+ * `RetainedPreference` et de `RetainedTaste` ; décide « même sujet, même sens » (F11-PO-12). L'ordre des colonnes de la
+ * liste des goûts retenus suit l'ordre de ces clés en texte (décision 0160 § 1.3 point 7).
+ */
+export function preferenceKey(subject: PreferenceSubject): string {
+  return subject.kind === "distance" ? "distance" : `category:${subject.category}:${subject.direction}`;
+}
+
+/** Nombre de sujets possibles : chaque catégorie dans chaque sens, plus la distance (17 au MVP ; décision 0160 § 1.2). */
+export const PREFERENCE_SUBJECTS_MAX = CATEGORIES.length * PREFERENCE_DIRECTIONS.length + 1;
+
+const PREFERENCE_KEYS: ReadonlySet<string> = new Set([
+  ...CATEGORIES.flatMap((category) =>
+    PREFERENCE_DIRECTIONS.map((direction) => preferenceKey({ kind: "category", category, direction })),
+  ),
+  preferenceKey({ kind: "distance" }),
+]);
+
+/** Vrai pour la clé d'un sujet possible (`preferenceKey`), faux pour tout autre texte. */
+export function isPreferenceKey(value: string): boolean {
+  return PREFERENCE_KEYS.has(value);
+}
+
+/**
+ * Accès à l'écran 16 « Après le voyage », calculé par le serveur une seule fois (décision 0160 § 1.2 point 3 et § 1.5
+ * point 3) : avant le dernier jour (`notEnded`), du dernier jour à la fin de l'accès (`open`), au-delà (`readOnly`).
+ * Source de `TripReviewSchema.access`.
+ */
+export const REVIEW_ACCESS = ["notEnded", "open", "readOnly"] as const;
+export type ReviewAccess = (typeof REVIEW_ACCESS)[number];
 
 /**
  * Sortes d'une ligne « À faire » (décision 0147 § 6.2, T8) : réservation à faire (« Réserver : {nom} », comptée),

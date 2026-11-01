@@ -10,6 +10,7 @@ import {
 } from "./refinements";
 import { LONGUEURS_CONTRAT, texteMaison } from "./texte";
 import {
+  ADDED_BY,
   CHECKLIST_KINDS,
   MAX_CITIES,
   STOP_KINDS,
@@ -138,9 +139,10 @@ export const StopSchema = z.strictObject({
   /**
    * Lieu à soi (décision 0147 § 6.1, T6) : `"person"` quand la personne a ajouté l'étape (opération `add`, écrit par le
    * moteur), absent pour une étape du programme. Stocké dans l'instantané, rétabli par un `revert` ; absent de la vue
-   * partagée (liste blanche de `shared_stop`). M8b étendra la valeur (`"discovered"`).
+   * partagée (liste blanche de `shared_stop`). `"discovered"` : adresse découverte sur place, lieu à soi ajouté pendant
+   * le voyage pour aujourd'hui ou un jour passé (décision 0160 § 1.4, M8b) ; la marque est calculée par le serveur.
    */
-  addedBy: z.literal("person").optional(),
+  addedBy: z.enum(ADDED_BY).optional(),
 });
 export type Stop = z.infer<typeof StopSchema>;
 
