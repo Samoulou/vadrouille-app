@@ -86,11 +86,12 @@ describe("proxy : adresses couvertes (config.matcher)", () => {
   });
 });
 
-describe("proxy : en-têtes « flight » reçus tels qu'envoyés (ticket 1029)", () => {
-  it("skipProxyUrlNormalize : sans lui, Next.js retire `Next-Router-Prefetch` avant le proxy, qui compterait le préchargement", () => {
-    // `next/dist/server/web/adapter.js` : les en-têtes de `FLIGHT_HEADERS` sont retirés de la requête du proxy, sauf si
-    // `__NEXT_NO_MIDDLEWARE_URL_NORMALIZE` (posé par `skipProxyUrlNormalize`) est vrai. Le comportement réel est éprouvé
-    // par `tests/e2e/partage-api.api.spec.ts` (« préchargement du routeur : 204 sans corps, sans lecture »).
+describe("proxy : garde du réglage skipProxyUrlNormalize (ticket 1029, décision 0161)", () => {
+  it("garde de configuration : skipProxyUrlNormalize reste à true dans next.config.ts", () => {
+    // Garde du réglage seulement : ce test ne vérifie que sa valeur. Pourquoi il faut : `next/dist/server/web/adapter.js`
+    // retire les en-têtes de `FLIGHT_HEADERS` (dont `Next-Router-Prefetch`) de la requête du proxy, sauf si
+    // `__NEXT_NO_MIDDLEWARE_URL_NORMALIZE` (posé au build par `skipProxyUrlNormalize`) est vrai. Le comportement réel est
+    // éprouvé par `tests/e2e/partage-api.api.spec.ts` (« préchargement du routeur : 204 sans corps, sans lecture »).
     expect(nextConfig.skipProxyUrlNormalize).toBe(true);
   });
 });
