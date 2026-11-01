@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 
-import { BOOTSTRAP_ROLE, BUSINESS_TABLES, closeAll, connect, type DbClient, PURGED_TABLES, seedOrganization } from "./helpers";
+import { BOOTSTRAP_ROLE, BUSINESS_TABLES, closeAll, connect, type DbClient, PURGED_TABLES, REMINDER_TABLES, seedOrganization } from "./helpers";
 
 /**
  * Tests `rôles` et `fonctions` de la décision 0007 et de la spécification B1, amendés par la décision 0046 (P0r2 :
@@ -77,6 +77,10 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     // M6a-D (migration 0023, décision 0157 § 1.9, T9) : `INSERT` et `UPDATE` par colonnes seulement (droits par colonne
     // ci-dessous).
     share_links: ["SELECT"],
+    // M6c-D (migration 0024_rappels, décision 0157 § 1.8) : un accord n'est modifié que par son retrait (droit par
+    // colonne ci-dessous) ; une réclamation jamais. Ni DELETE ni TRUNCATE.
+    reminder_consents: ["SELECT", "INSERT"],
+    reminder_sends: ["SELECT", "INSERT"],
     // M5-D (migration 0022_feedback_signalements, décision 0147 § 2 point 4) : un signalement n'est jamais modifié.
     feedback: ["SELECT", "INSERT"],
     // Migration 0016_restriction_update_generation_runs (décision 0120 S8) : `UPDATE` de table retiré, accordé par colonnes.
@@ -123,7 +127,9 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
   vadrouille_fn_share_views: {},
   vadrouille_fn_checkout: {},
   vadrouille_fn_coords: { place_coordinates: ["INSERT", "DELETE"] },
-  vadrouille_fn_purge: Object.fromEntries(PURGED_TABLES.map((t) => [t, ["DELETE"]])),
+  // M6c-D (0024, décision 0157 § 1.8) : les deux tables des rappels, hors de BUSINESS_TABLES (aucune ligne dans le
+  // peuplement commun : `tests/db/rappels.test.ts`), purgées comme les autres.
+  vadrouille_fn_purge: Object.fromEntries([...PURGED_TABLES, ...REMINDER_TABLES].map((t) => [t, ["DELETE"]])),
   // 0046 D15 point 6 : lecture de place_coordinates seulement (organisation fixe, lignes vivantes) ; aucun droit sur
   // une autre table de public, ni organizations ni usage_ledger.
   vadrouille_prototype: { place_coordinates: ["SELECT"] },
@@ -152,6 +158,9 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     },
     // M6a-D (0023, décision 0157 § 1.9, T9) : désactivation seulement ; insertion sans `id`, `created_at` ni `revoked_at`.
     share_links: { UPDATE: ["revoked_at"], INSERT: ["created_by", "expires_at", "organization_id", "token_hash", "trip_id"] },
+    // M6c-D (0024, décision 0157 § 1.8) : retrait d'un accord seulement ; une réclamation n'est jamais modifiée.
+    reminder_consents: { UPDATE: ["withdrawn_at"] },
+    reminder_sends: { UPDATE: [] },
   },
   vadrouille_auth: {
     users: { UPDATE: ["email_verified", "updated_at"] },
@@ -188,7 +197,7 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
   vadrouille_fn_purge: {
     memberships: { SELECT: ["organization_id", "role", "user_id"] },
     organizations: { SELECT: ["deletion_requested_at", "id"], UPDATE: ["deletion_requested_at"] },
-    ...Object.fromEntries(PURGED_TABLES.map((t) => [t, { SELECT: ["organization_id"] }])),
+    ...Object.fromEntries([...PURGED_TABLES, ...REMINDER_TABLES].map((t) => [t, { SELECT: ["organization_id"] }])),
     // B10b (migration 0015_recalcul_lot, décision 0119 § 5.2) : `kind` lue pour vider les lignes `batch` avant les clôtures.
     generation_runs: { SELECT: ["kind", "organization_id"] },
   },
@@ -435,7 +444,7 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
 
   it("vadrouille_auth n'a aucun droit sur une table métier ; vadrouille_share n'en a sur aucune table, seulement SELECT sur les vues partagées", async () => {
     for (const table of tables) {
-      for (const role of ["vadrouille_share", ...(BUSINESS_TABLES.includes(table as never) ? ["vadrouille_auth"] : [])]) {
+      for (const role of ["vadrouille_share", ...([...BUSINESS_TABLES, ...REMINDER_TABLES].includes(table as never) ? ["vadrouille_auth"] : [])]) {
         const { rows } = await app.query(
           `SELECT pg_catalog.has_any_column_privilege($1, ('public.' || $2)::regclass, 'SELECT, INSERT, UPDATE, REFERENCES') AS columns,
                   bool_or(pg_catalog.has_table_privilege($1, ('public.' || $2)::regclass, p)) AS any

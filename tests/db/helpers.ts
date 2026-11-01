@@ -140,6 +140,14 @@ export const BUSINESS_TABLES = [
 ] as const;
 export type BusinessTable = (typeof BUSINESS_TABLES)[number];
 
+/**
+ * Tables des rappels (M6c-D, migration 0024_rappels, décision 0157 § 1.8) : tables métier (RLS, politique type,
+ * purgées par `purge_organization_data`), mais hors de `BUSINESS_TABLES` et du peuplement commun : `reminder_sends` n'a
+ * pas de colonne `id`, et une ligne d'accord empêcherait la purge des migrations inverses éprouvées sur base jetable
+ * (purge de 0014 rétablie par `0015_recalcul_lot.down.sql`). Isolation, droits et purge : `tests/db/rappels.test.ts`.
+ */
+export const REMINDER_TABLES = ["reminder_consents", "reminder_sends"] as const;
+
 /** Tables purgées par `purge_organization_data` : toutes sauf `billing` et `usage_ledger` (Q48). */
 export const PURGED_TABLES = BUSINESS_TABLES.filter((t) => t !== "billing" && t !== "usage_ledger");
 

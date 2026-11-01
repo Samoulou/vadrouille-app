@@ -169,6 +169,13 @@
       "when": 1793485023703,
       "tag": "0023_lien_prive_partage",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793492175153,
+      "tag": "0024_rappels",
+      "breakpoints": true
     }
   ]
 }
