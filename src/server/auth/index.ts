@@ -402,9 +402,11 @@ export function notificationsDuServeur(): CompositionNotifications {
  * (`EMAIL_TRANSPORT=smtp`, `local` et `ci`) reste branché. Lue à chaque appel ; lève une `ServerEnvError` (sans valeur) si la
  * configuration est refusée.
  */
-export function rappelsDuServeur(): CompositionNotifications {
-  if (!RAPPELS_ENVOI_REEL && serverEnv().emailTransport === "resend") return { mailer: disabledNotificationMailer, origine: null };
-  return notificationsDuServeur();
+export function rappelsDuServeur(): CompositionNotifications & { readonly acceleration: number } {
+  const env = serverEnv();
+  // Accélération des durées (`RAPPELS_ACCELERATION`, `local` et `ci` seulement, contrôlée par `serverEnv`) : 1 ailleurs.
+  if (!RAPPELS_ENVOI_REEL && env.emailTransport === "resend") return { mailer: disabledNotificationMailer, origine: null, acceleration: 1 };
+  return { ...notificationsDuServeur(), acceleration: env.rappelsAcceleration };
 }
 
 /** Le rappel d'envoi n'a pas été appelé ; ne porte aucune valeur. */

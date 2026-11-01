@@ -114,12 +114,14 @@ async function activer(ctx: AdapterContext, tripId: string, deps: DependancesRap
   });
   // Accord déjà actif : son exécution existe déjà ; rien n'est écrit ni démarré.
   if (consentId === null) return ok({ active: true });
-  const demarrage = await deps.demarrer({
-    organizationId: ctx.organizationId,
-    tripId,
-    userId: ctx.userId,
-    consentId,
-  });
+  // Un démarrage qui lève (import dynamique de `@/workflows`, SDK) vaut un démarrage en échec (revue de la PR 1024, mineur 6
+  // de la Sécurité) : l'accord ne reste jamais actif sans exécution.
+  let demarrage: { readonly ok: boolean };
+  try {
+    demarrage = await deps.demarrer({ organizationId: ctx.organizationId, tripId, userId: ctx.userId, consentId });
+  } catch {
+    demarrage = { ok: false };
+  }
   if (demarrage.ok) return ok({ active: true });
   await withOrg(ctx, (tx) => executeurSql(tx).query(SQL_RETRAIT_ACCORD, [ctx.organizationId, tripId, ctx.userId, consentId]));
   return fail("internal");

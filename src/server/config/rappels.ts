@@ -38,3 +38,11 @@ export const RAPPELS_ENVOI_REEL = false;
  */
 export const ATTENTE_APRES_ECHEC_MS = 3_600_000;
 export const ECHECS_CONSECUTIFS_MAX = 24;
+
+/**
+ * Relais en échec (revue de la PR 1024, bloquant 1 du Tech Lead) : l'exécution ne se termine que si son successeur a
+ * démarré ; sinon elle continue (réveils et envois inchangés) et réessaie le relais avant chaque sommeil, au plus
+ * `RELAIS_ESSAIS_MAX` fois au total, puis se termine en journalisant `rappels.abandoned`.
+ */
+export const RELAIS_ESSAIS_MAX = 24;
+

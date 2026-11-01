@@ -88,8 +88,45 @@ describe("RappelsInterrupteur", () => {
     fireEvent.click(interrupteur);
     expect(modifier).toHaveBeenCalledTimes(1);
     expect(interrupteur).toHaveAttribute("aria-checked", "false");
+    // Revue de la PR 1024 (UX/UI, mineur 12) : enregistrement visible, interrupteur atténué tant que `aria-busy`.
+    expect(interrupteur).toHaveAttribute("aria-busy", "true");
+    expect(interrupteur).toHaveClass("aria-busy:opacity-60");
     await act(async () => resoudre(reussite(true)));
     expect(interrupteur).toHaveAttribute("aria-checked", "true");
+    expect(interrupteur).not.toHaveAttribute("aria-busy");
+  });
+
+  it("mineur 13 (revue de la PR 1024) : le bandeau d'erreur est effacé dès le début du nouvel essai", async () => {
+    enLigne(true);
+    let resoudre: (r: Result<TripRemindersStatus>) => void = () => undefined;
+    const modifier = vi.fn<(input: { tripId: string; enabled: boolean }) => Promise<Result<TripRemindersStatus>>>();
+    modifier.mockResolvedValueOnce({ ok: false, error: { code: "internal", retryable: true } }).mockImplementationOnce(() => new Promise((r) => (resoudre = r)));
+    render(<RappelsInterrupteur tripId={TRIP} active={false} modifier={modifier} />);
+    fireEvent.click(screen.getByRole("switch", { name: NOM }));
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Réessayer" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+    await act(async () => resoudre(reussite(true)));
+    expect(screen.getByRole("switch", { name: NOM })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("mineur 11 (revue de la PR 1024) : erreur puis hors ligne, « Réessayer » en aria-disabled, décrit par le bandeau hors ligne, sans effet", async () => {
+    const enLigneSpy = enLigne(true);
+    const modifier = vi.fn<(input: { tripId: string; enabled: boolean }) => Promise<Result<TripRemindersStatus>>>();
+    modifier.mockResolvedValue({ ok: false, error: { code: "internal", retryable: true } });
+    const { container } = render(<RappelsInterrupteur tripId={TRIP} active={false} modifier={modifier} />);
+    fireEvent.click(screen.getByRole("switch", { name: NOM }));
+    await screen.findByRole("alert");
+    enLigneSpy.mockReturnValue(false);
+    await act(async () => {
+      window.dispatchEvent(new Event("offline"));
+    });
+    const reessayer = screen.getByRole("button", { name: "Réessayer" });
+    expect(reessayer).toHaveAttribute("aria-disabled", "true");
+    expect(reessayer).toHaveAccessibleDescription(HORS_LIGNE);
+    fireEvent.click(reessayer);
+    expect(modifier).toHaveBeenCalledTimes(1);
+    expect(await axeViolations(container)).toEqual([]);
   });
 
   it("échec : alerte « Impossible de modifier les rappels pour le moment. » et « Réessayer », qui rejoue le geste ; état inchangé", async () => {

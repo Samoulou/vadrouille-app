@@ -45,11 +45,9 @@ describe("rappels : composition (rappelsDuServeur)", () => {
       betterAuth: BETTER_AUTH,
       emailTransport: "resend",
       smtp: null,
+      rappelsAcceleration: 1,
     };
-    expect(rappelsDuServeur()).toEqual({
-      mailer: disabledNotificationMailer,
-      origine: null,
-    });
+    expect(rappelsDuServeur()).toEqual({ mailer: disabledNotificationMailer, origine: null, acceleration: 1 });
     expect(resend.createResendNotificationMailer).not.toHaveBeenCalled();
     // Les notifications de M7a, elles, gardent leur composition.
     expect(notificationsDuServeur().mailer).toEqual({ resend: true });
@@ -61,11 +59,10 @@ describe("rappels : composition (rappelsDuServeur)", () => {
       betterAuth: BETTER_AUTH,
       emailTransport: "smtp",
       smtp: SMTP,
+      rappelsAcceleration: 3600,
     };
-    expect(rappelsDuServeur()).toEqual({
-      mailer: { smtp: true },
-      origine: BETTER_AUTH.appUrl,
-    });
+    // Accélération du test sur le monde local (`RAPPELS_ACCELERATION`, `local` et `ci` seulement, revue de la PR 1024).
+    expect(rappelsDuServeur()).toEqual({ mailer: { smtp: true }, origine: BETTER_AUTH.appUrl, acceleration: 3600 });
     expect(smtp.createSmtpNotificationMailer).toHaveBeenCalledWith(SMTP);
   });
 
@@ -82,10 +79,8 @@ describe("rappels : composition (rappelsDuServeur)", () => {
       betterAuth: null,
       emailTransport: "smtp",
       smtp: SMTP,
+      rappelsAcceleration: 1,
     };
-    expect(rappelsDuServeur()).toEqual({
-      mailer: disabledNotificationMailer,
-      origine: null,
-    });
+    expect(rappelsDuServeur()).toEqual({ mailer: disabledNotificationMailer, origine: null, acceleration: 1 });
   });
 });

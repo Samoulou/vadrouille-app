@@ -318,8 +318,9 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock, calen
 
       {rappels && (trip.unlocked || rappels.active) ? (
         // « Rappel par e-mail la veille » (M6c ; spécification M6 § 5.2) : voyage débloqué ; un accord actif reste toujours
-        // retirable, même si le voyage n'est plus débloqué (décision 0157 § 1.7 point 5). Place à valider par l'UX/UI (U2).
-        <Suspense fallback={null}>
+        // retirable, même si le voyage n'est plus débloqué (décision 0157 § 1.7 point 5). Place : décision UX/UI (U2) au § 7 de
+        // la spécification M6, à confirmer par la revue de la PR 1024. Réserve de hauteur pendant le chargement (mineur 14).
+        <Suspense fallback={<div aria-hidden="true" data-part="rappels-reserve" className="min-h-22" />}>
           <RappelsInterrupteur tripId={trip.id} active={rappels.active} />
         </Suspense>
       ) : null}

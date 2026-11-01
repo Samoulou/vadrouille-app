@@ -594,6 +594,13 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     motif:
       "marqueur `server-only` (sans capacité) du workflow 7 `rappelsVeille`, exigé par `ligne/require-server-only` ; M6c, ticket 1021, décision 0157 § 1.7 ; verdict Sécurité demandé dans la PR (précédent 0120 S9 point 1)",
   },
+  {
+    fichier: "src/workflows/region.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du module feuille de la région des workflows, exigé par `ligne/require-server-only` ; M6c, ticket 1021, revue de la PR 1024 (mineur 1 du Tech Lead) ; verdict Sécurité demandé dans la PR (précédent 0120 S9 point 1)",
+  },
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.
   ...["src/adapters/prototype-suivi.ts", "src/workflows/complet.ts"].map((fichier) => ({

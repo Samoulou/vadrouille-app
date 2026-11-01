@@ -1979,7 +1979,7 @@ function importsExecutesDe(fichier: string, source: string): string[] {
  * (B9d, workflow 4), `./recalcul` (B10b, workflow 5, décision 0119 § 1.8) et `./programme` (M1a-2, `generateProgramme`,
  * décision 0136 § 2.1), même forme : un pont de `"use step"` vers `src/server/generation/`, jamais dans un paquet client.
  */
-const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./programme", "./rappels", "./recalcul", "./voyage-complet"];
+const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./programme", "./rappels", "./recalcul", "./region", "./voyage-complet"];
 
 /**
  * Seuls imports exécutés admis dans le terminal `src/server/composition/villes.ts` (recherche de ville du site d'essai,
@@ -2415,7 +2415,7 @@ describe("p0: clé côté serveur seulement", () => {
       "src/server/composition/rappels.ts",
     ]);
     for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
-    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./programme", "./rappels", "./recalcul", "./voyage-complet", "server-only", "workflow/api"]);
+    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./programme", "./rappels", "./recalcul", "./region", "./voyage-complet", "server-only", "workflow/api"]);
     // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
     const versIndex = (f: string) => importsClientDe(f, lireDepot(f)).includes("@/workflows");
     expect(versIndex("src/server/p0/lancement.ts") && versIndex("src/server/p0/page-acces.ts")).toBe(true);

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ATTENTE_MIN_MS, HEURE_ENVOI_RAPPEL, RAPPELS_ENVOI_REEL, RELAIS_JOURS, REVEIL_MAX_HEURES } from "@/server/config/rappels";
 
-import { attenteJusqua, envoisDuVoyage, planDuReveil } from "./calcul";
+import { attenteJusqua, envoisDuVoyage, horlogeRappel, planDuReveil } from "./calcul";
 
 /**
  * Calcul des envois de rappel (M6c, ticket 1021 ; spécification M6 § 5.3 et § 6.3, critères 4 à 7 ; décision 0157 § 1.7
@@ -171,5 +171,31 @@ describe("rappels : plan d'un réveil", () => {
     expect(attenteJusqua(t("2026-08-28T17:00:00Z"), t("2026-08-28T16:00:00Z"))).toBe(3_600_000);
     expect(attenteJusqua(t("2026-08-28T17:00:00Z"), accord20)).toBe(24 * 3_600_000);
     expect(attenteJusqua(t("2026-08-28T17:00:00Z"), t("2026-08-28T17:00:00Z"))).toBe(1_000);
+  });
+});
+
+describe("rappels : horloge accélérée (local et ci ; revue de la PR 1024, bloquant 2)", () => {
+  const accord = t("2026-11-01T10:00:00Z");
+
+  it("facteur 1 : horloge réelle, accord réel, attentes inchangées", () => {
+    const h = horlogeRappel(1, accord, EDIMBOURG);
+    expect(h?.virtuel(accord + 5_000)).toBe(accord + 5_000);
+    expect(h?.consentiA).toBe(accord);
+    expect(h?.reelle(3_600_000)).toBe(3_600_000);
+  });
+
+  it("facteur 3 600 : l'accord vaut le premier envoi (veille de J1, 17:00Z) ; une seconde réelle vaut une heure ; attentes divisées, au moins une seconde", () => {
+    const h = horlogeRappel(3_600, accord, EDIMBOURG);
+    expect(iso(h?.consentiA ?? null)).toBe("2026-08-28T17:00:00.000Z");
+    expect(iso(h?.virtuel(accord + 2_000) ?? null)).toBe("2026-08-28T19:00:00.000Z");
+    expect(iso(h?.virtuel(accord - 5_000) ?? null)).toBe("2026-08-28T17:00:00.000Z");
+    expect(h?.reelle(24 * 3_600_000)).toBe(24_000);
+    expect(h?.reelle(10)).toBe(1_000);
+  });
+
+  it("facteur hors contrat ou voyage sans envoi : aucune horloge (fin)", () => {
+    expect(horlogeRappel(0, accord, EDIMBOURG)).toBeNull();
+    expect(horlogeRappel(2.5, accord, EDIMBOURG)).toBeNull();
+    expect(horlogeRappel(3_600, accord, { ...EDIMBOURG, timeZone: "Pas/Un_Fuseau" })).toBeNull();
   });
 });

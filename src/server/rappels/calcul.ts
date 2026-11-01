@@ -85,3 +85,29 @@ export function planDuReveil(entree: {
 export function attenteJusqua(prochainEnvoi: number, maintenant: number): number {
   return Math.min(Math.max(prochainEnvoi - maintenant, ATTENTE_MIN_MS), REVEIL_MAX_HEURES * HEURE_MS);
 }
+
+/**
+ * Horloge accélérée, **`local` et `ci` seulement** (`RAPPELS_ACCELERATION`, `src/server/env/index.ts` ; revue de la PR
+ * 1024, bloquant 2 du Tech Lead) : l'instant de l'accord devient le premier envoi du voyage, et le temps réel écoulé depuis
+ * l'accord avance `facteur` fois plus vite. Facteur 1 (partout ailleurs) : l'horloge réelle, inchangée.
+ */
+export type HorlogeRappel = {
+  /** Instant virtuel d'un instant réel. */
+  readonly virtuel: (reel: number) => number;
+  /** Instant de l'accord sur l'horloge virtuelle. */
+  readonly consentiA: number;
+  /** Attente réelle d'une attente virtuelle (divisée par le facteur, au moins `ATTENTE_MIN_MS`). */
+  readonly reelle: (attenteVirtuelle: number) => number;
+};
+
+export function horlogeRappel(facteur: number, consentiReel: number, voyage: VoyageDuRappel): HorlogeRappel | null {
+  if (facteur === 1) return { virtuel: (reel) => reel, consentiA: consentiReel, reelle: (attente) => attente };
+  if (!Number.isSafeInteger(facteur) || facteur < 1) return null;
+  const premier = envoisDuVoyage(voyage)[0];
+  if (premier === undefined) return null;
+  return {
+    virtuel: (reel) => premier.instant + Math.max(reel - consentiReel, 0) * facteur,
+    consentiA: premier.instant,
+    reelle: (attente) => Math.max(Math.ceil(attente / facteur), ATTENTE_MIN_MS),
+  };
+}

@@ -276,6 +276,10 @@ export default defineConfig<{ urlMock: string }>({
               AUTH_ADAPTER: "better-auth",
               DATA_ADAPTER: "api",
               ...PAIEMENT_SIMULE_API,
+              // M6c (revue de la PR 1024, bloquant 2 du Tech Lead) : durées des rappels accélérées pour le test sur le monde
+              // local du Workflow SDK (`tests/e2e/rappels-api.api.spec.ts`) ; une seconde réelle vaut une demi-heure.
+              // Refusée hors de `local` et `ci` par `src/server/env/index.ts`.
+              RAPPELS_ACCELERATION: "1800",
               VADROUILLE_ENV: "ci",
               TRUSTED_IP_HEADER: "x-vercel-forwarded-for",
               EMAIL_TRANSPORT: "smtp",

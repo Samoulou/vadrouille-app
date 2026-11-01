@@ -239,6 +239,10 @@ export const LECTURES_ENV = [
   // B4a (ticket 531 ; spécification B4, B4a point 6 ; décision 0097 B4-TL-3) : choix des adaptateurs de paiement et de
   // données, lus par propriété littérale, valeur contrôlée contre une liste fermée et jamais journalisée. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
   { fichier: "src/server/env/index.ts", noms: ["PAYMENT_ADAPTER", "DATA_ADAPTER"] },
+  // M6c, correction 1 (ticket 1021 ; revue de la PR 1024, bloquant 2) : facteur d'accélération de l'horloge des rappels,
+  // lu par propriété littérale au démarrage, refusé hors `local` et `ci`, entier 1 à 86 400 sinon refusé ; jamais
+  // journalisé. Verdict Sécurité demandé dans la PR.
+  { fichier: "src/server/env/index.ts", noms: ["RAPPELS_ACCELERATION"] },
 ] as const satisfies readonly LigneLectureEnv[];
 
 export const ENV_ENTIER = [

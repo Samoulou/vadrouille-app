@@ -22,12 +22,14 @@ export type ModifierRappels = (input: { tripId: string; enabled: boolean }) => P
  * notifications branché, personne propriétaire) ; sinon rien, sans texte de remplacement (§ 5.2 point 4).
  *
  * - `role="switch"` et `aria-checked` ; le texte d'aide décrit l'interrupteur (`aria-describedby`) ; cible ≥ 44 px.
- * - Pendant l'enregistrement, l'interrupteur garde son état et ignore un second geste ; il ne bascule qu'à la réponse.
+ * - Pendant l'enregistrement, l'interrupteur garde son état, est atténué (`aria-busy`) et ignore un second geste ; il ne
+ *   bascule qu'à la réponse.
  * - Réussite : annonce « Rappels activés. » ou « Rappels arrêtés. » dans une région `role="status"` toujours présente.
  * - Échec : bandeau d'erreur (`alert`) « Impossible de modifier les rappels pour le moment. » avec « Réessayer », qui rejoue
- *   le dernier geste ; l'interrupteur garde l'état enregistré.
- * - Hors ligne : `aria-disabled="true"`, décrit par le bandeau hors ligne, sans effet au geste.
- * Place (sous « Ajouter au calendrier »), rendu et textes : **à valider par l'UX/UI** (U2, U3).
+ *   le dernier geste ; l'interrupteur garde l'état enregistré ; le bandeau est effacé au début de chaque nouvel essai.
+ * - Hors ligne : interrupteur et « Réessayer » en `aria-disabled="true"`, décrits par le bandeau hors ligne, sans effet.
+ * Place (sous « Ajouter au calendrier »), rendu et textes : décision UX/UI (U2, U3) consignée au § 7 de la spécification M6,
+ * à confirmer par la revue de la PR 1024.
  */
 export function RappelsInterrupteur({ tripId, active: initial, modifier = setTripReminders }: { tripId: string; active: boolean; modifier?: ModifierRappels }) {
   const online = useOnline();
@@ -45,6 +47,8 @@ export function RappelsInterrupteur({ tripId, active: initial, modifier = setTri
     enCours.current = true;
     setPending(true);
     setAnnonce("");
+    // Revue de la PR 1024 (UX/UI, mineur 13) : le bandeau d'erreur d'un essai précédent est effacé dès le nouvel essai.
+    setEchec(null);
     try {
       const resultat = await modifier({ tripId, enabled });
       if (resultat.ok) {
@@ -66,7 +70,7 @@ export function RappelsInterrupteur({ tripId, active: initial, modifier = setTri
   const decrit = [aideId, ...(indisponible ? [offlineId] : [])].join(" ");
 
   return (
-    <section data-part="rappels" className="flex flex-col gap-2">
+    <div data-part="rappels" className="flex flex-col gap-2">
       {online ? null : (
         <div id={offlineId}>
           <StatusBanner kind="offline" message={t.horsLigne} />
@@ -81,7 +85,7 @@ export function RappelsInterrupteur({ tripId, active: initial, modifier = setTri
         aria-busy={pending || undefined}
         data-part="rappels-interrupteur"
         onClick={() => void enregistrer(!active)}
-        className="flex min-h-(--touch-target) w-full cursor-pointer items-center justify-between gap-4 rounded-control text-left text-corps font-bold text-ink aria-disabled:cursor-not-allowed aria-disabled:text-ink-soft"
+        className="flex min-h-(--touch-target) w-full cursor-pointer items-center justify-between gap-4 rounded-control text-left text-corps font-bold text-ink aria-busy:cursor-progress aria-busy:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:text-ink-soft"
       >
         <span>{t.interrupteur}</span>
         {/* Piste et curseur : décor seulement, l'état est porté par `aria-checked`. Allumé : aplat `line` (choix de la personne). */}
@@ -89,11 +93,12 @@ export function RappelsInterrupteur({ tripId, active: initial, modifier = setTri
           aria-hidden="true"
           data-part="rappels-piste"
           className={cn(
-            "inline-flex h-7 w-12 shrink-0 items-center rounded-full border-(length:--ligne-trait-controle) bg-clip-padding",
-            active ? "border-line bg-line" : "border-border-control bg-raised",
+            // Curseur centré dans la piste (revue de la PR 1024, UX/UI, mineur 14) : marge intérieure égale des deux côtés.
+            "inline-flex h-7 w-12 shrink-0 items-center rounded-full border-(length:--ligne-trait-controle) bg-clip-padding p-0.5",
+            active ? "justify-end border-line bg-line" : "justify-start border-border-control bg-raised",
           )}
         >
-          <span className={cn("size-5 rounded-full motion-safe:transition-transform", active ? "translate-x-5.5 bg-raised" : "translate-x-0.5 bg-ink-soft")} />
+          <span className={cn("size-5 rounded-full", active ? "bg-raised" : "bg-ink-soft")} />
         </span>
       </button>
       <p id={aideId} className="text-corps-s text-ink-soft">
@@ -108,12 +113,19 @@ export function RappelsInterrupteur({ tripId, active: initial, modifier = setTri
           kind="error"
           message={t.erreur}
           action={
-            <Button variant="text" size="sm" data-part="rappels-reessayer" onClick={() => void enregistrer(echec)}>
+            <Button
+              variant="text"
+              size="sm"
+              data-part="rappels-reessayer"
+              aria-disabled={indisponible ? true : undefined}
+              aria-describedby={indisponible ? offlineId : undefined}
+              onClick={() => void enregistrer(echec)}
+            >
               {t.reessayer}
             </Button>
           }
         />
       )}
-    </section>
+    </div>
   );
 }

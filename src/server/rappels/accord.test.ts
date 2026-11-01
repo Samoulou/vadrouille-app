@@ -83,6 +83,8 @@ function banc(
     verdict?: boolean;
     compterLeve?: boolean;
     demarre?: boolean;
+    /** Mineur 6 de la Sécurité (revue de la PR 1024) : le démarrage lève (import dynamique de `@/workflows`). */
+    demarrageLeve?: boolean;
     ctx?: AdapterContext | null;
     disponibles?: boolean;
   } = {},
@@ -152,7 +154,10 @@ function banc(
   const compter = vi.fn<(espece: "ip" | "trip", request: RateLimitRequest) => Promise<void>>(async () => {
     if (options.compterLeve === true) throw new Error("panne du limiteur");
   });
-  const demarrer = vi.fn(async () => ({ ok: options.demarre !== false }));
+  const demarrer = vi.fn(async () => {
+    if (options.demarrageLeve === true) throw new Error("SENTINELLE_IMPORT voyageuse@exemple.test");
+    return { ok: options.demarre !== false };
+  });
   const headers = new Headers();
   const deps: DependancesRappels = {
     disponibles: () => options.disponibles !== false,
@@ -268,6 +273,13 @@ describe("rappels : activation (setTripReminders, enabled: true)", () => {
     const t = banc({}, { demarre: false });
     expect(await modifierRappels({ tripId: TRIP, enabled: true }, t.deps)).toMatchObject({ ok: false, error: { code: "internal" } });
     expect(t.b.accords.map((a) => a.retire)).toEqual([true]);
+  });
+
+  it("mineur 6 de la Sécurité (revue de la PR 1024) : démarrage qui lève, traité comme un échec : accord retiré, internal, aucun message journalisé", async () => {
+    const t = banc({}, { demarrageLeve: true });
+    expect(await modifierRappels({ tripId: TRIP, enabled: true }, t.deps)).toMatchObject({ ok: false, error: { code: "internal" } });
+    expect(t.b.accords.map((a) => a.retire)).toEqual([true]);
+    expect(JSON.stringify(journal.lignes)).not.toContain("SENTINELLE");
   });
 
   it("erreur inattendue : internal, voyages.action_failed avec le nom de l'action et la classe seulement", async () => {

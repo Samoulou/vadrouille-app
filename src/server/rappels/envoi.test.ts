@@ -51,6 +51,11 @@ type Base = {
   email: unknown;
   verifiee: boolean;
   panne?: boolean;
+  /** Mineur 7 de la Sécurité (revue de la PR 1024) : retrait posé juste après la réclamation (avant l'envoi). */
+  retraitApresReclamation?: boolean;
+  /** Relecture de l'accord avant l'envoi en panne (seconde lecture de `SQL_ACCORD`). */
+  panneRelecture?: boolean;
+  lecturesAccord?: number;
 };
 
 function base(partiel: Partial<Base> = {}): Base {
@@ -100,7 +105,11 @@ function doubleWithOrg(b: Base) {
       execute: async (requete: { queryChunks: unknown[] }) => {
         const { texte, valeurs } = lire(requete);
         requetes.push({ texte, valeurs });
-        if (texte === SQL_ACCORD) return { rows: [{ consenti_ms: b.consentiA, actif: b.actif }] };
+        if (texte === SQL_ACCORD) {
+          b.lecturesAccord = (b.lecturesAccord ?? 0) + 1;
+          if (b.panneRelecture === true && b.lecturesAccord > 1) throw new Error("SENTINELLE_RELECTURE");
+          return { rows: [{ consenti_ms: b.consentiA, actif: b.actif }] };
+        }
         if (texte === SQL_VOYAGE)
           return {
             rows: b.voyage
@@ -128,6 +137,7 @@ function doubleWithOrg(b: Base) {
           const jour = Number(valeurs[3]);
           if (b.reclames.has(jour)) return { rows: [] };
           b.reclames.add(jour);
+          if (b.retraitApresReclamation === true) b.actif = false;
           return { rows: [{ day_index: jour }] };
         }
         throw new Error(`requête inattendue : ${texte}`);
@@ -141,7 +151,7 @@ function doubleWithOrg(b: Base) {
   };
 }
 
-function banc(b: Base, envoi: (m: RappelVeilleMessage) => Promise<void> = async () => undefined) {
+function banc(b: Base, envoi: (m: RappelVeilleMessage) => Promise<void> = async () => undefined, acceleration?: number) {
   const envoyes: { message: RappelVeilleMessage; instant: number }[] = [];
   let maintenant = 0;
   const sendRappelVeille = vi.fn(async (message: RappelVeilleMessage) => {
@@ -154,7 +164,7 @@ function banc(b: Base, envoi: (m: RappelVeilleMessage) => Promise<void> = async 
   };
   const { withOrg, requetes } = doubleWithOrg(b);
   const deps = (): DependancesReveil => ({
-    composer: () => ({ mailer, origine: ORIGINE }),
+    composer: () => ({ mailer, origine: ORIGINE, ...(acceleration === undefined ? {} : { acceleration }) }),
     withOrg,
     maintenant: () => maintenant,
   });
@@ -408,5 +418,48 @@ describe("rappels : réveil (spécification M6 § 5.3)", () => {
     expect(b.requetes.find((r) => r.texte === SQL_ACCORD)?.valeurs).toEqual([ETAT.organizationId, ETAT.tripId, ETAT.userId, ETAT.consentId]);
     expect(b.requetes.find((r) => r.texte === SQL_RECLAMATION)?.valeurs).toEqual([ETAT.organizationId, ETAT.tripId, ETAT.userId, 1]);
     expect(SQL_RECLAMATION).toMatch(/\(organization_id, trip_id, user_id, day_index\)/);
+  });
+});
+
+describe("rappels : retrait juste avant l'envoi (revue de la PR 1024, mineur 7 de la Sécurité)", () => {
+  it("accord retiré entre la réclamation et l'envoi : rien ne part, la journée reste réclamée, fin", async () => {
+    const b = banc(base({ retraitApresReclamation: true }));
+    expect(await b.reveil(t("2026-08-28T17:00:00.500Z"))).toEqual({ suite: "fin" });
+    expect(b.sendRappelVeille).not.toHaveBeenCalled();
+    expect(b.requetes.filter((r) => r.texte === SQL_ACCORD)).toHaveLength(2);
+  });
+
+  it("relecture de l'accord en panne : rien ne part, attente d'une heure marquée echec, errorName seul", async () => {
+    const b = banc(base({ panneRelecture: true }));
+    expect(await b.reveil(t("2026-08-28T17:00:00.500Z"))).toEqual({ suite: "attendre", attenteMs: 3_600_000, echec: true });
+    expect(b.sendRappelVeille).not.toHaveBeenCalled();
+    expect(journal.lignes).toEqual([{ evenement: "email.notification_failed", champs: { errorName: "Error" } }]);
+  });
+});
+
+describe("rappels : durées accélérées, local et ci seulement (revue de la PR 1024, bloquant 2 du Tech Lead)", () => {
+  it("facteur 3 600 : l'accord vaut la veille de J1 à 18:00 ; une seconde réelle vaut une heure ; six e-mails, attentes réelles d'au plus 24 secondes, puis fin", async () => {
+    const accord = t("2026-11-01T10:00:00Z");
+    const b = banc(base({ consentiA: accord }), undefined, 3_600);
+    const suites = await b.derouler(accord + 1_000);
+    expect(b.envoyes.map((e) => e.message.dayIndex)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(suites.at(-1)).toEqual({ suite: "fin" });
+    for (const suite of suites) if (suite.suite === "attendre") expect(suite.attenteMs).toBeLessThanOrEqual(24_000);
+    // Premier réveil une seconde après l'accord (19:00 virtuelles) : J1 envoyé, J2 dans 23 heures virtuelles, 23 secondes.
+    expect(suites[0]).toEqual({ suite: "attendre", attenteMs: 23_000 });
+  });
+
+  it("facteur 1 (partout hors de local et ci) : horloge réelle, inchangée", async () => {
+    const b = banc(base(), undefined, 1);
+    expect(await b.reveil(t("2026-08-28T17:00:00.500Z"))).toEqual({ suite: "attendre", attenteMs: 24 * 3_600_000 - 500 });
+    expect(b.envoyes.map((e) => e.message.dayIndex)).toEqual([1]);
+  });
+
+  it("facteur hors contrat (non entier, nul) : fin, rien n'est envoyé", async () => {
+    for (const facteur of [0, 1.5, -2]) {
+      const b = banc(base(), undefined, facteur);
+      expect(await b.reveil(t("2026-08-28T17:00:00.500Z"))).toEqual({ suite: "fin" });
+      expect(b.sendRappelVeille).not.toHaveBeenCalled();
+    }
   });
 });

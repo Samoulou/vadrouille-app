@@ -1,14 +1,14 @@
 import "server-only";
 
 import type { AdapterContext } from "@/adapters/types";
-import { ATTENTE_APRES_ECHEC_MS } from "@/server/config/rappels";
+import { ATTENTE_APRES_ECHEC_MS, ATTENTE_MIN_MS } from "@/server/config/rappels";
 import { type CanonicalEmail, parseEmailAddress } from "@/server/email";
 import { errorNameOf, logEvent } from "@/server/log";
 import { disabledNotificationMailer } from "@/server/mail/disabled";
 import { CodeMailerCapError, CodeMailerRefusalError, type NotificationMailer } from "@/server/mail/port";
 import { executeurSql, withOrg as withOrgParDefaut, type OrgTransaction } from "@/server/with-org";
 
-import { attenteJusqua, planDuReveil } from "./calcul";
+import { attenteJusqua, horlogeRappel, planDuReveil, type HorlogeRappel } from "./calcul";
 import { EtatRappelSchema, type EtatRappel, type SuiteRappel } from "./etat";
 
 /**
@@ -45,6 +45,11 @@ import { EtatRappelSchema, type EtatRappel, type SuiteRappel } from "./etat";
 export type CompositionRappels = {
   readonly mailer: NotificationMailer;
   readonly origine: string | null;
+  /**
+   * Accélération des durées (`RAPPELS_ACCELERATION`, `local` et `ci` seulement ; `horlogeRappel`, `./calcul.ts`) ; absente :
+   * 1, l'horloge réelle.
+   */
+  readonly acceleration?: number;
 };
 
 type FonctionWithOrg = <T>(ctx: Pick<AdapterContext, "organizationId" | "userId">, fn: (tx: OrgTransaction) => Promise<T>) => Promise<T>;
@@ -90,18 +95,26 @@ type Lu =
       readonly prochainEnvoi: number | null;
     };
 
+/** Décision d'un réveil et horloge du voyage (réelle, ou accélérée en `local` et `ci`). */
+type Decision = { readonly lu: Lu; readonly horloge: HorlogeRappel | null };
+
 const FIN: SuiteRappel = Object.freeze({ suite: "fin" });
 
-async function lireEtReclamer(etat: EtatRappel, maintenant: number, withOrg: FonctionWithOrg): Promise<Lu> {
-  return withOrg({ organizationId: etat.organizationId, userId: etat.userId }, async (tx): Promise<Lu> => {
+async function lireEtReclamer(etat: EtatRappel, maintenantReel: number, facteur: number, withOrg: FonctionWithOrg): Promise<Decision> {
+  let horloge: HorlogeRappel | null = null;
+  const lu = await withOrg({ organizationId: etat.organizationId, userId: etat.userId }, async (tx): Promise<Lu> => {
     const executeur = executeurSql(tx);
     const accord = (await executeur.query(SQL_ACCORD, [etat.organizationId, etat.tripId, etat.userId, etat.consentId])).rows[0];
-    const consentiA = Number(accord?.consenti_ms);
-    if (accord === undefined || accord.actif !== true || !Number.isFinite(consentiA)) return { issue: "fin" };
+    const consentiReel = Number(accord?.consenti_ms);
+    if (accord === undefined || accord.actif !== true || !Number.isFinite(consentiReel)) return { issue: "fin" };
     const voyage = (await executeur.query(SQL_VOYAGE, [etat.organizationId, etat.tripId])).rows[0];
     if (voyage === undefined || voyage.debloque !== true) return { issue: "fin" };
     const { start, end, time_zone: timeZone } = voyage;
     if (typeof start !== "string" || typeof end !== "string" || typeof timeZone !== "string") return { issue: "fin" };
+    horloge = horlogeRappel(facteur, consentiReel, { start, end, timeZone });
+    if (horloge === null) return { issue: "fin" };
+    const maintenant = horloge.virtuel(maintenantReel);
+    const consentiA = horloge.consentiA;
     const reclames = new Set((await executeur.query(SQL_RECLAMES, [etat.organizationId, etat.tripId, etat.userId])).rows.map((l) => Number(l.day_index)));
     const plan = planDuReveil({
       maintenant,
@@ -130,23 +143,27 @@ async function lireEtReclamer(etat: EtatRappel, maintenant: number, withOrg: Fon
         }
       : rien;
   });
+  return { lu, horloge };
+}
+
+/** Accord toujours actif juste avant l'envoi (revue de la PR 1024, mineur 7 de la Sécurité) : un retrait arrête l'envoi. */
+async function accordToujoursActif(etat: EtatRappel, withOrg: FonctionWithOrg): Promise<boolean> {
+  return withOrg({ organizationId: etat.organizationId, userId: etat.userId }, async (tx) => {
+    const accord = (await executeurSql(tx).query(SQL_ACCORD, [etat.organizationId, etat.tripId, etat.userId, etat.consentId])).rows[0];
+    return accord?.actif === true;
+  });
 }
 
 /** Erreurs de `../mail/resend.ts` (que ce module n'importe pas, 0138 § 9 ligne 7b) dont l'événement est déjà écrit. */
 const DEJA_JOURNALISEES: ReadonlySet<string> = new Set(["ResendRefusError", "ResendEnvoiError"]);
 
-function suite(prochainEnvoi: number | null, maintenant: number): SuiteRappel {
-  return prochainEnvoi === null
-    ? FIN
-    : {
-        suite: "attendre",
-        attenteMs: attenteJusqua(prochainEnvoi, maintenant),
-      };
+function suite(prochainEnvoi: number | null, maintenantReel: number, horloge: HorlogeRappel): SuiteRappel {
+  return prochainEnvoi === null ? FIN : { suite: "attendre", attenteMs: horloge.reelle(attenteJusqua(prochainEnvoi, horloge.virtuel(maintenantReel))) };
 }
 
-function echec(erreur: unknown): SuiteRappel {
+function echec(erreur: unknown, facteur = 1): SuiteRappel {
   logEvent("email.notification_failed", { errorName: errorNameOf(erreur) }, "warn");
-  return { suite: "attendre", attenteMs: ATTENTE_APRES_ECHEC_MS, echec: true };
+  return { suite: "attendre", attenteMs: Math.max(Math.ceil(ATTENTE_APRES_ECHEC_MS / facteur), ATTENTE_MIN_MS), echec: true };
 }
 
 /** Un réveil : relit tout, envoie au plus le rappel de la journée du lendemain, rend la suite ; ne lève jamais. */
@@ -168,14 +185,26 @@ export async function reveillerRappel(entree: unknown, deps: DependancesReveil):
       logEvent("email.transport_disabled", {}, "warn");
       return FIN;
     }
-    let decision: Lu;
+    const facteur = composition.acceleration ?? 1;
+    const withOrg = deps.withOrg ?? withOrgParDefaut;
+    let lue: Decision;
     try {
-      decision = await lireEtReclamer(etat, horloge(), deps.withOrg ?? withOrgParDefaut);
+      lue = await lireEtReclamer(etat, horloge(), facteur, withOrg);
     } catch (erreur) {
-      return echec(erreur);
+      return echec(erreur, facteur);
     }
-    if (decision.issue === "fin") return FIN;
+    const decision = lue.lu;
+    if (decision.issue === "fin" || lue.horloge === null) return FIN;
     if (decision.issue === "envoyer") {
+      // Relecture de l'accord juste avant l'envoi : retiré entre la réclamation et l'envoi, rien ne part (la journée reste
+      // réclamée) et l'exécution se termine. Relecture en échec : rien ne part non plus.
+      let actif: boolean;
+      try {
+        actif = await accordToujoursActif(etat, withOrg);
+      } catch (erreur) {
+        return echec(erreur, facteur);
+      }
+      if (!actif) return FIN;
       try {
         await composition.mailer.sendRappelVeille({
           to: decision.to,
@@ -190,7 +219,7 @@ export async function reveillerRappel(entree: unknown, deps: DependancesReveil):
         }
       }
     }
-    return suite(decision.prochainEnvoi, horloge());
+    return suite(decision.prochainEnvoi, horloge(), lue.horloge);
   } catch (erreur) {
     return echec(erreur);
   }

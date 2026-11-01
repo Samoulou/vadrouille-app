@@ -676,12 +676,28 @@ describe("env: mode réel du prototype (P0r3b ; décision 0055, section 1 point 
       "emailTransport",
       "environment",
       "paymentAdapter",
+      "rappelsAcceleration",
       "rateLimitHmacSecret",
       "simulatedWebhookFlag",
       "simulatedWebhookSecret",
       "smtp",
       "trustedIpHeader",
     ]);
+  });
+});
+
+describe("env: accélération des rappels (M6c ; revue de la PR 1024, bloquant 2 du Tech Lead)", () => {
+  it("absente ou vide : 1 ; en local et en ci, un entier de 1 à 86 400", () => {
+    expect(parseServerEnv(ci()).rappelsAcceleration).toBe(1);
+    expect(parseServerEnv(ci({ [NOM.RAPPELS_ACCELERATION]: "" })).rappelsAcceleration).toBe(1);
+    expect(parseServerEnv(ci({ [NOM.RAPPELS_ACCELERATION]: "3600" })).rappelsAcceleration).toBe(3600);
+    expect(parseServerEnv({ VADROUILLE_ENV: "local", [NOM.RAPPELS_ACCELERATION]: "86400" }).rappelsAcceleration).toBe(86_400);
+  });
+
+  it("valeur hors contrat : invalid_value, sans la valeur ; hors de local et ci : forbidden", () => {
+    for (const valeur of ["0", "-1", "1.5", "0360", " 3600", "86401", "1e3", SENTINELLE]) refusParse(ci({ [NOM.RAPPELS_ACCELERATION]: valeur }), NOM.RAPPELS_ACCELERATION, "invalid_value");
+    refusParse({ VADROUILLE_ENV: "staging", [NOM.RAPPELS_ACCELERATION]: "3600" }, NOM.RAPPELS_ACCELERATION, "forbidden");
+    refusParse({ VADROUILLE_ENV: "production", [NOM.RAPPELS_ACCELERATION]: "3600" }, NOM.RAPPELS_ACCELERATION, "forbidden");
   });
 });
 
@@ -702,6 +718,7 @@ describe("env: modules d'environnement", () => {
       "emailTransport",
       "environment",
       "paymentAdapter",
+      "rappelsAcceleration",
       "rateLimitHmacSecret",
       "simulatedWebhookFlag",
       "simulatedWebhookSecret",

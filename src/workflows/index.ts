@@ -13,6 +13,7 @@ import { choixRevisionValides, p0Revision, p0Run } from "./p0-run";
 import { generateProgramme } from "./programme";
 import { rappelsVeille } from "./rappels";
 import { batchRecompute } from "./recalcul";
+import { REGION_WORKFLOWS } from "./region";
 import { generateFullTrip } from "./voyage-complet";
 
 export { P0RUN_COMPLET };
@@ -56,7 +57,7 @@ export {
  *   réservée (`cloreExecutionNonDemarree`).
  */
 
-export const REGION_WORKFLOWS = "fra1";
+export { REGION_WORKFLOWS };
 
 /** Workflows démarrables par `startWorkflow` (garde de P0) ; `generatePreview` a son propre démarrage, `demarrerApercu`. */
 export type NomWorkflow = "p0Run";

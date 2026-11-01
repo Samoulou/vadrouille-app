@@ -77,6 +77,11 @@ export const LOG_EVENTS = [
   // panne du transport) ; `errorName` seulement, `warn`. Jamais bloquant pour le workflow ; aucune valeur (ni adresse, ni
   // lien, ni identifiant). Les refus déjà journalisés (adresse, enveloppe, plafond, Resend) ne l'écrivent pas une seconde fois.
   "email.notification_failed",
+  // M6c (ticket 1021 ; revue de la PR 1024, bloquant 1 et mineur 3 du Tech Lead) : workflow 7 des rappels. Relais vers une
+  // exécution successeur en échec (l'exécution continue et réessaie au réveil suivant) ; fin de l'exécution sur pannes
+  // répétées (réveils ou relais). Nom seul, `warn` : ni voyage, ni accord, ni adresse, ni message d'erreur.
+  "rappels.relay_failed",
+  "rappels.abandoned",
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",
@@ -359,6 +364,7 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     "P0_*": 0,
     RESEND_API_KEY: 0,
     "NEXT_PUBLIC_*RESEND*": 0,
+    RAPPELS_ACCELERATION: 0,
   }),
 );
 
