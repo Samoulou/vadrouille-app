@@ -13,6 +13,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -30,7 +31,7 @@ import {
   STOP_FACTS_KEYS,
   sqlTextArray,
 } from "../jsonb-keys.ts";
-import { organizations, users } from "./auth.ts";
+import { memberships, organizations, users } from "./auth.ts";
 import { uniqueKeyName } from "./naming.ts";
 
 /**
@@ -775,6 +776,69 @@ export const shareLinks = pgTable(
     // dans les contrats permettrait de resserrer la seconde, jamais de l'élargir sans décision.
     check("share_links_expires_after_created_check", sql`${t.expiresAt} > ${t.createdAt}`),
     check("share_links_expires_within_3_years_check", sql`${t.expiresAt} <= ${t.createdAt} + interval '3 years'`),
+  ],
+);
+
+/**
+ * Accords aux rappels de voyage (M6c-D, migration 0024, décision 0157 § 1.8) : une ligne par accord, jamais réécrite
+ * une fois retiré (déclencheur `reminder_consents_withdraw_once`, migration) ; réactiver crée une ligne. Au plus un
+ * accord actif par voyage et par personne. `consented_at` et `withdrawn_at` sont posés par la base, jamais par
+ * l'application (`INSERT` par colonnes, instant du retrait posé par le déclencheur). Aucune adresse, aucun texte, aucune
+ * donnée Google.
+ */
+export const reminderConsents = pgTable(
+  "reminder_consents",
+  {
+    id: id(),
+    organizationId: organizationId(),
+    tripId: uuid("trip_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    consentedAt: timestamp("consented_at", { withTimezone: true }).notNull().defaultNow(),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+  },
+  (t) => [
+    tripFk("reminder_consents_trip_fk", t),
+    // La personne est membre de l'organisation du voyage (clé unique existante de `memberships`).
+    foreignKey({
+      name: "reminder_consents_membership_fk",
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [memberships.organizationId, memberships.userId],
+    }),
+    uniqueIndex("reminder_consents_one_active_idx")
+      .on(t.organizationId, t.tripId, t.userId)
+      .where(sql`${t.withdrawnAt} IS NULL`),
+    check("reminder_consents_withdrawn_after_consented_check", sql`${t.withdrawnAt} IS NULL OR ${t.withdrawnAt} >= ${t.consentedAt}`),
+  ],
+);
+
+/**
+ * Réclamations des rappels (M6c-D, migration 0024, décision 0157 § 1.8) : la réclamation d'une journée est
+ * l'insertion de sa ligne, validée avant l'envoi ; la clé primaire refuse la seconde. Aucune colonne d'horaire, aucune
+ * adresse, aucun texte.
+ */
+export const reminderSends = pgTable(
+  "reminder_sends",
+  {
+    organizationId: organizationId(),
+    tripId: uuid("trip_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    dayIndex: smallint("day_index").notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "reminder_sends_pkey", columns: [t.organizationId, t.tripId, t.userId, t.dayIndex] }),
+    tripFk("reminder_sends_trip_fk", t),
+    // Revue de la PR M6c-D, mineur 2 : la réclamation ne vise qu'un membre de l'organisation du voyage.
+    foreignKey({
+      name: "reminder_sends_membership_fk",
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [memberships.organizationId, memberships.userId],
+    }),
+    check("reminder_sends_day_index_check", sql`${t.dayIndex} >= 1`),
   ],
 );
 
