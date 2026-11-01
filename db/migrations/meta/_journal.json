@@ -176,6 +176,13 @@
       "when": 1793492175153,
       "tag": "0024_rappels",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793530568052,
+      "tag": "0025_recu_stripe",
+      "breakpoints": true
     }
   ]
 }

@@ -870,7 +870,10 @@ export const usageLedger = pgTable(
 
 /**
  * Paiements : `vadrouille_app` écrit la ligne et une seule fois `stripe_checkout_session_id` ; le statut et le
- * montant ne sont mis à jour que par `vadrouille_webhook` (décision 0007).
+ * montant ne sont mis à jour que par `vadrouille_webhook` (décision 0007). `stripe_receipt_url` (migration
+ * 0025_recu_stripe, décision 0144 § 5.3 point 1) : lien du reçu de Stripe, écrit une seule fois par
+ * `vadrouille_webhook` (seul droit `UPDATE` de la colonne), jamais à l'insertion ; écriture unique et refus de
+ * l'insertion non nulle par le déclencheur `checkouts_receipt_once` (écrit à la main dans la migration).
  */
 export const checkouts = pgTable(
   "checkouts",
@@ -890,6 +893,7 @@ export const checkouts = pgTable(
       .references(() => users.id),
     createdAt: createdAt(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    stripeReceiptUrl: text("stripe_receipt_url"),
   },
   (t) => [
     tripFk("checkouts_trip_fk", t),
@@ -901,6 +905,12 @@ export const checkouts = pgTable(
     check(
       "checkouts_status_check",
       oneOf(t.status, ["pending", "succeeded", "duplicate", "declined", "cancelled", "expired"]),
+    ),
+    // Décision 0144 § 5.2 et § 5.3 point 1 : motif de la Sécurité, inchangé et sensible à la casse, puis refus de `..`
+    // et de ses formes encodées (`%2e`), sans égard à la casse ; 2048 caractères au plus.
+    check(
+      "checkouts_stripe_receipt_url_check",
+      sql`${t.stripeReceiptUrl} IS NULL OR (length(${t.stripeReceiptUrl}) <= 2048 AND ${t.stripeReceiptUrl} ~ '^https://pay\\.stripe\\.com/receipts/[A-Za-z0-9_%./~-]+(\\?[A-Za-z0-9_%=&.~-]*)?$' AND ${t.stripeReceiptUrl} !~* '(\\.|%2e)(\\.|%2e)')`,
     ),
   ],
 );
