@@ -104,6 +104,30 @@ async function sejourComparable(page: Page): Promise<{ rendu: string; aFaire: st
   return { rendu: sansBudget(rendu), aFaire: [...aFaire].sort() };
 }
 
+/**
+ * Bloc « Rappel par e-mail la veille » (M6c, ticket 1021) : propre à `api` (spécification M6 § 5 : l'accord vit dans
+ * Postgres et démarre un workflow durable ; l'interrupteur n'est rendu qu'avec `DATA_ADAPTER=api` et le port des
+ * notifications branché, § 5.2 point 4), absent de `mock`. Sur `api`, il est exigé pour un voyage débloqué, avec son texte
+ * exact, puis retiré du rendu comparé (aucune autre partie du texte) ; sur `mock`, son absence est exigée.
+ */
+const RAPPELS_TEXTE =
+  "Rappel par e-mail la veille Chaque soir vers 18:00, heure de ta destination, un e-mail avec le lien de ta journée du lendemain. Tu peux l'arrêter à tout moment.";
+const blocRappels = (page: Page) => sheet(page).locator("[data-part='rappels']");
+
+async function sejourComparableApi(page: Page): Promise<{ rendu: string; aFaire: string[] }> {
+  await expect(blocRappels(page), "interrupteur des rappels sur api").toHaveCount(1);
+  await expect(blocRappels(page)).toBeVisible();
+  expect((await blocRappels(page).innerText()).replace(/\s+/g, " ").trim()).toBe(RAPPELS_TEXTE);
+  const { rendu, aFaire } = await sejourComparable(page);
+  expect(rendu, "bloc des rappels dans le rendu de api").toContain(RAPPELS_TEXTE);
+  return { rendu: rendu.replace(RAPPELS_TEXTE, "").replace(/\s+/g, " ").trim(), aFaire };
+}
+
+async function sejourComparableMock(page: Page): Promise<{ rendu: string; aFaire: string[] }> {
+  await expect(blocRappels(page), "pas d'interrupteur des rappels sur mock").toHaveCount(0);
+  return sejourComparable(page);
+}
+
 /** Lignes « Jour par jour » du Séjour (liens des journées servies), texte normalisé, dans l'ordre de l'écran. */
 async function joursDuSejour(page: Page): Promise<string[]> {
   const liens = await sheet(page).locator("a[data-part='jour']").allInnerTexts();
@@ -204,10 +228,11 @@ test("écrans 11, 12 et 17 avec DATA_ADAPTER=api : même rendu que mock ; autre 
       expect(joursApi, `Séjour ${idMock} : journées servies`).toEqual(joursMock.slice(0, 2));
       continue;
     }
-    const renduApi = await sejourComparable(page);
+    // Voyages débloqués (`ED_OK`, `LIS`, `POR`) : bloc des rappels exigé sur `api`, absent de `mock` (M6c).
+    const renduApi = await sejourComparableApi(page);
     await ouvrir(page, urlMock, `/voyages/${idMock}`);
     await expect(sheet(page)).toBeVisible();
-    expect(renduApi, `Séjour ${idMock}`).toEqual(await sejourComparable(page));
+    expect(renduApi, `Séjour ${idMock}`).toEqual(await sejourComparableMock(page));
   }
 
   // Écran 12 : chaque Journée d'Édimbourg et de son pendant débloqué. J5 : écart fixé (70 et 70 au lieu de 50 et 20).

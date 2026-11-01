@@ -246,7 +246,8 @@ Ordre proposé : M6a et M6b en parallèle (fichiers distincts), puis M6c.
 Tutoiement, phrases courtes, sans point d'exclamation (handover § 10). Vocabulaire : « Séjour », « Journée », « étape », « programme », « À réserver », « Désactiver » (jamais « révoquer » à l'écran).
 
 **Lien privé (M6a)** — textes de F10c inchangés, plus :
-- Limite de création atteinte : « Tu as créé beaucoup de liens pour ce voyage. Réessaie demain. »
+- Limite de création atteinte : « Tu as créé beaucoup de liens ces derniers temps. Réessaie plus tard. »
+- **Décision UX/UI (U3, lien privé), Q819, définitive à la fusion de #1018 (0093)** : texte élargi, parce que la création est limitée de deux façons (20 par heure et par adresse, 10 par voyage et par 24 heures) et que l'ancien « … pour ce voyage. Réessaie demain. » était faux pour la limite par adresse ; un seul texte vrai pour les deux (`src/i18n/fr/partage.json` l. 28, `limite` ; `src/server/config/limites.ts` l. 75 à 78, `partage-lien` ; `src/server/partage/liens.ts` l. 48 et 162, refus `rate_limited`).
 - Trop de consultations (page 429 de la vue partagée) : « Trop de visites sur ce lien pour le moment. Réessaie dans une minute. »
 
 **Ajouter au calendrier (M6b)** :
@@ -266,7 +267,7 @@ Tutoiement, phrases courtes, sans point d'exclamation (handover § 10). Vocabula
 - Hors ligne : « Tu es hors ligne. Modifier les rappels demande une connexion. »
 - E-mail, objet : « Ta journée de demain »
 - E-mail, corps : « Ta journée de demain est prête.\n\nPour la voir : {lien}\n\nTu reçois ce message parce que tu as demandé un rappel la veille de chaque journée sur {produit}. Pour l'arrêter, ouvre ton Séjour : {lienSejour} »
-- **Décision UX/UI (U2, U3) : à confirmer par la revue** (PR 1024, M6c) : interrupteur dans le Séjour seulement (pas l'écran 15), sous « Ajouter au calendrier » ; piste en tokens de Ligne (allumé : aplat `line`) ; enregistrement visible (interrupteur atténué) ; hors ligne : interrupteur et « Réessayer » inactifs (`aria-disabled`), décrits par le bandeau hors ligne ; erreur : bandeau effacé à chaque nouvel essai ; textes ci-dessus tels quels.
+- **Décision UX/UI (U2, U3) : définitive à la fusion de #1024 (0093)** : interrupteur dans le Séjour seulement (pas l'écran 15), sous « Ajouter au calendrier » ; piste en tokens de Ligne (allumé : aplat `line`) ; enregistrement visible (interrupteur atténué) ; hors ligne : interrupteur et « Réessayer » inactifs (`aria-disabled`), décrits par le bandeau hors ligne ; erreur : bandeau effacé à chaque nouvel essai ; textes ci-dessus tels quels.
 
 ---
 
