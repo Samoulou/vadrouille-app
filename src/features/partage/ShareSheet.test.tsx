@@ -282,6 +282,21 @@ describe("erreur d'une action (C37, C41)", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Impossible de modifier le partage pour le moment.");
   });
 
+  it("créer, limite atteinte (rate_limited, spécification M6 § 7) : texte de la limite ; une autre erreur au nouvel essai : texte commun", async () => {
+    const createShareLink = vi
+      .fn<ShareActions["createShareLink"]>()
+      .mockResolvedValueOnce({ ok: false, error: { code: "rate_limited" } })
+      .mockResolvedValueOnce(FAILED);
+    renderSheet(actions({ getShareStatus: vi.fn(async () => NONE), createShareLink }));
+    await loaded();
+    fireEvent.click(button("Créer un lien"));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Tu as créé beaucoup de liens pour ce voyage. Réessaie demain.");
+    fireEvent.click(within(alert).getByRole("button", { name: "Réessayer" }));
+    await waitFor(() => expect(createShareLink).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Impossible de modifier le partage pour le moment."));
+  });
+
   it("désactiver, échec : le lien reste actif ; « Réessayer » relance la désactivation", async () => {
     const revokeShareLink = vi.fn<ShareActions["revokeShareLink"]>().mockResolvedValueOnce(FAILED).mockResolvedValueOnce(NONE);
     renderSheet(actions({ revokeShareLink }));

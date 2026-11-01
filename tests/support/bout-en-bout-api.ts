@@ -27,3 +27,15 @@ export const ADRESSE_DEBLOQUER = "b4b-debloquer@exemple.test";
 export const ADRESSE_DEBLOQUER_REFUS = "b4b-debloquer-refus@exemple.test";
 export const ADRESSE_REMPLACER = "m1g-remplacer@exemple.test";
 export const ADRESSE_PHOTOS = "m1e-photos@exemple.test";
+
+/**
+ * Lien privé sur `api` (ticket 1013, M6a ; décision 0158 § 4.2, `tests/e2e/partage-api.api.spec.ts`) : une organisation
+ * propre, deux voyages à venir écrits par `tests/db/donnees-bout-en-bout.test.ts`, chacun avec un lien actif dont seule
+ * l'empreinte SHA-256 du jeton est en base. Le voyage de `JETON_PARTAGE_VALIDE` est débloqué ; celui de
+ * `JETON_PARTAGE_REVERROUILLE` a été débloqué puis reverrouillé (droit `tripUnlocked` retiré par l'administration des
+ * tests, lien toujours `valid`). Jetons fixes de test, de la forme aléatoire (43 caractères base64url), sans valeur
+ * hors de la base de test.
+ */
+export const ADRESSE_PARTAGE = "m6a-partage@exemple.test";
+export const JETON_PARTAGE_VALIDE = "m6aPartageApiValide".padEnd(43, "A");
+export const JETON_PARTAGE_REVERROUILLE = "m6aPartageApiReverrouille".padEnd(43, "B");

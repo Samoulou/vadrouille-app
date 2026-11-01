@@ -68,6 +68,18 @@ export const RATE_LIMITS: RateLimitConfig = {
   // compte ne se partage pas entre personnes. Vérifié après la session et le contrôle du voyage dans l'organisation, avant
   // la lecture de la version ; `api` seulement (limiteur en base).
   calendrier: [{ kind: "trip", windowSeconds: 3600, threshold: 30 }],
+  // M6a (ticket 1013 ; décision 0157 § 2.1 point 1, S1 confirmée par la Sécurité) : création, remplacement et
+  // désactivation d'un lien privé, 20 par heure et par adresse IP, puis 10 par voyage et par 24 heures (espèce `trip`,
+  // évaluée après le contrôle du voyage dans l'organisation et de la personne propriétaire). Création et remplacement
+  // refusés au-delà ; la désactivation est comptée mais jamais refusée (0157 § 1.2).
+  "partage-lien": [
+    { kind: "ip", windowSeconds: 3600, threshold: 20 },
+    { kind: "trip", windowSeconds: 86_400, threshold: 10 },
+  ],
+  // M6a (décision 0157 § 2.1 points 1 à 5, S1) : vue partagée `RP` et `RPJ` sur `api`, 60 requêtes par minute et par
+  // adresse IP, comptées par `src/proxy.ts` seul (`src/server/partage/limite-vue.ts`), une fois par requête à jeton bien
+  // formé ; hors de `local` et `ci`, jamais dans le compartiment commun (404 sans compter sans clé d'adresse).
+  "partage-vue": [{ kind: "ip", windowSeconds: 60, threshold: 60 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

@@ -446,6 +446,11 @@ export default defineConfig([
       "src/adapters/share-signed-token.ts",
       "src/adapters/share-views.ts",
       "src/server/essai/partage.ts",
+      // M6a (ticket 1013) : partage sur `api` (jeton, empreinte, chemin et en-tête « compté » jamais journalisés).
+      "src/adapters/api-share.ts",
+      "src/adapters/api-share-instance.ts",
+      "src/server/partage/**/*.ts",
+      "src/server/voyages/carte-partagee.ts",
     ],
     rules: { "no-console": "error" },
   },
@@ -454,7 +459,8 @@ export default defineConfig([
     // F10c : de même dans l'adaptateur de partage simulé (F10-TL-5) ; F8b : de même dans la connexion simulée
     // et la création simulée (0017 § 10.1).
     // Décision 0135 : de même dans l'adaptateur de partage réel (horloge de la portée).
-    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts", "src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts", "src/adapters/signed-share.ts"],
+    // M6a (ticket 1013) : de même dans l'adaptateur de partage `api`.
+    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts", "src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts", "src/adapters/signed-share.ts", "src/adapters/api-share.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -905,6 +911,28 @@ export default defineConfig([
       "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
       ...noClientStorage("Vue partagée", "spécification F10, F10c, décision 0039 F10-TL-5", "aucun service worker"),
       ...restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+    },
+  },
+  {
+    // M6a (ticket 1013 ; spécification M6 § 3.3 point 1 et § 3.4 ; décision 0157 § 2.1) : proxy de Next.js, limité à
+    // `/p/…`. Liste blanche d'imports : `next/server`, la garde `@/adapters/share-guard` (seul module de src/adapters) et
+    // le limiteur `@/server/partage/limite-vue` (seul module de src/server) ; toute autre source, alias, relative ou
+    // paquet, est refusée. Aucun journal : ni jeton, ni chemin, ni adresse (tests/unit/lint/proxy-lint.test.ts).
+    files: ["src/proxy.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^(?!(next/server|@/adapters/share-guard|@/server/partage/limite-vue)$)",
+              message:
+                "src/proxy.ts n'importe que next/server, @/adapters/share-guard et @/server/partage/limite-vue (décision 0157 § 2.1 ; ticket 1013, M6a).",
+            },
+          ],
+        },
+      ],
+      "no-console": "error",
     },
   },
   {

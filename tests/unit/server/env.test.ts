@@ -5,6 +5,7 @@ import { inspect } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { authAdapterChoice, betterAuthAllowed } from "@/adapters/auth-guard";
+import { apiShareAvailable, environnementLocalOuCi } from "@/adapters/share-guard";
 import { paymentAvailable } from "@/adapters/payment-guard";
 import { isProductionDeployment } from "@/dev/flags";
 import * as route from "@/app/api/v1/webhooks/simulated/route";
@@ -749,6 +750,39 @@ describe("env: lien avec la garde de base et les gardes d'interface (A10, A13)",
           attendu = false;
         }
         expect(betterAuthAllowed({ NODE_ENV: "test", ...env }), JSON.stringify(env)).toBe(attendu);
+      }
+    }
+  });
+
+  it("partage api : « hors de local et ci » suit resolveServerEnvironment (décision 0157 § 1.2, mineur 8 de la revue du head `217e389`)", () => {
+    const valeurs = [undefined, "", " ", "local", "development", " CI ", "ci", "staging", "preview", "production", " Production", "inconnu", "constructor"];
+    const ouverte = true;
+    for (const vadrouille of valeurs) {
+      for (const vercelEnv of valeurs) {
+        const env = { VADROUILLE_ENV: vadrouille, VERCEL_ENV: vercelEnv };
+        let localOuCi: boolean;
+        let production: boolean;
+        try {
+          const environnement = resolveServerEnvironment(env);
+          localOuCi = environnement === "local" || environnement === "ci";
+          production = environnement === "production";
+        } catch {
+          localOuCi = false;
+          production = false;
+        }
+        expect(environnementLocalOuCi({ NODE_ENV: "test", ...env }), JSON.stringify(env)).toBe(localOuCi);
+        // Ouverture simulée (M1h) : hors de local et ci, l'en-tête de confiance est exigé ; jamais en production.
+        const api = { NODE_ENV: "test", DATA_ADAPTER: "api", AUTH_ADAPTER: "better-auth", ...env } as unknown as NodeJS.ProcessEnv;
+        expect(apiShareAvailable(api, ouverte), JSON.stringify(env)).toBe(localOuCi);
+        const avecEnTete = apiShareAvailable({ ...api, TRUSTED_IP_HEADER: "x-vercel-forwarded-for" }, ouverte);
+        let staging: boolean;
+        try {
+          staging = resolveServerEnvironment(env) === "staging";
+        } catch {
+          staging = false;
+        }
+        expect(avecEnTete, JSON.stringify(env)).toBe(localOuCi || staging);
+        if (production) expect(avecEnTete, JSON.stringify(env)).toBe(false);
       }
     }
   });

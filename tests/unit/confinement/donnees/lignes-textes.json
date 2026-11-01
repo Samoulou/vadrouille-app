@@ -164,6 +164,21 @@
       "ecart": "ligne ordinaire de portée application (M1e, ticket 879 ; décision 0143), modèle accepté par 0040 D4 et par la ligne de `api-tri-instance.ts` ; verdict Sécurité : approuvé (revue de la PR #882, c89c3f5)"
     },
     {
+      "fichier": "src/adapters/api-share-instance.ts",
+      "portee": "application",
+      "usage": "portée application, justification (0040 D4, modèle de `api-photos-instance.ts`) : alias de `globalThis` affecté à la constante `holder`, lu et écrit par la seule clé constante `PARTAGE_KEY` (`Symbol.for(\"vadrouille.partage-api\")`) ; garde les cas d'usage du partage de `api` (`creerCasLiens` de `src/server/partage/liens.ts` et `creerLectureVue` de `src/server/partage/vue.ts`) branchés une fois au démarrage par `src/instrumentation.ts` quand `DATA_ADAPTER` vaut `api`, entre les copies du module que Next charge par route ; n'atteint aucune capacité (ni `fetch`, ni module à capacité, ni `process`) ; non branchés, chaque méthode rejette sans rien lire ni écrire (échec fermé). Garde-fou : `brancherPartageApi` lève `PartageDejaBrancheError` si la clé est déjà définie, hors de `tests/` seuls ce module et `src/instrumentation.ts` la nomment, et la remise à zéro `debrancherPartageApiPourTests` n'est nommée hors de `tests/` que par ce module (`tests/unit/auth/points-injection.test.ts`) ; toute autre écriture de `globalThis` reste refusée par ce régime",
+      "capacites": [
+        {
+          "capacite": "global:globalThis",
+          "formes": [
+            "alias:holder",
+            "holder[PARTAGE_KEY]"
+          ]
+        }
+      ],
+      "ecart": "ligne ordinaire de portée application (M6a, ticket 1013 ; décision 0157 § 1.2), modèle accepté par 0040 D4 et par la ligne de `api-photos-instance.ts` ; verdict Sécurité à rendre"
+    },
+    {
       "fichier": "src/adapters/simulated-payment-instance.ts",
       "portee": "application",
       "usage": "portée application, justification (0040 D4, modèle de `api-instance.ts`, `api-creation-instance.ts` et `api-tri-instance.ts`) : alias de `globalThis` affecté à la constante `holder`, lu et écrit par la seule clé constante `PAIEMENT_KEY` (`Symbol.for(\"vadrouille.paiement-simule\")`) ; garde la fabrique de l'adaptateur de paiement `simulated` (`composerPaiementSimule` de `src/server/payment/composition.ts`) et l'adaptateur qu'elle construit au premier usage, branchée une fois au démarrage par `src/instrumentation.ts` quand `PAYMENT_ADAPTER` vaut `simulated`, entre les copies du module que Next charge par route ; n'atteint aucune capacité (ni `fetch`, ni module à capacité, ni `process`, ni la clé de signature) ; non branchée, ou fabrique qui lève, chaque méthode rend `provider_error` sans rien lire ni écrire (échec fermé). Garde-fou : `brancherPaiementSimule` lève `PaiementSimuleDejaBrancheError` si la clé est déjà définie, hors de `tests/` seuls ce module et `src/instrumentation.ts` la nomment, et la remise à zéro `debrancherPaiementSimulePourTests` n'est nommée hors de `tests/` que par ce module (`tests/unit/auth/points-injection.test.ts`) ; toute autre écriture de `globalThis` reste refusée par ce régime",
