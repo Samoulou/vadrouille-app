@@ -1,8 +1,8 @@
 # 0165 — Après l'avis 0164 : forme des correctifs E1 (essais du code d'accès) et E3 (page de saisie) ; avis sur E4
 
-Statut : **proposée par l'agent tech-lead, définitive à la fusion (0093)**. Décision déléguée du **Tech Lead** (architecture, bibliothèques, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`, l. 37-43). Elle répond à **T1** et **T2** de l'avis 0164 (§ 3, « Questions nouvelles ») et à **Q841** de `QUESTIONS.md`, et fixe ce que livrent les tickets E1 et E3 que le CEO ouvrira (§ 4). Rien n'est tranché ici de ce qui revient à la **Sécurité** (confirmation de la forme de E1 : question SE1) ni à **Samuel** (reprise des risques acceptés S1 à S5 de 0164, réglages Vercel et Google, donnée personnelle : questions SA1 à SA3). À lister dans la prochaine note de version (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment par une nouvelle décision.
+Statut : **définitive (0093, fusion de la PR #1066) ; SE1 confirmée par la Sécurité (PR #1072, section « Amendements ») : la voie (c) du § 1 est la forme définitive d'E1 ; la voie de repli (b) du § 1.5 et le ticket E1-repli (§ 4.2) sont sans objet**. Décision déléguée du **Tech Lead** (architecture, bibliothèques, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`, l. 37-43). Elle répond à **T1** et **T2** de l'avis 0164 (§ 3, « Questions nouvelles ») et à **Q841** de `QUESTIONS.md`, et fixe ce que livrent les tickets E1 et E3 que le CEO ouvrira (§ 4). Rien n'est tranché ici de ce qui revient à la **Sécurité** (confirmation de la forme de E1 : question SE1) ni à **Samuel** (reprise des risques acceptés S1 à S5 de 0164, réglages Vercel et Google, donnée personnelle : questions SA1 à SA3). À lister dans la prochaine note de version (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment par une nouvelle décision.
 
-Date : 2026-11-09 · Décideur : Tech Lead (T1, T2, forme des tickets E1 et E3, avis sur E4) ; SE1 : posée, confirmation par la Sécurité attendue · Ticket : #1063 · `main` relu : `bd21c14` (après #1057)
+Date : 2026-11-09 · Décideur : Tech Lead (T1, T2, forme des tickets E1 et E3, avis sur E4) ; SE1 : confirmée par la Sécurité (Amendements, PR #1072) · Ticket : #1063 · `main` relu : `bd21c14` (après #1057)
 
 Numérotation : `main` va jusqu'à 0164 ; la seule PR ouverte au 2026-11-09 (#1058) ne touche pas `docs/decisions/`.
 
@@ -181,3 +181,58 @@ Ces amendements ne valent qu'à la fusion du ticket E1 (§ 4.1), donc après la 
 - Si le code d'accès cesse d'être un secret aléatoire de 256 bits (risque 1).
 - Si `p0-reel` est ouvert à d'autres personnes que Samuel (G0 ou au-delà) : la voie (c) suppose un seul détenteur du code.
 - Si des liens d'essai `/p/` sont donnés au-delà d'un petit cercle (E4, § 4.4).
+
+## Amendements
+
+### Amendée par la PR #1072 (ticket #1070, 2026-11-09) — verdict de la Sécurité sur SE1
+
+Statut : **avis de l'agent securite**, qui répond à SE1. La Sécurité n'a pas de domaine délégué (`docs/CONTEXT.md`, « Qui décide quoi » ; 0164, en-tête) : cet amendement ne tranche rien d'autre que la réserve SE1 que le Tech Lead a posée au § 1. Il ne modifie aucun code, aucun test, aucune migration, aucun réglage. Code relu sur `origin/main` au commit `dbcd736` (après #1058) : `src/server/p0/acces.ts` (en-tête l. 21-36, `memeCode` l. 64-68, `SQL_VERROU` à `SQL_ESSAI` l. 196-199, `essaiAccepte` l. 202-206, `saisirCodeAcces` l. 208-246), `src/server/env/p0.ts` (`decoderJetonSaisi`, l. 120-126), `src/server/env/index.ts` (`OCTETS_MIN = 32` et `OCTETS_DISTINCTS_MIN = 16`, l. 260-261 ; `decodeSecret`, l. 317-330), `src/server/actions/p0-acces.ts` (l. 19-29), `src/server/p0/base.ts` (l. 15-18). Les lignes citées par 0165 sont inchangées depuis `bd21c14`.
+
+#### 1. Verdict : **voie (c) confirmée**
+
+La Sécurité confirme la voie (c) du § 1 (comparaison d'abord, seuls les refus comptés, 5 par heure glissante, bon code jamais refusé par le compte), dans la forme du § 1.2. Elle **ne retient pas** la voie de repli (b) du § 1.5.
+
+Motifs :
+1. **(c) supprime le défaut d'E1 ; (b) ne fait que le repousser.** Avec (b), le filet global de 30 essais par heure reste épuisable par quelques adresses, et une adresse IPv6 se renouvelle à volonté (§ 1.1). Avec (c), aucun nombre de refus, d'où qu'ils viennent, ne fait refuser le bon code par le compte.
+2. **(c) n'ajoute ni donnée personnelle, ni table, ni `GRANT`, ni réglage.** 0055 S-2 point 4 reste tenu tel quel. (b) demanderait une empreinte d'adresse (SA1), `TRUSTED_IP_HEADER` sur `p0-reel` (réglage de Samuel) et une migration de plus.
+3. **Ce que (c) abandonne (la borne de 5 comparaisons par heure) ne protégeait rien de mesurable** face à un code de 256 bits (point 2 du § 2 ci-dessous). La borne utile est l'entropie du code, et elle est tenue par la procédure de D22 (0055 § 4 point 2).
+
+Conséquences :
+- **SA1 est sans objet** : la question à Samuel ne se pose que si (b) est retenue (§ « Questions nouvelles »). Le CEO peut la retirer de `QUESTIONS.md` ou la marquer sans objet. `TRUSTED_IP_HEADER` n'est pas requis sur `p0-reel` pour E1.
+- **Le ticket E1 (§ 4.1) peut être ouvert** par le CEO ; le ticket E1-repli (§ 4.2) ne l'est pas.
+- La piste de 0164 § 3 E1 (« compter aussi par adresse ») est retirée par la Sécurité elle-même.
+- **Rien de ce qui revient à Samuel n'est tranché.** S1 de 0164 reste à Samuel : après la fusion d'E1, elle ne porte plus que sur 0055 S-2 point 1 (cookie volé valable 12 heures) et sur les risques 1 et 2 de 0165 (§ « Conséquences »). La reprise de ces risques, le redéploiement de `p0-reel`, SA2 et SA3 restent à lui.
+
+#### 2. Relecture du § 1.3, point par point
+
+| Point du § 1.3 | Avis de la Sécurité |
+|---|---|
+| **Blocage de Samuel par un inconnu** (0055 S-2 point 2) | **Confirmé**, avec une précision. Le blocage **par le compte** disparaît : le bon code ne lit pas le compte et ne prend pas le verrou (§ 1.2 point 3). Les essais acceptés ne comptent plus. Reste un blocage qui n'est pas propre au compteur : un afflux de mauvaises saisies simultanées attend le verrou consultatif en tenant chacune une connexion. Si les connexions de Neon venaient à manquer, le bon code recevrait `indisponible` (échec fermé, voulu). Ce défaut existe déjà aujourd'hui et existerait de même avec (b) (le compte par adresse passe aussi par la base). Il demande un afflux soutenu, et non 5 requêtes par heure. Ce n'est donc pas un motif de préférer (b). Il est consigné comme risque 4 ci-dessous. |
+| **Borne des essais** | **Confirmé.** Le calcul est juste : 1 000 essais par seconde pendant un an font environ 3,15 × 10¹⁰ ≈ 2³⁵ essais, soit une probabilité de l'ordre de 2³⁵ / 2²⁵⁶ = 2⁻²²¹. Le débit réel est bien plus faible : chaque mauvaise saisie prend le verrou, et les mauvaises saisies sont donc traitées une à une. Deux précisions. (1) **La réponse reste un oracle au-delà du plafond** : aujourd'hui, au-delà de 5 essais, la réponse est `too_many_attempts` sans comparaison ; avec (c), un mauvais code reçoit `too_many_attempts` et le bon code un cookie. C'est exactement le « nombre de comparaisons non borné » du risque 1. Les réponses possibles sont les mêmes qu'aujourd'hui et ne disent rien de plus que « accepté ou non ». (2) **L'entropie repose sur la procédure, pas sur le contrôle** : `decodeSecret` refuse moins de 32 octets, les motifs triviaux et moins de 16 octets distincts (`src/server/env/index.ts` l. 260-261, l. 317-330), mais ne prouve pas qu'un code de 32 octets a été tiré au hasard. Les 256 bits sont tenus par `openssl rand -hex 32` (D22 point 2). La saisie passe par ce même `decodeSecret` (`decoderJetonSaisi`, `src/server/env/p0.ts` l. 120-126) : une saisie de moins de 32 octets est refusée sans comparaison et comptée comme un refus, comme aujourd'hui. Le temps de réponse du bon code (sans verrou) diffère de celui d'un mauvais (avec verrou) ; il ne révèle que le résultat, que la réponse donne déjà, puisque la comparaison est faite en temps constant avant (`memeCode`, l. 64-68). |
+| **Écritures en base** | **Confirmé.** Un inconnu écrit au plus 5 lignes `refuse` par heure glissante (le refus du compte n'écrit rien, verrou compris). Seul le détenteur du code écrit des lignes `accepte` sans borne, gardées 24 heures (D15, D16). Chaque ligne `accepte` est aussi la trace d'une saisie réussie : une ligne `accepte` que Samuel ne reconnaît pas signale un code connu d'un tiers, donc une rotation (D22 point 6). |
+| **Charge de la base** | **Confirmé.** Chaque mauvaise saisie coûte un verrou et un compte, comme aujourd'hui au-delà du plafond. La comparaison faite avant le verrou ne coûte que quelques HMAC sur au plus 256 caractères (`LONGUEUR_SAISIE_MAX`). Le bon code ne coûte qu'une insertion. Le risque d'afflux est celui du premier point (risque 4). |
+| **Trace** | **Confirmé.** Les refus au-delà du plafond ne laissent ni ligne ni journal (`saisirCodeAcces` n'appelle pas `logEvent`), comme aujourd'hui. La trace durable reste `prototype.run_attempts`, limitée à `resultat` et `created_at` (0055 S-2 point 4). Une tentative massive ne se voit donc que par les 5 lignes `refuse` de chaque heure et par les journaux d'accès de Vercel. C'est suffisant pour le prototype à un seul détenteur. |
+
+#### 3. Ce que la revue Sécurité du ticket E1 vérifiera
+
+La revue Tech Lead vérifie le § 4.1 (§ « Conséquences »). La revue Sécurité de la PR d'E1 vérifiera en plus, sur le head proposé :
+1. **Ordre** (§ 1.2) : garde d'abord, sans base si elle est fermée ; puis `essaiAccepte` **avant** toute connexion et toute requête. Aucune autre branche ne précède la comparaison, hormis la garde.
+2. **Bon code** : transaction sans `SQL_VERROU` ni `SQL_COMPTE` (critère 4 du § 4.1, sur l'ordre des requêtes du double), insertion de `accepte`, puis `COMMIT`. Le cookie n'est rendu **qu'après** un `COMMIT` réussi. Toute erreur (connexion, insertion, `COMMIT`) rend `indisponible`, jamais un cookie (échec fermé, 0055 section 2 point 3).
+3. **Mauvais code** : verrou, puis compte filtré sur `resultat = 'refuse'` et sur 60 minutes, la valeur `'refuse'` étant écrite dans le texte SQL (aucune valeur tirée de la saisie dans une requête). À 5 ou plus : `ROLLBACK` et `too_many_attempts`, sans ligne. Sinon : ligne `refuse` et `invalid_code`. Compte illisible : `indisponible`.
+4. **Saisie hors forme** : une saisie qui n'est pas une chaîne, de plus de 256 caractères ou indécodable suit le chemin du mauvais code (comptée, plafonnée), sans décodage au-delà de 256 caractères.
+5. **Concurrence** : 6 mauvaises saisies simultanées donnent au plus 5 lignes `refuse` et exactement un `too_many_attempts` (critère 6) ; le bon code passe après 5 refus (critère 1) et six fois dans l'heure (critère 3).
+6. **Aucune trace du code** : test sentinelle inchangé et vert (console, journaux, état sérialisé, erreurs, base) ; `prototype.run_attempts` ne reçoit que `resultat` (0055 S-2 point 4) ; aucune comparaison par `===` (test statique inchangé).
+7. **Réponses** : toujours les seuls codes `fermee`, `invalid_code`, `too_many_attempts`, `indisponible` ; l'état du formulaire (`src/server/actions/p0-acces.ts`) ne porte qu'un statut. Aucun nouveau signal (ni compte restant, ni délai) dans la réponse ou dans le texte de `src/i18n/fr/prototype.json`.
+8. **Périmètre** : aucun fichier de `db/`, aucune migration, aucun `GRANT`, `tests/db/roles.test.ts` inchangé (critère 8) ; aucun en-tête d'adresse lu, aucune lecture de `TRUSTED_IP_HEADER` ni d'`x-vercel-forwarded-for` dans `src/server/p0/` ; `ESSAIS_PAR_HEURE`, `LONGUEUR_SAISIE_MAX`, le cookie et ses clés dérivées inchangés.
+9. **Tests modifiés, jamais retirés** : les quatre cas du § 4.1 sont modifiés comme écrit, et aucun autre test d'`acces.ts` n'est supprimé ni désactivé (`CLAUDE.md`).
+10. **Commentaires** : l'en-tête (l. 29-30), `ESSAIS_PAR_HEURE` (l. 42), `saisirCodeAcces` (l. 208-212) et `src/server/actions/p0-acces.ts` l. 19 disent « 5 refus par heure glissante ; le bon code n'est jamais compté contre lui », sans mention de la protection Vercel comme barrière.
+
+Un écart sur l'un de ces points vaut changements demandés.
+
+#### 4. Risques (s'ajoutent à ceux de 0165, à lister dans la note de version)
+
+4. **Afflux de mauvaises saisies** : des mauvaises saisies simultanées et soutenues attendent le verrou en tenant une connexion chacune. Si les connexions venaient à manquer, le bon code recevrait `indisponible` pendant l'afflux. Ce risque existe déjà aujourd'hui et n'est pas propre à (c). Le prototype n'a qu'un utilisateur. Une borne d'attente du verrou (`lock_timeout`, comme `src/server/auth/index.ts` l. 185-187) le réduirait côté base ; c'est une suggestion au Tech Lead, **non exigée** pour E1. Une limite de débit en amont (pare-feu Vercel) est un réglage de compte externe, donc à Samuel (non posé ici).
+
+#### 5. « Quand revoir » (inchangé, précisé)
+
+La confirmation de (c) tombe si l'une des conditions de « Quand revoir » change : code qui ne serait plus un secret aléatoire de 256 bits, `p0-reel` ouvert à d'autres détenteurs du code que Samuel (G0 ou au-delà), ou mise en public au sens de 0034 point 1. Dans chacun de ces cas, la Sécurité réexamine (c) et la voie (b) avant le changement.
