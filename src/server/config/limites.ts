@@ -88,6 +88,11 @@ export const RATE_LIMITS: RateLimitConfig = {
     { kind: "ip", windowSeconds: 3600, threshold: 20 },
     { kind: "trip", windowSeconds: 86_400, threshold: 6 },
   ],
+  // M8a (ticket 1062 ; décision 0160 § 2.3, S3, **proposition à confirmer par la Sécurité**) : avis rapide de l'écran 16
+  // (`rateStop`), 120 gestes par heure et par adresse IP, effacement compris. Vérifié après le contrôle du voyage, de la
+  // personne propriétaire, du déblocage et de l'accès `open`, avant le contrôle de l'étape et toute écriture ; `api`
+  // seulement (sur `mock`, les avis vivent dans la mémoire de l'onglet).
+  avis: [{ kind: "ip", windowSeconds: 3600, threshold: 120 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */
