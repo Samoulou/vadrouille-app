@@ -10,12 +10,21 @@ import { z } from "zod";
 
 const Uuid = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
-/** Entrée d'une exécution (et de son relais) : organisation, voyage, personne, accord. */
+/** Numéro de génération d'une exécution dans la chaîne des relais d'un accord (décision 0162 § 2 point 1, `smallint`). */
+export const RELAY_N_MAX = 32_767;
+
+/**
+ * Entrée d'une exécution (et de son relais) : organisation, voyage, personne, accord ; `relayN`, compteur de la génération
+ * (décision 0162 § 3 point 1), **absent = génération 0** : `setTripReminders` démarre sans lui, et une exécution démarrée
+ * par le code d'avant R-B relaie avec l'état à quatre clés, que ce schéma accepte toujours (arguments compatibles entre
+ * les déploiements reliés, Workflow SDK 5.1.0, « Versioning »).
+ */
 export const EtatRappelSchema = z.strictObject({
   organizationId: Uuid,
   tripId: Uuid,
   userId: Uuid,
   consentId: Uuid,
+  relayN: z.number().int().min(1).max(RELAY_N_MAX).optional(),
 });
 export type EtatRappel = z.infer<typeof EtatRappelSchema>;
 

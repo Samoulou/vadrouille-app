@@ -82,6 +82,10 @@ export const LOG_EVENTS = [
   // répétées (réveils ou relais). Nom seul, `warn` : ni voyage, ni accord, ni adresse, ni message d'erreur.
   "rappels.relay_failed",
   "rappels.abandoned",
+  // R-B (ticket 1075 ; décision 0162 § 3 point 3) : la réclamation du relais trouve la génération suivante tenue par une
+  // autre exécution (doublon d'une même génération) ; l'exécution se termine sans relayer. Nom seul, `info` : ni voyage, ni
+  // accord, ni identifiant d'exécution. Une réclamation en panne écrit `rappels.relay_failed`.
+  "rappels.relay_duplicate",
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",
