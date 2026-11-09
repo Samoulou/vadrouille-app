@@ -226,3 +226,15 @@ describe("portées", () => {
     expect(await adapter.getCheckoutStatus(ctx, first)).toEqual({ ok: false, error: { code: "not_found" } });
   });
 });
+
+// B4e (décision 0144 § 2 point 2) : méthodes obligatoires du port ; aucun reçu pour les démonstrations (`mock`).
+describe("reçus", () => {
+  it("aucun reçu, même après un paiement réussi : getReceipt → not_found, listReceipts → []", async () => {
+    const { adapter } = setup();
+    const id = await start(adapter);
+    expect((await adapter.simulateOutcome(ctx, id, "succeeded")).ok).toBe(true);
+    expect(await adapter.getEntitlement(ctx, EDIMBOURG_TRIP_ID)).toEqual({ unlocked: true });
+    expect(await adapter.getReceipt(ctx, EDIMBOURG_TRIP_ID)).toEqual({ ok: false, error: { code: "not_found" } });
+    expect(await adapter.listReceipts(ctx)).toEqual({ ok: true, value: [] });
+  });
+});

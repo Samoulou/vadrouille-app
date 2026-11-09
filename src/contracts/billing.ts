@@ -9,7 +9,9 @@ import {
   PAYMENT_EVENT_STATUSES,
   PAYMENT_EVENT_TYPES,
   PAYMENT_METHODS,
+  LONGUEUR_MAX_RECU,
   PRICE_VARIANTS,
+  recuStripeAdmis,
   TRIP_ID_PATTERN,
 } from "./values";
 
@@ -132,16 +134,9 @@ export const CheckoutStatusSchema = z.strictObject({
 });
 export type CheckoutStatus = z.infer<typeof CheckoutStatusSchema>;
 
-/**
- * Reçu d'un voyage débloqué (spécification B4, ligne B4d du plan `docs/plans/mvp-etapes-1-9.md`). Une seule forme pour
- * l'instant : `simulated`, le **reçu maison** du prestataire simulé, construit à la lecture depuis le paiement qui a
- * accordé le droit (`entitlements.billing_id` → `billing.checkout_id` → `checkouts`), sans rien stocker de plus. Le
- * reçu de Stripe (lien `receipt_url` du paiement) demande une colonne qui n'existe pas encore (migration décrite dans
- * la PR de B4d, tâche `data`) : il sera une seconde forme de cette union, jamais un champ libre.
- */
-export const ReceiptSchema = z.strictObject({
-  kind: z.literal("simulated"),
-  /** Identifiant **public** du paiement (`R9-retour`, `R9-sim`), jamais l'`uuid` interne. */
+/** Champs communs aux deux formes du reçu (0144 § 1 et § 2 point 3). */
+const CHAMPS_RECU = {
+  /** Identifiant **public** du paiement (`R9-retour`, `R9-sim`), jamais l'`uuid` interne ni un identifiant de Stripe. */
   checkoutId: CheckoutIdSchema,
   tripId: TripIdSchema,
   method: PaymentMethodSchema,
@@ -150,7 +145,26 @@ export const ReceiptSchema = z.strictObject({
   currency: CurrencySchema,
   /** Instant de l'enregistrement de la confirmation qui a accordé le droit (`billing.received_at`). */
   paidAt: z.iso.datetime({ offset: true }),
-});
+};
+
+/**
+ * Reçu d'un voyage débloqué (spécification B4, lignes B4d et B4e du plan `docs/plans/mvp-etapes-1-9.md` ; décision 0144
+ * § 2 point 3) : **union discriminée par `kind`**, objets stricts, jamais un champ libre.
+ * - `simulated` : le **reçu maison** du prestataire simulé, construit à la lecture depuis le paiement qui a accordé le
+ *   droit (`entitlements.billing_id` → `billing.checkout_id` → `checkouts`), sans rien stocker de plus (B4d) ;
+ * - `stripe` (B4e) : les mêmes champs, plus `url`, le lien du reçu de Stripe conservé par le webhook Stripe
+ *   (`checkouts.stripe_receipt_url`, migration 0025_recu_stripe), admis par `recuStripeAdmis`. Ce lien n'est rendu que
+ *   dans le HTML de `R9-recu`, à la seule personne qui a payé ; il n'a aucune valeur comptable (Q127, Samuel).
+ */
+export const ReceiptSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("simulated"), ...CHAMPS_RECU }),
+  z.strictObject({
+    kind: z.literal("stripe"),
+    ...CHAMPS_RECU,
+    /** Lien du reçu de Stripe (`receipt_url` de la Charge), revalidé par `recuStripeAdmis` (0144 § 5.3 point 3). */
+    url: z.string().max(LONGUEUR_MAX_RECU).refine(recuStripeAdmis, { message: "lien de reçu de Stripe attendu" }),
+  }),
+]);
 export type Receipt = z.infer<typeof ReceiptSchema>;
 
 export const SimulateOutcomeRequestSchema = z.strictObject({

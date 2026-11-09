@@ -3,7 +3,8 @@
     "debloquer": "{destination} · Débloquer",
     "simule": "Paiement simulé",
     "confirmation": "{destination} · Confirmation du paiement",
-    "recu": "{destination} · Reçu simulé"
+    "recu": "{destination} · Reçu simulé",
+    "recuStripe": "{destination} · Reçu"
   },
   "retour": "Retour",
   "offre": {
@@ -81,5 +82,11 @@
     "date": "Date",
     "dateHeure": "{date} à {heure} (heure de Zurich)",
     "identifiant": "Identifiant du paiement"
+  },
+  "recuStripe": {
+    "titre": "Reçu",
+    "mention": "Paiement de test : aucun montant réel n'a été débité.",
+    "details": "Détails du paiement",
+    "lien": "Ouvrir le reçu de Stripe"
   }
 }

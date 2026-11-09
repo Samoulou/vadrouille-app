@@ -21,3 +21,20 @@ describe("en-têtes des pages du voyage (B6b, Q524)", () => {
     for (const valeur of valeurs) expect(valeur).not.toMatch(/public|s-maxage|stale-while-revalidate/);
   });
 });
+
+// B4e (décision 0144 § 5.3 point 7) : `R9-recu`, seul HTML qui porte le lien du reçu de Stripe. Vérification sur le serveur
+// mesuré par le projet `api` : `tests/e2e/debloquer-api.api.spec.ts`.
+describe("en-têtes du reçu R9-recu (B4e)", () => {
+  it("/voyages/:id/debloquer/recu : privé et no-store, aucun référent ; aucun en-tête Link ni Location", () => {
+    const rule = RESPONSE_HEADERS.find((entry) => entry.source === "/voyages/:id/debloquer/recu");
+    expect(rule?.headers).toEqual([
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "no-referrer" },
+    ]);
+    const cles = RESPONSE_HEADERS.flatMap((entry) => entry.headers.map((h) => h.key.toLowerCase()));
+    expect(cles).not.toContain("link");
+    expect(cles).not.toContain("location");
+    expect(JSON.stringify(RESPONSE_HEADERS)).not.toMatch(/stripe/i);
+  });
+});
+

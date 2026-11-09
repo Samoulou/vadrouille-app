@@ -575,6 +575,8 @@ describe("module de journal", () => {
       "payment.webhook_config_invalid",
       // B4c (PR 863 ; décision 0140 § 1.2) : échec d'un appel au prestataire Stripe, classe d'erreur de la liste fermée seulement.
       "payment.provider_failed",
+      // B4e (décision 0144 § 5.3 point 4) : lien du reçu de Stripe non conservé, `eventId` et raison fermée seulement.
+      "payment.receipt_unavailable",
       // B9d (décision 0087 § 1.4) : voyage complet bloqué, identifiants internes et code fermé seulement.
       "generation.full_stuck",
       // M1a-2 (décision 0136 § 2 ; verdict 0139 § 2, attente étendue, Q649) : fin de l'étape e de generateProgramme,

@@ -15,7 +15,7 @@ Aucun argent ne circule dans B4 : le simulé n'appelle aucun prestataire, et le 
 - **Aucun compte externe** : B4a et B4b n'ont besoin d'aucun compte ; B4c attend le compte de test ouvert par Samuel (Q26).
 - **Pas d'ouverture du paiement simulé sur Internet** (Q131, Samuel) : le webhook simulé ne s'ouvre qu'en local et en CI.
 - **Aucun stockage ni API propres à Vercel** (KV, Edge Config ; décision 0002) : l'état du paiement vit dans Postgres.
-- Pas de remboursement, ni automatique ni manuel (Q129) ; pas de facture ni de reçu (Q127) ; pas de mentions légales avant paiement (Q127).
+- Pas de remboursement, ni automatique ni manuel (Q129) ; pas de facture ni de reçu ayant valeur comptable (Q127) ; pas de mentions légales avant paiement (Q127). **Amendement (décision 0144, amendement 5 ; B4d et B4e)** : le reçu simulé (reçu maison marqué « simulé », B4d) et le lien vers le reçu de Stripe en mode test (B4e) sont livrés, sans valeur comptable ; le reçu ou la facture comptable restent à Samuel (Q127). À confirmer par le Product Owner (0093).
 - Pas de démarrage du workflow 4 (voyage complet) : B4 livre le point d'appel « suite », que B9 remplit (B4-PO-15).
 - Pas d'événement de mesure côté serveur (`payment_succeeded` reste émis par le navigateur tant que Q56 est ouverte, décision 0020 § 9).
 - L'adaptateur `mock` de la phase 0 (`src/adapters/mock-payment.ts`) reste en place pour les démonstrations sur les préversions (B4-PO-1). Son seul changement (B4a) : il exige `requestId` et applique l'idempotence de B4-PO-8 ; sa machine d'états, sa garde et ses autres règles (0020 § 2.2) ne changent pas.
@@ -233,7 +233,7 @@ Périmètre de B4a dans l'interface : aucun fichier de `src/components` ; dans `
 
 ## Hors périmètre
 - Paiement réel, compte Stripe, clés de production, TWINT en production, mise en production : Samuel (Q26 ; mise en production réservée).
-- Remboursement, litige, reçu, facture, mentions avant paiement, TVA : Samuel (Q127, Q129).
+- Remboursement, litige, reçu ou facture ayant valeur comptable, mentions avant paiement, TVA : Samuel (Q127, Q129). Le reçu simulé (B4d) et le lien vers le reçu de Stripe en mode test (B4e) n'en sont pas : ils sont dans le périmètre (décision 0144, amendement 5 ; à confirmer par le Product Owner, 0093).
 - Démarrage du workflow 4 et contenu du voyage débloqué : B9 ; `AdjustmentSummary` et déblocage côté moteur : B10.
 - Événement de mesure émis par le serveur : après Q56.
 - Ouverture du paiement simulé (en mémoire ou serveur) sur une préversion ou la démonstration Vercel : Q131.

@@ -6,6 +6,7 @@ import type { AdapterContext } from "@/adapters/types";
 import { OFFER_INCLUSIONS, type OfferConfig } from "@/contracts";
 import { prestataireStripe } from "@/server/payment/composition-stripe";
 import type { DependancesPaiement } from "@/server/payment/dependances";
+import { creerConserverRecu, type OptionsConserverRecu } from "@/server/payment/recu-stripe";
 import { creerCasPaiement, type PaiementAEmettre, type PrestataireSimule } from "@/server/payment/paiements";
 import { creerPrestataireSimule, type TransportWebhook } from "@/server/payment/simulated-provider";
 import { verifierEvenementStripe } from "@/server/payment/stripe";
@@ -111,6 +112,11 @@ export const APP_URL_BANC = "https://essai.vadrouille.test";
 export type OptionsBancStripe = Partial<Omit<DependancesPaiement, "database" | "withOrg" | "maintenant">> & {
   readonly debut?: number;
   readonly double?: OptionsDouble;
+  /**
+   * Conservation du reçu (B4e) : par défaut, `creerConserverRecu` sur le prestataire du banc (double du client) ;
+   * `null` pour un webhook sans conservation, ou d'autres options (durée totale, prestataire qui lève).
+   */
+  readonly recu?: (Partial<OptionsConserverRecu> & { readonly deps?: (d: DependancesPaiement) => DependancesPaiement }) | null;
 };
 
 /**
@@ -122,7 +128,7 @@ export type OptionsBancStripe = Partial<Omit<DependancesPaiement, "database" | "
  * `simulateOutcome` sur le chemin réel du webhook Stripe.
  */
 export function creerBancStripe(options: OptionsBancStripe = {}) {
-  const { debut, double: reglagesDouble, ...reste } = options;
+  const { debut, double: reglagesDouble, recu: reglagesRecu, ...reste } = options;
   let t = debut ?? Date.now();
   const cle = cleDeTest();
   const secret = secretWebhookDeTest();
@@ -131,6 +137,14 @@ export function creerBancStripe(options: OptionsBancStripe = {}) {
   const webhook = creerWebhookStripe({
     lireConfiguration: () => ({ ouvert: true, verifierSignature: () => (corps, entete, ms) => verifierEvenementStripe(corps, entete, secret, ms) }),
     dependances: deps,
+    // Jamais la composition réelle (`serverEnv`) : le prestataire du banc (double) ou aucune conservation.
+    conserverRecu:
+      reglagesRecu === null
+        ? () => async () => undefined
+        : (d) => {
+            const { deps: remplacer, ...reglages } = reglagesRecu ?? {};
+            return creerConserverRecu(remplacer ? remplacer(d) : d, { prestataire: () => prestataire, ...reglages });
+          },
   });
   const prestataire = prestataireStripe({
     lireCle: () => ({ ok: true, cle }),

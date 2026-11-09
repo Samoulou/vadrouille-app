@@ -242,13 +242,13 @@ export interface PaymentAdapter {
   /** Droit « voyage débloqué » acquis par paiement, lu par `getTripReader()` (§ 3). */
   getEntitlement(ctx: AdapterContext, tripId: string): Promise<{ unlocked: boolean }>;
   /**
-   * Reçu du paiement qui a débloqué le voyage (B4d), pour la personne qui l'a payé seulement ; `not_found` sinon.
-   * Facultatif : seul l'adaptateur `simulated` l'implémente (reçu maison) ; `mock` n'en a pas, `stripe` pas encore
-   * (lien du reçu de Stripe en attente de sa colonne). Sans la méthode, aucun lien de reçu n'est rendu.
+   * Reçu du paiement qui a débloqué le voyage, pour la personne qui l'a payé seulement (`created_by`) ; `not_found`
+   * sinon. **Obligatoire** depuis B4e (décision 0144 § 2 point 2) : `simulated` rend le reçu maison (B4d), `stripe` le
+   * reçu dont le lien de Stripe est conservé (`not_found` tant que la colonne est `NULL`), `mock` toujours `not_found`.
    */
-  getReceipt?(ctx: AdapterContext, tripId: string): Promise<Result<Receipt>>;
-  /** Reçus de la personne, pour « Mes voyages » (B4d) ; même règle que `getReceipt`. */
-  listReceipts?(ctx: AdapterContext): Promise<Result<readonly Receipt[]>>;
+  getReceipt(ctx: AdapterContext, tripId: string): Promise<Result<Receipt>>;
+  /** Reçus de la personne, pour « Mes voyages » (B4d, B4e) ; même règle que `getReceipt` (`mock` : liste vide). */
+  listReceipts(ctx: AdapterContext): Promise<Result<readonly Receipt[]>>;
 }
 
 /**

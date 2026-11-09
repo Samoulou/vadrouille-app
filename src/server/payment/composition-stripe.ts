@@ -12,8 +12,11 @@ import { withOrg } from "@/server/with-org";
 
 import { createDatabase } from "../../../db/index.ts";
 
+import type { DependancesPaiement } from "./dependances";
 import type { PrestatairePaiement } from "./paiements";
+import { creerConserverRecu } from "./recu-stripe";
 import { creerClientSessionsStripe, type FabriqueClientStripe } from "./stripe";
+import type { RecuAConserver } from "./webhook";
 
 /**
  * Composition de l'adaptateur de paiement `stripe` en mode test (spécification B4, B4c ; décision 0140 § 3 point 4 et
@@ -55,6 +58,9 @@ export function prestataireStripe(options: OptionsPrestataireStripe): Prestatair
     async adresseSession(sessionId, paiement) {
       return (await client()?.adresseSession(sessionId, paiement)) ?? refus;
     },
+    async adresseRecu(sessionId, paiement) {
+      return (await client()?.adresseRecu(sessionId, paiement)) ?? refus;
+    },
   };
 }
 
@@ -68,5 +74,22 @@ export function composerPaiementStripe(): PaymentAdapter {
     prestataire: prestataireStripe({ adressesRetour: adressesRetourStripe(env.betterAuth.appUrl), moyens: OFFER_CONFIG.methods }),
     // Limiteur des actions (B4-TL-6 point 2) : en-têtes de la requête de l'action, lus par l'en-tête de confiance seul.
     limiteur: async (action) => checkRateLimit({ action, headers: new Headers(await (await import("next/headers")).headers()) }),
+  });
+}
+
+/**
+ * Conservation du lien du reçu de Stripe pour le webhook Stripe (B4e ; décision 0144 § 5.3 point 4), sur les dépendances
+ * du webhook : le prestataire est celui de `prestataireStripe` (clé relue par `cleStripe` à chaque appel, barrière de
+ * sortie rejouée), construit **à l'appel**, avec les mêmes refus que `composerPaiementStripe` (hors de
+ * `PAYMENT_ADAPTER=stripe`, en production ou sans `APP_URL` validée : la construction lève, la panne est journalisée
+ * `provider_error` et avalée). Rien n'est lu de l'environnement avant le premier reçu à conserver.
+ */
+export function composerConserverRecuStripe(deps: DependancesPaiement): (recu: RecuAConserver) => Promise<void> {
+  return creerConserverRecu(deps, {
+    prestataire: () => {
+      const env = serverEnv();
+      if (env.paymentAdapter !== "stripe" || productionPaiement(env) || env.betterAuth === null) throw new Error("paiement Stripe indisponible");
+      return prestataireStripe({ adressesRetour: adressesRetourStripe(env.betterAuth.appUrl), moyens: OFFER_CONFIG.methods });
+    },
   });
 }

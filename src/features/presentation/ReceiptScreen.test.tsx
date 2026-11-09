@@ -67,4 +67,38 @@ describe("ReceiptScreen", () => {
     expect(formatInstantRecu("2026-03-29T01:00:00Z")).toBe("29 mars 2026 à 03:00 (heure de Zurich)");
     expect(formatInstantRecu("pas une date")).toBe("pas une date");
   });
+
+  // B4e (ticket 887 ; décision 0144 § 5.3 point 7) : forme `stripe`, textes provisoires de 0144 (question 1).
+  const LIEN = "https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xVGVzdA";
+  const STRIPE: Receipt = { ...RECU, kind: "stripe", method: "card", url: LIEN };
+
+  it("B4e : reçu de Stripe, même forme ; mention de mode test ; lien externe sans référent ni accès à la fenêtre", async () => {
+    expect(ReceiptSchema.parse(STRIPE)).toEqual(STRIPE);
+    const { container } = rendre(STRIPE);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Reçu$/);
+    expect(container.querySelector("[data-part='mention-test']")).toHaveTextContent("Paiement de test : aucun montant réel n'a été débité.");
+    expect(container.querySelector("[data-part='mention-simule']")).toBeNull();
+    const details = screen.getByRole("region", { name: "Détails du paiement" });
+    expect(within(details).getAllByRole("term").map((dt) => dt.textContent)).toEqual(["Voyage", "Montant", "Moyen de paiement", "Date", "Identifiant du paiement"]);
+    const lien = screen.getByRole("link", { name: "Ouvrir le reçu de Stripe" });
+    expect(lien).toHaveAttribute("href", LIEN);
+    expect(lien).toHaveAttribute("rel", "noopener noreferrer");
+    expect(lien).toHaveAttribute("referrerpolicy", "no-referrer");
+    expect(lien).not.toHaveAttribute("target");
+    // Le lien n'apparaît qu'une fois, dans ce seul attribut ; aucun autre lien ne sort de l'application.
+    expect(container.innerHTML.split("pay.stripe.com")).toHaveLength(2);
+    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual([`/voyages/${TRIP}`, LIEN, `/voyages/${TRIP}`]);
+    expect(container.querySelector("main")).toHaveAttribute("data-receipt", "stripe");
+    expect(container.textContent).not.toContain("simulé");
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("B4e : lien qui ne passe pas la revalidation (valeur forcée hors du schéma) → aucun lien rendu", () => {
+    for (const url of ["javascript:alert(1)", "https://PAY.STRIPE.COM/receipts/x", "https://evil.example/receipts/x"]) {
+      const { container, unmount } = rendre({ ...STRIPE, url } as Receipt);
+      expect(screen.queryByRole("link", { name: "Ouvrir le reçu de Stripe" })).toBeNull();
+      expect(container.innerHTML).not.toContain(url);
+      unmount();
+    }
+  });
 });

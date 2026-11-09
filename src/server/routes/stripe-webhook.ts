@@ -2,9 +2,11 @@ import "server-only";
 
 import { serverEnv, type ServerEnv } from "@/server/env";
 import { secretWebhookStripe, webhookStripeOuvert } from "@/server/env/payment";
+import { composerConserverRecuStripe } from "@/server/payment/composition-stripe";
 import type { DependancesPaiement } from "@/server/payment/dependances";
 import { formeStripe } from "@/server/payment/formes";
 import { verifierEvenementStripe } from "@/server/payment/stripe";
+import type { RecuAConserver } from "@/server/payment/webhook";
 
 import { creerWebhook, type ConfigurationWebhookCommun } from "./webhook-commun";
 
@@ -16,7 +18,9 @@ import { creerWebhook, type ConfigurationWebhookCommun } from "./webhook-commun"
  * - étape 1 : `webhookStripeOuvert` (`PAYMENT_ADAPTER=stripe` et pas la production, `productionPaiement`) ;
  * - étape 5 : secret lu par `secretWebhookStripe` à ce moment seulement, vérification par `verifierEvenementStripe`
  *   (bibliothèque, sans clé d'API, tolérance de 300 s, horloge en millisecondes) ;
- * - étape 7 : forme Stripe des identifiants (`formeStripe`, critère C7 : un identifiant simulé est refusé).
+ * - étape 7 : forme Stripe des identifiants (`formeStripe`, critère C7 : un identifiant simulé est refusé) et
+ *   conservation du lien du reçu de Stripe après la transaction (B4e, décision 0144 § 5.3 point 4 :
+ *   `composerConserverRecuStripe`, panne avalée, réponse inchangée).
  * Événements traités : ceux de `analyserEvenement`, inchangés ; remboursement et litige restent en alerte seule (§ 2.4).
  */
 
@@ -38,6 +42,8 @@ export type OptionsWebhookStripe = {
   readonly lireConfiguration?: () => ConfigurationWebhookCommun;
   readonly dependances?: DependancesPaiement;
   readonly creerDependances?: () => DependancesPaiement;
+  /** Conservation du reçu (défaut : `composerConserverRecuStripe`) ; les tests l'injectent sur le double du client. */
+  readonly conserverRecu?: (deps: DependancesPaiement) => (recu: RecuAConserver) => Promise<void>;
 };
 
 export function creerWebhookStripe(options: OptionsWebhookStripe = {}): (request: Request) => Promise<Response> {
@@ -46,6 +52,7 @@ export function creerWebhookStripe(options: OptionsWebhookStripe = {}): (request
     formeAttendue: formeStripe,
     dependances: options.dependances,
     creerDependances: options.creerDependances,
+    conserverRecu: options.conserverRecu ?? composerConserverRecuStripe,
   });
 }
 

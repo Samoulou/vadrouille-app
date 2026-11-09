@@ -23,14 +23,22 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { id } = await params;
   // Sans session (`better-auth`) : titre par défaut ; seule la page redirige (`exigerSession`).
   const ctx = await contexteFacultatif();
-  const trip = ctx === null ? null : await getTripReader().getTrip(ctx, id);
-  return trip ? { title: format(messages.debloquer.titreDocument.recu, { destination: trip.destination }), robots: ROBOTS } : { robots: ROBOTS };
+  if (ctx === null) return { robots: ROBOTS };
+  const scope = await getSimulationScope();
+  // Titre selon la forme du reçu (B4e) ; sans reçu de la personne, la page répond 404 avec le titre par défaut.
+  const data = await loadReceipt(getTripReader({ scope }), getPaymentAdapter({ scope }), ctx, id);
+  if (!data) return { robots: ROBOTS };
+  const titre = data.receipt.kind === "stripe" ? messages.debloquer.titreDocument.recuStripe : messages.debloquer.titreDocument.recu;
+  return { title: format(titre, { destination: data.trip.destination }), robots: ROBOTS };
 }
 
 /**
- * Reçu `R9-recu` (B4d) : reçu maison du paiement simulé qui a débloqué le voyage, pour la personne qui l'a payé.
- * Paiement indisponible (F9-PO-19), adaptateur sans reçu (`mock` ; `stripe`, dont le lien attend sa colonne), voyage
- * inconnu ou d'une autre organisation, voyage non débloqué ou payé par une autre personne : 404. Sans session
+ * Reçu `R9-recu` (B4d, B4e) : reçu du paiement qui a débloqué le voyage, pour la personne qui l'a payé (`created_by`) :
+ * reçu maison du simulé, ou reçu du paiement de test Stripe avec le lien de Stripe (décision 0144 § 5.3 point 7 : ce lien
+ * n'apparaît que dans le HTML de cette page). En-têtes propres à ce chemin (`Cache-Control: private, no-store`,
+ * `Referrer-Policy: no-referrer`) : `next.config.ts`. Paiement indisponible (F9-PO-19), adaptateur sans reçu (`mock` ;
+ * `stripe` sans lien conservé), voyage inconnu ou d'une autre organisation, voyage non débloqué ou payé par une autre
+ * personne : 404. Sans session
  * (`better-auth`, B3c) : redirection vers l'écran 4, suite « Débloquer » (`R9`, qui rend le lien du reçu), comme les
  * pages de paiement simulé : la liste blanche des suites (B3-PO-11, `src/features/compte/suite.ts`) n'est pas étendue.
  */
