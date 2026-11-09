@@ -85,7 +85,7 @@
   },
   "recuStripe": {
     "titre": "Reçu",
-    "mention": "Paiement de test : aucun montant réel n'a été débité.",
+    "mention": "Paiement de test : aucun montant réel n'a été débité et ce reçu n'a aucune valeur comptable.",
     "details": "Détails du paiement",
     "lien": "Ouvrir le reçu de Stripe"
   }

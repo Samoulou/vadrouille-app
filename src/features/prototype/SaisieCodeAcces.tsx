@@ -21,9 +21,10 @@ const BOUTON_EN_COURS = "aria-disabled:cursor-not-allowed aria-disabled:bg-muted
  * l'action serveur, champ `type="password"` non contrôlé (la saisie n'entre dans aucun état React), `autocomplete="off"`.
  * L'état rendu par l'action n'est qu'un statut ; la saisie n'est jamais réaffichée.
  *
- * - Un seul envoi à la fois (0055, section 2 point 3 : chaque envoi consomme un des 5 essais de l'heure) : un second
- *   envoi (double clic, deux Entrée) est ignoré tant que le premier n'a pas répondu ; le bouton reste focalisable,
- *   `aria-disabled`, grisé et libellé « Vérification… ».
+ * - Un seul envoi à la fois (0055, section 2 point 3 ; depuis 0165 § 1 et la PR #1077, seuls les refus comptent, au
+ *   plus 5 refus par heure glissante, et un envoi accepté n'en consomme aucun) : un second envoi (double clic, deux
+ *   Entrée) est ignoré tant que le premier n'a pas répondu, pour qu'un mauvais code ne soit pas compté deux fois ; le
+ *   bouton reste focalisable, `aria-disabled`, grisé et libellé « Vérification… ».
  * - Annonces (handover § 11 ; 0018 § 14) : la région `status` de la confirmation et la région `alert` de l'erreur sont
  *   présentes dès l'affichage, vides ; accepté, le focus passe au titre ; refusé, l'erreur est reliée au champ
  *   (`aria-invalid`, `aria-describedby`) et le focus revient au champ.
