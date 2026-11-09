@@ -65,8 +65,9 @@ const SIUD = ["SELECT", "INSERT", "UPDATE", "DELETE"];
 const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
   vadrouille_app: {
     checklist_items: SIUD,
-    // M8-D (migration 0026_apres_voyage, proposition de 0160 § 2.1, S1, verdict de la Sécurité attendu) : un goût s'insère
-    // par colonnes (droits par colonne ci-dessous) et ne se modifie jamais ; un avis s'insère et se modifie par colonnes.
+    // M8-D (migration 0026_apres_voyage, proposition de 0160 § 2.1, S1 ; verdict favorable de la Sécurité, revue de la
+    // PR #1057, amendement de 0160 par la PR #1066) : un goût s'insère par colonnes (droits par colonne ci-dessous) et
+    // ne se modifie jamais ; un avis s'insère et se modifie par colonnes.
     preferences: ["SELECT", "DELETE"],
     stop_reviews: ["SELECT", "DELETE"],
     stays: SIUD,
@@ -85,8 +86,9 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
     // ni TRUNCATE.
     reminder_consents: ["SELECT"],
     reminder_sends: ["SELECT", "INSERT"],
-    // R-D (migration 0027_rappels_relais, proposition de 0162 § 2 point 5, S-R1, verdict de la Sécurité attendu) : une
-    // réclamation de relais s'insère par colonnes (droits par colonne ci-dessous) et n'est jamais modifiée ni supprimée.
+    // R-D (migration 0027_rappels_relais, proposition de 0162 § 2 point 5, S-R1 ; confirmée par la Sécurité, revues de
+    // la PR #1067) : une réclamation de relais s'insère par colonnes (droits par colonne ci-dessous) et n'est jamais
+    // modifiée ni supprimée.
     reminder_relays: ["SELECT"],
     // M5-D (migration 0022_feedback_signalements, décision 0147 § 2 point 4) : un signalement n'est jamais modifié.
     feedback: ["SELECT", "INSERT"],
