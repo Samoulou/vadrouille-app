@@ -48,6 +48,7 @@ import {
 import { briefDepuisFormulaire } from "@/server/programme/brief";
 import { instantaneDuProgramme } from "@/server/programme/instantane";
 import { avecSiteGarde, sitesDuProgramme } from "@/server/programme/sites";
+import { ecrireVersion } from "@/server/versions/ecrire";
 import type { OrgTransaction } from "@/server/with-org";
 
 import {
@@ -1038,10 +1039,15 @@ describe("chaîne inversée : récit fermé (0139 § 1.2 point 6)", () => {
 });
 
 describe("chaine-inversee: voyage complet et recalcul clos sans écriture (0136 § 4.4)", () => {
-  it("full : ligne close en ready sur la version 1, aucune nouvelle version ni appel", async () => {
+  // Attente modifiée par M1c (ticket 1048 ; Q638) : la version 1 ne porte plus de `placeId` hors des journées de l'aperçu, et
+  // le voyage complet vérifie ces lieux restants (`tests/db/voyage-complet-programme.test.ts`). La règle de 0136 § 4.4 (ligne
+  // close en `ready` sans écriture ni appel) vaut désormais quand **aucune étape ne reste à vérifier** : ce cas est fabriqué
+  // par une version 2 dont toutes les étapes hors de l'aperçu ont un `placeId`.
+  it("full : aucune étape restante, ligne close en ready sur la version courante, aucune nouvelle version ni appel", async () => {
     const org = await createOrg(auth);
     const { adapter, tripId, etat } = await lancer(org);
     expect((await derouler(etat, dependances())).fin.arret).toBeUndefined();
+    await toutVerifier(org, tripId);
     await admin.query(
       "INSERT INTO public.entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')",
       [org.org, tripId],
@@ -1064,9 +1070,9 @@ describe("chaine-inversee: voyage complet et recalcul clos sans écriture (0136 
     expect(await dernierRun(org, tripId, "full")).toMatchObject({
       phase: "ready",
       stop_reason: null,
-      last_version: 1,
+      last_version: 2,
     });
-    expect(await nombre(org, "trip_versions", tripId)).toBe(1);
+    expect(await nombre(org, "trip_versions", tripId)).toBe(2);
   });
 
   it("batch : ligne close en ready sur sa version de base, aucune nouvelle version ni appel", async () => {
@@ -1133,12 +1139,32 @@ async function journeesDesCases(org: Org, tripId: string): Promise<number[]> {
   return [...new Set([1, ...cases.map((c) => c.day)])].sort((a, b) => a - b);
 }
 
-/** Positions sentinelles (aucune réponse Google) pour chaque lieu de la version 1, comme le cache `place_coordinates`. */
+/**
+ * Version 2 où chaque étape sans `placeId` de la version 1 en reçoit un sentinelle : ce qu'écrit le voyage complet après le
+ * déblocage (M1c, ticket 1048 ; Q638), sans appel. Rend l'instantané écrit.
+ */
+async function toutVerifier(org: Org, tripId: string): Promise<TripSnapshot> {
+  const v1 = await version1(org, tripId);
+  const toutVerifie: TripSnapshot = {
+    days: v1.days.map((jour) => ({
+      ...jour,
+      items: jour.items.map((ligne, rang) =>
+        ligne.type === "stop" && ligne.stop.placeId === undefined ? { ...ligne, stop: { ...ligne.stop, placeId: `SENTINELLE_PLACE_ID_M1C_${jour.index}_${rang}` } } : ligne,
+      ),
+    })),
+  };
+  await inTx(app, { org: org.org, user: org.owner }, (c) =>
+    ecrireVersion(c, { organizationId: org.org, tripId, requestId: crypto.randomUUID(), auteur: "workflow", instantane: toutVerifie, instantanePrecedent: v1 }),
+  );
+  return toutVerifie;
+}
+
+/** Positions sentinelles (aucune réponse Google) pour chaque lieu de l'instantané, comme le cache `place_coordinates`. */
 async function positionsDe(org: Org, snapshot: TripSnapshot) {
   const lieux = [...new Set(snapshot.days.flatMap((j) => j.items.flatMap((l) => (l.type === "stop" && l.stop.placeId !== undefined ? [l.stop.placeId] : []))))];
   for (const [rang, placeId] of lieux.entries()) {
     await admin.query(
-      "INSERT INTO public.place_coordinates (organization_id, place_id, lat, lng, fetched_at, expires_at) VALUES ($1, $2, $3, 12.5, now(), now() + interval '29 days')",
+      "INSERT INTO public.place_coordinates (organization_id, place_id, lat, lng, fetched_at, expires_at) VALUES ($1, $2, $3, 12.5, now(), now() + interval '29 days') ON CONFLICT DO NOTHING",
       [org.org, placeId, 41.8 + rang / 1000],
     );
   }
@@ -1212,7 +1238,9 @@ describe("chaîne inversée : lecture avant et après le déblocage (0136 § 3.5
     expect(textes.filter((t) => /place_coordinates/.test(t))).toEqual([]);
     // Journée de l'aperçu : la carte est lue ; après le déblocage, la journée 4 aussi.
     expect((await lecteur().getDayMap(contexteDe(org), tripId, 1))?.dayIndex).toBe(1);
+    // Attente modifiée par M1c (Q638) : la journée 4 n'a de lieux, donc de carte, qu'après le voyage complet (`toutVerifier`).
     await debloquer(org, tripId);
+    await positionsDe(org, await toutVerifier(org, tripId));
     expect((await lecteur().getDayMap(contexteDe(org), tripId, 4))?.dayIndex).toBe(4);
   });
 
@@ -1228,7 +1256,9 @@ describe("chaîne inversée : lecture avant et après le déblocage (0136 § 3.5
     expect(avant.map((c) => c.dayIndex)).toEqual(apercu);
     const servies = etapesDe(apercu);
     for (const carte of avant) for (const point of carte.points) if (point.ref.type === "stop") expect(servies.has(point.ref.stopId)).toBe(true);
+    // Attente modifiée par M1c (Q638) : les journées 3 à 5 n'ont de lieux, donc de carte, qu'après le voyage complet.
     await debloquer(org, tripId);
+    await positionsDe(org, await toutVerifier(org, tripId));
     expect((await lecteur().getTripMap(contexteDe(org), tripId)).map((c) => c.dayIndex)).toEqual([1, 2, 3, 4, 5]);
   });
 

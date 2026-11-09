@@ -325,6 +325,14 @@ export interface CapaciteProgramme {
    * Aucun programme rédigé avant : `RangeError`.
    */
   lieux(programme: ProgrammeRedige): { readonly nombre: number; verifier(controle: ControleVerification): Promise<LieuxVerifies> };
+  /**
+   * Voyage complet de la chaîne inversée (M1c, ticket 1048 ; réponse de Samuel à Q638) : **même vérification que `lieux`**
+   * (mêmes lieux distincts, même texte `« {lieu}, {ville} »`, même zone, même contrôle avant chaque appel), sur un programme
+   * **reconstruit par l'étape** depuis les étapes de la version courante restées sans `placeId` (noms et villes maison : ceux
+   * que l'IA a écrits et que la lecture tolérante a contrôlés, jamais une donnée Google), **sans requête de modèle** : aucun
+   * programme rédigé n'est exigé. Les logements doivent avoir été ancrés avant (`logements`), sinon `RangeError`.
+   */
+  lieuxRestants(programme: ProgrammeRedige): { readonly nombre: number; verifier(controle: ControleVerification): Promise<LieuxVerifies> };
   /** Vérification de statut des sites proposés (0122 § 1) : variante simulée, barrière fermée, ni résolution ni connexion. */
   readonly sites: VerificateurDesSites;
 }
@@ -716,6 +724,45 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
       ...(reponse.tokens === undefined ? {} : { tokens: { entree: reponse.tokens.entree, sortie: reponse.tokens.sortie } }),
     };
   }
+  /** Lieux distincts du programme reçu et leur vérification (corps commun de `lieux` et de `lieuxRestants`). */
+  function verification(programme: ProgrammeRedige): ReturnType<CapaciteProgramme["lieux"]> {
+    const destination = zones?.destination ?? "";
+    const { lieux, cleDe } = lieuxDuProgramme(programme, destination);
+    return {
+      nombre: lieux.length,
+      async verifier(controle) {
+        if (zones === undefined) throw new RangeError("programme : logements non ancrés");
+        const { commune, parVille, plusieursVilles } = zones;
+        // Zone de la ville du lieu, posée par le cadrage (0148 § 7.1 point 6 ; 0149 § 1.3 point 5) : jamais la zone commune
+        // d'un voyage à plusieurs villes. Le choix suit le seul prédicat de bascule (`briefAPlusieursVilles`, revue de la PR 932,
+        // Sécurité M2), jamais la taille de `parVille` : plusieurs villes sans zone pour la ville du lieu lève (échec fermé).
+        // Une seule ville : la zone du séjour, inchangée.
+        const zoneDe = (lieu: { readonly ville?: string }) => {
+          if (!plusieursVilles) return commune;
+          const zone = lieu.ville === undefined ? undefined : parVille.get(lieu.ville);
+          if (zone === undefined) throw new RangeError("programme : zone de la ville introuvable");
+          return zone;
+        };
+        const issue = await verifierLieuxDuProgramme(lieux, destination, { textSearch: ancrage.textSearch, places }, zoneDe, controle);
+        for (const fiche of issue.fiches.values()) retenir(fiche.placeId, fiche.position);
+        return {
+          placeIdDe: (jour, rang) => {
+            const cle = cleDe(jour, rang);
+            return cle === undefined ? undefined : issue.fiches.get(cle)?.placeId;
+          },
+          positions: {
+            ecrire: (executeur, publies, obtenuesA, creerPort) =>
+              ecrirePositionsAbsentes(
+                executeur,
+                positionsFraiches([...positions].filter(([placeId]) => publies.has(placeId)).map(([placeId, position]) => ({ issue: "chargee" as const, placeId, position }))),
+                obtenuesA,
+                creerPort,
+              ),
+          },
+        };
+      },
+    };
+  }
   return {
     async logements(brief, plusieursVilles) {
       // L'étape passe le `BriefEssai` entier, forme structurelle de `Brief` (`src/prototype/brief.ts`), que ce pont n'importe pas
@@ -739,43 +786,9 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
       lireRedaction(() => redigerRevisionV3(entree), sejour, filtrer, cadreLectureChangements(entree.brief.changements).joursDureeEstimee ?? []),
     lieux(programme) {
       if (lu === undefined) throw new RangeError("programme : aucun programme rédigé");
-      const destination = zones?.destination ?? "";
-      const { lieux, cleDe } = lieuxDuProgramme(programme, destination);
-      return {
-        nombre: lieux.length,
-        async verifier(controle) {
-          if (zones === undefined) throw new RangeError("programme : logements non ancrés");
-          const { commune, parVille, plusieursVilles } = zones;
-          // Zone de la ville du lieu, posée par le cadrage (0148 § 7.1 point 6 ; 0149 § 1.3 point 5) : jamais la zone commune
-          // d'un voyage à plusieurs villes. Le choix suit le seul prédicat de bascule (`briefAPlusieursVilles`, revue de la PR 932,
-          // Sécurité M2), jamais la taille de `parVille` : plusieurs villes sans zone pour la ville du lieu lève (échec fermé).
-          // Une seule ville : la zone du séjour, inchangée.
-          const zoneDe = (lieu: { readonly ville?: string }) => {
-            if (!plusieursVilles) return commune;
-            const zone = lieu.ville === undefined ? undefined : parVille.get(lieu.ville);
-            if (zone === undefined) throw new RangeError("programme : zone de la ville introuvable");
-            return zone;
-          };
-          const issue = await verifierLieuxDuProgramme(lieux, destination, { textSearch: ancrage.textSearch, places }, zoneDe, controle);
-          for (const fiche of issue.fiches.values()) retenir(fiche.placeId, fiche.position);
-          return {
-            placeIdDe: (jour, rang) => {
-              const cle = cleDe(jour, rang);
-              return cle === undefined ? undefined : issue.fiches.get(cle)?.placeId;
-            },
-            positions: {
-              ecrire: (executeur, publies, obtenuesA, creerPort) =>
-                ecrirePositionsAbsentes(
-                  executeur,
-                  positionsFraiches([...positions].filter(([placeId]) => publies.has(placeId)).map(([placeId, position]) => ({ issue: "chargee" as const, placeId, position }))),
-                  obtenuesA,
-                  creerPort,
-                ),
-            },
-          };
-        },
-      };
+      return verification(programme);
     },
+    lieuxRestants: (programme) => verification(programme),
     sites,
   };
 }
