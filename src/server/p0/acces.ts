@@ -168,8 +168,11 @@ const REFUS_DE_PRODUCTION: ReadonlySet<CodeGardeFermee> = new Set(["production_r
 /**
  * Lu à chaque affichage de la page (`GET`). Revue du head 6be9299, mineur 11 : en production, la page est publique et un
  * robot pourrait inonder le journal ; l'affichage n'y écrit donc **rien** (refus de production, ou déploiement de
- * production). Hors production (préversions, derrière la protection Vercel), `p0.guard_closed` reste écrit : c'est
- * l'outil du relevé de la section 1 point 3 (ouvrir la page et lire le code). Les actions journalisent toujours.
+ * production). Hors production, les préversions sont publiques depuis la désactivation de la protection Vercel
+ * (avis 0164, 2026-11-09). L'affichage y écrit `p0.guard_closed`, par choix (décision 0165 § 2) : c'est l'outil du relevé
+ * de 0055 S-1 point 4 sur `p0-reel` (ouvrir la page et lire le code). Un inconnu peut l'inonder, ce qui ne produit que du
+ * bruit dans un journal gardé une heure. Depuis 0163, seules `main` et `p0-reel` sont construites. Les actions
+ * journalisent toujours.
  */
 export function etatPageAcces(cookie: string | undefined, dependances: DependancesAcces = {}): EtatPageAcces {
   const { resultat: ouverture, diagnostic } = ouvrir(dependances);
