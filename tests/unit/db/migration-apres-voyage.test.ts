@@ -39,7 +39,7 @@ function liste(nom: string): string[] {
   const fin = SQL.indexOf("\n", debut);
   const valeurs = SQL.slice(debut, fin).match(/ IN \(([^)]*)\)/);
   expect(valeurs, nom).not.toBeNull();
-  return [...(valeurs?.[1] ?? "").matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  return [...(valeurs?.[1] ?? "").matchAll(/'([^']+)'/g)].map((m) => m[1] ?? "");
 }
 
 describe("migration 0026 : valeurs fermées égales aux contrats", () => {
