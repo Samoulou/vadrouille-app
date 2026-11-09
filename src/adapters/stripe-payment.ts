@@ -10,7 +10,8 @@ import type { PaymentAdapter } from "./types";
  * dans le même processus. Il ne connaît que le port `PrestatairePaiement`, injecté : un double dans les tests (C1,
  * A22), le client réel de `src/server/payment/stripe.ts` par la composition (`src/server/payment/composition-stripe.ts`,
  * seul appelant de `cleStripe` hors des tests), branchée par `src/instrumentation.ts` sur `./stripe-payment-instance.ts`.
- * Il n'implémente pas `PaymentSimulator` : seul le webhook Stripe accorde le droit, sur un événement signé.
+ * Il n'implémente pas `PaymentSimulator` : seul le webhook Stripe accorde le droit, sur un événement signé. Le reçu
+ * (`getReceipt`, `listReceipts`) est celui de Stripe : son lien, conservé par le webhook Stripe (B4e, décision 0144).
  */
 export type OptionsPaiementStripe = DependancesPaiement & { readonly prestataire: PrestatairePaiement };
 
@@ -21,6 +22,10 @@ export function createStripePaymentAdapter(options: OptionsPaiementStripe): Paym
     createCheckout: (ctx, request) => cas.createCheckout(ctx, request, options.prestataire),
     getCheckoutStatus: (ctx, checkoutId) => cas.getCheckoutStatus(ctx, checkoutId),
     getEntitlement: (ctx, tripId) => cas.getEntitlement(ctx, tripId),
+    // Reçu de Stripe (B4e ; décision 0144 § 5.3 point 7) : lien conservé par le webhook Stripe, revalidé à la lecture ;
+    // un paiement dont la colonne est `NULL` n'a pas de reçu (404 sur `R9-recu`, aucun lien).
+    getReceipt: (ctx, tripId) => cas.getReceipt(ctx, tripId, "stripe"),
+    listReceipts: (ctx) => cas.listReceipts(ctx, "stripe"),
   };
 }
 

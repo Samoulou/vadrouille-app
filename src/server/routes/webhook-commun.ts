@@ -51,6 +51,12 @@ export type OptionsWebhookCommun = {
    * l'étape 7 ; espion des tests.
    */
   readonly creerDependances?: () => DependancesPaiement;
+  /**
+   * Conservation du reçu de la route (B4e ; décision 0144 § 5.3 point 4, route Stripe seulement), construite sur les
+   * dépendances de l'étape 7 puis transmise telle quelle à `handlePaymentEvent` avec `formeAttendue`. La fabrique n'y
+   * ajoute ni clé ni appel ; absente (route simulée), rien ne change.
+   */
+  readonly conserverRecu?: (deps: DependancesPaiement) => NonNullable<OptionsTraitement["conserverRecu"]>;
 };
 
 /** Dépendances par défaut : client de `vadrouille_app` (lève si sa variable manque), `withOrg`, horloge système. */
@@ -129,7 +135,8 @@ export function creerWebhook(options: OptionsWebhookCommun): (request: Request) 
     // de base absente donne `500`, comme une base indisponible.
     try {
       const deps = (dependances ??= (options.creerDependances ?? dependancesWebhookParDefaut)());
-      await handlePaymentEvent(deps, evenement, { formeAttendue: options.formeAttendue });
+      const conserverRecu = options.conserverRecu?.(deps);
+      await handlePaymentEvent(deps, evenement, { formeAttendue: options.formeAttendue, ...(conserverRecu === undefined ? {} : { conserverRecu }) });
     } catch {
       return json(500, { error: "server_error" });
     }

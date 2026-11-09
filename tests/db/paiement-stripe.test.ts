@@ -350,6 +350,7 @@ describe("paiement: la ligne checkouts précède l'appel à Stripe", () => {
         return resultat;
       },
       adresseSession: (id, paiement) => banc.prestataire.adresseSession(id, paiement),
+      adresseRecu: (id, paiement) => banc.prestataire.adresseRecu(id, paiement),
     };
     const adapter = createStripePaymentAdapter({ ...banc.deps, prestataire });
     const { ctx, tripId } = await organisation();
@@ -388,6 +389,7 @@ describe("paiement: reprise sans session bornée à 120 s", () => {
         return banc.prestataire.creerSession(paiement, cle);
       },
       adresseSession: (id, paiement) => banc.prestataire.adresseSession(id, paiement),
+      adresseRecu: (id, paiement) => banc.prestataire.adresseRecu(id, paiement),
     };
     const adapter = createStripePaymentAdapter({ ...banc.deps, prestataire });
     const { ctx, tripId } = await organisation();

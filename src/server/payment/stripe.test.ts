@@ -388,3 +388,133 @@ describe("paiement: formes simulée et Stripe disjointes", () => {
     expect(formeStripe("evt_abc", "cs_live_abc")).toBe(false);
   });
 });
+
+// B4e (ticket 887 ; décision 0144 § 5.3 point 2) : lien du reçu d'une session payée, sur le double puis sur le client réel.
+describe("paiement: lien du reçu Stripe (adresseRecu)", () => {
+  const LIEN = "https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xVGVzdA";
+  /** Session développée de la forme de Stripe : payée, intention et Charge développées, lien de reçu. */
+  const developpee = (s: { id: string }, charge: unknown = { id: "ch_1", object: "charge", receipt_url: LIEN }) => ({
+    ...s,
+    status: "complete",
+    payment_status: "paid",
+    payment_intent: { id: "pi_1", object: "payment_intent", latest_charge: charge },
+  });
+
+  async function avecSession(recu?: (s: { id: string; metadata: { checkoutId: string } }) => unknown) {
+    const double = creerDoubleStripe();
+    const client = creerClientSessionsStripe(cleDeTest(), configuration(double));
+    const cree = await client.creerSession(PAIEMENT, `checkout:${PAIEMENT.id}`);
+    if (!cree.ok) throw new Error("création");
+    if (recu) double.regler({ recu });
+    return { double, client, sessionId: cree.value.sessionId };
+  }
+
+  it("session payée du même paiement : le lien, lu par une relecture développée (2 s, aucune relance)", async () => {
+    const { double, client, sessionId } = await avecSession((s) => developpee(s));
+    const { valeur, lignes } = await capturer(() => client.adresseRecu(sessionId, PAIEMENT));
+    expect(valeur).toEqual({ ok: true, value: LIEN });
+    expect(lignes).toEqual([]);
+    expect(double.appels.filter((a) => a.methode === "recu")).toEqual([
+      { methode: "recu", cle: expect.any(String), id: sessionId, expand: ["payment_intent.latest_charge"], options: { timeout: 2000, maxNetworkRetries: 0 } },
+    ]);
+  });
+
+  it("autre paiement, autre session, non payée, lien absent, non chaîne, refusé, Charge ou intention non développées → invalid_response", async () => {
+    const cas: ((s: { id: string; metadata: { checkoutId: string } }) => unknown)[] = [
+      (s) => ({ ...developpee(s), metadata: { checkoutId: crypto.randomUUID() } }),
+      (s) => ({ ...developpee(s), id: "cs_test_autre" }),
+      (s) => ({ ...developpee(s), payment_status: "unpaid" }),
+      (s) => ({ ...developpee(s), payment_status: "no_payment_required" }),
+      (s) => developpee(s, { id: "ch_1", object: "charge" }),
+      (s) => developpee(s, { id: "ch_1", object: "charge", receipt_url: null }),
+      (s) => developpee(s, { id: "ch_1", object: "charge", receipt_url: 42 }),
+      (s) => developpee(s, { id: "ch_1", object: "charge", receipt_url: "https://PAY.STRIPE.COM/receipts/x" }),
+      (s) => developpee(s, { id: "ch_1", object: "charge", receipt_url: "https://evil.example/receipts/x" }),
+      (s) => developpee(s, "ch_1"),
+      (s) => developpee(s, null),
+      (s) => ({ ...developpee(s), payment_intent: "pi_1" }),
+      (s) => ({ ...developpee(s), payment_intent: null }),
+      () => null,
+    ];
+    for (const recu of cas) {
+      const { client, sessionId } = await avecSession(recu);
+      const { valeur, lignes } = await capturer(() => client.adresseRecu(sessionId, PAIEMENT));
+      expect(valeur).toEqual({ ok: false, code: "provider_error", retryable: false });
+      expect(lignes.map((l) => JSON.parse(l) as object)).toEqual([expect.objectContaining({ event: "payment.provider_failed", errorClass: "invalid_response" })]);
+      for (const ligne of lignes) expect(ligne).not.toMatch(/stripe\.com/i);
+    }
+  });
+
+  it("identifiant de session qui n'a pas la forme Stripe → invalid_response sans appel ; erreur du SDK → classe seule", async () => {
+    const double = creerDoubleStripe();
+    const { valeur } = await capturer(() => creerClientSessionsStripe(cleDeTest(), configuration(double)).adresseRecu("cs_sim_abc", PAIEMENT));
+    expect(valeur).toEqual({ ok: false, code: "provider_error", retryable: false });
+    expect(double.appels).toEqual([]);
+    const SENTINELLE = `SENTINELLE${randomBytes(8).toString("hex")}`;
+    const erreur = new SDK.errors.StripeConnectionError({ message: SENTINELLE, requestId: `req_${SENTINELLE}`, raw: { message: SENTINELLE } } as never);
+    const client = creerClientSessionsStripe(cleDeTest(), configuration(creerDoubleStripe({ erreur: () => erreur })));
+    const lu = await capturer(() => client.adresseRecu("cs_test_abc", PAIEMENT));
+    expect(lu.valeur).toEqual({ ok: false, code: "provider_error", retryable: true });
+    expect(lu.lignes.map((l) => JSON.parse(l) as object)).toEqual([{ level: "warn", event: "payment.provider_failed", errorClass: "StripeConnectionError" }]);
+    expect(lu.lignes.join("\n")).not.toContain(SENTINELLE);
+  });
+
+  it("le prestataire simulé n'a pas de reçu de prestataire", async () => {
+    const { creerPrestataireSimule } = await import("./simulated-provider");
+    const simule = creerPrestataireSimule({ cle: randomBytes(32), transport: async () => 200, maintenant: () => 0, cheminSimulation: () => "/x" });
+    expect(await simule.adresseRecu("cs_sim_x", PAIEMENT)).toEqual({ ok: false, code: "provider_error", retryable: false });
+  });
+
+  describe("sur le client réel du SDK et un transport de test (fabriqueClientSdk, 0144 § 3)", () => {
+    /** Transport : chaque requête rend la réponse fixée ; note le chemin, la méthode et le délai reçu du SDK. */
+    function transport(statut: number, corps: unknown) {
+      const requetes: { methode: string; chemin: string; delai: number }[] = [];
+      const client = {
+        getClientName: () => "transport-de-test",
+        makeRequest: async (_h: string, _p: string, chemin: string, methode: string, _e: unknown, _d: unknown, _pr: unknown, delai: number) => {
+          requetes.push({ methode, chemin, delai });
+          return {
+            getStatusCode: () => statut,
+            getHeaders: () => ({ "request-id": `req_${randomBytes(6).toString("hex")}` }),
+            // Réponse brute : objet vide (le SDK y recopie quelques en-têtes en cas de réussite).
+            getRawResponse: () => ({}),
+            toStream: () => undefined,
+            toJSON: async () => corps,
+          };
+        },
+      };
+      return { requetes, client: client as unknown as TransportHttpStripe };
+    }
+    const sdk = (t: ReturnType<typeof transport>) => creerClientSessionsStripe(cleDeTest(), { adressesRetour: RETOUR, moyens: ["twint"], fabriqueClient: fabriqueClientSdk(t.client) });
+    const SESSION = "cs_test_a1B2c3D4e5F6g7H8i9J0k1L2";
+
+    it("réussite : un GET de la session avec expand, délai de 2 s ; le lien seul est rendu", async () => {
+      const t = transport(200, { ...developpee({ id: SESSION }), object: "checkout.session", metadata: { checkoutId: PAIEMENT.id }, customer_details: { email: "x@example.test" } });
+      const { valeur, lignes } = await capturer(() => sdk(t).adresseRecu(SESSION, PAIEMENT));
+      expect(valeur).toEqual({ ok: true, value: LIEN });
+      expect(lignes).toEqual([]);
+      expect(t.requetes).toHaveLength(1);
+      expect(t.requetes[0]?.methode).toBe("GET");
+      expect(decodeURIComponent(t.requetes[0]?.chemin ?? "")).toBe(`/v1/checkout/sessions/${SESSION}?expand[0]=payment_intent.latest_charge`);
+      expect(t.requetes[0]?.delai).toBe(2000);
+    });
+
+    it.each([500, 503, 409, 429])("réponse %i : aucune relance (maxNetworkRetries: 0 pour cette requête), classe seule au journal", async (statut) => {
+      const t = transport(statut, { error: { type: "api_error", message: "SECRET-MESSAGE" } });
+      const { valeur, lignes } = await capturer(() => sdk(t).adresseRecu(SESSION, PAIEMENT));
+      expect(valeur).toMatchObject({ ok: false, code: "provider_error" });
+      expect(t.requetes).toHaveLength(1);
+      expect(lignes).toHaveLength(1);
+      const ligne = JSON.parse(lignes[0] ?? "{}") as Record<string, unknown>;
+      expect(Object.keys(ligne).sort()).toEqual(["errorClass", "event", "level"]);
+      // Ni message, ni `raw`, ni `requestId` de l'erreur du SDK.
+      expect(lignes.join("\n")).not.toMatch(/SECRET-MESSAGE|req_|raw/);
+    });
+
+    it("les autres appels gardent les options du client (création : délai de 10 s)", async () => {
+      const t = transport(400, { error: { type: "invalid_request_error", message: "x" } });
+      await capturer(() => sdk(t).creerSession(PAIEMENT, `checkout:${PAIEMENT.id}`));
+      expect(t.requetes[0]?.delai).toBe(10_000);
+    });
+  });
+});

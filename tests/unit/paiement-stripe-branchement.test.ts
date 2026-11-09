@@ -20,6 +20,8 @@ const adaptateurEspion = (): PaymentAdapter => ({
   createCheckout: vi.fn(),
   getCheckoutStatus: vi.fn(),
   getEntitlement: vi.fn(async () => ({ unlocked: true })),
+  getReceipt: vi.fn(),
+  listReceipts: vi.fn(),
 });
 
 beforeEach(() => {

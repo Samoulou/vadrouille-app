@@ -246,7 +246,15 @@ test("debloquer: paiement refusé puis réussi sur la base", async ({ page, requ
   await expect(enTete(page, "Ton voyage est débloqué")).toBeVisible();
   await expect(payTwint(page)).toHaveCount(0);
   // Le reçu est celui du paiement réussi, jamais celui du refus (PR 878).
-  await page.goto(recu);
+  const reponseRecu = await page.goto(recu);
+  // En-têtes propres à `R9-recu` (B4e ; décision 0144 § 5.3 point 7) : ni cache, ni référent, ni `Link` ni `Location`.
+  const entetesRecu = reponseRecu?.headers() ?? {};
+  // Next.js peut réécrire la valeur d'une page dynamique : les deux directives restent (modèle de lecture-api.api.spec.ts).
+  expect(entetesRecu["cache-control"]).toMatch(/private/);
+  expect(entetesRecu["cache-control"]).toMatch(/no-store/);
+  expect(entetesRecu["referrer-policy"]).toBe("no-referrer");
+  expect(entetesRecu).not.toHaveProperty("location");
+  expect(entetesRecu.link ?? "").not.toMatch(/stripe/i);
   await verifierRecu(page, recu, reussi, "TWINT");
 
   // « Mes voyages » : plus aucun voyage à débloquer dans l'organisation.

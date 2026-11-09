@@ -522,10 +522,12 @@ describe("journal: generation.programme_written (0139 § 2)", () => {
     // Décision 0147 § 12 S1 point 5 (M5d-1, ticket 939) : `lieu.recherche`, motif, nombre de résultats et diagnostic fermé.
     // Décision 0155 § 2.4 (M5d-4, ticket 976) : `recalcul.lieux_a_soi`, deux compteurs.
     // Spécification M6 § 4 (M6b, ticket 1005) : `calendrier.version_unavailable`, aucun champ.
+    // Décision 0144 § 5.3 point 4 (B4e, ticket 887) : `payment.receipt_unavailable`, `eventId` et raison fermée.
     expect([...CHAMPS_ADMIS_PAR_EVENEMENT.keys()].sort()).toEqual([
       "calendrier.version_unavailable",
       "generation.programme_written",
       "lieu.recherche",
+      "payment.receipt_unavailable",
       "recalcul.lieux_a_soi",
       "ville.purge_failed",
       "ville.refusee",
