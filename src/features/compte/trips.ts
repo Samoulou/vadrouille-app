@@ -74,3 +74,23 @@ export function reopenTarget(summary: TripSummary, now: number, lastTab: LastTab
   if (!summary.unlocked && summary.end >= today) return presentationRoute(summary.id);
   return routes.sejour();
 }
+
+/**
+ * Lien de l'écran 16 « Donner ton avis » (M8a, ticket 1062 ; spécification M8 § 3.1 point 5, F11-PO-9) : adresse et
+ * dernier jour d'accès modifiable (`accessUntil`, calculé par la page serveur), fournis par la page pour les seuls voyages
+ * qui ont un écran 16 (débloqués, hors du site d'essai).
+ */
+export interface ReviewLink {
+  href: string;
+  until: IsoDate;
+}
+
+/**
+ * Vrai du dernier jour du voyage à `until` compris, à la date de la destination : jamais avant (F11-PO-8). Après `until`
+ * (lecture seule, Q149), le lien n'est plus proposé : « Donner ton avis » ne décrirait plus l'écran ; la page reste ouverte
+ * (proposition à confirmer par le Product Owner et l'UX/UI).
+ */
+export function reviewLinkShown(summary: Pick<TripSummary, "timeZone" | "end">, link: ReviewLink, now: number): boolean {
+  const today = tripToday(summary, now);
+  return today >= summary.end && today <= link.until;
+}

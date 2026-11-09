@@ -811,6 +811,11 @@ const VILLES_ECRANS = "src/features/voyage/villes.ts";
 const CHANGEMENT_DOMAINE = "src/domain/changement-de-ville.ts";
 /** Les deux seuls modules d'écran qui l'importent : le bandeau de la Journée et l'aide de l'écran 1. */
 const CHANGEMENT_ECRANS = ["src/features/sejour/BandeauChevauchement.tsx", "src/features/creation/aide-changement.ts"];
+/** M8a (décision 0160 § 1.5 point 4) : étapes à évaluer et accès de l'écran 16, fonction pure unique (écran, serveur, `mock`). */
+const APRES_VOYAGE_DOMAINE = "src/domain/apres-voyage.ts";
+/** L'écran 16 et l'accès calculé de `mock` (`getTripReview` de `@/adapters`) : les deux seuls importeurs hors de src/server. */
+const APRES_VOYAGE_ECRAN = "src/features/voyage/ReviewScreen.tsx";
+const APRES_VOYAGE_IMPORTEURS = [APRES_VOYAGE_ECRAN, "src/adapters/index.ts"];
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 /** Classification des codes de la couche IA (B9b, 0081 B9-TL-1 point 2 ; 0077 § 3 point 4). */
 const NATURES_IA = "src/ai/natures.ts";
@@ -940,6 +945,18 @@ const ARETES_ADMISES: readonly AreteAdmise[] = [
     typeSeulement: false,
     exemple: "src/features/sejour/BandeauChevauchement.tsx",
     horsArete: "src/features/sejour/JourneePanel.tsx",
+  },
+  {
+    // M8a (ticket 1062 ; décision 0160 § 1.5 point 4) : les étapes à évaluer de l'écran 16 viennent de
+    // `src/domain/apres-voyage.ts` (types de `@/contracts` seulement), la même fonction pure que le serveur et `mock` ; un
+    // seul module d'écran l'importe, avec l'accès calculé de `mock` dans `src/adapters/index.ts`, sans la recopier ; arête
+    // exacte : le parcours ne descend pas au-delà.
+    nom: "M8a : écran 16 et mock de @/adapters → src/domain/apres-voyage.ts",
+    de: (chemin) => APRES_VOYAGE_IMPORTEURS.includes(chemin),
+    vers: [APRES_VOYAGE_DOMAINE],
+    typeSeulement: false,
+    exemple: APRES_VOYAGE_ECRAN,
+    horsArete: "src/features/voyage/TodayScreen.tsx",
   },
 ];
 
@@ -1620,7 +1637,7 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       // Aucun autre fichier de l'application hors de src/server n'importe src/domain : l'arête ne vaut que pour le double.
       // B10a (0112 § 2) : seule autre arête, l'écran de présentation vers les règles du tri (`src/domain/preferences.ts`).
       const importeurs = application.filter(
-        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/")) && !(c === VILLES_DOMAINE && f === VILLES_ECRANS) && !(c === CHANGEMENT_DOMAINE && CHANGEMENT_ECRANS.includes(f))),
+        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/")) && !(c === VILLES_DOMAINE && f === VILLES_ECRANS) && !(c === CHANGEMENT_DOMAINE && CHANGEMENT_ECRANS.includes(f)) && !(c === APRES_VOYAGE_DOMAINE && APRES_VOYAGE_IMPORTEURS.includes(f))),
       );
       expect(importeurs).toEqual([DOUBLE_RELECTURES]);
     });

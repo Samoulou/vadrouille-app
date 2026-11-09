@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { isPrototypeAdapter } from "@/adapters";
+import { apresVoyageDisponible, finAccesApresVoyage, getTripReview, isPrototypeAdapter } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
 import { exigerSession } from "@/features/compte/session";
 import { tripRoutes } from "@/features/sejour/routes";
@@ -32,13 +32,19 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
  * `(programme)` (F10-TL-3) : elle lit le voyage par `getTripReader()` et transmet tous ses jours projetés ;
  * l'écran choisit le jour dans le navigateur (F10-TL-2). Voyage inconnu ou d'une autre organisation : 404 ;
  * erreur de l'adaptateur : page d'erreur commune. Sans session (`better-auth`, B3c) : redirection vers l'écran 4.
+ * « Donner ton avis » (M8a, ticket 1062) : seulement si l'écran 16 existe pour ce voyage (`getTripReview` non nul :
+ * débloqué, personne propriétaire sur `api`, jamais sur le site d'essai) ; l'écran le montre à l'état « terminé ».
  */
 export default async function AujourdhuiPage({ params }: { params: Params }) {
   const { id } = await params;
   const routes = tripRoutes("/voyages", id);
-  await exigerSession(routes.aujourdhui() ?? routes.sejour());
+  const ctx = await exigerSession(routes.aujourdhui() ?? routes.sejour());
   const trip = await loadToday(id);
   if (!trip) notFound();
+  const href = routes.apresVoyage();
+  const end = trip.days[trip.days.length - 1]?.date;
+  const review =
+    href !== null && end !== undefined && apresVoyageDisponible() && (await getTripReview(ctx, id)) !== null ? { href, until: finAccesApresVoyage(end) } : undefined;
   // Mention « Données de lieux : Google » avec l'adaptateur `prototype` (spécification P0), comme le Séjour.
-  return <TodayScreen trip={trip} placesFromGoogle={isPrototypeAdapter()} recorderKind={devPagesEnabled() ? "console" : "none"} />;
+  return <TodayScreen trip={trip} placesFromGoogle={isPrototypeAdapter()} recorderKind={devPagesEnabled() ? "console" : "none"} review={review} />;
 }
