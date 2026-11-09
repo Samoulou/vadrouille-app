@@ -229,7 +229,7 @@ Composition simulée partout, aucun appel payant, tests de base en CI. Les fichi
 
 ## Amendements
 
-### Amendée par la PR #1065 (ticket #1063, 2026-11-09) — après la revue consolidée du head `dd23bce` de #1057 (M8-D, migration 0026)
+### Amendée par la PR #1066 (ticket #1063, 2026-11-09) — après la revue consolidée du head `dd23bce` de #1057 (M8-D, migration 0026)
 
 Statut : **proposé par l'agent tech-lead, définitif à la fusion (0093)**. Décideur : Tech Lead (points 1 à 3). Le point 4 consigne les mineurs 1 à 5 de la Sécurité sans les trancher. Aucune migration n'est modifiée : `0026_apres_voyage.sql` et son empreinte (`1ac33b56…8902`, description de #1057) restent ceux de `main` (`bd21c14`). À lister dans la prochaine note de version (rubrique « Décisions prises par le studio »).
 
