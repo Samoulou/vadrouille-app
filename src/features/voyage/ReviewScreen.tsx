@@ -85,7 +85,9 @@ function ChoiceGroup({
       aria-busy={busy || undefined}
       data-part="avis"
       data-busy={busy || undefined}
-      className={cn("flex w-full gap-1 rounded-control bg-muted p-1", busy && "opacity-70")}
+      // Envoi en cours : contour pointillé `ink-soft` du rail, sans atténuer les libellés (revue de la PR 1068, mineur 5 :
+      // `opacity-70` faisait tomber le choix actif à 3,4:1 ; les contrastes restent ceux du rail, 6,3:1 au moins).
+      className={cn("flex w-full gap-1 rounded-control bg-muted p-1", busy && "outline-(length:--ligne-trait-controle) outline-ink-soft outline-dashed")}
     >
       {STOP_RATINGS.map((rating) => {
         const pressed = value === rating;
@@ -131,7 +133,7 @@ function ChoiceGroup({
  *   point 4). Le choix n'est affiché qu'une fois enregistré ; une erreur le laisse à son état d'avant, avec « Réessayer ».
  * - Lecture seule (`readOnly`, plus de 30 jours après le retour) : avis affichés, aucun bouton d'écriture.
  *
- * Envoi en cours (revue de la PR 1068, bloquant 4) : groupe atténué, « Enregistrement… » sous l'étape, `aria-busy` ; à la
+ * Envoi en cours (revue de la PR 1068, bloquant 4) : rail en contour pointillé, « Enregistrement… » sous l'étape, `aria-busy` ; à la
  *   réponse, annonce discrète (`role="status"`) « Avis enregistré. » ou « Avis effacé. ».
  * - Erreur d'écriture (bloquant 5) : message du § 7 et « Réessayer » **sous l'étape concernée** ; l'erreur reste jusqu'au
  *   réessai ou à un nouveau geste sur cette étape. Un geste mis en attente pendant un envoi qui échoue n'est pas envoyé :
@@ -313,7 +315,9 @@ export function ReviewScreen({ trip, review, mode, actions: injected, recorderKi
                               variant="text"
                               size="sm"
                               className="px-0"
+                              aria-label={format(t.reessayerEtape, { name: etape.name })}
                               aria-disabled={disabled || undefined}
+                              aria-describedby={disabled ? OFFLINE_ID : undefined}
                               onClick={() => {
                                 if (!disabled) send(failure);
                               }}

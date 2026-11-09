@@ -63,9 +63,9 @@ export interface TodayScreenProps {
   /** Fuseau de l'appareil (tests) ; celui du navigateur par défaut. */
   deviceTimeZone?: string;
   /**
-   * Écran 16 (M8a, ticket 1062) : adresse de « Donner ton avis » et dernier jour modifiable, fournis par la page pour un
-   * voyage qui a cet écran (débloqué, hors du site d'essai). Le lien n'apparaît qu'à l'état « Ton voyage est terminé »,
-   * jusqu'à ce jour compris. Absent : aucun lien.
+   * Écran 16 (M8a, ticket 1062) : adresse de « Donner ton avis », fournie par la page pour un voyage qui a cet écran
+   * (débloqué, hors du site d'essai). Le lien n'apparaît qu'à l'état « Ton voyage est terminé », sans borne haute (après
+   * 30 jours, l'écran 16 s'ouvre en lecture seule). Absent : aucun lien.
    */
   review?: { href: string };
 }

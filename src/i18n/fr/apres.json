@@ -23,7 +23,8 @@
   "enregistrement": "Enregistrement…",
   "enregistre": "Avis enregistré.",
   "efface": "Avis effacé.",
-  "horsLigne": "Tu es hors ligne. Ton avis sera possible dès le retour du réseau.",
+  "horsLigne": "Tu es hors ligne. Tu pourras donner ton avis dès que le réseau revient.",
   "erreur": "Impossible d'enregistrer ton avis pour le moment.",
-  "reessayer": "Réessayer"
+  "reessayer": "Réessayer",
+  "reessayerEtape": "Réessayer : {name}"
 }

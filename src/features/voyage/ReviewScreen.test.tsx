@@ -170,7 +170,7 @@ describe("ReviewScreen : écran complet (critères 2, 3, 10, 12)", () => {
     // Sous l'étape concernée (bloquant 5).
     const ligne = group(CHATEAU).closest("li")!;
     expect(within(ligne).getByRole("alert")).toHaveTextContent(t.erreur);
-    fireEvent.click(within(ligne).getByRole("button", { name: t.reessayer }));
+    fireEvent.click(within(ligne).getByRole("button", { name: `Réessayer : ${CHATEAU}` }));
     expect(calls).toHaveLength(2);
     expect(calls[1]!.request).toEqual(calls[0]!.request);
     await act(async () => calls[1]!.resolve({ ok: true, value: { stopId: calls[1]!.request.stopId, rating: "liked" } }));
@@ -203,7 +203,7 @@ describe("ReviewScreen : écran complet (critères 2, 3, 10, 12)", () => {
     await act(async () => calls[0]!.resolve({ ok: false, error: { code: "internal" } }));
     await flush();
     expect(calls).toHaveLength(1);
-    fireEvent.click(within(group(CHATEAU).closest("li")!).getByRole("button", { name: t.reessayer }));
+    fireEvent.click(within(group(CHATEAU).closest("li")!).getByRole("button", { name: `Réessayer : ${CHATEAU}` }));
     expect(calls).toHaveLength(2);
     expect(calls[1]!.request.rating).toBe("notDone");
   });

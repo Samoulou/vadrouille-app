@@ -69,6 +69,12 @@ function Title({ embedded }: { embedded: boolean }) {
   );
 }
 
+/**
+ * Ligne d'un voyage. **Ordre des liens** (M8a, revue de la PR 1068, mineur 15 ; à consigner dans la décision par le Tech
+ * Lead) : le lien du voyage d'abord (seul lien à nom long, celui que la tabulation atteint en premier), puis « Donner ton
+ * avis » (geste du voyage terminé, propre à l'écran 16), puis « Voir le reçu » (document, B4d). Chacun est un lien distinct,
+ * jamais imbriqué dans celui du voyage ; les tests e2e de « Mes voyages » comptent les liens dans cet ordre.
+ */
 function TripRow({
   summary,
   section,

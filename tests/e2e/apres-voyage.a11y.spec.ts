@@ -36,7 +36,7 @@ test("apres-voyage a11y: ouvert, choix de 44 px au moins ; hors ligne : bandeau,
     expect(boite?.width ?? 0).toBeGreaterThanOrEqual(44);
   }
   await context.setOffline(true);
-  await expect(page.getByText("Tu es hors ligne. Ton avis sera possible dès le retour du réseau.")).toBeVisible();
+  await expect(page.getByText("Tu es hors ligne. Tu pourras donner ton avis dès que le réseau revient.")).toBeVisible();
   await expect(choice(page, CHATEAU, "J'ai aimé")).toHaveAttribute("aria-disabled", "true");
   await axe(page);
   await context.setOffline(false);
