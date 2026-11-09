@@ -140,7 +140,13 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
   // peuplement commun : `tests/db/rappels.test.ts`), purgées comme les autres.
   // M8-D (0026, 0160 § 1.1) : `stop_reviews`, hors de BUSINESS_TABLES pour la même raison (`tests/db/apres-voyage.test.ts`).
   // R-D (0027, 0162 § 2) : `reminder_relays`, hors de BUSINESS_TABLES pour la même raison (`tests/db/rappels-relais.test.ts`).
-  vadrouille_fn_purge: Object.fromEntries([...PURGED_TABLES, ...REMINDER_TABLES, ...REVIEW_TABLES, ...RELAY_TABLES].map((t) => [t, ["DELETE"]])),
+  // Migration 0028_purge_place_coordinates (décision 0167, option (a), « Tests exigés » 1) : `place_coordinates`, ajoutée
+  // explicitement, hors de BUSINESS_TABLES et de PURGED_TABLES (qui décrivent aussi les politiques de vadrouille_app et
+  // les comptes de `tests/db/purge.test.ts`).
+  vadrouille_fn_purge: {
+    ...Object.fromEntries([...PURGED_TABLES, ...REMINDER_TABLES, ...REVIEW_TABLES, ...RELAY_TABLES].map((t) => [t, ["DELETE"]])),
+    place_coordinates: ["DELETE"],
+  },
   // 0046 D15 point 6 : lecture de place_coordinates seulement (organisation fixe, lignes vivantes) ; aucun droit sur
   // une autre table de public, ni organizations ni usage_ledger.
   vadrouille_prototype: { place_coordinates: ["SELECT"] },
@@ -224,6 +230,9 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     ...Object.fromEntries([...PURGED_TABLES, ...REMINDER_TABLES, ...REVIEW_TABLES, ...RELAY_TABLES].map((t) => [t, { SELECT: ["organization_id"] }])),
     // B10b (migration 0015_recalcul_lot, décision 0119 § 5.2) : `kind` lue pour vider les lignes `batch` avant les clôtures.
     generation_runs: { SELECT: ["kind", "organization_id"] },
+    // Migration 0028 (décision 0167, Décision 1.1, SP2) : `organization_id` seule lue ; ni `place_id`, ni `lat`, ni `lng`,
+    // ni les instants ; aucune écriture par colonne.
+    place_coordinates: { SELECT: ["organization_id"], INSERT: [], UPDATE: [], REFERENCES: [] },
   },
 };
 
@@ -390,6 +399,36 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
         expect(rows.map((r) => r.privilege).sort(), `${role} sur ${table}`).toEqual([...(expected[table] ?? [])].sort());
       }
     }
+  });
+
+  // Migration 0028_purge_place_coordinates (décision 0167, « Tests exigés » 2 ; forme de `tests/db/rappels.test.ts`) : les
+  // sept politiques de 0002 inchangées, plus celle de la purge du compte, bornée à l'organisation de la transaction.
+  it("politiques de place_coordinates : exactement celles de 0002 et place_coordinates_fn_purge (ALL, vadrouille_fn_purge, organisation de la transaction)", async () => {
+    const { rows } = await app.query(
+      `SELECT policyname, permissive, roles::text[] AS roles, cmd, qual, with_check FROM pg_catalog.pg_policies
+       WHERE schemaname = 'public' AND tablename = 'place_coordinates' ORDER BY policyname COLLATE "C"`,
+    );
+    const ORG = "(organization_id = app_current_org())";
+    const EXPIREE = "(expires_at <= now())";
+    expect(rows.map((p) => [p.policyname, p.permissive, p.roles, p.cmd, p.qual, p.with_check])).toEqual([
+      [
+        "place_coordinates_app",
+        "PERMISSIVE",
+        ["vadrouille_app"],
+        "SELECT",
+        `((organization_id = app_current_org()) AND (organization_id <> '${PROTOTYPE_ORG_ID}'::uuid) AND (expires_at > now()))`,
+        null,
+      ],
+      ["place_coordinates_fn_coords_delete_expired", "PERMISSIVE", ["vadrouille_fn_coords"], "DELETE", EXPIREE, null],
+      ["place_coordinates_fn_coords_delete_org", "PERMISSIVE", ["vadrouille_fn_coords"], "DELETE", ORG, null],
+      ["place_coordinates_fn_coords_insert", "PERMISSIVE", ["vadrouille_fn_coords"], "INSERT", null, ORG],
+      ["place_coordinates_fn_coords_select_expired", "PERMISSIVE", ["vadrouille_fn_coords"], "SELECT", EXPIREE, null],
+      ["place_coordinates_fn_coords_select_org", "PERMISSIVE", ["vadrouille_fn_coords"], "SELECT", ORG, null],
+      ["place_coordinates_fn_purge", "PERMISSIVE", ["vadrouille_fn_purge"], "ALL", ORG, ORG],
+      ["place_coordinates_prototype", "PERMISSIVE", ["vadrouille_prototype"], "SELECT", `((organization_id = '${PROTOTYPE_ORG_ID}'::uuid) AND (expires_at > now()))`, null],
+    ]);
+    const rls = await app.query("SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class WHERE oid = 'public.place_coordinates'::regclass");
+    expect(rls.rows[0]).toEqual({ relrowsecurity: true, relforcerowsecurity: true });
   });
 
   it("droits par colonne : UPDATE de vadrouille_app sur checkouts limité à stripe_checkout_session_id ; INSERT de vadrouille_auth sur organizations sans deletion_requested_at", async () => {
