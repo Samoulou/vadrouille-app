@@ -6,11 +6,13 @@ import { DayLine, type DayLineViewItem, type DayLineViewStop } from "@/component
 import { DestinationPlate } from "@/components/ligne/DestinationPlate";
 import { IconCoche } from "@/components/ligne/icons";
 import { PRODUCT_NAME } from "@/config/site";
+import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
 const t = messages.accueil;
 const e = t.exemple.etapes;
 const offre = messages.debloquer.offre.inclus;
+const p = messages.prevente;
 
 /**
  * « Ce que tu reçois » : lignes de l'offre affichée sur « Débloquer », reprises telles quelles (une seule source de
@@ -93,6 +95,20 @@ export interface LandingProps {
   secondary?: ReactNode;
   /** En fin de page : section « Démonstration » (données simulées, spécification D1). */
   footer?: ReactNode;
+  /**
+   * Précommande ouverte (`getPrevente()`) : les boutons deviennent « Précommander pour {prix} » et la page gagne le
+   * prix, la garantie de remboursement et les questions fréquentes (`docs/commercial/page-prevente.md`). « Créer un
+   * voyage » disparaît : le produit n'est pas encore ouvert.
+   */
+  presale?: { href: string; prix: string };
+}
+
+function BoutonAction({ createHref, presale }: Pick<LandingProps, "createHref" | "presale">) {
+  return (
+    <Button asChild className="w-full">
+      {presale ? <a href={presale.href}>{format(p.precommander, { prix: presale.prix })}</a> : <Link href={createHref}>{t.creer}</Link>}
+    </Button>
+  );
 }
 
 /**
@@ -100,18 +116,23 @@ export interface LandingProps {
  * étapes, ce que l'on reçoit, fiabilité, puis le bouton une seconde fois. Composant serveur, aucun JavaScript client.
  * Règles de Ligne : un seul aplat de destination, le bleu pour la ligne et l'action seulement, ni ombre ni emoji.
  */
-export function Landing({ createHref, secondary, footer }: LandingProps) {
+export function Landing({ createHref, secondary, footer, presale }: LandingProps) {
+  const date = p.ouverture;
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-10 px-5 pt-10 pb-16">
       <header className="flex flex-col gap-4">
         <h1 className="text-destination font-extrabold tracking-(--ligne-destination-approche) text-ink">{PRODUCT_NAME}</h1>
         <p className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">{t.accroche}</p>
         <p className="text-corps text-ink-soft">{messages.produit.promesse}</p>
+        {presale ? <p className="text-corps text-ink">{format(p.sousTitre, { prix: presale.prix, date })}</p> : null}
         <div className="mt-2 flex flex-col gap-3">
-          <Button asChild className="w-full">
-            <Link href={createHref}>{t.creer}</Link>
-          </Button>
-          <p className="text-center text-corps-s text-ink-soft">{t.offert}</p>
+          <BoutonAction createHref={createHref} presale={presale} />
+          <p className="text-center text-corps-s text-ink-soft">{presale ? format(p.garantie, { date }) : t.offert}</p>
+          {presale && footer ? (
+            <Button asChild variant="secondary" className="w-full">
+              <a href="#demonstration">{p.demo}</a>
+            </Button>
+          ) : null}
           {secondary}
         </div>
       </header>
@@ -157,20 +178,60 @@ export function Landing({ createHref, secondary, footer }: LandingProps) {
         </ul>
       </Section>
 
-      <Section id="fiable-titre" title={t.fiable.titre}>
-        <p className="text-corps text-ink-soft">{t.fiable.texte}</p>
-      </Section>
+      {presale ? (
+        <>
+          <Section id="vise-titre" title={format(p.vise.titre, { produit: PRODUCT_NAME })}>
+            <ul role="list" className="flex flex-col gap-4">
+              {p.vise.liste.map((point) => (
+                <li key={point.titre} className="flex flex-col gap-1">
+                  <h3 className="text-arret font-bold text-ink">{point.titre}</h3>
+                  <p className="text-corps text-ink-soft">{point.texte}</p>
+                </li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section id="prix-titre" title={format(p.prix.titre, { prix: presale.prix })}>
+            <ul role="list" className="flex flex-col">
+              {p.prix.lignes.map((ligne) => (
+                <li key={ligne} className="flex items-start gap-3 border-b border-hairline py-3 last:border-b-0">
+                  <IconCoche aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-ink" />
+                  <span className="text-corps text-ink">{format(ligne, { date })}</span>
+                </li>
+              ))}
+            </ul>
+            <BoutonAction createHref={createHref} presale={presale} />
+            <p className="text-corps-s text-ink-soft">{p.prix.moyens}</p>
+            <p className="text-corps-s text-ink-soft">{p.prix.sansAide}</p>
+          </Section>
+
+          <Section id="faq-titre" title={p.faq.titre}>
+            <dl className="flex flex-col gap-5">
+              {p.faq.liste.map((entree) => (
+                <div key={entree.question} className="flex flex-col gap-1">
+                  <dt className="text-arret font-bold text-ink">{entree.question}</dt>
+                  <dd className="text-corps text-ink-soft">{format(entree.reponse, { date, produit: PRODUCT_NAME })}</dd>
+                </div>
+              ))}
+            </dl>
+          </Section>
+        </>
+      ) : (
+        <Section id="fiable-titre" title={t.fiable.titre}>
+          <p className="text-corps text-ink-soft">{t.fiable.texte}</p>
+        </Section>
+      )}
 
       <section aria-labelledby="final-titre" className="flex flex-col gap-3 rounded-block bg-muted p-5">
         <h2 id="final-titre" className="text-section font-extrabold text-ink-2">
-          {t.final.titre}
+          {presale ? p.final.titre : t.final.titre}
         </h2>
-        <p className="text-corps text-ink-2">{t.final.texte}</p>
-        <Button asChild className="mt-2 w-full">
-          <Link href={createHref}>{t.creer}</Link>
-        </Button>
+        <p className="text-corps text-ink-2">{presale ? format(p.final.texte, { date }) : t.final.texte}</p>
+        <div className="mt-2">
+          <BoutonAction createHref={createHref} presale={presale} />
+        </div>
       </section>
-      {footer}
+      {footer ? <div id="demonstration">{footer}</div> : null}
     </main>
   );
 }

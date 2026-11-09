@@ -24,3 +24,4 @@ export { default as emailRappel } from "./fr/emailRappel.json";
 export { default as revision } from "./fr/revision.json";
 export { default as partage } from "./fr/partage.json";
 export { default as prototype } from "./fr/prototype.json";
+export { default as prevente } from "./fr/prevente.json";

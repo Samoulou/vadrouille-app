@@ -91,6 +91,7 @@ export { assertApiAdapter } from "./api-guard";
 export { getRequestContext, SessionRequiseError } from "./context";
 export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
 export { apiShareAvailable, realShareAvailable, shareAvailable, shareDemoAvailable } from "./share-guard";
+export { adressePaiementPrevente, getPrevente, sourcePrevente, type Prevente } from "./prevente";
 export { getSimulationScope, type SimulationScope } from "./simulation";
 export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype-instance";
 

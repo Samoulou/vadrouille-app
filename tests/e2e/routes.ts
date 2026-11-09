@@ -266,6 +266,24 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // Précommande (décision 0168) : pages absentes (404) tant que `PREVENTE` ne vaut pas `1`, ce qui est le cas de
+    // tout build mesuré (CI, poste). Elles servent alors la page introuvable.
+    id: "R-precommande",
+    path: "/precommande",
+    page: "precommande/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    id: "R-precommande-merci",
+    path: "/precommande/merci",
+    page: "precommande/merci/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     id: "R-introuvable",
     path: "/voyages/inconnu",
     status: 404,

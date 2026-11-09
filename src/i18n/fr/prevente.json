@@ -1,0 +1,86 @@
+{
+  "ouverture": "1er février 2027",
+  "sousTitre": "Précommande ton voyage complet pour le printemps : {prix}, utilisable dès le {date}.",
+  "precommander": "Précommander pour {prix}",
+  "garantie": "Remboursé intégralement si ce n'est pas prêt le {date}.",
+  "demo": "Voir la démonstration",
+  "vise": {
+    "titre": "Ce que {produit} cherche à garantir",
+    "liste": [
+      {
+        "titre": "Fiable",
+        "texte": "Chaque lieu est contrôlé avant d'apparaître. Ce qui reste incertain est marqué « À confirmer », jamais caché."
+      },
+      {
+        "titre": "Choisi pour toi",
+        "texte": "Pour chaque adresse, la raison pour laquelle elle est là, d'après ce que tu as raconté."
+      },
+      {
+        "titre": "D'actualité",
+        "texte": "Les événements réellement prévus pendant tes dates."
+      },
+      {
+        "titre": "Adaptable",
+        "texte": "Une étape changée en quelques gestes, sans casser tes réservations ni tes horaires fixes."
+      }
+    ]
+  },
+  "prix": {
+    "titre": "{prix} pour un voyage",
+    "lignes": [
+      "Paiement unique pour ce voyage, sans abonnement.",
+      "Utilisable dès le {date}, pour un voyage en Europe.",
+      "Si le voyage complet n'est pas prêt le {date}, tu es remboursé intégralement.",
+      "Avant l'ouverture, tu peux être remboursé sur simple demande, en répondant à l'e-mail du reçu."
+    ],
+    "moyens": "Paiement par TWINT ou par carte, sur la page sécurisée de Stripe.",
+    "sansAide": "Tout se fait dans l'application, quand tu veux. Pas de rendez-vous, pas d'appel."
+  },
+  "faq": {
+    "titre": "Questions fréquentes",
+    "liste": [
+      {
+        "question": "Qu'est-ce que j'achète exactement ?",
+        "reponse": "Le voyage complet pour un voyage : toutes les journées, les repas, les soirées, les événements, la liste à réserver et l'accès jusqu'à 30 jours après ton retour."
+      },
+      {
+        "question": "Quand pourrai-je l'utiliser ?",
+        "reponse": "À partir du {date}. Tu prépares alors ton voyage dans l'application, au moment qui te convient."
+      },
+      {
+        "question": "Et si ce n'est pas prêt à temps ?",
+        "reponse": "Tu es remboursé intégralement, sans démarche de ta part."
+      },
+      {
+        "question": "Et si je change d'avis ?",
+        "reponse": "Avant l'ouverture, réponds à l'e-mail du reçu : tu es remboursé intégralement."
+      },
+      {
+        "question": "Est-ce que quelqu'un réserve à ma place ?",
+        "reponse": "Non. {produit} te dit quoi réserver et quand ; tu réserves toi-même."
+      },
+      {
+        "question": "Pour quelles destinations ?",
+        "reponse": "Les villes et régions d'Europe, pour un voyage de quelques jours à deux semaines."
+      }
+    ]
+  },
+  "final": {
+    "titre": "Prêt pour le printemps ?",
+    "texte": "Précommande maintenant, prépare ton voyage dès le {date}."
+  },
+  "bientot": {
+    "titreDocument": "Précommande · {produit}",
+    "titre": "La précommande ouvre très bientôt",
+    "texte": "Le paiement n'est pas encore ouvert. Reviens dans quelques jours.",
+    "retour": "Revenir à l'accueil"
+  },
+  "merci": {
+    "titreDocument": "Merci · {produit}",
+    "titre": "Merci",
+    "texte": "Ta précommande est enregistrée. Le reçu arrive par e-mail.",
+    "suite": "Le {date}, tu reçois à la même adresse le lien pour créer ton voyage complet.",
+    "remboursement": "Un changement d'avis avant cette date ? Réponds à l'e-mail du reçu : tu es remboursé intégralement.",
+    "retour": "Revenir à l'accueil"
+  }
+}
