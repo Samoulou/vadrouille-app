@@ -14,9 +14,10 @@ import { chargerDoubles } from "@/server/composition/fixtures-simulees";
 import { composerSimuleeAvec, type DoublesGeneration, type FabriqueGeneration } from "@/server/composition/generation";
 import { PLAFONDS_VARIANTE_SIMULEE } from "@/server/config/usage";
 import type { DependancesGeneration } from "@/server/generation/dependances";
+import { etapeCompletDebut, etapeCompletLogement } from "@/server/generation/etapes-complet";
 import { etapeLotDebut, etapeLotPlanification } from "@/server/generation/etapes-lot";
 import { etapeProgrammeDebut, etapeProgrammeEcriture } from "@/server/generation/etapes-programme";
-import type { EtatLot, EtatProgramme } from "@/server/generation/etat";
+import type { EtatComplet, EtatLot, EtatProgramme } from "@/server/generation/etat";
 import { texteDuLogement } from "@/server/programme/brief";
 
 import { BRIEF_EDIMBOURG, MAINTENANT, PLAFONDS_LARGES, contexteDe, creerHorlogeManuelle, creerWithOrg, creerWithSystemOrgPourTests } from "../support/banc-apercu";
@@ -232,6 +233,22 @@ async function generer(org: Org, draft: TripDraft, fabrique: () => FabriqueGener
   return { tripId, apercu: run!.id, sorties: [apresA, fin], fin };
 }
 
+/**
+ * Déblocage puis `generateFullTrip` déroulé sans le SDK (étapes `a` et `l`) avec la même composition : le voyage complet
+ * vérifie les lieux hors des journées de l'aperçu (M1c, ticket 1048 ; Q638) et écrit la version 2.
+ */
+async function completer(org: Org, tripId: string, fabrique: () => FabriqueGeneration, surcharge: Partial<DependancesGeneration> = {}) {
+  await admin.query("INSERT INTO public.entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [org.org, tripId]);
+  const adapter = createApiCreationAdapter({ withOrg, maintenant: () => MAINTENANT, demarrerApercu: async () => null, demarrerVoyageComplet: async () => `wrun_${crypto.randomUUID()}`, chaine: "inversee" });
+  expect((await adapter.getFullTripStatus(contexteDe(org), tripId)).ok).toBe(true);
+  const [run] = await lire<{ id: string }>(org, "SELECT id FROM public.generation_runs WHERE trip_id = $1 AND kind = 'full'", [tripId]);
+  const apresA = await etapeCompletDebut({ generationRunId: run!.id, organizationId: org.org, rang: 0 } satisfies EtatComplet, dependances(fabrique, surcharge));
+  expect(apresA.arret).toBeUndefined();
+  expect((await etapeCompletLogement(apresA, dependances(fabrique, surcharge))).arret).toBeUndefined();
+  expect(await lire(org, "SELECT phase, last_version FROM public.generation_runs WHERE id = $1", [run!.id])).toEqual([{ phase: "ready", last_version: 2 }]);
+  return version(org, tripId, 2);
+}
+
 async function version(org: Org, tripId: string, numero: number): Promise<TripSnapshot> {
   const [ligne] = await lire<{ snapshot: unknown }>(org, "SELECT snapshot FROM public.trip_versions WHERE trip_id = $1 AND version = $2", [tripId, numero]);
   return TripSnapshotSchema.parse(ligne!.snapshot);
@@ -300,28 +317,17 @@ describe("plusieurs-villes : deux villes sur api (critères 1 à 12)", () => {
     expect(j2.items.flatMap((item) => (item.type === "stop" ? item.stop.exceptions : []))).not.toContain("toReserve");
     // Aucun trajet d'une ville à l'autre : pas de segment juste après la ligne.
     expect(j2.items[rang + 1]?.type).not.toBe("segment");
-    // Vérification par ville (critère 12) : étape du matin de la ville quittée gardée ; lieu de Rome après l'arrivée, ou un jour
-    // de Florence, sans `placeId` ; le même lieu un jour de Rome le garde.
-    const placeIdDe = (date: string, nom: string) =>
-      jour(v1, date).items.flatMap((item) => (item.type === "stop" && item.stop.name === nom ? [item.stop.placeId ?? null] : []))[0];
-    expect(placeIdDe("2027-05-05", "Panthéon")).toEqual(expect.any(String));
-    expect(placeIdDe("2027-05-05", "Roscioli")).toBeNull();
-    expect(placeIdDe("2027-05-05", "Galerie des Offices")).toEqual(expect.any(String));
-    expect(placeIdDe("2027-05-06", "Ai Tre Scalini")).toBeNull();
-    expect(placeIdDe("2027-05-04", "Ai Tre Scalini")).toEqual(expect.any(String));
+    // Vérification par ville (critère 12) : lieu de Rome un jour de Florence sans `placeId` ; le même lieu un jour de Rome le
+    // garde. Attente modifiée par M1c (Q638) : la journée du changement, hors des journées de l'aperçu, n'est vérifiée qu'au
+    // voyage complet (ci-dessous) ; ses étapes n'ont aucun `placeId` en version 1 et aucune n'a été cherchée.
+    const placeIdDe = (instantane: TripSnapshot, date: string, nom: string) =>
+      jour(instantane, date).items.flatMap((item) => (item.type === "stop" && item.stop.name === nom ? [item.stop.placeId ?? null] : []))[0];
+    for (const nom of nomsDesEtapes(j2.items)) expect(placeIdDe(v1, "2027-05-05", nom)).toBeNull();
+    expect(c.recherches.map((r) => r.texte).some((t) => t.startsWith("Trattoria Mario,") || t.startsWith("Galerie des Offices,"))).toBe(false);
+    expect(placeIdDe(v1, "2027-05-06", "Ai Tre Scalini")).toBeNull();
+    expect(placeIdDe(v1, "2027-05-04", "Ai Tre Scalini")).toEqual(expect.any(String));
     // Aucune autre journée ne porte de transfer.
     expect(v1.days.filter((d) => d.items.some((item) => item.type === "transfer")).map((d) => d.date)).toEqual(["2027-05-05"]);
-
-    // Créneau retiré jamais cherché ; chaque lieu cherché dans la zone de sa ville (ville de l'IA écrasée).
-    const textes = c.recherches.map((r) => r.texte);
-    expect(textes.some((t) => t.startsWith("Lieu dans le créneau M4B") || t.startsWith("Ponte Vecchio"))).toBe(false);
-    expect(textes).toContain("Trattoria Mario, Florence");
-    expect(textes).not.toContain("Trattoria Mario, Paris");
-    const zoneDe = (texte: string) => c.recherches.find((r) => r.texte === texte)?.restriction;
-    expect(zoneDe("Colisée, Rome")).toEqual(zoneDe("Panthéon, Rome"));
-    expect(zoneDe("Trattoria Mario, Florence")).toEqual(zoneDe("Duomo de Florence, Florence"));
-    expect(zoneDe("Trattoria Mario, Florence")).not.toEqual(zoneDe("Colisée, Rome"));
-
     // Cases de l'aperçu : jamais une étape de la journée du changement de ville (0148 § 10.1 point 1).
     const idsJ2 = new Set(j2.items.flatMap((item) => (item.type === "stop" ? [item.stop.id] : [])));
     const cases = await lire<{ position: number; content: { stop: { id: string }; day: number } }>(org, "SELECT position, content FROM public.proposals WHERE trip_id = $1 ORDER BY position", [tripId]);
@@ -340,6 +346,25 @@ describe("plusieurs-villes : deux villes sur api (critères 1 à 12)", () => {
     expect(texte).toContain('\\"villes\\"');
     expect(texte).toContain('\\"changements\\"');
     expect(texte).not.toMatch(/SENTINELLE|recit/);
+
+    // Voyage complet (M1c) : la journée du changement vérifiée par ville. Étape du matin de la ville quittée gardée ; lieu de
+    // Rome après l'arrivée sans `placeId` ; aucun appel de modèle de plus.
+    const v2 = await completer(org, tripId, c.fabrique);
+    expect(placeIdDe(v2, "2027-05-05", "Panthéon")).toEqual(expect.any(String));
+    expect(placeIdDe(v2, "2027-05-05", "Roscioli")).toBeNull();
+    expect(placeIdDe(v2, "2027-05-05", "Galerie des Offices")).toEqual(expect.any(String));
+    expect(placeIdDe(v2, "2027-05-05", "Trattoria Mario")).toEqual(expect.any(String));
+    expect(placeIdDe(v2, "2027-05-06", "Ai Tre Scalini")).toBeNull();
+    expect(c.requetes()).toHaveLength(1);
+    // Créneau retiré jamais cherché ; chaque lieu cherché dans la zone de sa ville (ville de l'IA écrasée).
+    const textes = c.recherches.map((r) => r.texte);
+    expect(textes.some((t) => t.startsWith("Lieu dans le créneau M4B") || t.startsWith("Ponte Vecchio"))).toBe(false);
+    expect(textes).toContain("Trattoria Mario, Florence");
+    expect(textes).not.toContain("Trattoria Mario, Paris");
+    const zoneDe = (texte: string) => c.recherches.find((r) => r.texte === texte)?.restriction;
+    expect(zoneDe("Colisée, Rome")).toEqual(zoneDe("Panthéon, Rome"));
+    expect(zoneDe("Trattoria Mario, Florence")).toEqual(zoneDe("Duomo de Florence, Florence"));
+    expect(zoneDe("Trattoria Mario, Florence")).not.toEqual(zoneDe("Colisée, Rome"));
   });
 
   it("plusieurs-villes: Trip.cities lu depuis stays, absent de la vue partagée avec le transfer", async () => {
@@ -569,13 +594,19 @@ describe("plusieurs-villes : forfait (critère 21 ; 0148 § 3)", () => {
     const org = await createOrg(auth);
     const { tripId, fin } = await generer(org, draft, c.fabrique, { plafonds: PLAFONDS_VARIANTE_SIMULEE });
     expect(fin.arret).toBeUndefined();
-    // 86 lieux et 3 logements : 89 Text Search au plus 100 (profil `programme`), chaque étape vérifiée.
-    expect(c.recherches.length).toBeLessThanOrEqual(PLAFONDS_VARIANTE_SIMULEE.generations.programme.placesTextSearch);
+    // Attente modifiée par M1c (Q638) : la génération ne cherche que les lieux des journées de l'aperçu et les logements (au plus
+    // 100, profil `programme`) ; le voyage complet cherche les autres sous le profil `verification` (au plus 100). Les 86 étapes
+    // sont vérifiées en version 2.
+    const aLApercu = c.recherches.length;
+    expect(aLApercu).toBeLessThanOrEqual(PLAFONDS_VARIANTE_SIMULEE.generations.programme.placesTextSearch);
     const v1 = await version(org, tripId, 1);
-    const etapes = v1.days.flatMap((d) => d.items.flatMap((item) => (item.type === "stop" ? [item.stop] : [])));
+    expect(v1.days.flatMap((d) => d.items.flatMap((item) => (item.type === "stop" ? [item.stop] : []))).filter((s) => s.placeId === undefined).length).toBeGreaterThan(0);
+    const v2 = await completer(org, tripId, c.fabrique, { plafonds: PLAFONDS_VARIANTE_SIMULEE });
+    expect(c.recherches.length - aLApercu).toBeLessThanOrEqual(PLAFONDS_VARIANTE_SIMULEE.generations.verification.placesTextSearch);
+    const etapes = v2.days.flatMap((d) => d.items.flatMap((item) => (item.type === "stop" ? [item.stop] : [])));
     expect(etapes).toHaveLength(86);
     expect(etapes.filter((s) => s.placeId === undefined).map((s) => s.name)).toEqual([]);
-    expect(v1.days.filter((d) => d.items.some((item) => item.type === "transfer")).map((d) => d.date)).toEqual(["2027-05-09", "2027-05-14"]);
+    expect(v2.days.filter((d) => d.items.some((item) => item.type === "transfer")).map((d) => d.date)).toEqual(["2027-05-09", "2027-05-14"]);
   });
 });
 
@@ -622,7 +653,9 @@ describe("M4-suite : journée du changement de ville sur api (critères 3, 8 et 
     expect(j2.items[rang - 1]).toEqual({ type: "free", from: "13:15", to: "15:05" });
     expect(j2.items[rang + 1]).toEqual({ type: "free", from: "16:40", to: "17:10" });
 
-    // Créneaux retirés jamais cherchés ; au plus 4 lieux de ce jour cherchés par Text Search, logements exclus.
+    // Créneaux retirés jamais cherchés ; au plus 4 lieux de ce jour cherchés par Text Search, logements exclus. Attente
+    // modifiée par M1c (Q638) : ce jour, hors des journées de l'aperçu, est cherché au voyage complet ; recherches cumulées.
+    await completer(org, tripId, c.fabrique);
     const textes = c.recherches.map((r) => r.texte);
     for (const nom of RETIRES) expect(textes.some((t) => t.startsWith(nom))).toBe(false);
     const duJour = textes.filter((t) => GARDES.some((nom) => t.startsWith(`${nom},`)));

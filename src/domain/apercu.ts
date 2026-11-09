@@ -85,6 +85,22 @@ export function joursHorsChangement<J extends { readonly index: number; readonly
   return jours.filter((jour) => jour.index === 1 || !jour.items.some((ligne) => ligne.type === "transfer"));
 }
 
+/**
+ * Journées que l'aperçu de la chaîne inversée peut lire (M1c, ticket 1048 ; réponse de Samuel à Q638 du 2026-11-09 : avant le
+ * paiement, Google ne vérifie que les propositions de l'aperçu) : indices des `JOURS_APERCU` premières journées candidates
+ * (`joursHorsChangement`), dans l'ordre des jours, **la même règle** que `selectionApercu` sur ces candidates. Lue à la
+ * génération (journées dont les lieux sont vérifiés avant le paiement) et par le voyage complet (journées déjà vérifiées, que
+ * le passage d'après le déblocage ne revérifie pas).
+ */
+export function joursCandidatsApercu<J extends { readonly index: number; readonly items: readonly { readonly type: string }[] }>(jours: readonly J[]): ReadonlySet<number> {
+  return new Set(
+    joursHorsChangement(jours)
+      .map((jour) => jour.index)
+      .sort((a, b) => a - b)
+      .slice(0, JOURS_APERCU),
+  );
+}
+
 /** Étape retenue pour une case de la chaîne inversée : un `placeId` et une `reason` non vide (décision 0136 § 3.4). */
 export const etapeAncreeEtRedigee = (stop: { readonly placeId?: string; readonly reason?: string }): boolean =>
   stop.placeId !== undefined && stop.reason !== undefined && stop.reason.trim() !== "";

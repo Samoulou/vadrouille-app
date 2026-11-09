@@ -13,6 +13,7 @@ import { ecrireVersion, verrouillerVersions } from "@/server/versions/ecrire";
 import { executeurSql } from "@/server/with-org";
 
 import { signalerSiBloquee } from "./blocage";
+import { debutDuCompletProgramme, verificationDuCompletProgramme, type FinDuComplet } from "./complet-programme";
 import { ArretEtape, codeDeErreur, codeFerme, estArret } from "./codes";
 import type { EtatBarriere } from "./barriere";
 import type { DependancesGeneration, DependancesResolues } from "./dependances";
@@ -303,6 +304,15 @@ const SQL_FIN_COMPLET = `UPDATE public.generation_runs SET phase = $4, stop_reas
 const SQL_JOUR_PUBLIE = `UPDATE public.generation_runs SET last_version = $4, updated_at = $5::timestamptz
   WHERE organization_id = $1 AND id = $2 AND step_seq = $3 AND phase = 'preparing' AND kind = 'full' RETURNING id`;
 
+/**
+ * Fin `ready` de la ligne au rang de l'étape courante, sur `version` (`last_version` gardé si `null`) ; ligne déjà avancée ou
+ * close : `step_expired`. Passée aux corps de la chaîne inversée (`complet-programme.ts`).
+ */
+const finReady = (contexte: ContexteComplet): FinDuComplet => async (x, version) => {
+  const fin = await x.query(SQL_FIN_COMPLET, [contexte.organizationId, contexte.generationRunId, contexte.rang, "ready", version, maintenant(contexte).toISOString()]);
+  if (fin.rows.length === 0) throw new ArretEtape("step_expired");
+};
+
 /** Phase finale : `incomplete` si un jour planifié par ce passage reste sans étape, `ready` sinon. */
 function phaseFinale(instantane: TripSnapshot, jours: readonly number[]): "ready" | "incomplete" {
   return instantane.days.some((jour) => jours.includes(jour.index) && sansEtape(jour)) ? "incomplete" : "ready";
@@ -316,16 +326,10 @@ export function etapeCompletDebut(entree: unknown, dependances?: DependancesGene
     entree,
     "a",
     async (contexte) => {
-      // Chaîne inversée (décision 0136 § 4.4), en attendant M1c : la version 1 porte déjà tout le programme vérifié ; la ligne
-      // `full` est close en `ready` sur la version courante, sans rien écrire d'autre ni appeler (ni forfait, ni composition).
-      if (contexte.dep.chaine === "inversee") {
-        await sql(contexte, async (x) => {
-          const { version } = await lireInstantane(x, contexte.organizationId, contexte.tripId);
-          const fin = await x.query(SQL_FIN_COMPLET, [contexte.organizationId, contexte.generationRunId, contexte.rang, "ready", version, maintenant(contexte).toISOString()]);
-          if (fin.rows.length === 0) throw new ArretEtape("step_expired");
-        });
-        return;
-      }
+      // Chaîne inversée (M1c, ticket 1048 ; Q638) : aucune étape restante hors de l'aperçu, la ligne `full` est close en `ready`
+      // sur la version courante sans rien écrire ni appeler (0136 § 4.4) ; sinon le forfait `verification` est réservé et
+      // l'étape `l` vérifie les lieux restants (`complet-programme.ts`).
+      if (contexte.dep.chaine === "inversee") return debutDuCompletProgramme(contexte, finReady(contexte));
       const passage = await sql(contexte, (x) => lirePassage(x, contexte));
       if (passage.jours.length === 0) {
         await sql(contexte, async (x) => {
@@ -349,6 +353,8 @@ export function etapeCompletLogement(entree: unknown, dependances?: DependancesG
     entree,
     "l",
     async (contexte) => {
+      // Chaîne inversée (M1c) : vérification des lieux restants et publication d'une version, en une seule étape.
+      if (contexte.dep.chaine === "inversee") return verificationDuCompletProgramme(contexte, finReady(contexte));
       const passage = await sql(contexte, (x) => lirePassage(x, contexte));
       const rangs = new Set(passage.jours.flatMap((jour) => villesDuJour(passage.voyage, passage.villes, jour).map((v) => v.rang)));
       const aVerifier = passage.villes.filter((ville) => rangs.has(ville.rang) && (ville.sejour.logement.kind === "known" || ville.sejour.logement.kind === "suggestedLodging"));
