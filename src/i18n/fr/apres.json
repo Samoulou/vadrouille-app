@@ -18,6 +18,11 @@
     "disliked": "Pas pour moi",
     "notDone": "Pas fait"
   },
+  "avisLu": "Ton avis : {choix}",
+  "sansAvis": "Pas d'avis",
+  "enregistrement": "Enregistrement…",
+  "enregistre": "Avis enregistré.",
+  "efface": "Avis effacé.",
   "horsLigne": "Tu es hors ligne. Ton avis sera possible dès le retour du réseau.",
   "erreur": "Impossible d'enregistrer ton avis pour le moment.",
   "reessayer": "Réessayer"

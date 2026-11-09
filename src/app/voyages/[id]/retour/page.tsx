@@ -27,10 +27,11 @@ const ROBOTS = { index: false, follow: false } as const;
 const loadReview = cache(async (tripId: string) => {
   const ctx = await contexteFacultatif();
   if (ctx === null) return null;
+  // Contrôles de l'écran 16 d'abord (propriétaire, débloqué ; revue de la PR 1068, mineur 14), puis le programme.
+  const review = await getTripReview(ctx, tripId);
+  if (review === null) return null;
   const trip = await getTripReader().getTrip(ctx, tripId);
-  if (trip === null) return null;
-  const review = await getTripReview(ctx, trip.id);
-  return review === null ? null : { trip, review };
+  return trip === null ? null : { trip, review };
 });
 
 /** Titre du document : « {destination} · Après le voyage » (provisoire, UX/UI). */
@@ -43,7 +44,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 /**
  * Écran 16 « Après le voyage » (`R16` ; tâche M8a, ticket 1062 ; décision 0160 § 1.5 point 2). Page sans carte, hors du
  * groupe `(programme)`, sous le fournisseur de l'onglet de `src/app/voyages/layout.tsx` (mémoire des avis de `mock`). Ordre :
- * session (`exigerSession`, sinon l'écran 4), voyage par `getTripReader()` (404), lecture `getTripReview` (404).
+ * session (`exigerSession`, sinon l'écran 4), lecture `getTripReview` (404 : propriétaire, débloqué), voyage par
+ * `getTripReader()` (404).
  */
 export default async function ApresVoyagePage({ params }: { params: Params }) {
   const { id } = await params;

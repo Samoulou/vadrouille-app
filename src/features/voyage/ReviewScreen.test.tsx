@@ -112,12 +112,15 @@ describe("ReviewScreen : écran complet (critères 2, 3, 10, 12)", () => {
     const { actions, calls } = deferredActions();
     const { recorder } = renderScreen({ actions });
     fireEvent.click(choice(CHATEAU, "J'ai aimé"));
-    // Pas encore enregistré : rien n'est affiché comme choisi.
+    // Pas encore enregistré : rien n'est affiché comme choisi ; l'attente est visible (bloquant 4).
     expect(choice(CHATEAU, "J'ai aimé")).toHaveAttribute("aria-pressed", "false");
     expect(group(CHATEAU)).toHaveAttribute("aria-busy", "true");
+    expect(within(group(CHATEAU).closest("li")!).getByText(t.enregistrement)).toBeInTheDocument();
     await act(async () => calls[0]!.resolve({ ok: true, value: { stopId: calls[0]!.request.stopId, rating: "liked" } }));
     await flush();
     expect(choice(CHATEAU, "J'ai aimé")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText(t.enregistrement)).toBeNull();
+    expect(document.querySelector("[data-part='annonce-avis']")).toHaveTextContent(t.enregistre);
 
     fireEvent.click(choice(CHATEAU, "Pas fait"));
     expect(calls[1]!.request.rating).toBe("notDone");
@@ -132,6 +135,7 @@ describe("ReviewScreen : écran complet (critères 2, 3, 10, 12)", () => {
     await act(async () => calls[2]!.resolve({ ok: true, value: null }));
     await flush();
     for (const button of within(group(CHATEAU)).getAllByRole("button")) expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(document.querySelector("[data-part='annonce-avis']")).toHaveTextContent(t.efface);
 
     expect(recorder.events).toEqual([
       { name: "stop_reviewed", properties: { rating: "liked", kind: "activity" } },
@@ -163,8 +167,10 @@ describe("ReviewScreen : écran complet (critères 2, 3, 10, 12)", () => {
     await act(async () => calls[0]!.resolve({ ok: false, error: { code: "internal" } }));
     await flush();
     expect(choice(CHATEAU, "J'ai aimé")).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("alert")).toHaveTextContent(t.erreur);
-    fireEvent.click(screen.getByRole("button", { name: t.reessayer }));
+    // Sous l'étape concernée (bloquant 5).
+    const ligne = group(CHATEAU).closest("li")!;
+    expect(within(ligne).getByRole("alert")).toHaveTextContent(t.erreur);
+    fireEvent.click(within(ligne).getByRole("button", { name: t.reessayer }));
     expect(calls).toHaveLength(2);
     expect(calls[1]!.request).toEqual(calls[0]!.request);
     await act(async () => calls[1]!.resolve({ ok: true, value: { stopId: calls[1]!.request.stopId, rating: "liked" } }));
@@ -174,6 +180,34 @@ describe("ReviewScreen : écran complet (critères 2, 3, 10, 12)", () => {
     expect(recorder.events).toHaveLength(1);
   });
 
+  it("erreur : un geste sur une autre étape ne l'efface pas ; seul le réessai ou un nouveau geste sur l'étape la remplace", async () => {
+    const { actions, calls } = deferredActions();
+    renderScreen({ actions });
+    fireEvent.click(choice(CHATEAU, "J'ai aimé"));
+    await act(async () => calls[0]!.resolve({ ok: false, error: { code: "internal" } }));
+    await flush();
+    const autre = screen.getAllByRole("group").find((g) => g.getAttribute("aria-label") !== `Ton avis sur ${CHATEAU}`)!;
+    fireEvent.click(within(autre).getByRole("button", { name: "Pas fait" }));
+    await act(async () => calls[1]!.resolve({ ok: true, value: { stopId: calls[1]!.request.stopId, rating: "notDone" } }));
+    await flush();
+    expect(within(group(CHATEAU).closest("li")!).getByRole("alert")).toHaveTextContent(t.erreur);
+    fireEvent.click(choice(CHATEAU, "Pas pour moi"));
+    expect(within(group(CHATEAU).closest("li")!).queryByRole("alert")).toBeNull();
+  });
+
+  it("échec avec un geste en attente : rien n'est envoyé d'office ; « Réessayer » rejoue le dernier geste (mineur 6)", async () => {
+    const { actions, calls } = deferredActions();
+    renderScreen({ actions });
+    fireEvent.click(choice(CHATEAU, "J'ai aimé"));
+    fireEvent.click(choice(CHATEAU, "Pas fait"));
+    await act(async () => calls[0]!.resolve({ ok: false, error: { code: "internal" } }));
+    await flush();
+    expect(calls).toHaveLength(1);
+    fireEvent.click(within(group(CHATEAU).closest("li")!).getByRole("button", { name: t.reessayer }));
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.request.rating).toBe("notDone");
+  });
+
   it("hors ligne : bandeau, choix en aria-disabled décrits par le bandeau, aucun appel ; avis déjà donnés affichés", async () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     const { actions, calls } = deferredActions();
@@ -181,6 +215,9 @@ describe("ReviewScreen : écran complet (critères 2, 3, 10, 12)", () => {
     expect(screen.getByText(t.horsLigne)).toBeInTheDocument();
     const bouton = choice(CHATEAU, "J'ai aimé");
     expect(bouton).toHaveAttribute("aria-disabled", "true");
+    // Rendu indisponible visible (bloquant 3) : contour et texte `ink-soft`, fond `muted`.
+    expect(bouton.className).toMatch(/border-ink-soft/);
+    expect(bouton.className).toMatch(/text-ink-soft/);
     expect(group(CHATEAU)).toHaveAttribute("aria-describedby", "apres-hors-ligne");
     fireEvent.click(bouton);
     expect(calls).toHaveLength(0);
@@ -196,7 +233,10 @@ describe("ReviewScreen : lecture seule (critère 7)", () => {
     expect(screen.getByText(t.lectureSeule)).toBeInTheDocument();
     expect(screen.queryAllByRole("group")).toHaveLength(0);
     expect(screen.queryAllByRole("button")).toHaveLength(0);
-    expect(container.querySelector(`[data-stop='${id}'] [data-part='avis-lu']`)?.textContent).toBe("J'ai aimé");
+    expect(container.querySelector(`[data-stop='${id}'] [data-part='avis-lu']`)?.textContent).toBe("Ton avis : J'ai aimé");
+    // Étape sans avis : « Pas d'avis » (mineur 15).
+    const autre = container.querySelector(`[data-stop]:not([data-stop='${id}']) [data-part='avis-lu']`);
+    expect(autre?.textContent).toBe(t.sansAvis);
   });
 });
 

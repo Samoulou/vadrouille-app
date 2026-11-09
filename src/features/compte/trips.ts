@@ -82,15 +82,13 @@ export function reopenTarget(summary: TripSummary, now: number, lastTab: LastTab
  */
 export interface ReviewLink {
   href: string;
-  until: IsoDate;
 }
 
 /**
- * Vrai du dernier jour du voyage à `until` compris, à la date de la destination : jamais avant (F11-PO-8). Après `until`
- * (lecture seule, Q149), le lien n'est plus proposé : « Donner ton avis » ne décrirait plus l'écran ; la page reste ouverte
- * (proposition à confirmer par le Product Owner et l'UX/UI).
+ * Vrai à partir du dernier jour du voyage, à la date de la destination : jamais avant (F11-PO-8), sans borne haute
+ * (spécification M8 § 2, § 3.1 points 4 et 5 ; revue de la PR 1068, bloquant 2) : après 30 jours, l'écran 16 s'ouvre en
+ * lecture seule.
  */
-export function reviewLinkShown(summary: Pick<TripSummary, "timeZone" | "end">, link: ReviewLink, now: number): boolean {
-  const today = tripToday(summary, now);
-  return today >= summary.end && today <= link.until;
+export function reviewLinkShown(summary: Pick<TripSummary, "timeZone" | "end">, now: number): boolean {
+  return tripToday(summary, now) >= summary.end;
 }

@@ -73,10 +73,10 @@ test("apres-voyage: voyage non débloqué, 404", async ({ page, baseURL }) => {
   expect(response?.status()).toBe(404);
 });
 
-test("apres-voyage: « Donner ton avis » dans Mes voyages à partir du dernier jour, jamais avant (critère 11)", async ({ page }) => {
+test("apres-voyage: « Donner ton avis » dans Mes voyages à partir du dernier jour, jamais avant, sans borne haute (critère 11)", async ({ page }) => {
   await setClock(page, "2026-09-02T12:00:00+01:00");
   await openTrips(page);
-  await expect(page.locator("[data-part='avis']")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Donner ton avis (Édimbourg)", exact: true })).toHaveCount(0);
 
   await page.clock.setSystemTime(new Date("2026-09-03T12:00:00+01:00"));
   await page.reload();
@@ -84,6 +84,12 @@ test("apres-voyage: « Donner ton avis » dans Mes voyages à partir du dernier 
   const lien = page.getByRole("link", { name: "Donner ton avis (Édimbourg)", exact: true });
   await expect(lien).toHaveCount(1);
   await expect(lien).toHaveAttribute("href", R16);
+
+  // Sans borne haute (revue de la PR 1068, bloquant 2) : après 30 jours, le lien reste ; l'écran s'ouvre en lecture seule.
+  await page.clock.setSystemTime(new Date("2026-10-09T12:00:00+01:00"));
+  await page.reload();
+  await openTrips(page);
+  await expect(page.getByRole("link", { name: "Donner ton avis (Édimbourg)", exact: true })).toHaveAttribute("href", R16);
 });
 
 test("apres-voyage: écran 15 à l'état « terminé » : « Donner ton avis » vers l'écran 16 (critère 11)", async ({ page }) => {

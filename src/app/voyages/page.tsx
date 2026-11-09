@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { apresVoyageDisponible, finAccesApresVoyage, getPaymentAdapter, getTripReader, paymentAvailable, siteEssaiAutorise } from "@/adapters";
+import { apresVoyageDisponible, getPaymentAdapter, getTripReader, paymentAvailable, siteEssaiAutorise } from "@/adapters";
 import type { TripSummary } from "@/contracts";
 import { PRODUCT_NAME } from "@/config/site";
 import { exigerSession } from "@/features/compte/session";
@@ -52,16 +52,15 @@ export default async function MesVoyagesPage() {
 }
 
 /**
- * « Donner ton avis » (M8a, ticket 1062) : pour chaque voyage débloqué, l'adresse de l'écran 16 et son dernier jour
- * modifiable ; l'écran ne montre le lien que du dernier jour du voyage à ce jour compris. Aucun lien sur le site d'essai.
+ * « Donner ton avis » (M8a, ticket 1062) : pour chaque voyage débloqué, l'adresse de l'écran 16 ; l'écran ne montre le
+ * lien qu'à partir du dernier jour du voyage. Aucun lien sur le site d'essai.
  */
 function reviewLinksOf(trips: readonly TripSummary[]): Record<string, ReviewLink> {
   if (!apresVoyageDisponible()) return {};
   const links: Record<string, ReviewLink> = {};
   for (const trip of trips) {
     const href = tripRoutes("/voyages", trip.id).apresVoyage();
-    if (trip.unlocked && href !== null) links[trip.id] = { href, until: finAccesApresVoyage(trip.end) };
+    if (trip.unlocked && href !== null) links[trip.id] = { href };
   }
   return links;
 }
-

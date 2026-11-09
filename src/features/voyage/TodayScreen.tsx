@@ -30,14 +30,12 @@ import {
   firstStop,
   hasStops,
   isPastStop,
-  localDateAt,
   localTimeAt,
   nextUp,
   nowAt,
   reminders,
   tripMoment,
   type CurrentMoment,
-  type IsoDate,
   type LocalTime,
   type NextUp,
   type TodayDay,
@@ -69,7 +67,7 @@ export interface TodayScreenProps {
    * voyage qui a cet écran (débloqué, hors du site d'essai). Le lien n'apparaît qu'à l'état « Ton voyage est terminé »,
    * jusqu'à ce jour compris. Absent : aucun lien.
    */
-  review?: { href: string; until: IsoDate };
+  review?: { href: string };
 }
 
 /** « Samedi 29 août » → « samedi 29 août » : date d'un jour dans une phrase (`redaction.md`). */
@@ -388,7 +386,7 @@ export function TodayScreen({ trip, placesFromGoogle, recorderKind = "none", rec
                   : format(t.avant, { date: first ? inSentence(formatTitreJour(first.date)) : "" })}
             </p>
             {moment.kind === "before" && moment.eve ? <TomorrowBlock day={first} /> : null}
-            {moment.kind === "after" && review && localDateAt(now, trip.timeZone) <= review.until ? (
+            {moment.kind === "after" && review ? (
               <Link href={review.href} prefetch={false} data-part="donner-avis" className={cn(LINK, "text-corps text-line")}>
                 {t.avis}
               </Link>

@@ -31,8 +31,8 @@ export interface TripsScreenProps {
    */
   receiptHrefs?: Readonly<Record<string, string>>;
   /**
-   * Écran 16 (M8a) : identifiant du voyage → lien « Donner ton avis » et dernier jour modifiable, lus par la page pour les
-   * voyages qui ont cet écran ; affiché du dernier jour à ce jour compris (`reviewLinkShown`). Absent : aucun lien.
+   * Écran 16 (M8a) : identifiant du voyage → lien « Donner ton avis », lu par la page pour les voyages qui ont cet écran ;
+   * affiché à partir du dernier jour du voyage (`reviewLinkShown`). Absent : aucun lien.
    */
   reviewLinks?: Readonly<Record<string, ReviewLink>>;
   /** Horloge injectable (tests) ; `Date.now` par défaut. Fonction stable. */
@@ -215,7 +215,7 @@ const AUCUN_AVIS: Readonly<Record<string, ReviewLink>> = {};
 /** Adresse de « Donner ton avis » pour ce voyage à cet instant, ou `undefined`. */
 function reviewHrefOf(summary: TripSummary, links: Readonly<Record<string, ReviewLink>>, now: number): string | undefined {
   const link = Object.hasOwn(links, summary.id) ? links[summary.id] : undefined;
-  return link && reviewLinkShown(summary, link, now) ? link.href : undefined;
+  return link && reviewLinkShown(summary, now) ? link.href : undefined;
 }
 
 export function TripsScreen({ trips, createHref, receiptHrefs = AUCUN_RECU, reviewLinks = AUCUN_AVIS, now: clock, embedded = false }: TripsScreenProps) {

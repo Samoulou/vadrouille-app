@@ -813,9 +813,12 @@ const CHANGEMENT_DOMAINE = "src/domain/changement-de-ville.ts";
 const CHANGEMENT_ECRANS = ["src/features/sejour/BandeauChevauchement.tsx", "src/features/creation/aide-changement.ts"];
 /** M8a (décision 0160 § 1.5 point 4) : étapes à évaluer et accès de l'écran 16, fonction pure unique (écran, serveur, `mock`). */
 const APRES_VOYAGE_DOMAINE = "src/domain/apres-voyage.ts";
-/** L'écran 16 et l'accès calculé de `mock` (`getTripReview` de `@/adapters`) : les deux seuls importeurs hors de src/server. */
+/**
+ * L'écran 16 : seul importeur hors de src/server. L'accès de `mock` (`getTripReview` de `@/adapters`) passe par
+ * `src/server/avis/acces.ts`, calcul unique avec le serveur (revue de la PR 1068, mineur 7).
+ */
 const APRES_VOYAGE_ECRAN = "src/features/voyage/ReviewScreen.tsx";
-const APRES_VOYAGE_IMPORTEURS = [APRES_VOYAGE_ECRAN, "src/adapters/index.ts"];
+const APRES_VOYAGE_IMPORTEURS = [APRES_VOYAGE_ECRAN];
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 /** Classification des codes de la couche IA (B9b, 0081 B9-TL-1 point 2 ; 0077 § 3 point 4). */
 const NATURES_IA = "src/ai/natures.ts";
@@ -949,9 +952,8 @@ const ARETES_ADMISES: readonly AreteAdmise[] = [
   {
     // M8a (ticket 1062 ; décision 0160 § 1.5 point 4) : les étapes à évaluer de l'écran 16 viennent de
     // `src/domain/apres-voyage.ts` (types de `@/contracts` seulement), la même fonction pure que le serveur et `mock` ; un
-    // seul module d'écran l'importe, avec l'accès calculé de `mock` dans `src/adapters/index.ts`, sans la recopier ; arête
-    // exacte : le parcours ne descend pas au-delà.
-    nom: "M8a : écran 16 et mock de @/adapters → src/domain/apres-voyage.ts",
+    // seul module d'écran l'importe, sans la recopier ; arête exacte : le parcours ne descend pas au-delà.
+    nom: "M8a : écran 16 → src/domain/apres-voyage.ts",
     de: (chemin) => APRES_VOYAGE_IMPORTEURS.includes(chemin),
     vers: [APRES_VOYAGE_DOMAINE],
     typeSeulement: false,
