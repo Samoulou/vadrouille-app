@@ -596,6 +596,8 @@ describe("module de journal", () => {
       // M5d-4 (décision 0155 § 2.4) : lieux à soi réinjectés par la révision M1b, deux compteurs seulement.
       "recalcul.lieux_a_soi",
       "calendrier.version_unavailable",
+      // M9a (ticket 1097) : export du compte en échec, nom de l'erreur seulement.
+      "compte.export_failed",
       "log.unknown_event",
     ]);
   });

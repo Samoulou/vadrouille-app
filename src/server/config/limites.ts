@@ -9,10 +9,12 @@ import "server-only";
  */
 
 /**
- * Espèce d'une règle : par clé d'adresse IP (ou compartiment commun), par adresse e-mail canonique, ou par voyage
- * (`trip`, décision 0147 § 6.4 point 1 : identifiant `uuid` du voyage, contrôlé dans l'organisation avant le limiteur).
+ * Espèce d'une règle : par clé d'adresse IP (ou compartiment commun), par adresse e-mail canonique, par voyage
+ * (`trip`, décision 0147 § 6.4 point 1 : identifiant `uuid` du voyage, contrôlé dans l'organisation avant le limiteur), ou
+ * par personne (`user`, M9a, spécification M9 § 5 point 7 : identifiant `uuid` de la personne **lu dans la session**, jamais
+ * dans l'entrée).
  */
-export type RateLimitKind = "ip" | "email" | "trip";
+export type RateLimitKind = "ip" | "email" | "trip" | "user";
 
 /** Une règle : au plus `threshold` appels admis par fenêtre fixe de `windowSeconds` secondes (horloge de la base). */
 export type RateLimitRule = { readonly kind: RateLimitKind; readonly windowSeconds: number; readonly threshold: number };
@@ -88,6 +90,11 @@ export const RATE_LIMITS: RateLimitConfig = {
     { kind: "ip", windowSeconds: 3600, threshold: 20 },
     { kind: "trip", windowSeconds: 86_400, threshold: 6 },
   ],
+  // M9a (ticket 1097 ; spécification M9 § 5 point 7, S7 à confirmer par la Sécurité) : « Exporter mes données », 5 par heure
+  // et par personne (proposition). Espèce `user` : identifiant de la personne de la session, sans dépendre de l'en-tête
+  // d'adresse. Vérifié après la session, le rôle, l'organisation personnelle et la connexion récente (refus gratuits), avant
+  // toute lecture de l'export ; `api` seulement (limiteur en base).
+  export: [{ kind: "user", windowSeconds: 3600, threshold: 5 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

@@ -39,7 +39,9 @@ const PLACE = "SENTINELLE_PLACE_M5C";
 
 describe("not_unlocked (décision 0147 § 8)", () => {
   it("ajouté en dernier, sans renommer ni réordonner ; retryable faux exigé", () => {
-    expect(API_ERROR_CODES.at(-1)).toBe("not_unlocked");
+    // Dernier jusqu'à M9a (spécification M9 § 6.1) : `reauthentication_required` et `forbidden` le suivent, dans cet ordre.
+    expect(API_ERROR_CODES.indexOf("not_unlocked")).toBe(API_ERROR_CODES.indexOf("email_cap_reached") + 1);
+    expect(API_ERROR_CODES.slice(API_ERROR_CODES.indexOf("not_unlocked"))).toEqual(["not_unlocked", "reauthentication_required", "forbidden"]);
     expect(API_ERROR_CODES.indexOf("already_unlocked")).toBe(2);
     expect(ApiErrorSchema.safeParse({ code: "not_unlocked", retryable: false }).success).toBe(true);
     expect(ApiErrorSchema.safeParse({ code: "not_unlocked", retryable: true }).success).toBe(false);

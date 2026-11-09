@@ -60,6 +60,11 @@ export type RateLimitRequest = {
    * l'organisation par l'appelant avant le limiteur. Écrit en minuscules dans le message.
    */
   readonly tripId?: string;
+  /**
+   * Identifiant `uuid` de la personne, exigé si l'action a une règle par personne (M9a, espèce `user`) ; lu dans la session
+   * par l'appelant, jamais dans l'entrée. Écrit en minuscules dans le message.
+   */
+  readonly userId?: string;
 };
 
 export type RateLimiterOptions = {
@@ -96,15 +101,18 @@ const ADMIS: Result<void> = Object.freeze({ ok: true, value: undefined });
 const REFUS_FERME: RateLimitVerdict = Object.freeze({ ok: false });
 const VERDICT_ADMIS: RateLimitVerdict = Object.freeze({ ok: true });
 
-/** Rang fixe d'évaluation des espèces (0147 § 6.4 point 1) : adresse IP, puis e-mail, puis voyage. */
-const RANG_ESPECE: Readonly<Record<RateLimitKind, number>> = Object.freeze({ ip: 0, email: 1, trip: 2 });
+/** Rang fixe d'évaluation des espèces (0147 § 6.4 point 1) : adresse IP, puis e-mail, puis voyage, puis personne (M9a). */
+const RANG_ESPECE: Readonly<Record<RateLimitKind, number>> = Object.freeze({ ip: 0, email: 1, trip: 2, user: 3 });
 
 /** Règles dans l'ordre fixe d'évaluation : par espèce, puis dans l'ordre de la configuration (tri stable). */
 export function reglesOrdonnees(regles: readonly RateLimitRule[]): RateLimitRule[] {
   return [...regles].sort((a, b) => RANG_ESPECE[a.kind] - RANG_ESPECE[b.kind]);
 }
 
-/** Message à préfixe de domaine (B3-TL-6 point 1) ; l'espèce est `ip/<clé>`, `email/<clé>`, `trip/<uuid>` ou `no-trusted-ip`. */
+/**
+ * Message à préfixe de domaine (B3-TL-6 point 1) ; l'espèce est `ip/<clé>`, `email/<clé>`, `trip/<uuid>`, `user/<uuid>`
+ * ou `no-trusted-ip`.
+ */
 export function rateLimitMessage(action: string, windowSeconds: number, species: string): string {
   return `rl/v1/${action}/${windowSeconds}s/${species}`;
 }
@@ -207,13 +215,28 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
       logEvent("rate_limit.failed", { action, errorName: "MissingTripId" }, "error");
       return REFUS_FERME;
     }
+    // Espèce `user` (M9a) : identifiant `uuid` de la personne de la session exigé, sinon refus fermé.
+    const avecPersonne = regles.some((regle) => regle.kind === "user");
+    const personne = typeof request.userId === "string" && UUID.test(request.userId) ? request.userId.toLowerCase() : null;
+    if (avecPersonne && personne === null) {
+      logEvent("rate_limit.failed", { action, errorName: "MissingUserId" }, "error");
+      return REFUS_FERME;
+    }
 
     const ip = trustedIpKey(request.headers, env.trustedIpHeader);
     if (ip === null) logEvent("rate_limit.no_trusted_ip", { action }, "warn");
     const secret = env.secret;
     const cles = regles.map((regle) => {
       const espece =
-        regle.kind === "ip" ? (ip === null ? "no-trusted-ip" : `ip/${ip}`) : regle.kind === "email" ? `email/${cleEmail}` : `trip/${voyage}`;
+        regle.kind === "ip"
+          ? ip === null
+            ? "no-trusted-ip"
+            : `ip/${ip}`
+          : regle.kind === "email"
+            ? `email/${cleEmail}`
+            : regle.kind === "trip"
+              ? `trip/${voyage}`
+              : `user/${personne}`;
       return { cle: rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, espece)), regle };
     });
 
