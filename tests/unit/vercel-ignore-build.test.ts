@@ -10,10 +10,14 @@ import { describe, expect, it } from "vitest";
  */
 const script = join(process.cwd(), "scripts/vercel/ignore-build.sh");
 
+/**
+ * `/bin/sh` par chemin absolu et environnement construit, sans `PATH` hérité : le script n'utilise que des commandes
+ * internes du shell (ligne nominative de `tests/unit/confinement/listes/capacites.ts`).
+ */
 function sortie(ref: string | undefined): number | null {
-  const env: NodeJS.ProcessEnv = { NODE_ENV: "test", PATH: process.env.PATH };
+  const env: NodeJS.ProcessEnv = { NODE_ENV: "test" };
   if (ref !== undefined) env.VERCEL_GIT_COMMIT_REF = ref;
-  return spawnSync("sh", [script], { env, encoding: "utf8" }).status;
+  return spawnSync("/bin/sh", [script], { env, encoding: "utf8" }).status;
 }
 
 describe("vercel ignore-build : seules main et p0-reel sont construites (décision 0163)", () => {

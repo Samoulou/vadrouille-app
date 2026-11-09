@@ -14,7 +14,8 @@ case "$ref" in
     exit 1
     ;;
   *)
-    echo "vercel ignore-build : construction ignorée (branche « ${ref:-absente} » hors de main et p0-reel, décision 0163)."
+    # Le nom de branche n'est pas recopié dans le journal : il vient du dépôt et peut contenir n'importe quel texte.
+    echo "vercel ignore-build : construction ignorée (branche hors de main et p0-reel, ou absente ; décision 0163)."
     exit 0
     ;;
 esac

@@ -2,7 +2,7 @@
 
 Statut : **proposée par l'agent release, définitive à la fusion (0093)**. Elle applique une décision de Samuel (offre gratuite, argent : réservé à Samuel, « Qui décide quoi » de `docs/CONTEXT.md`) ; la forme technique (`ignoreCommand`) relève de l'outillage et passe par la revue du Tech Lead. À lister dans la prochaine note de version (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment.
 
-Date : 2026-11-09 · Rédacteur : agent release · Ticket : #1050 · Amende, sans la réécrire : 0002 (hébergement Vercel, « préversion par PR »).
+Date : 2026-11-09 · Rédacteur : agent release · Ticket : #1050 · Amende, sans la réécrire : 0002 (hébergement Vercel, « préversion par PR ») ; pointeurs ajoutés dans 0138 § 8 et 0140 (« Questions nouvelles », point 1).
 
 **Ce que cette décision n'engage pas.** Aucun réglage du compte ni du projet Vercel (tableau de bord, protection, variables), aucune dépense, aucun changement de `.github/`. Rien de ce qui revient à Samuel n'est tranché : le passage à une offre payante reste à lui.
 
@@ -29,18 +29,13 @@ Date : 2026-11-09 · Rédacteur : agent release · Ticket : #1050 · Amende, san
 
 - **Constructions limitées.** Plus de préversion par PR : la phrase « préversion par PR » de 0002 ne vaut plus tant que le compte reste gratuit. Une PR se juge sur la CI de GitHub Actions et, pour l'interface, sur les captures de la CI (`test:visual`). Le statut « Vercel » d'une PR `claude/…` apparaît comme construction ignorée ; il n'est pas obligatoire.
 - **Journaux 1 h.** Un incident de `main` ou de `p0-reel` doit être relevé dans l'heure (`get_runtime_logs`, `get_runtime_errors`), sinon ses journaux sont perdus. Les notes de version et les vérifications de staging de l'agent release le mentionnent quand un journal manque.
-- **Préversions publiques.** Sans protection, la préversion de `p0-reel` est publique. Son code d'accès doit à lui seul bloquer tout appel payant : vérification confiée à la Sécurité, **ticket #1049** (décision 0164 à venir). Le déploiement de `p0-reel` a été supprimé par Samuel ; il n'est pas remis en ligne avant le verdict de #1049. Point d'attention : avec cette décision, toute mise à jour de `p0-reel` relance une construction, donc une préversion publique. Aujourd'hui, `p0-reel` n'avance que par une PR de tête `main` fusionnée par Samuel (dernière : #837, `8a928a7`, 2026-10-29) ; la mise à jour automatique de 0093 point 6 (tâche C) n'est pas livrée, et le jour où elle l'est, elle redéploierait `p0-reel` sans geste de Samuel (question au Tech Lead et à la Sécurité, ci-dessous). Les conditions qui supposaient la protection des déploiements (0138 § 8, préversion `mvp-essai` ; 0140, question 1 à Samuel) ne sont plus remplies tant que le compte reste gratuit.
+- **Préversions publiques.** Sans protection, la préversion de `p0-reel` est publique. Son code d'accès doit à lui seul bloquer tout appel payant : vérification confiée à la Sécurité, **ticket #1049**. Selon le ticket #1049 (rédigé par Samuel), le déploiement de `p0-reel` est aujourd'hui hors ligne ; il n'est pas remis en ligne avant le verdict de #1049. Point d'attention : avec cette décision, toute mise à jour de `p0-reel` relance une construction, donc une préversion publique. Aujourd'hui, `p0-reel` n'avance que par une PR de tête `main` fusionnée par Samuel (dernière : #837, `8a928a7`, 2026-10-29) ; la mise à jour automatique de 0093 point 6 (tâche C) n'est pas livrée, et le jour où elle l'est, elle redéploierait `p0-reel` sans geste de Samuel (question au Tech Lead et à la Sécurité, ci-dessous). Les conditions qui supposaient la protection des déploiements (0138 § 8, préversion `mvp-essai` ; 0140, question 1 à Samuel) ne sont plus remplies tant que le compte reste gratuit.
 - **Branche `mvp-essai`** (0138, 0140) : elle n'existe pas aujourd'hui ; si elle est créée, elle ne sera **pas** construite par Vercel tant que cette décision n'est pas amendée (voir « Quand revoir »).
 
 ## Ce qui reste à Samuel
 
 1. **Passer à une offre payante (Pro) avant le lancement public** : l'offre gratuite interdit l'usage commercial (`docs/handovers/comptes-externes.md`, § 4, point 6). Question à poser à Samuel avant toute bêta payante ou ouverture publique.
 2. Décider si la protection des préversions (offre payante) redevient une condition de l'essai `mvp-essai` (0138 § 8).
-
-## Questions
-
-- **Samuel** : passage à Pro avant le lancement public (usage commercial interdit sur l'offre gratuite) ; échéance souhaitée ?
-- **Tech Lead et Sécurité** : tant que #1049 n'a pas rendu son verdict, faut-il aussi ignorer `p0-reel` dans `ignore-build.sh`, pour qu'une mise à jour de `p0-reel` (PR de Samuel, ou plus tard la mise à jour automatique de 0093 point 6) ne remette pas en ligne une préversion publique ? Cette décision suit le ticket #1050 (`main` et `p0-reel` construites).
 
 ## Quand revoir
 

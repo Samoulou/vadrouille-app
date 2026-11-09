@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -24,5 +24,6 @@ describe("vercel.json : région des fonctions (décision 0002, amendement du 202
 
   it("confie la décision de construire au script testé (décision 0163)", () => {
     expect(config.ignoreCommand).toBe("sh scripts/vercel/ignore-build.sh");
+    expect(existsSync(join(process.cwd(), "scripts/vercel/ignore-build.sh"))).toBe(true);
   });
 });
