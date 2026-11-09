@@ -85,12 +85,17 @@ describe("ChecklistItem.kind (décision 0147 § 6.2)", () => {
   });
 });
 
-describe("Stop.addedBy (décision 0147 § 6.1)", () => {
+describe("Stop.addedBy (décisions 0147 § 6.1 et 0160 § 1.4)", () => {
   const stop = { id: "ajout-x", kind: "activity", name: "Mon lieu", start: "10:00", facts: {}, exceptions: [], locked: true };
-  it("facultatif, seule valeur \"person\"", () => {
+  // Modifié par M8-C (ticket 1041) sous la spécification M8 § 6.1 critère 3 et la décision 0160 § 1.4 point 1 :
+  // `"discovered"` est désormais accepté ; une valeur inconnue reste refusée.
+  it("facultatif, valeurs \"person\" et \"discovered\" (décision 0160 § 1.4)", () => {
     expect(StopSchema.safeParse(stop).success).toBe(true);
     expect(StopSchema.safeParse({ ...stop, addedBy: "person" }).success).toBe(true);
-    expect(StopSchema.safeParse({ ...stop, addedBy: "discovered" }).success).toBe(false);
+    expect(StopSchema.safeParse({ ...stop, addedBy: "discovered" }).success).toBe(true);
+    expect(StopSchema.safeParse({ ...stop, addedBy: "found" }).success).toBe(false);
+    expect(StopSchema.safeParse({ ...stop, addedBy: "google" }).success).toBe(false);
+    expect(StopSchema.safeParse({ ...stop, addedBy: null }).success).toBe(false);
   });
 });
 

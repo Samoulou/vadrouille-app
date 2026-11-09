@@ -218,18 +218,24 @@ Cette tâche peut être codée et testée sur Mailpit dès M1a. Elle ne sert sur
 ## 8. Étape 8 — Après le voyage
 
 ### (a) Ce qui existe
-Les tables `feedback`, `preference_signals`, `preferences` (B1). `specs/F11-mes-voyages-apres-etats.md` (écran 16 « Retenir mes goûts »). Q150 : consentement explicite et révocable décidé par Samuel ; les **durées de conservation** attendent la revue juridique (Q5). **B12 n'a pas de spécification** pour l'après-voyage.
+Les tables `preference_signals` et `preferences` (B1) ; `feedback` ne porte que les signalements depuis 0022 (0160 § 1.1 : les avis vont dans la table `stop_reviews`, à créer par M8-D). `specs/F11-mes-voyages-apres-etats.md` (écran 16 « Retenir mes goûts »). Q150 : consentement explicite et révocable décidé par Samuel ; les **durées de conservation** attendent la revue juridique (Q5). **La spécification B12 (après le voyage) existe** : `specs/M8-apres-le-voyage-api.md` (#1026, fusionnée), et la décision 0160 (#1035, fusionnée) en tranche les points T1 à T8.
 
 ### (b) Ce qui manque
-La spécification B12 (après) ; l'avis rapide sur `api` ; « adresse découverte » (la personne note un lieu trouvé sur place : lieu à soi de M5d, marqué « découvert ») ; la mémoire des goûts entre voyages, sur accord, réutilisée par le prompt `programme` d'un voyage suivant (préférences maison seulement, jamais une donnée Google).
+L'écran 16 et l'avis rapide sur `api` (table `stop_reviews`, contrats, écran : tâches M8-D, M8-C, M8a) ; « adresse découverte » (la personne note un lieu trouvé sur place : lieu à soi de M5d, marqué « découvert ») ; la mémoire des goûts entre voyages, sur accord, réutilisée par le prompt `programme` d'un voyage suivant (préférences maison seulement, jamais une donnée Google).
 
 ### (c) Tâches
 | ID | Tâche | Rôle | Prérequis |
 |---|---|---|---|
-| M8-spec | Spécification B12 (après le voyage) | product-owner | M5d |
-| M8a | Avis rapide (écran de fin de voyage, `feedback`) | backend avec frontend | M8-spec |
-| M8b | Adresse découverte | backend avec frontend | M8-spec, M5d |
-| M8c | Mémoire des goûts sur accord, révocable, transmise au prompt du voyage suivant | backend, ia-recherche | M8-spec ; textes et durées validés par Samuel (Q150, action S6) avant l'essai par d'autres testeurs |
+| M8-spec | Spécification B12 (après le voyage) : `specs/M8-apres-le-voyage-api.md` (#1026, fusionnée) | product-owner | M5d-1 et M5d-2 (fusionnées) |
+| M8-TL | Décision 0160 du Tech Lead (#1035, fusionnée) : T1 à T8 ; les points S1 à S6 sont posés par 0160 § 2 comme propositions du Tech Lead, en attente de la Sécurité (ce qui bloque quoi : 0160 « Questions », l. 214) | tech-lead, securite | M8-spec |
+| M8-C | PR de contrat (0147 § 14) : `src/contracts/preference.ts`, avis, `TripReview` complété, `addedBy` étendu, événements (spec § 6.1 ; formes : 0160) | backend avec frontend | M8-TL |
+| M8-D | Migration : table des avis, `preferences` durcie, RLS, droits, purge, `.down.sql` (spec § 6.2 ; formes : 0160) | data | M8-TL ; S1 de la Sécurité (et S2 si l'option (b) de 0160 § 3.2 est retenue) ; seule tâche `db/migrations` de son cycle |
+| M8a | Écran 16 et avis rapide, `mock` et `api` (spec § 3, § 6.3) | frontend avec backend | M8-C, M8-D ; S3 de la Sécurité pour la limite `avis` |
+| M8b | Adresse découverte (spec § 4, § 6.4) | backend avec frontend | M8a, M5d-1 et M5d-2 (fusionnées) ; confirmation S6 de la Sécurité ; Q682 ne bloque pas le code, seulement l'ajout d'adresses découvertes sur `api` (0160 § 3.4) |
+| M8c-1 | Retenir et retirer ses goûts (spec § 5.1 à § 5.3, § 6.5) | backend avec frontend | M8a, M8-D ; S2 et S3 de la Sécurité |
+| M8c-2 | Goûts proposés à l'écran 2 et transmis au prompt (spec § 5.4, § 6.6) | backend avec frontend | M8c-1 ; T7 (0160 : pas de goût « distance ») ; confirmation S4 de la Sécurité |
+
+Ordre tranché par le CEO (Q826) : M8-TL, puis M8-C et M8-D, puis M8a, M8b, M8c-1, M8c-2 ; le § 6 de la spécification fait foi pour les fichiers, critères et interdits de cycle. Une spécification porte toutes les tâches de l'étape, comme pour M6. Ouverture à d'autres testeurs que Samuel : action S6 (Q150, Q824), qui ne pèse pas sur le code.
 
 ---
 
@@ -277,15 +283,16 @@ Les spécifications et les décisions (`specs/`, `docs/decisions/`) ne bloquent 
 | 224 | M4c | M6a | — | M5b |
 | 225 | M8-spec | M6b | — | M5c |
 | 226 | M9-spec | M6c | — | M5d |
-| 227 | M8c | — | — | M8a |
+| 227 | M8-TL, M8-C, M8-D (cycles libres ; M8-D seule sur `db/migrations`) | — | — | M8a |
 | 228 | M9a | — | — | M8b |
-| 229 | M9b | — | — | M9c (après l'action S6) |
+| 229 | M9b | — | — | M8c-1 puis M8c-2, puis M9c (après l'action S6) |
 | 230 | M4d (plusieurs fuseaux) | — | — | corrections des essais |
 
 Lecture du tableau :
 - Les retours de Samuel sur ses essais (cycles 221 et suivants) passent avant la suite : le CEO réserve un fil aux corrections dès qu'un essai en remonte.
 - M7a (étape 7) passe au cycle 219, avant les étapes 4 à 6 : elle ne touche que le fil B, qui est libre, et l'e-mail sert à l'essai de Samuel. Elle n'est utile sur la préversion qu'après S1. C'est le seul écart à l'ordre des étapes, et il ne retarde aucune étape plus prioritaire.
 - Si une décision (M1-TL, M1-S) demande une PR de plus, tout le fil A glisse d'un cycle ; les autres fils continuent.
+- **Note du CEO (2026-11-01)** : l'étape 8 compte désormais M8-TL, M8-C et M8-D avant M8a, et M8c est coupée en M8c-1 et M8c-2 (§ 8 (c), Q826) ; ces tâches prennent les cycles libres à partir du 259e, M8-D seule sur `db/migrations` dans son cycle. Les lignes 227 à 229 du tableau ci-dessus sont réécrites dans l'ordre de Q826 (M8-TL, M8-C, M8-D, M8a, M8b, M8c-1, M8c-2) ; les cycles réels sont ceux de `STATUS.md`.
 - **Note du CEO (2026-10-29)** : les lignes M5 des cycles 222 à 226 (M5e, M5a, M5b, M5c, M5d) précèdent le découpage de 0147 § 14 ; l'ordre de M5 qui fait foi est celui du § 5 (c) : M5-C et M5-D d'abord, M5d coupée en M5d-1 et M5d-2. De même, M4-suite (§ 4 (c), Q697) n'y figure pas, ni les deux tâches `db/migrations` ajoutées depuis : B4e (§ 3 (c), 0144 § 7 ; après la fusion de #866) et M5-D (§ 5 (c), fusionnée par la PR #899 le 2026-10-29 à 19:08 UTC ; sa ligne de `MIGRATIONS_APPROUVEES` passe par une PR de workflow séparée après #866, Q713). Le tableau n'est pas réécrit.
 - Les tâches du site d'essai encore ouvertes (#822, #826, #692, #687 ; #827 est fusionnée depuis le 2026-10-28) se terminent sur leur branche. Le CEO n'en ouvre pas de nouvelles sur le prototype, sauf correction demandée par Samuel (0115 § 5.5 : aucune nouvelle tâche de qualité sur l'ancienne chaîne non plus).
 
@@ -302,7 +309,7 @@ Chaque action est une seule chose à faire. Le CEO l'envoie au moment indiqué, 
 | S3 | M1i fusionnée | Poser `owner-approved` sur la PR de workflow des migrations, puis lancer `db-migrate` sur `main` (bouton « Run workflow », champ `sha_attendu` donné par le CEO) | Les tables et colonnes de l'étape 1 sur Neon |
 | S4 | Avant le premier essai déployé | Répondre à Q438 (purge des coordonnées du MVP faite par le studio, recommandation : oui) | Le respect des 30 jours de `place_coordinates` pour les vrais voyages (#527) |
 | S5 | B4c fusionnée (cycle 221 prévu) | Sur stripe.com : ouvrir un compte suisse en **mode test**, activer TWINT dans « Payment methods », copier `sk_test_…` dans Vercel (Preview, `mvp-essai`), puis créer le point de terminaison du webhook avec l'adresse donnée par le CEO et copier son secret `whsec_…` (Q26, Q353) | Le paiement de test par TWINT et carte (étape 3) |
-| S6 | M8c et M9c prêtes, avant tout testeur hors de Samuel | Valider (ou faire valider) les textes de « Retenir mes goûts », d'export et de suppression, et les durées de conservation (Q5, Q27, Q150) | L'ouverture des étapes 8 et 9 à d'autres personnes (pas le code) |
+| S6 | M8c-1, M8c-2 et M9c prêtes, avant tout testeur hors de Samuel | Valider (ou faire valider) les textes de « Retenir mes goûts », d'export et de suppression, et les durées de conservation (Q5, Q27, Q150) | L'ouverture des étapes 8 et 9 à d'autres personnes (pas le code) |
 | S7 | Fin de l'étape 9 | Mise en ligne publique : domaine, production, plafonds Google (étape 10, à discuter) | — |
 
 Aucun réglage de la production n'est demandé avant S7 (Q285 : production laissée telle quelle).

@@ -142,6 +142,26 @@ export type {
   TripVersionsRequest,
   TripVersionSummary,
 } from "./retouches";
+export { PreferenceKeySchema, PreferenceSubjectSchema, RetainedPreferenceSchema, RetainedTasteSchema } from "./preference";
+export type { PreferenceSubject, RetainedPreference, RetainedTaste, TasteCandidate } from "./preference";
+export {
+  RemoveAllTastesRequestSchema,
+  RemoveTasteRequestSchema,
+  RestoreTasteRequestSchema,
+  RetainTastesRequestSchema,
+  StopReviewRequestSchema,
+  StopReviewSchema,
+  TripReviewSchema,
+} from "./review";
+export type {
+  RemoveAllTastesRequest,
+  RemoveTasteRequest,
+  RestoreTasteRequest,
+  RetainTastesRequest,
+  StopReview,
+  StopReviewRequest,
+  TripReview,
+} from "./review";
 export { TripSummarySchema } from "./trip-summary";
 export type { TripSummary } from "./trip-summary";
 export {

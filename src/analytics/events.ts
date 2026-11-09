@@ -1,6 +1,15 @@
 import * as z from "zod/mini";
 
-import { BRIEF_FIELDS, CATEGORIES, CHECKOUT_FAILURES, PAYMENT_METHODS, PRICE_VARIANTS } from "@/contracts/values";
+import {
+  BRIEF_FIELDS,
+  CATEGORIES,
+  CHECKOUT_FAILURES,
+  PAYMENT_METHODS,
+  PREFERENCE_ORIGINS,
+  PRICE_VARIANTS,
+  STOP_KINDS,
+  STOP_RATINGS,
+} from "@/contracts/values";
 
 import { EVENT_REASON, EVENT_REASONS, type EventReason } from "./reasons";
 
@@ -196,6 +205,46 @@ export const PlaceAddedEventSchema = z.strictObject({
   properties: z.strictObject({ method: z.literal("button") }),
 });
 
+/**
+ * Après le voyage (spécification F11, F11-PO-16 ; décisions 0021 § 9 et 0160 § 1.2 point 7 ; PR de contrat M8-C, ticket
+ * 1041). Aucune autre propriété : ni identifiant de voyage, d'étape ou de goût, ni nom, ni destination, ni date, ni
+ * texte libre. Aucun événement propre à l'ajout d'une adresse découverte (0160 § 1.2 point 7, amende 0021 § 9) : il
+ * est déjà mesuré par `place_added`.
+ */
+
+/** Choix d'un avis sur une étape, changement compris ; jamais à l'effacement d'un avis (0160 § 1.2 point 7). */
+export const StopReviewedEventSchema = z.strictObject({
+  name: z.literal("stop_reviewed"),
+  properties: z.strictObject({ rating: z.enum(STOP_RATINGS), kind: z.enum(STOP_KINDS) }),
+});
+
+/** « Retenir ces goûts » réussi : nombre de goûts nouvellement retenus, dont déduits. */
+export const TastesRetainedEventSchema = z.strictObject({
+  name: z.literal("tastes_retained"),
+  properties: z
+    .strictObject({
+      count: z.int().check(z.positive()),
+      inferred_count: z.int().check(z.nonnegative()),
+    })
+    .check(
+      z.refine((properties) => properties.inferred_count <= properties.count, {
+        message: "inferred_count au plus count",
+      }),
+    ),
+});
+
+/**
+ * « Retirer » un goût, à l'expiration du délai d'annulation sans « Annuler » (comme `preference_removed`, 0020 § 9) :
+ * catégorie du sujet (ou `distance`) et origine, sans le sens ni la clé du goût.
+ */
+export const TasteRemovedEventSchema = z.strictObject({
+  name: z.literal("taste_removed"),
+  properties: z.strictObject({
+    category: z.union([CategoryPropertySchema, z.literal("distance")]),
+    origin: z.enum(PREFERENCE_ORIGINS),
+  }),
+});
+
 export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   DeckDecisionEventSchema,
   DeckUndoEventSchema,
@@ -213,6 +262,9 @@ export const AnalyticsEventSchema = z.discriminatedUnion("name", [
   ReplaceUndoneEventSchema,
   StopMovedEventSchema,
   PlaceAddedEventSchema,
+  StopReviewedEventSchema,
+  TastesRetainedEventSchema,
+  TasteRemovedEventSchema,
 ]);
 export type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
 export type AnalyticsEventName = AnalyticsEvent["name"];

@@ -457,6 +457,9 @@ Noms en `snake_case`, propriétés sans donnée personnelle. Ils alimentent les 
 | `paywall_viewed` / `payment_started` / `payment_succeeded` | `method: twint \| card`, `price_variant` |
 | `replace_applied` / `replace_undone` | `reason`, `from_reserve: boolean`, `duration_ms` |
 | `place_added` | `method: button` (seul geste d'ajout ; décision 0155 § 4.2) |
+| `stop_reviewed` | `rating: liked \| disliked \| notDone`, `kind: activity \| meal \| event` ; jamais à l'effacement d'un avis (F11-PO-16 ; décision 0160 § 1.2 point 7) |
+| `tastes_retained` | `count` (≥ 1), `inferred_count` (0 à `count`) (F11-PO-16) |
+| `taste_removed` | `category` (dont `distance`), `origin: confirmed \| inferred` ; à l'expiration du délai d'annulation (F11-PO-16) |
 | `stop_moved` | `method: button \| drag` |
 | `checklist_item_done` | — |
 | `today_opened` | `offline: boolean` |
