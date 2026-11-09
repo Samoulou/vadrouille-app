@@ -66,6 +66,14 @@ export type AuthOperations = {
   readonly readSession: (headers: Headers) => Promise<AuthSession | null>;
   /** Ferme la session du cookie (idempotente). */
   readonly signOut: (headers: Headers) => Promise<{ readonly ok: true } | AuthFailure>;
+  /**
+   * Instant de création d'une session non expirée (M9a, réauthentification récente ; spécification M9 § 1.3, T1), `null`
+   * si elle est inconnue, expirée ou illisible. Lu dans `sessions.created_at`, que Better Auth 1.7.7 écrit à la création
+   * (`createSession` : `createdAt: new Date()`) et **ne change pas à la prolongation** (`getSession` → `updateSession` avec
+   * `expiresAt` et `updatedAt` seulement ; c'est aussi la mesure de son propre `freshSessionMiddleware`). Une session
+   * n'est créée que par une vérification de code réussie : l'instant mesure donc le dernier code juste de cette session.
+   */
+  readonly readSessionCreatedAt: (sessionId: string) => Promise<Date | null>;
 };
 
 /**
@@ -102,6 +110,8 @@ const POOL_VERROUS = { max: 5, connectionTimeoutMillis: 5_000, query_timeout: 10
 const DUREE_SOUS_VERROU_MS = 20_000;
 /** Forme d'un code de connexion : 6 chiffres ASCII (B3-PO-4). */
 const FORME_CODE = /^[0-9]{6}$/;
+/** Identifiant de session (`sessions.id`, `uuid`), contrôlé avant toute requête. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Le délai d'une opération tenue sous verrou est dépassé ; ne porte aucune valeur. */
 class DelaiDepasseError extends Error {
@@ -340,7 +350,21 @@ export function createAuthOperations(config: AuthOperationsConfig): AuthOperatio
     }
   }
 
-  return Object.freeze({ requestCode, verifyCode, readSession, signOut });
+  async function readSessionCreatedAt(sessionId: string): Promise<Date | null> {
+    if (secret === null || typeof sessionId !== "string" || !UUID.test(sessionId)) return null;
+    try {
+      const lu = await database.execute<{ cree_ms: unknown }>(
+        sql`SELECT (extract(epoch FROM created_at) * 1000)::float8 AS cree_ms FROM sessions WHERE id = ${sessionId} AND expires_at > now() LIMIT 1`,
+      );
+      const ms = Number(lu.rows[0]?.cree_ms);
+      return lu.rows.length === 1 && Number.isFinite(ms) ? new Date(ms) : null;
+    } catch (erreur) {
+      journaliserEchec("session-created-at", erreur);
+      return null;
+    }
+  }
+
+  return Object.freeze({ requestCode, verifyCode, readSession, signOut, readSessionCreatedAt });
 }
 
 let parDefaut: AuthOperations | undefined;

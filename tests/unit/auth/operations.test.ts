@@ -56,7 +56,8 @@ describe("exports", () => {
         expect(Object.hasOwn(valeur, "$context")).toBe(false);
       }
     }
-    expect(Object.keys(operations).sort()).toEqual(["readSession", "requestCode", "signOut", "verifyCode"]);
+    // M9a (ticket 1097 ; spécification M9 § 1.3, T1) : instant de création d'une session, pour la réauthentification récente.
+    expect(Object.keys(operations).sort()).toEqual(["readSession", "readSessionCreatedAt", "requestCode", "signOut", "verifyCode"]);
     expect(Object.isFrozen(operations)).toBe(true);
     // M7a (PR 870) : composition du port des notifications (`notificationsDuServeur`), qui rend le port et l'origine, jamais `auth`.
     // M6c (ticket 1021 ; décision 0157 § 1.7 point 10) : composition des rappels (`rappelsDuServeur`), même forme.
@@ -77,6 +78,7 @@ describe("configuration injectée", () => {
     const operations = moduleAuth.createAuthOperations(configuration(null));
     expect(await operations.signOut(new Headers())).toEqual({ ok: false, code: "provider_error" });
     expect(await operations.readSession(new Headers())).toBeNull();
+    expect(await operations.readSessionCreatedAt("0d000000-0000-4000-8000-000000000001")).toBeNull();
   });
 });
 

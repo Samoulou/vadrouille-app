@@ -1,6 +1,7 @@
 import "server-only";
 
 import { type SQL, sql } from "drizzle-orm";
+import type { PgTransactionConfig } from "drizzle-orm/pg-core";
 
 import { createDatabase, type Database } from "../../db/index.ts";
 import type { AdapterContext } from "@/adapters/types";
@@ -26,20 +27,28 @@ export class WithOrgContextError extends Error {
 
 export type OrgTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
-type FonctionWithOrg = <T>(ctx: Pick<AdapterContext, "organizationId" | "userId">, fn: (tx: OrgTransaction) => Promise<T>) => Promise<T>;
+/**
+ * `config` (M9a, ticket 1097) : mode de la transaction, facultatif (`BEGIN ISOLATION LEVEL … READ ONLY`, posé par Drizzle
+ * avant `set_config`) ; l'export du compte s'en sert pour une lecture cohérente en une transaction en lecture seule.
+ */
+type FonctionWithOrg = <T>(
+  ctx: Pick<AdapterContext, "organizationId" | "userId">,
+  fn: (tx: OrgTransaction) => Promise<T>,
+  config?: PgTransactionConfig,
+) => Promise<T>;
 
 /**
  * Fabrique liée à un client donné (tests, revue du head `f0b8c5a`, mineur 9) : l'API de production, `withOrg`, ne
  * prend aucun client en paramètre.
  */
 export function creerWithOrg(database: Database): FonctionWithOrg {
-  return async (ctx, fn) => {
+  return async (ctx, fn, config) => {
     if (typeof ctx.organizationId !== "string" || !UUID.test(ctx.organizationId)) throw new WithOrgContextError();
     if (typeof ctx.userId !== "string" || !UUID.test(ctx.userId)) throw new WithOrgContextError();
     return database.transaction(async (tx) => {
       await tx.execute(sql`SELECT set_config('app.organization_id', ${ctx.organizationId}, true), set_config('app.user_id', ${ctx.userId}, true)`);
       return fn(tx);
-    });
+    }, config);
   };
 }
 
@@ -68,7 +77,11 @@ export function executeurSql(tx: OrgTransaction): { query(texte: string, valeurs
 let parDefaut: FonctionWithOrg | undefined;
 
 /** Sur le client du rôle `vadrouille_app` de `db/index.ts`. */
-export async function withOrg<T>(ctx: Pick<AdapterContext, "organizationId" | "userId">, fn: (tx: OrgTransaction) => Promise<T>): Promise<T> {
+export async function withOrg<T>(
+  ctx: Pick<AdapterContext, "organizationId" | "userId">,
+  fn: (tx: OrgTransaction) => Promise<T>,
+  config?: PgTransactionConfig,
+): Promise<T> {
   parDefaut ??= creerWithOrg(createDatabase("vadrouille_app"));
-  return parDefaut(ctx, fn);
+  return parDefaut(ctx, fn, config);
 }

@@ -193,7 +193,7 @@ Admis nommément, hors du tableau (décision 0080, B7a) : `parse5` dans le seul 
 | Après le voyage | `getTripReview` (fonction à part, décisions 0021 et 0160 § 1.2 point 5) ; `rateStop`, `retainTastes`, `removeTaste`, `restoreTaste`, `removeAllTastes` | lecture ; action | `StopReviewRequest` ; `RetainTastesRequest` ; `RemoveTasteRequest` ; `RestoreTasteRequest` ; `RemoveAllTastesRequest` | `TripReview` ; `StopReview` ; `RetainedTaste` | propriétaire du voyage (`trips.created_by`) ; goûts : la personne de la session (décision 0160 § 1.5) | `requestId` (rejeux automatiques, 0160 § 1.2 point 6) | `not_found`, `validation_failed`, `rate_limited` |
 | États | transverses : chaque erreur est un `ApiError` | — | — | — | — | — | voir la correspondance ci-dessous |
 | Vue partagée | `createShareLink` ; `revokeShareLink` ; lecture `/p/[token]` par `TripAdapter.getSharedTrip` ; `getPlaceDetails` depuis la vue partagée, seulement pour un `placeId` du voyage du lien (§ 12) | action ; lecture | — | `ShareLink` ; `SharedTrip` ; `PlaceDetails` | propriétaire ou conseiller ; lecture : lien valide | un lien actif par voyage (PO-7) | `link_expired`, `link_revoked`, `not_found`, `rate_limited`, `cost_cap_reached` |
-| Compte : export et suppression (cadrage § 3.5) | `exportAccount` ; `deleteAccount` (§ 12) | action | — | `AccountExport` | propriétaire (vérifié dans `src/server` et par `purge_organization_data`), avec **réauthentification récente** : code vérifié depuis moins de 10 minutes (§ 12) | suppression idempotente | `forbidden`, `reauthentication_required` (ajouté par B11) |
+| Compte : export et suppression (cadrage § 3.5) | `exportAccount` (M9a : route `GET /api/v1/compte/export`, `src/server/routes/compte-export.ts`, forme T2 à confirmer) ; `deleteAccount` (§ 12) | route ; action | — | `AccountExport` | propriétaire (vérifié dans `src/server` et par `purge_organization_data`), avec **réauthentification récente** : code vérifié depuis moins de 10 minutes (§ 12) | suppression idempotente | `forbidden`, `reauthentication_required` (ajouté par B11) |
 
 Un voyage d'une autre organisation renvoie `not_found`, jamais `forbidden` : on ne révèle pas son existence.
 
@@ -252,7 +252,7 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 | `ChecklistUpdate` | `{ tripId, itemId, done }`, objet strict : état coché voulu d'une ligne « À faire » (`src/contracts/trip.ts`) | B6b (fait ; déplacé de B11 par la décision 0086 § 2.2) |
 | `PlaceDetails` | Détail d'un lieu chargé à la demande (contenu Google, jamais stocké, affiché avec attribution) | B11 |
 | `StopReport` | Signalement d'erreur sur une étape : `{ tripId, stopId, reason, requestId }`, objet strict ; motif (code fermé `STOP_REPORT_REASONS` : `closed`, `hours`, `wrongPlace`, `price`, `other`), aucun texte (M5-PO-9, décision 0147 § 1) (`src/contracts/trip.ts`) | PR de contrat M5-C (fait, 0147 § 14) ; action `reportStop` : M5c |
-| `AccountExport` | Export des données de la personne (format JSON) | B11 |
+| `AccountExport` | Export des données de la personne (format JSON) : en-tête `format`, `version`, `exportedAt`, `notice`, puis `account`, `trips[]` (brief, logements, engagements, toutes les versions, tri, « À faire », signalements, avis, rappels, liens privés, paiements, droits) et `tastes[]` ; liste blanche stricte, aucune donnée Google hors `placeId` (`src/contracts/account-export.ts`, spécification M9 § 3.2 ; forme T3 à confirmer par le Tech Lead) | M9a (ticket 1097) |
 | `ShareLink` | Adresse du lien privé, expiration | B12 |
 | `SharedTrip` | Lecture seule des écrans 11 et 12, sans information de logement tant que Q50 n'est pas tranchée, **sans `organizationId`** (schéma strict ; test `partage: SharedTrip n'expose pas organizationId`) | B12 |
 
@@ -269,7 +269,8 @@ Les contrats déjà exportés par `src/contracts` ou `src/adapters` ne figurent 
 | `provider_error`, `cost_cap_reached`, `quota_reached`, `internal` | `error` (`retryable` dit si « Réessayer » est proposé) |
 | `validation_failed` (avec `field`) | erreur de champ du formulaire |
 | `unauthenticated` | redirection vers la connexion (décision 0017 § 4) |
-| `not_found`, `forbidden`, `link_expired`, `link_revoked` | page « introuvable » ou lien expiré |
+| `reauthentication_required` | écran « Confirme que c'est toi » : nouveau code, puis retour à l'action choisie (spécification M9 § 1.3 ; ajouté par M9a) |
+| `not_found`, `forbidden`, `link_expired`, `link_revoked` | page « introuvable » ou lien expiré (`forbidden` ajouté à `API_ERROR_CODES` par M9a : export refusé à un conseiller ou dans une organisation partagée, sous réserve de T9) |
 | `rate_limited`, `invalid_code`, `code_expired`, `too_many_attempts`, `email_cap_reached` | message du formulaire de connexion (`email_cap_reached` : « Le nombre d'emails du jour est atteint. Réessaie demain. », texte de M2c) |
 | `active_preview_exists`, `already_unlocked` | message de l'écran concerné (`active_preview_exists` : décision 0017, rendu 0018 ; sa levée après déblocage suit Q135) |
 

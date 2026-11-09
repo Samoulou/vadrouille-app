@@ -340,6 +340,12 @@ export const API_ERROR_CODES = [
   // M5 (décision 0147 § 8) : retouche refusée sur un voyage non débloqué (M5-PO-1) ; `retryable` faux. Symétrique
   // d'`already_unlocked`. Ajouté à la fin, sans renommer ni réordonner.
   "not_unlocked",
+  // M9a (spécification M9 § 6.1 ; ticket 1097) : export ou suppression du compte refusés faute de connexion récente (code
+  // vérifié depuis moins de 10 minutes, handover § 12), puis export refusé à un conseiller ou dans une organisation à
+  // plusieurs membres (`forbidden`, sous réserve de T9 : le Tech Lead peut retenir `not_found`). Ajoutés à la fin, sans
+  // renommer ni réordonner.
+  "reauthentication_required",
+  "forbidden",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
