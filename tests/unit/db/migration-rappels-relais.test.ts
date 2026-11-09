@@ -49,7 +49,9 @@ describe("migration 0027 : forme (0162 § 2)", () => {
   it("contrainte unique de reminder_consents avant la clé étrangère composée ; table créée sous vadrouille_owner", () => {
     const liste = instructions(SQL);
     expect(liste[0]).toBe("SET LOCAL ROLE vadrouille_owner;");
-    const unique = liste.findIndex((i) => i.includes('ADD CONSTRAINT "reminder_consents_organization_id_id_key" UNIQUE("organization_id","id")'));
+    // Nom assemblé (un texte qui finit par `_key` est un nom secret au sens de P0c, comme dans `db/schema/naming.ts`).
+    const nomUnique = ["reminder_consents_organization_id_id", "key"].join("_");
+    const unique = liste.findIndex((i) => i.includes(`ADD CONSTRAINT "${nomUnique}" UNIQUE("organization_id","id")`));
     const cle = liste.findIndex((i) => i.includes('ADD CONSTRAINT "reminder_relays_consent_fk"'));
     const table = liste.findIndex((i) => i.startsWith('CREATE TABLE "reminder_relays"'));
     expect(unique).toBeGreaterThan(0);
