@@ -185,6 +185,16 @@ export function createMockPaymentAdapter(options: MockPaymentOptions): PaymentAd
       return { unlocked: entitled(ctx.organizationId, tripId) };
     },
 
+    // Aucun reçu pour les démonstrations (décision 0144 § 2 point 2, sauf réponse contraire du Product Owner à la
+    // question 5 de la PR 884) : `R9-recu` répond 404 et aucun lien « Voir le reçu » n'est rendu.
+    async getReceipt() {
+      return fail("not_found");
+    },
+
+    async listReceipts() {
+      return ok([]);
+    },
+
     async simulateOutcome(ctx, checkoutId, outcome) {
       const record = find(ctx, checkoutId);
       if (!record) return fail("not_found");

@@ -512,3 +512,40 @@ export function isEmailShape(value: string): boolean {
   const dot = domain.indexOf(".");
   return dot > 0 && !domain.startsWith(".") && !domain.endsWith(".");
 }
+
+/**
+ * Origine du reçu de Stripe (décision 0144 § 5.3 point 3) : **liste fermée**, seul littéral de cette origine dans ce
+ * fichier ; ajouter une origine demande une nouvelle décision (Tech Lead, avec la Sécurité).
+ */
+export const ORIGINES_RECU: readonly string[] = ["https://pay.stripe.com"];
+/** Plafond de longueur du lien du reçu (0144 § 2 point 3 ; `CHECK` de la migration 0025_recu_stripe). */
+export const LONGUEUR_MAX_RECU = 2048;
+/**
+ * Motif de la Sécurité (0144 § 5.2), recopié du `CHECK` `checkouts_stripe_receipt_url_check` de la migration
+ * 0025_recu_stripe, sensible à la casse : l'hôte en majuscules est refusé.
+ */
+const MOTIF_RECU = /^https:\/\/pay\.stripe\.com\/receipts\/[A-Za-z0-9_%./~-]+(\?[A-Za-z0-9_%=&.~-]*)?$/;
+/** Second motif du `CHECK` (0144 § 5.3 point 1) : `..` et ses formes encodées (`%2e`), sans égard à la casse. */
+const REMONTEE_RECU = /(\.|%2e)(\.|%2e)/i;
+
+/**
+ * Seule fonction qui admet un lien de reçu de Stripe (0144 § 5.3 point 3), dans le module de sa liste fermée (lu par
+ * l'interface sans `zod`, décision 0016 § 3.1), employée avant l'écriture en base (webhook Stripe), par le raffinement
+ * de `ReceiptSchema` (forme `stripe`, `billing.ts`) et avant tout `href` (`R9-recu`), y compris sur une valeur relue de
+ * la base. Vraie **seulement** si : (1) chaîne d'au plus 2048 caractères ; (2) **la chaîne brute** passe
+ * les deux motifs du `CHECK` (motif de la Sécurité, sensible à la casse ; refus de `..` et de `%2e%2e` sans égard à la
+ * casse), **avant** toute analyse, pour que la normalisation de `new URL` (hôte en minuscules, `..` résolu) ne fasse
+ * rien admettre que la base refuserait ; (3) `new URL` réussit sans base ; (4) protocole `https:`, ni identifiants ni
+ * port ; (5) origine dans `ORIGINES_RECU`. La valeur n'est jamais décodée ni réécrite : elle est rendue telle quelle.
+ */
+export function recuStripeAdmis(valeur: unknown): valeur is string {
+  if (typeof valeur !== "string" || valeur.length > LONGUEUR_MAX_RECU) return false;
+  if (!MOTIF_RECU.test(valeur) || REMONTEE_RECU.test(valeur)) return false;
+  let url: URL;
+  try {
+    url = new URL(valeur);
+  } catch {
+    return false;
+  }
+  return url.protocol === "https:" && url.username === "" && url.password === "" && url.port === "" && ORIGINES_RECU.includes(url.origin);
+}

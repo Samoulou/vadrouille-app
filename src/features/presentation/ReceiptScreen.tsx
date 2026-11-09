@@ -4,6 +4,7 @@ import { Button } from "@/components/ligne/Button";
 import { iconButtonClassName } from "@/components/ligne/IconButton";
 import { IconRetour } from "@/components/ligne/icons";
 import type { Receipt } from "@/contracts";
+import { recuStripeAdmis } from "@/contracts/values";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { formatDateLongue } from "@/lib/dates";
@@ -12,6 +13,8 @@ import { decalageMinutes } from "@/lib/fuseaux";
 import { formatPrice } from "./price";
 
 const t = messages.debloquer.recu;
+/** Textes de la forme `stripe` (B4e ; provisoires, question 1 de la décision 0144 au Product Owner et à l'UX). */
+const ts = messages.debloquer.recuStripe;
 
 /**
  * Fuseau d'affichage de la date du reçu : celui du marché du MVP (Suisse romande, cadrage § 1). Le fuseau de la
@@ -40,11 +43,17 @@ export interface ReceiptScreenProps {
 }
 
 /**
- * Reçu maison `R9-recu` du paiement simulé (B4d ; rendus et textes provisoires, UX/UI et Product Owner) : marqué
- * « simulé » dans le titre et par une mention visible avant les détails ; montant, date, voyage et identifiant public
- * du paiement. Aucune donnée de la personne, aucune donnée de paiement (le simulé n'en demande aucune).
+ * Reçu `R9-recu` (B4d, B4e ; rendus et textes provisoires, UX/UI et Product Owner), même forme pour ses deux variantes
+ * (décision 0144 § 1) : titre, mention en aplat avant les détails, puis voyage, montant, moyen, date et identifiant
+ * public du paiement. Aucune donnée de la personne, aucune donnée de paiement.
+ * - `simulated` : reçu maison, marqué « simulé » dans le titre et par la mention ;
+ * - `stripe` : reçu du paiement de test, avec un lien texte externe vers le reçu de Stripe, **revalidé par
+ *   `recuStripeAdmis` avant le `href`** (0144 § 5.3 point 3 ; lien refusé : aucun lien), même onglet (question 3 de 0144
+ *   ouverte), `rel="noopener noreferrer"` et `referrerpolicy="no-referrer"`. Ce lien n'apparaît que dans ce HTML.
  */
 export function ReceiptScreen({ receipt, destination, tripDates, programmeHref }: ReceiptScreenProps) {
+  const textes = receipt.kind === "stripe" ? ts : t;
+  const lienStripe = receipt.kind === "stripe" && recuStripeAdmis(receipt.url) ? receipt.url : null;
   const lignes: readonly { key: string; label: string; value: string; className?: string }[] = [
     { key: "voyage", label: t.voyage, value: format(t.voyageValeur, { destination, dates: tripDates }) },
     { key: "montant", label: t.montant, value: formatPrice(receipt.amount, receipt.currency), className: "tabular-nums" },
@@ -57,13 +66,13 @@ export function ReceiptScreen({ receipt, destination, tripDates, programmeHref }
       <Link href={programmeHref} aria-label={messages.debloquer.retour} className={iconButtonClassName("square", "self-start")}>
         <IconRetour />
       </Link>
-      <h1 className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">{t.titre}</h1>
-      <p data-part="mention-simule" className="rounded-block bg-muted p-4 text-corps text-ink">
-        {t.mention}
+      <h1 className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">{textes.titre}</h1>
+      <p data-part={receipt.kind === "stripe" ? "mention-test" : "mention-simule"} className="rounded-block bg-muted p-4 text-corps text-ink">
+        {textes.mention}
       </p>
       <section aria-labelledby="recu-details" className="flex flex-col gap-3">
         <h2 id="recu-details" className="text-section font-extrabold text-ink">
-          {t.details}
+          {textes.details}
         </h2>
         <dl className="flex flex-col">
           {lignes.map((ligne) => (
@@ -73,6 +82,14 @@ export function ReceiptScreen({ receipt, destination, tripDates, programmeHref }
             </div>
           ))}
         </dl>
+        {lienStripe === null ? null : (
+          <Button asChild variant="text" className="self-start">
+            {/* Lien externe : `<a>` simple (jamais `next/link`), sans référent ni accès à cette fenêtre. */}
+            <a data-part="lien-recu-stripe" href={lienStripe} rel="noopener noreferrer" referrerPolicy="no-referrer">
+              {ts.lien}
+            </a>
+          </Button>
+        )}
       </section>
       <Button asChild className="w-full">
         <Link href={programmeHref}>{messages.debloquer.offre.voirProgramme}</Link>

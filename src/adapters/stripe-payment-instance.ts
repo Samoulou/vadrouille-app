@@ -53,6 +53,8 @@ const NON_BRANCHE: PaymentAdapter = {
   createCheckout: refus,
   getCheckoutStatus: refus,
   getEntitlement: async () => ({ unlocked: false }),
+  getReceipt: refus,
+  listReceipts: refus,
 };
 
 /** Adaptateur `stripe` du processus : celui de la fabrique branchée (construit une fois), sinon le refus. */

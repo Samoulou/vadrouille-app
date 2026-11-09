@@ -3,6 +3,7 @@ import "server-only";
 import Stripe from "stripe";
 
 import { adressePrestataireAdmise } from "@/contracts/billing";
+import { recuStripeAdmis } from "@/contracts/values";
 import type { PaymentMethod } from "@/contracts/values";
 import { logEvent } from "@/server/log";
 
@@ -20,8 +21,9 @@ import { LONGUEUR_MAX_ENTETE, TOLERANCE_SECONDES } from "./signature";
  * PR 867, mineur 4), dont le type de transport est dérivé du constructeur du SDK sans en exporter de valeur.
  *
  * - `creerClientSessionsStripe(cle, configuration)` : le port `PrestatairePaiement` (création et relecture d'une session
- *   Checkout) ; seul lieu où un client `Stripe` est construit, **à chaque appel** (aucun client en cache), avec
- *   `telemetry: false`, `maxNetworkRetries: 1`, un délai de 10 s, sans `appInfo` et sans surcharger `apiVersion`.
+ *   Checkout, lien du reçu d'une session payée) ; seul lieu où un client `Stripe` est construit, **à chaque appel**
+ *   (aucun client en cache), avec `telemetry: false`, `maxNetworkRetries: 1`, un délai de 10 s, sans `appInfo` et sans
+ *   surcharger `apiVersion` ; la lecture du reçu (B4e) passe ses propres options de requête : délai de 2 s, aucune relance.
  * - `verifierEvenementStripe(corps, entete, secret, maintenantMs)` : vérification de la signature d'un événement par la
  *   fonction de la bibliothèque, **sans clé d'API** (aucun client construit), corps brut, tolérance de 300 s passée
  *   explicitement, horloge injectée par `receivedAt`.
@@ -43,6 +45,14 @@ import { LONGUEUR_MAX_ENTETE, TOLERANCE_SECONDES } from "./signature";
 
 /** Options du client (0140 § 1.1 point 4) : rien n'est envoyé sans nécessité. */
 const OPTIONS_CLIENT = { telemetry: false, maxNetworkRetries: 1, timeout: 10_000 } as const;
+
+/**
+ * Options de la seule requête de lecture du reçu (décision 0144 § 5.3 point 2, « délai court ») : 2 s et **aucune
+ * relance** du SDK, passées à cette requête seulement (le client garde `OPTIONS_CLIENT` pour les autres appels).
+ */
+export const OPTIONS_REQUETE_RECU = { timeout: 2_000, maxNetworkRetries: 0 } as const;
+/** Développement demandé pour lire `receipt_url` (0144 § 5.3 point 2) : la Charge de l'intention de paiement de la session. */
+export const EXPANSION_RECU: readonly string[] = ["payment_intent.latest_charge"];
 
 /** Nom du produit de la ligne de la session : constant, sans aucune donnée de la personne ni du voyage. */
 export const NOM_PRODUIT_STRIPE = "Déblocage du voyage";
@@ -70,7 +80,11 @@ export type ClientStripe = {
   readonly checkout: {
     readonly sessions: {
       create(params: ParametresSessionStripe, options: { idempotencyKey: string }): Promise<unknown>;
-      retrieve(id: string): Promise<unknown>;
+      retrieve(
+        id: string,
+        params?: { readonly expand: readonly string[] },
+        options?: { readonly timeout: number; readonly maxNetworkRetries: number },
+      ): Promise<unknown>;
     };
   };
 };
@@ -98,7 +112,8 @@ function clientSdk(client: Stripe): ClientStripe {
     checkout: {
       sessions: {
         create: (params, options) => client.checkout.sessions.create(params, options),
-        retrieve: (id) => client.checkout.sessions.retrieve(id),
+        retrieve: (id, params, options) =>
+          client.checkout.sessions.retrieve(id, params === undefined ? undefined : { expand: [...params.expand] }, options === undefined ? undefined : { ...options }),
       },
     },
   };
@@ -156,6 +171,18 @@ export function parametresSessionStripe(paiement: PaiementPrestataire, configura
 }
 
 /**
+ * `receipt_url` de la Charge développée d'une session (0144 § 5.3 point 2, minimisation) : accès explicite, garde de type
+ * à chaque niveau (`payment_intent`, `latest_charge`), **aucun autre champ lu** ; `undefined` si un niveau n'est pas un
+ * objet (intention ou Charge non développée : identifiant en chaîne, ou `null`).
+ */
+function lienDeRecu(session: Record<string, unknown>): unknown {
+  const intention = session.payment_intent;
+  if (!objet(intention)) return undefined;
+  const charge = intention.latest_charge;
+  return objet(charge) ? charge.receipt_url : undefined;
+}
+
+/**
  * Port `PrestatairePaiement` sur l'API de Stripe, pour la clé reçue (lue par `cleStripe` après la barrière de sortie,
  * dans `composition-stripe.ts`). La clé n'est gardée que dans la fermeture ; aucun type de la bibliothèque n'en sort.
  */
@@ -186,6 +213,29 @@ export function creerClientSessionsStripe(cle: string, configuration: Configurat
         if (session.status !== "open") return { ok: false, code: "provider_error", retryable: false };
         if (typeof session.url !== "string" || !adressePrestataireAdmise(session.url)) return echec("invalid_response", false);
         return { ok: true, value: session.url };
+      } catch (erreur) {
+        return echecErreur(erreur);
+      }
+    },
+
+    /**
+     * Lien du reçu (0144 § 5.3 point 2), sur le modèle d'`adresseSession` : session relue avec sa Charge développée,
+     * délai de 2 s, aucune relance ; `provider_error` sauf si la session lue est celle demandée, porte `metadata.checkoutId`
+     * égal à l'`uuid` interne du paiement, a `payment_status` `paid`, et une Charge dont `receipt_url` passe
+     * `recuStripeAdmis`. Seul ce lien sort d'ici ; il n'est jamais journalisé.
+     */
+    async adresseRecu(sessionId, paiement) {
+      try {
+        if (!SESSION_STRIPE.test(sessionId)) return echec("invalid_response", false);
+        const client = fabrique(cle);
+        const session = await client.checkout.sessions.retrieve(sessionId, { expand: EXPANSION_RECU }, OPTIONS_REQUETE_RECU);
+        if (!objet(session) || session.id !== sessionId || !objet(session.metadata) || session.metadata.checkoutId !== paiement.id) {
+          return echec("invalid_response", false);
+        }
+        if (session.payment_status !== "paid") return echec("invalid_response", false);
+        const lien = lienDeRecu(session);
+        if (!recuStripeAdmis(lien)) return echec("invalid_response", false);
+        return { ok: true, value: lien };
       } catch (erreur) {
         return echecErreur(erreur);
       }

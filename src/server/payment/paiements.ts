@@ -63,6 +63,12 @@ export type PaiementPrestataire = {
 export type PrestatairePaiement = {
   creerSession(paiement: PaiementPrestataire, cleIdempotence: string): Promise<ResultatPrestataire<{ readonly sessionId: string; readonly redirectUrl: string }>>;
   adresseSession(sessionId: string, paiement: Pick<PaiementPrestataire, "id" | "checkoutId" | "tripId">): Promise<ResultatPrestataire<string>>;
+  /**
+   * Lien du reçu d'une session payée (B4e ; décision 0144 § 5.3 point 2), appelé **hors de toute transaction** par le
+   * seul webhook Stripe, après la validation de celle qui accorde le droit : `receipt_url` de la Charge de la session, admis
+   * par `recuStripeAdmis`, ou `provider_error`. Le prestataire simulé n'a pas de reçu de prestataire : `provider_error`.
+   */
+  adresseRecu(sessionId: string, paiement: Pick<PaiementPrestataire, "id" | "checkoutId" | "tripId">): Promise<ResultatPrestataire<string>>;
 };
 
 /**
@@ -178,30 +184,39 @@ function depart(ligne: LignePaiement, redirectUrl: string): Result<CheckoutStart
 }
 
 /**
- * Reçus maison (B4d) : paiement qui a accordé le droit `tripUnlocked` de chaque voyage (`entitlements.billing_id` →
+ * Reçus (B4d, B4e) : paiement qui a accordé le droit `tripUnlocked` de chaque voyage (`entitlements.billing_id` →
  * `billing.checkout_id` → `checkouts`), lu sous RLS dans l'organisation de la transaction et réservé à la personne qui
- * l'a commencé (`created_by`, comme la lecture d'un paiement, B4-PO-7). Un droit sans ligne `billing` (données de test,
- * droit accordé hors paiement) n'a pas de reçu. Rien n'est écrit, rien d'autre n'est lu : ni événement, ni moyen
- * détaillé, ni donnée de la personne.
+ * l'a commencé (`created_by`, comme la lecture d'un paiement, B4-PO-7 ; règle de 0144 § 2 point 4). Un droit sans ligne
+ * `billing` (données de test, droit accordé hors paiement) n'a pas de reçu. Rien n'est écrit, rien d'autre n'est lu : ni
+ * événement, ni moyen détaillé, ni donnée de la personne. Le lien du reçu de Stripe (`stripe_receipt_url`) n'est lu que
+ * pour la forme `stripe`. **Limite assumée en mode test** (0144 § 5.3 point 7) : la règle `created_by` n'est tenue que par
+ * ce code (les membres de l'organisation lisent toute la table sous RLS) ; bloquant avant tout mode réel.
  */
-const SQL_RECUS = `SELECT c.id::text AS id, c.trip_id::text AS trip_id, c.method, c.amount_cents, c.currency,
-    floor(extract(epoch FROM b.received_at) * 1000)::bigint AS paye_ms
+const sqlRecus = (forme: FormeRecu) => `SELECT c.id::text AS id, c.trip_id::text AS trip_id, c.method, c.amount_cents, c.currency,
+    floor(extract(epoch FROM b.received_at) * 1000)::bigint AS paye_ms${forme === "stripe" ? ", c.stripe_receipt_url" : ""}
   FROM entitlements e
   JOIN billing b ON b.id = e.billing_id
   JOIN checkouts c ON c.id = b.checkout_id
-  WHERE e.kind = 'tripUnlocked' AND c.created_by = $1`;
+  WHERE e.kind = 'tripUnlocked' AND c.created_by = $1${forme === "stripe" ? " AND c.stripe_receipt_url IS NOT NULL" : ""}`;
 
-/** Reçu d'une ligne lue, validé par `ReceiptSchema` ; `null` si la ligne ne le respecte pas (jamais inventé). */
-function recuDe(row: Record<string, unknown>): Receipt | null {
-  const valide = ReceiptSchema.safeParse({
-    kind: "simulated",
+/** Forme du reçu rendue par l'adaptateur : reçu maison (`simulated`) ou reçu de Stripe (`stripe`). */
+export type FormeRecu = Receipt["kind"];
+
+/**
+ * Reçu d'une ligne lue, validé par `ReceiptSchema` ; `null` si la ligne ne le respecte pas (jamais inventé). Forme
+ * `stripe` : le lien relu de la base est revalidé par `recuStripeAdmis` (raffinement du schéma, 0144 § 5.3 point 3) ;
+ * un lien absent ou refusé ne donne aucun reçu.
+ */
+function recuDe(row: Record<string, unknown>, forme: FormeRecu): Receipt | null {
+  const champs = {
     checkoutId: versIdentifiantPublic(String(row.id)),
     tripId: String(row.trip_id),
     method: row.method,
     amount: Number(row.amount_cents),
     currency: row.currency,
     paidAt: new Date(Number(row.paye_ms)).toISOString(),
-  });
+  };
+  const valide = ReceiptSchema.safeParse(forme === "stripe" ? { kind: "stripe", ...champs, url: row.stripe_receipt_url } : { kind: "simulated", ...champs });
   return valide.success ? valide.data : null;
 }
 
@@ -337,23 +352,26 @@ export function creerCasPaiement(deps: DependancesPaiement) {
       return enOrganisation(ctx, async (executeur) => ({ unlocked: (await lireDroitVoyage(executeur, tripId)) !== null }));
     },
 
-    /** Reçu maison du voyage (B4d) : `not_found` sans droit payé par la personne ; panne → `provider_error`. */
-    async getReceipt(ctx: AdapterContext, tripId: string): Promise<Result<Receipt>> {
+    /**
+     * Reçu du voyage (B4d ; B4e pour la forme `stripe`) : `not_found` sans droit payé par la personne, ou, pour la forme
+     * `stripe`, sans lien conservé ; panne → `provider_error`.
+     */
+    async getReceipt(ctx: AdapterContext, tripId: string, forme: FormeRecu): Promise<Result<Receipt>> {
       if (!UUID.test(tripId)) return fail("not_found");
       try {
-        const rows = await enOrganisation(ctx, async (executeur) => (await executeur.query(`${SQL_RECUS} AND e.trip_id = $2`, [ctx.userId, tripId])).rows);
-        const recu = rows.length === 0 ? null : recuDe(rows[0] as Record<string, unknown>);
+        const rows = await enOrganisation(ctx, async (executeur) => (await executeur.query(`${sqlRecus(forme)} AND e.trip_id = $2`, [ctx.userId, tripId])).rows);
+        const recu = rows.length === 0 ? null : recuDe(rows[0] as Record<string, unknown>, forme);
         return recu === null ? fail("not_found") : ok(recu);
       } catch {
         return ERREUR_PRESTATAIRE;
       }
     },
 
-    /** Reçus maison de la personne dans l'organisation (« Mes voyages », B4d), dans l'ordre des voyages. */
-    async listReceipts(ctx: AdapterContext): Promise<Result<readonly Receipt[]>> {
+    /** Reçus de la personne dans l'organisation (« Mes voyages », B4d, B4e), dans l'ordre des voyages. */
+    async listReceipts(ctx: AdapterContext, forme: FormeRecu): Promise<Result<readonly Receipt[]>> {
       try {
-        const rows = await enOrganisation(ctx, async (executeur) => (await executeur.query(`${SQL_RECUS} ORDER BY c.trip_id`, [ctx.userId])).rows);
-        return ok(rows.flatMap((row) => recuDe(row as Record<string, unknown>) ?? []));
+        const rows = await enOrganisation(ctx, async (executeur) => (await executeur.query(`${sqlRecus(forme)} ORDER BY c.trip_id`, [ctx.userId])).rows);
+        return ok(rows.flatMap((row) => recuDe(row as Record<string, unknown>, forme) ?? []));
       } catch {
         return ERREUR_PRESTATAIRE;
       }

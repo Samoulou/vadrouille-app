@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import Stripe from "stripe";
 
 import { ORIGINE_PRESTATAIRE } from "@/contracts/billing";
+import { ORIGINES_RECU } from "@/contracts/values";
 import type { CheckoutOutcome } from "@/contracts/values";
 import type { ClientStripe, FabriqueClientStripe, ParametresSessionStripe } from "@/server/payment/stripe";
 
@@ -97,14 +98,40 @@ export type SessionDouble = {
 
 export type AppelDouble =
   | { readonly methode: "create"; readonly cle: string; readonly params: ParametresSessionStripe; readonly idempotencyKey: string }
-  | { readonly methode: "retrieve"; readonly cle: string; readonly id: string };
+  | { readonly methode: "retrieve"; readonly cle: string; readonly id: string }
+  | {
+      readonly methode: "recu";
+      readonly cle: string;
+      readonly id: string;
+      readonly expand: readonly string[];
+      readonly options: { readonly timeout: number; readonly maxNetworkRetries: number } | undefined;
+    };
+
+/**
+ * Lien de reçu de test de la forme de Stripe (`receipt_url` d'une Charge), propre à une session ; construit depuis la
+ * liste fermée (`ORIGINES_RECU`) : ce fichier du régime n'écrit aucun hôte, comme pour `ORIGINE_PRESTATAIRE`.
+ */
+export const lienRecuDeTest = (sessionId: string): string => `${ORIGINES_RECU[0] ?? ""}/receipts/payment/${sessionId.replace(/[^A-Za-z0-9]/g, "")}`;
 
 export type OptionsDouble = {
   /** Réponse à rendre à la place de la session (réponse invalide, adresse hors liste…). */
   readonly reponse?: (session: SessionDouble) => unknown;
   /** Erreur levée par `create` ou `retrieve` (classe du SDK ou autre). */
   readonly erreur?: () => unknown;
+  /**
+   * Lecture du reçu (`retrieve` avec `expand`, B4e) : session développée rendue (défaut : `payment_status` `paid` et la
+   * Charge portant `lienRecuDeTest(id)`), ou promesse qui ne se résout jamais, erreur levée, etc.
+   */
+  readonly recu?: (session: SessionDouble) => unknown;
 };
+
+/** Session développée par défaut d'une lecture du reçu : payée, Charge avec son lien de reçu (aucune donnée de la personne). */
+export const sessionPayeeDeTest = (session: SessionDouble): Record<string, unknown> => ({
+  ...session,
+  status: "complete",
+  payment_status: "paid",
+  payment_intent: { id: `pi_${session.id.slice(8)}`, object: "payment_intent", latest_charge: { id: `ch_${session.id.slice(8)}`, object: "charge", receipt_url: lienRecuDeTest(session.id) } },
+});
 
 /**
  * Double du client Stripe (A22 étendu) : `create` est idempotent par clé (même clé, même session, comme l'API), `retrieve`
@@ -131,11 +158,13 @@ export function creerDoubleStripe(options: OptionsDouble = {}) {
           }
           return reglages.reponse ? reglages.reponse(session) : { ...session };
         },
-        async retrieve(id) {
-          appels.push({ methode: "retrieve", cle, id });
+        async retrieve(id, params, requete) {
+          if (params !== undefined) appels.push({ methode: "recu", cle, id, expand: [...params.expand], options: requete === undefined ? undefined : { ...requete } });
+          else appels.push({ methode: "retrieve", cle, id });
           if (reglages.erreur) throw reglages.erreur();
           const session = sessions.get(id);
           if (session === undefined) throw new Stripe.errors.StripeInvalidRequestError({ message: "No such checkout.session", type: "invalid_request_error" });
+          if (params !== undefined) return reglages.recu ? reglages.recu(session) : sessionPayeeDeTest(session);
           return reglages.reponse ? reglages.reponse(session) : { ...session };
         },
       },
