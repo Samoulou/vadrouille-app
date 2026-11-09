@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ATTENTE_VERROU_ESSAIS,
   cookieAccesValide,
   DUREE_COOKIE_S,
   etatPageAcces,
@@ -249,18 +250,20 @@ describe("p0: jeton limité à 5 essais par heure, masqué", () => {
     expect(base.essais.map((e) => e.resultat)).toEqual(["refuse", "refuse", "refuse", "refuse", "refuse", "accepte", "accepte"]);
   });
 
-  it("mauvais code : verrou, compte des seuls refus, puis ligne « refuse » ; compte illisible → indisponible, sans ligne", async () => {
+  it("mauvais code : borne d'attente, verrou, compte des seuls refus, puis ligne « refuse » ; compte illisible → indisponible, sans ligne", async () => {
     const base = baseEssais(T0);
     const avant = base.requetes.length;
     expect(await saisirCodeAcces("faux", () => base.pool, dependances(base))).toEqual({ ok: false, code: "invalid_code" });
     const textes = base.requetes.slice(avant).map((r) => r.texte);
-    expect(textes).toHaveLength(5);
+    expect(textes).toHaveLength(6);
     expect(textes[0]).toBe("BEGIN");
-    expect(textes[1]).toContain("pg_advisory_xact_lock");
-    expect(textes[2]).toContain("pg_catalog.count(*)");
-    expect(textes[2]).toContain("resultat = 'refuse'");
-    expect(textes[3]).toBe("INSERT INTO prototype.run_attempts (resultat) VALUES ($1)");
-    expect(textes[4]).toBe("COMMIT");
+    // `lock_timeout` local à la transaction, posé après `BEGIN` et avant le verrou (risque 4 de l'amendement de 0165).
+    expect(textes[1]).toBe(`SELECT pg_catalog.set_config('lock_timeout', '${ATTENTE_VERROU_ESSAIS}', true)`);
+    expect(textes[2]).toContain("pg_advisory_xact_lock");
+    expect(textes[3]).toContain("pg_catalog.count(*)");
+    expect(textes[3]).toContain("resultat = 'refuse'");
+    expect(textes[4]).toBe("INSERT INTO prototype.run_attempts (resultat) VALUES ($1)");
+    expect(textes[5]).toBe("COMMIT");
     const illisible = (): PoolSql => ({
       connect: async () => {
         const client = await base.pool.connect();
@@ -272,6 +275,35 @@ describe("p0: jeton limité à 5 essais par heure, masqué", () => {
     });
     expect(await saisirCodeAcces("faux", illisible, dependances(base))).toEqual({ ok: false, code: "indisponible" });
     expect(base.essais.map((e) => e.resultat)).toEqual(["refuse"]);
+  });
+
+  it("verrou tenu au-delà de la borne d'attente : mauvais code → indisponible, sans compte ni ligne ; le bon code passe", async () => {
+    // Risque 4 de l'amendement de 0165 ; revue de #1077, mineur 3 : l'attente du verrou est bornée (`lock_timeout`).
+    expect(ATTENTE_VERROU_ESSAIS).toBe("5s");
+    const base = baseEssais(T0);
+    const pool = () => base.pool;
+    base.verrouTenu = true;
+    for (const saisie of ["faux", randomBytes(32).toString("hex"), "a".repeat(LONGUEUR_SAISIE_MAX + 1)]) {
+      const avant = base.requetes.length;
+      expect(await saisirCodeAcces(saisie, pool, dependances(base))).toEqual({ ok: false, code: "indisponible" });
+      const textes = base.requetes.slice(avant).map((r) => r.texte);
+      expect(textes[0]).toBe("BEGIN");
+      expect(textes[1]).toContain("set_config('lock_timeout'");
+      expect(textes[2]).toContain("pg_advisory_xact_lock");
+      expect(textes.slice(3)).toEqual(["ROLLBACK"]);
+    }
+    expect(base.requetes.some((r) => r.texte.startsWith("INSERT") || r.texte.includes("pg_catalog.count(*)"))).toBe(false);
+    expect(base.essais).toEqual([]);
+    // Le bon code ne prend pas le verrou (0165 § 1.2, critère 4 de § 4.1) : accepté même verrou tenu, sans borne posée.
+    const avant = base.requetes.length;
+    const accepte = await saisirCodeAcces(code.toString("hex"), pool, dependances(base));
+    expect(accepte.ok).toBe(true);
+    expect(base.requetes.slice(avant).map((r) => r.texte)).toEqual(["BEGIN", "INSERT INTO prototype.run_attempts (resultat) VALUES ($1)", "COMMIT"]);
+    expect(base.essais.map((e) => e.resultat)).toEqual(["accepte"]);
+    // Verrou libéré : le mauvais code est de nouveau compté.
+    base.verrouTenu = false;
+    expect(await saisirCodeAcces("faux", pool, dependances(base))).toEqual({ ok: false, code: "invalid_code" });
+    expect(base.essais.map((e) => e.resultat)).toEqual(["accepte", "refuse"]);
   });
 
   it("six bons codes dans l'heure sont tous acceptés (six lignes « accepte »)", async () => {

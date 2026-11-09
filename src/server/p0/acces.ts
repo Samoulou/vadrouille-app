@@ -29,7 +29,8 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
  * - Essais (décision 0165 § 1, voie (c), confirmée par la Sécurité) : 5 refus par heure glissante ; le bon code n'est
  *   jamais compté contre lui. La saisie est comparée d'abord ; le bon code est accepté sans verrou ni compte ; seuls les
  *   refus sont comptés, sous verrou consultatif, dans `prototype.run_attempts` (seule la colonne `resultat` est écrite ;
- *   aucune adresse, aucune empreinte, aucune longueur).
+ *   aucune adresse, aucune empreinte, aucune longueur). L'attente du verrou est bornée par `lock_timeout`
+ *   (`ATTENTE_VERROU_ESSAIS`, risque 4 de l'amendement de 0165) : au-delà, `indisponible`, sans ligne écrite.
  * - Cookie `__Host-p0_acces` = `v1.<exp>.<mac>`, `mac = hex(HMAC(K_cookie, "p0/v1/acces/p0-reel/" + exp))`,
  *   `K_cookie = HMAC-SHA-256(code, "vadrouille/p0/cookie/v1")` ; échéance fixe de 12 heures, jamais prolongée ; une
  *   rotation du code invalide tous les cookies au déploiement suivant.
@@ -43,6 +44,14 @@ export const NOM_COOKIE_ACCES = "__Host-p0_acces";
 export const DUREE_COOKIE_S = 43_200;
 /** Refus par heure glissante (0055, section 2 point 3, amendé par 0165 § 1.2) ; le bon code n'est jamais compté contre lui. */
 export const ESSAIS_PAR_HEURE = 5;
+/**
+ * Attente maximale du verrou des mauvaises saisies (`lock_timeout` local à la transaction ; risque 4 de l'amendement de
+ * 0165, revue de #1077, mineur 3). Même borne que `ATTENTE_VERROU` de `src/server/auth/index.ts` (5 s) : un afflux de
+ * mauvaises saisies ne tient pas une connexion chacune plus longtemps que cela ; au-delà, Postgres lève 55P03, la
+ * transaction est annulée et la saisie reçoit `indisponible`, sans ligne écrite (échec fermé). Le bon code ne prend
+ * pas le verrou et n'est pas concerné. Texte écrit dans la requête (constante, aucune valeur tirée de la saisie).
+ */
+export const ATTENTE_VERROU_ESSAIS = "5s";
 /** Saisie au-delà de cette longueur : essai refusé et compté, sans décodage ni calcul (0055, section 2 point 2). */
 export const LONGUEUR_SAISIE_MAX = 256;
 
@@ -192,12 +201,13 @@ export function etatPageAcces(cookie: string | undefined, dependances: Dependanc
 
 /**
  * Issue d'une saisie : cookie à poser, ou code fermé. `fermee` : garde fermée (aucune base lue) ; `indisponible` :
- * base injoignable ou erreur, l'essai n'a pas pu être compté (échec fermé).
+ * base injoignable, attente du verrou dépassée ou erreur, l'essai n'a pas pu être compté (échec fermé).
  */
 export type ResultatSaisie =
   | { readonly ok: true; readonly cookie: string }
   | { readonly ok: false; readonly code: "fermee" | "invalid_code" | "too_many_attempts" | "indisponible" };
 
+const SQL_ATTENTE_VERROU = `SELECT pg_catalog.set_config('lock_timeout', '${ATTENTE_VERROU_ESSAIS}', true)`;
 const SQL_VERROU = "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('p0_run_attempts'))";
 const SQL_COMPTE = `SELECT pg_catalog.count(*) AS n FROM prototype.run_attempts
 WHERE resultat = 'refuse' AND created_at > pg_catalog.now() - pg_catalog.make_interval(mins => 60)`;
@@ -217,9 +227,11 @@ function essaiAccepte(saisie: unknown, attendu: Buffer): boolean {
  * 2. Comparaison (`essaiAccepte`), avant toute connexion : calcul local seulement.
  * 3. Bon code : transaction `vadrouille_prototype` sans verrou ni compte, ligne `accepte`, `COMMIT`, puis cookie (rendu
  *    seulement après un `COMMIT` réussi).
- * 4. Mauvais code (ou saisie hors forme) : transaction avec verrou consultatif et compte des seuls refus des
- *    60 dernières minutes ; à 5 ou plus, `too_many_attempts` sans ligne nouvelle ; sinon ligne `refuse`, `invalid_code`.
- * Base injoignable, compte illisible ou toute erreur : `indisponible`, jamais un cookie (échec fermé).
+ * 4. Mauvais code (ou saisie hors forme) : transaction avec `lock_timeout` local (`ATTENTE_VERROU_ESSAIS`), verrou
+ *    consultatif et compte des seuls refus des 60 dernières minutes ; à 5 ou plus, `too_many_attempts` sans ligne
+ *    nouvelle ; sinon ligne `refuse`, `invalid_code`. Attente du verrou au-delà de la borne : `indisponible`, sans ligne.
+ * Base injoignable, attente du verrou dépassée, compte illisible ou toute erreur : `indisponible`, jamais un cookie
+ * (échec fermé).
  */
 export async function saisirCodeAcces(saisie: unknown, pool: () => PoolSql, dependances: DependancesAcces = {}): Promise<ResultatSaisie> {
   const ouverture = ouvertureP0(dependances);
@@ -236,6 +248,8 @@ export async function saisirCodeAcces(saisie: unknown, pool: () => PoolSql, depe
     await client.query("BEGIN");
     enTransaction = true;
     if (!accepte) {
+      // `set_config(…, true)` : borne locale à cette transaction, levée au `COMMIT` ou au `ROLLBACK`.
+      await client.query(SQL_ATTENTE_VERROU);
       await client.query(SQL_VERROU);
       const refus = Number((await client.query(SQL_COMPTE)).rows[0]?.n);
       if (!Number.isSafeInteger(refus)) throw new Error("p0: refus illisibles");
