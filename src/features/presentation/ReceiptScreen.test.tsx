@@ -76,7 +76,7 @@ describe("ReceiptScreen", () => {
     expect(ReceiptSchema.parse(STRIPE)).toEqual(STRIPE);
     const { container } = rendre(STRIPE);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Reçu$/);
-    expect(container.querySelector("[data-part='mention-test']")).toHaveTextContent("Paiement de test : aucun montant réel n'a été débité.");
+    expect(container.querySelector("[data-part='mention-test']")).toHaveTextContent("Paiement de test : aucun montant réel n'a été débité et ce reçu n'a aucune valeur comptable.");
     expect(container.querySelector("[data-part='mention-simule']")).toBeNull();
     const details = screen.getByRole("region", { name: "Détails du paiement" });
     expect(within(details).getAllByRole("term").map((dt) => dt.textContent)).toEqual(["Voyage", "Montant", "Moyen de paiement", "Date", "Identifiant du paiement"]);
