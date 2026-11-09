@@ -226,3 +226,29 @@ Composition simulée partout, aucun appel payant, tests de base en CI. Les fichi
 - À B10f (signal `travelReduction` sur `api`) : passage de `GOUT_DISTANCE_PROPOSE` à `true` avec le champ du prompt (tâche à part, avec ia-recherche).
 - À l'arrivée d'un second membre dans une organisation (agences, après le MVP) : `stop_reviews` a une ligne par étape **pour le voyage**, et la politique d'écriture proposée (`created_by = app_current_user()`, § 2.1) empêcherait un second membre de modifier ou d'effacer l'avis d'un autre. Sans effet au MVP (une personne par organisation, écriture réservée à la propriétaire, § 1.5 point 5) ; à revoir avec S1.
 - À toute tâche qui supprime un voyage (M4, M9) : `stop_reviews` en `NO ACTION` à traiter comme `reminder_consents` (0157 § 1.7 point 5) ; `preferences` en `SET NULL`.
+
+## Amendements
+
+### Amendée par la PR #1065 (ticket #1063, 2026-11-09) — après la revue consolidée du head `dd23bce` de #1057 (M8-D, migration 0026)
+
+Statut : **proposé par l'agent tech-lead, définitif à la fusion (0093)**. Décideur : Tech Lead (points 1 à 3). Le point 4 consigne les mineurs 1 à 5 de la Sécurité sans les trancher. Aucune migration n'est modifiée : `0026_apres_voyage.sql` et son empreinte (`1ac33b56…8902`, description de #1057) restent ceux de `main` (`bd21c14`). À lister dans la prochaine note de version (rubrique « Décisions prises par le studio »).
+
+Verdict de la Sécurité sur **S1** (§ 2.1), donné dans la même revue : favorable aux droits et politiques de 0026 (`stop_reviews`, `preferences`), sous réserve des mineurs 1 à 3, à traiter ou à consigner. Ils sont consignés au point 4. S2 à S6 restent posés.
+
+1. **§ 1.1 point 1, § 1.1 point 4 et § 2.1 : colonne `opinion` au lieu de `rating`** (mineur 6 de la revue ; question 1 de #1057 au Tech Lead : **confirmée**). Le motif `/rating/` du test « schéma : aucune colonne de contenu Google » (`tests/db/schema.test.ts` l. 151-152) refuserait `stop_reviews.rating`, et la spécification § 6.2 critère 4 veut ce test vert **sans exception nouvelle**. La colonne s'appelle donc `opinion` (`0026_apres_voyage.sql` l. 61, `CHECK` l. 66). Partout où le § 1.1 et le § 2.1 nomment la colonne `rating`, lire `opinion` :
+   - l'`INSERT … ON CONFLICT … DO UPDATE SET opinion = EXCLUDED.opinion, …` ;
+   - `GRANT INSERT (…, opinion, …)` et `UPDATE (opinion, request_id, updated_at)` (`0026_apres_voyage.sql` l. 171-172).
+
+   Le contrat ne change pas : `StopReview.rating`, `StopReviewRequestSchema.rating` et `STOP_RATINGS` (§ 1.2) gardent leur nom. La correspondance `StopReview.rating` → `stop_reviews.opinion` est écrite au § 4 de `docs/handovers/backend.md`.
+2. **§ 1.3 point 8 : descente qui supprime `stop_reviews` vide** (question 2 de #1057 : **admise**). La règle « retour arrière refusé dès qu'une ligne existe » vaut pour `stop_reviews` comme pour `preferences`. Sur deux tables vides, la descente supprime `stop_reviews`. Une table vide n'est pas « porteuse de données » : aucune ligne n'est jamais supprimée, et le texte de 0026 se rejoue ensuite (vérifié par la montée, descente, montée de `tests/db/apres-voyage.test.ts`).
+3. **§ 1.3 et § 3.2 : garde de table vide aussi à la montée** (question 3 de #1057 : **admise**). La migration est refusée (`55000`, rien modifié) si `preferences` a une ligne. Ce refus n'était pas demandé par la décision, mais il remplace l'échec moins clair de l'`ADD COLUMN … NOT NULL` (`23502`).
+4. **Mineurs 1 à 5 de la Sécurité, consignés** (aucun ne bloque ; la migration n'est pas modifiée) :
+   1. *Index unique sans `created_by`* (`0026_apres_voyage.sql` l. 77). L'avis est **mono-membre par construction** : une ligne par étape et par lieu pour le voyage (§ 1.1 point 2), une personne par organisation au MVP, écriture réservée à la propriétaire (§ 1.5 point 5). Un second membre qui noterait la même étape verrait son `ON CONFLICT DO UPDATE` refusé par `stop_reviews_app_update` (`42501`, l. 143-145). À rouvrir avec le multi-membre, en même temps que la politique de `created_by` (voir « Quand revoir »).
+   2. *Pas de clé `(organization_id, created_by)` vers `memberships`* (l. 69-73 ; elle existe sur `preferences`, l. 110).
+   3. *`stop_id` et `place_id` sans borne de longueur ni de format* (l. 59-60). Une `CHECK (length(…) <= 300)` garantirait qu'on n'y range qu'un identifiant (0011). Aujourd'hui, le serveur n'écrit qu'un `stop_id` lu dans la version courante et le `place_id` de cette étape, jamais une valeur du client (§ 1.1 point 3).
+   4. *`UPDATE (updated_at)` accordé sans déclencheur* (l. 172) : le client peut antidater un avis. Impact faible : `updated_at` ne sert à aucune décision ni à aucun ordre.
+
+      Les points 2 à 4 sont **à reprendre dans une migration corrective ultérieure si le multi-membre arrive** (rôle `data`, avec l'avis de la Sécurité). Ils ne justifient pas une migration à eux seuls avant cela.
+   5. *Lecture de `stop_reviews` ouverte à toute l'organisation* (l. 137-138) : voulue (§ 2.1). À rouvrir avec le multi-membre. La durée de conservation des avis est renvoyée à Q824 (Samuel). L'événement d'accord (S2) est reporté. À suivre côté RGPD.
+
+Mineurs 7 à 10 de la même revue : hors de cet amendement. Les commentaires de tête de la migration (mineur 7) ne peuvent pas changer sans changer l'empreinte. La version de Postgres (mineur 9) est à confirmer par le rôle `data` avant la ligne `MIGRATIONS_APPROUVEES`.
