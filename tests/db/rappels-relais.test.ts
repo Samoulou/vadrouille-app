@@ -10,7 +10,8 @@ import { creerBase, supprimerBases } from "./workflows-harnais";
 
 /**
  * Migration 0027_rappels_relais (tâche R-D, ticket 1061 ; décision 0162 § 2 et § 6.1, critères 1 à 9 ; droits et
- * politiques : propositions du Tech Lead, verdict de la Sécurité attendu, S-R1 à S-R6).
+ * politiques : propositions du Tech Lead ; S-R1 à S-R6 de 0162 § 4 confirmées par la Sécurité, revues consolidées des
+ * heads `c9d2ba1` et `d4523c2` de la PR #1067).
  *
  * `reminder_relays` : la réclamation de la génération `relay_n` de la chaîne d'exécutions d'un accord est l'insertion de
  * sa ligne ; la seconde échoue (`23505`) ou ne rend aucune ligne (`ON CONFLICT DO NOTHING`). Insertion seulement, par

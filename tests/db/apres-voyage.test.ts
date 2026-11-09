@@ -10,8 +10,9 @@ import { creerBase, supprimerBases } from "./workflows-harnais";
 
 /**
  * Migration 0026_apres_voyage (plan du MVP, M8-D, ticket 1055 ; décision 0160 § 1.1 (T1), § 1.3 (T3), § 2.1 (S1,
- * proposition du Tech Lead, verdict de la Sécurité attendu) et § 3.2 ; spécification `specs/M8-apres-le-voyage-api.md`
- * § 6.2).
+ * proposition du Tech Lead ; verdict de la Sécurité favorable, sous réserve des mineurs 1 à 3, consignés : revue
+ * consolidée du head `dd23bce` de la PR #1057, amendement de 0160 par la PR #1066) et § 3.2 ; spécification
+ * `specs/M8-apres-le-voyage-api.md` § 6.2).
  *
  * `stop_reviews` : une ligne par étape et par lieu pour le voyage, valeur fermée, écriture bornée à la personne de la
  * transaction, idempotence de l'`INSERT … ON CONFLICT` par `request_id`. `preferences` durcie : sujet fermé, unicité par
