@@ -156,6 +156,15 @@ export const REMINDER_TABLES = ["reminder_consents", "reminder_sends"] as const;
  */
 export const REVIEW_TABLES = ["stop_reviews"] as const;
 
+/**
+ * Table des relais de rappels (R-D, migration 0027_rappels_relais, décision 0162 § 2) : réclamation insert-only d'une
+ * génération de la chaîne d'exécutions d'un accord, purgée par `purge_organization_data`. Hors de `REMINDER_TABLES` (les
+ * cas de `tests/db/rappels.test.ts` décrivent les deux tables de 0024 telles quelles), hors de `BUSINESS_TABLES` et du
+ * peuplement commun pour la même raison que les rappels (clé `NO ACTION` vers les accords). Isolation, droits et purge :
+ * `tests/db/rappels-relais.test.ts`.
+ */
+export const RELAY_TABLES = ["reminder_relays"] as const;
+
 /** Tables purgées par `purge_organization_data` : toutes sauf `billing` et `usage_ledger` (Q48). */
 export const PURGED_TABLES = BUSINESS_TABLES.filter((t) => t !== "billing" && t !== "usage_ledger");
 
