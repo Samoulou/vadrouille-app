@@ -40,11 +40,10 @@ export async function loadUnlockPage(
 }
 
 /**
- * Reçu du voyage (B4d) : `null` si l'adaptateur n'en a pas (`mock`, `stripe` en attente de la colonne du lien), si la
+ * Reçu du voyage (B4d, B4e) : `null` si l'adaptateur n'en rend pas (`mock` ; `stripe` sans lien conservé), si la
  * personne n'a pas payé ce voyage, ou si la lecture échoue (aucun lien plutôt qu'une erreur).
  */
 async function receiptOf(payment: PaymentAdapter, ctx: AdapterContext, tripId: string): Promise<Receipt | null> {
-  if (payment.getReceipt === undefined) return null;
   try {
     const receipt = await payment.getReceipt(ctx, tripId);
     return receipt.ok && receipt.value.tripId === tripId ? receipt.value : null;
@@ -60,7 +59,6 @@ export async function loadReceipt(
   ctx: AdapterContext,
   tripId: string,
 ): Promise<{ trip: Trip; receipt: Receipt } | null> {
-  if (payment.getReceipt === undefined) return null;
   const trip = await trips.getTrip(ctx, tripId);
   if (!trip) return null;
   const receipt = await receiptOf(payment, ctx, trip.id);
@@ -68,15 +66,15 @@ export async function loadReceipt(
 }
 
 /**
- * Voyages de « Mes voyages » qui ont un reçu de la personne (B4d) : identifiant du voyage → adresse de `R9-recu`.
- * Vide si l'adaptateur n'en a pas ou si la lecture échoue (la liste des voyages s'affiche quand même).
+ * Voyages de « Mes voyages » qui ont un reçu de la personne (B4d, B4e) : identifiant du voyage → adresse de `R9-recu`
+ * (chemin de l'application, jamais le lien de Stripe). Vide si l'adaptateur n'en rend pas ou si la lecture échoue (la
+ * liste des voyages s'affiche quand même).
  */
 export async function loadReceiptLinks(
   payment: PaymentAdapter,
   ctx: AdapterContext,
   hrefOf: (tripId: string) => string,
 ): Promise<Readonly<Record<string, string>>> {
-  if (payment.listReceipts === undefined) return {};
   try {
     const receipts = await payment.listReceipts(ctx);
     return receipts.ok ? Object.fromEntries(receipts.value.map((receipt) => [receipt.tripId, hrefOf(receipt.tripId)])) : {};

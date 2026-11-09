@@ -228,3 +228,33 @@ describe("« Mes voyages » : liens des reçus (PR 878)", () => {
     expect((await mesVoyages()).receiptHrefs).toEqual({});
   });
 });
+
+// B4e (ticket 887 ; décision 0144 § 5.3 point 7) : reçu de forme `stripe` rendu par la page ; le lien de Stripe ne sort
+// que dans les props de `ReceiptScreen` (HTML de `R9-recu`), jamais dans R9 ni « Mes voyages ». Lecture en base et règle
+// `created_by` : `tests/db/recu-stripe-webhook.test.ts`.
+describe("R9-recu : reçu de Stripe (B4e)", () => {
+  const LIEN = "https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xVGVzdA";
+  const STRIPE: Receipt = { ...RECU, kind: "stripe", method: "card", url: LIEN };
+
+  it("page : props du reçu avec le lien, titre « {destination} · Reçu »", async () => {
+    brancher(adaptateurEspion({ recus: [STRIPE] }));
+    expect((await recu(PAYE)).receipt).toEqual(STRIPE);
+    expect(await generateMetadata({ params: Promise.resolve({ id: PAYE }) })).toEqual({ title: "Édimbourg · Reçu", robots: { index: false, follow: false } });
+  });
+
+  it("écran 9 et « Mes voyages » : adresse de R9-recu seulement, jamais pay.stripe.com", async () => {
+    brancher(adaptateurEspion({ recus: [STRIPE] }));
+    const ecran9 = await r9(PAYE);
+    expect(ecran9.receiptHref).toBe(`/voyages/${PAYE}/debloquer/recu`);
+    expect(JSON.stringify(ecran9)).not.toContain("pay.stripe.com");
+    const liste = await mesVoyages();
+    expect(liste.receiptHrefs).toEqual({ [PAYE]: `/voyages/${PAYE}/debloquer/recu` });
+    expect(JSON.stringify(liste)).not.toContain("pay.stripe.com");
+  });
+
+  it("sans reçu de Stripe conservé (not_found) : 404 et titre par défaut", async () => {
+    brancher(adaptateurEspion({ recus: [] }));
+    await expect(RecuPage({ params: Promise.resolve({ id: PAYE }) })).rejects.toMatchObject(notFound);
+    expect(await generateMetadata({ params: Promise.resolve({ id: PAYE }) })).toEqual({ robots: { index: false, follow: false } });
+  });
+});

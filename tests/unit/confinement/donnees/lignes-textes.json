@@ -848,7 +848,6 @@
             "http://pay.stripe.com/receipts/x",
             "https://pay.stripe.com.example/receipts/x",
             "https://pay.stripe.com/receiptsx",
-            "https://pay.stripe.com/receipts/",
             "https://PAY.STRIPE.COM/receipts/x",
             "HTTPS://pay.stripe.com/receipts/x",
             "https://pay.stripe.com/receipts/../x",
@@ -862,7 +861,15 @@
             "https://pay.stripe.com:443/receipts/x",
             "https://pay.stripe.com/receipts/x\n",
             "https://pay.stripe.com/receipts/a.b~c_d-e%20f/g?h=i&j=k.l~m"
-          ]
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://pay.stripe.com/receipts/"
+          ],
+          "nombre": 5
         },
         {
           "capacite": "hote:checkout.stripe.com",
@@ -872,7 +879,7 @@
           "nombre": 1
         }
       ],
-      "ecart": "B4e partie data (0144 § 5.4, liste des liens hors préfixe) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+      "ecart": "B4e partie data (0144 § 5.4, liste des liens hors préfixe) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé) ; bornée en nombre, forme par forme (mineurs 1 et 2 de la revue consolidée de la PR 1044, repris par la PR back de B4e)"
     },
     {
       "fichier": "tests/unit/db/migration-recu-stripe.test.ts",
@@ -888,6 +895,214 @@
         }
       ],
       "ecart": "B4e partie data (0144 § 5.3 point 1) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "src/contracts/values.ts",
+      "portee": "application",
+      "usage": "liste fermée de l'origine du reçu de Stripe (ORIGINES_RECU) et motif de la Sécurité recopié du CHECK de 0025_recu_stripe, employés par recuStripeAdmis (décision 0144 § 5.3 point 3) avant l'écriture, à la lecture et avant tout href ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://pay.stripe.com",
+            "^https:\\/\\/pay\\.stripe\\.com\\/receipts\\/[A-Za-z0-9_%./~-]+(\\?[A-Za-z0-9_%=&.~-]*)?$"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B4e partie back (0144 § 5.3 point 6 (a) : la chaîne de l'origine et le texte exact du motif de revalidation, nombre: 1 chacun, relevés par `pnpm test`) ; verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "src/server/log.ts",
+      "portee": "application",
+      "usage": "refus de journaliser tout lien de Stripe (0144 § 5.3 point 5) ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:stripe.com",
+          "formes": [
+            "stripe\\.com|stripe%2ecom"
+          ],
+          "nombre": 2
+        }
+      ],
+      "ecart": "B4e partie back (0144 § 5.3 point 6 (b) : texte exact du motif du contrôle global, nombre: 2, les deux branches) ; verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "src/features/presentation/ReceiptScreen.test.tsx",
+      "portee": "test",
+      "usage": "rendu de la forme stripe de R9-recu (B4e, 0144 § 5.3 point 7) : lien de reçu de test, rel et referrerpolicy, liens refusés non rendus ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xVGVzdA",
+            "pay.stripe.com",
+            "https://PAY.STRIPE.COM/receipts/x"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B4e partie back (décision 0144 § 5.4) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "src/server/payment/stripe.test.ts",
+      "portee": "test",
+      "usage": "adresseRecu sur le double et sur le transport de test (B4e, 0144 § 5.3 point 2 et § 5.4) : liens de reçu de test admis et refusés, motif de contrôle du journal ; aucun appel réseau",
+      "capacites": [
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xVGVzdA",
+            "https://PAY.STRIPE.COM/receipts/x"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:stripe.com",
+          "formes": [
+            "stripe\\.com"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B4e partie back (décision 0144 § 5.4) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "tests/db/recu-stripe-webhook.test.ts",
+      "portee": "test",
+      "usage": "conservation du lien du reçu par le webhook Stripe et lecture par l'adaptateur stripe (B4e, 0144 § 5.4) : lien refusé de test, motif de contrôle du journal ; aucun appel réseau (double du client)",
+      "capacites": [
+        {
+          "capacite": "hote:stripe.com",
+          "formes": [
+            "stripe\\.com|stripe%2ecom"
+          ],
+          "nombre": 2
+        },
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://PAY.STRIPE.COM/receipts/x",
+            "pay.stripe.com"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B4e partie back (décision 0144 § 5.4) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "tests/unit/paiement/recu-stripe.test.ts",
+      "portee": "test",
+      "usage": "recuStripeAdmis (mêmes cas que le CHECK de 0025, plus identifiants, port et autre origine), forme stripe de ReceiptSchema, contrôle global du journal (0144 § 5.3 points 3 à 5, § 5.4) ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xVGVzdA",
+            "https://pay.stripe.com",
+            "https://pay.stripe.com/receipts/a.b~c_d-e%20f/g?h=i&j=k.l~m",
+            "https://pay.stripe.com/receipts/x?",
+            "http://pay.stripe.com/receipts/x",
+            "https://pay.stripe.com.example/receipts/x",
+            "https://pay.stripe.com/receiptsx",
+            "HTTPS://pay.stripe.com/receipts/x",
+            "https://pay.stripe.com/receipts/../x",
+            "https://pay.stripe.com/receipts/%2E%2E/x",
+            "https://pay.stripe.com/receipts/.%2e/x",
+            "https://pay.stripe.com/receipts/%2E./x",
+            "https://pay.stripe.com/receipts/a b",
+            "https://pay.stripe.com/receipts/x#fragment",
+            "https://pay.stripe.com/receipts/x\n",
+            "https://u@pay.stripe.com/receipts/x",
+            "https://u:p@pay.stripe.com/receipts/x",
+            "https://pay.stripe.com:443/receipts/x",
+            "https://pay.stripe.com:8443/receipts/x",
+            "//pay.stripe.com/receipts/x",
+            "https://pay.stripe.com/receipts/a%20b",
+            "HTTPS://PAY.STRIPE.COM/receipts/x",
+            "HTTPS://PAY.STRIPE.COM/x"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://pay.stripe.com/receipts/",
+            "https://pay.stripe.com/receipts/%2e%2e/x",
+            "pay%2estripe%2ecom"
+          ],
+          "nombre": 2
+        },
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://PAY.STRIPE.COM/receipts/x"
+          ],
+          "nombre": 3
+        },
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://pay.stripe.com/receipts/x"
+          ],
+          "nombre": 5
+        },
+        {
+          "capacite": "hote:checkout.stripe.com",
+          "formes": [
+            "https://checkout.stripe.com/receipts/x",
+            "checkout.Stripe.Com/c/pay"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:stripe.com",
+          "formes": [
+            "aucune ligne ne contient stripe.com, sous aucune casse ni forme %2e, quel que soit le champ passé",
+            "stripe\\.com"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:stripe.com",
+          "formes": [
+            "STRIPE%2ECOM",
+            "stripe\\.com|stripe%2ecom"
+          ],
+          "nombre": 2
+        },
+        {
+          "capacite": "hote:api.stripe.com",
+          "formes": [
+            "api.stripe.com"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B4e partie back (décision 0144 § 5.4) ; ligne relevée par `pnpm test` (hôtes refusés écrits comme cas de test, y compris api.stripe.com, checkout.stripe.com et stripe.com du contrôle global) ; verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "tests/unit/recu-pages.test.tsx",
+      "portee": "test",
+      "usage": "pages du reçu de forme stripe (B4e, 0144 § 5.3 point 7) : lien de reçu de test ; contrôle que pay.stripe.com n'apparaît ni dans R9 ni dans « Mes voyages » ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xVGVzdA",
+            "écran 9 et « Mes voyages » : adresse de R9-recu seulement, jamais pay.stripe.com"
+          ],
+          "nombre": 1
+        },
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "pay.stripe.com"
+          ],
+          "nombre": 2
+        }
+      ],
+      "ecart": "B4e partie back (décision 0144 § 5.4) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
     }
   ]
 }

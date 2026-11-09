@@ -74,6 +74,10 @@ export function creerPrestataireSimule(options: OptionsPrestataireSimule): Prest
     async adresseSession(_sessionId, paiement) {
       return { ok: true, value: options.cheminSimulation(paiement.tripId, paiement.checkoutId) };
     },
+    // Aucun reçu de prestataire (décision 0144 § 5.3 point 2) : le reçu simulé est construit à la lecture (B4d).
+    async adresseRecu() {
+      return { ok: false, code: "provider_error", retryable: false };
+    },
     async emettre(paiement, issue) {
       const secondes = Math.floor(options.maintenant() / 1000);
       const corps = Buffer.from(JSON.stringify(evenementSimule(paiement, issue, secondes)), "utf8");

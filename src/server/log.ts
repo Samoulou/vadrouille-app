@@ -135,6 +135,10 @@ export const LOG_EVENTS = [
   // champ unique `errorClass` (`LOG_PROVIDER_ERROR_CLASSES`) ; ni message, ni en-tête, ni paramètre, ni identifiant de
   // requête de Stripe, ni clé.
   "payment.provider_failed",
+  // B4e (décision 0144 § 5.3 point 4) : lien du reçu de Stripe non conservé après un droit accordé (prestataire, lien
+  // refusé, base ou durée totale dépassée), niveau `warn`, champs `eventId` et `reason` seulement (`LOG_RECEIPT_REASONS`) ;
+  // jamais le lien, ni l'identifiant de session, ni un message d'erreur. Ajout soumis au verdict de la Sécurité.
+  "payment.receipt_unavailable",
   // B9d (spécification B9, B9-PO-17 points 3 et 4 ; décision 0087 § 1.4) : un voyage complet entre en état bloqué (reprise par
   // le studio), une fois par passage, par l'écrivain dont l'écriture a passé la ligne en `failed`. Niveau `warn` ; champs
   // `tripId`, `organizationId`, `generationRunId` (identifiants internes) et `stopReason` (code fermé) ; aucune donnée de lieu.
@@ -634,6 +638,11 @@ export const LOG_EMAIL_TRANSPORT_REASONS: readonly string[] = ["egress_refused",
 export const LOG_EMAIL_USAGES: readonly string[] = ["connexion", "notification"];
 const USAGES_EMAIL: ReadonlySet<string> = new Set(LOG_EMAIL_USAGES);
 /**
+ * Raisons de `payment.receipt_unavailable` (B4e, décision 0144 § 5.3 point 4) : copie de `RAISONS_RECU` de
+ * `src/server/payment/recu-stripe.ts` (ce module n'importe pas `src/server/payment`), égalité vérifiée par le test.
+ */
+export const LOG_RECEIPT_REASONS: readonly string[] = ["provider_error", "refused", "db_error", "timeout"];
+/**
  * Liste de `reason` admise **par événement** (mineur 3 de la revue du head 244b81a) : une raison d'un autre événement est
  * retirée. Un événement absent de la table n'admet aucune `reason`.
  */
@@ -649,6 +658,7 @@ const RAISONS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map(
   // M5c (0147 § 12 S1 point 4) : liste fermée importée de sa définition unique, aucune copie.
   ["voyages.stop_reported", new Set<string>(STOP_REPORT_REASONS)],
   ["lieu.recherche", new Set<string>(LOG_LIEU_REASONS)],
+  ["payment.receipt_unavailable", new Set(LOG_RECEIPT_REASONS)],
 ]);
 /**
  * Phases admises dans `phase` (`p0.step_failed`, ticket 493, décision 0090 § 3 point 4) : celles de
@@ -909,6 +919,8 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   ["lieu.recherche", new Set(["places", "reason", "googleCode", "httpStatus", "errorName"])],
   // Décision 0155 § 2.4 : deux compteurs ; identifiants, noms, `placeId` et heures retirés.
   ["recalcul.lieux_a_soi", new Set(["places", "stopsRemoved"])],
+  // Décision 0144 § 5.3 point 4 : identifiant d'événement et raison fermée ; lien, session, message et code retirés.
+  ["payment.receipt_unavailable", new Set(["eventId", "reason"])],
   // M6b (ticket 1005) : aucun champ ; tout champ passé est retiré.
   ["calendrier.version_unavailable", new Set<string>()],
   [
@@ -948,7 +960,34 @@ export function errorNameOf(error: unknown): string | undefined {
   }
 }
 
-/** Ligne écrite pour un événement : champs filtrés, `dropped` si des champs ont été retirés. */
+/**
+ * Motif du contrôle global (décision 0144 § 5.3 point 5) : tout lien de Stripe, quelle qu'en soit la casse, forme encodée
+ * `%2e` comprise (`pay.`, `checkout.`, `api.stripe.com`…). Hôte écrit d'un seul tenant dans chaque branche, pour que
+ * l'analyseur de confinement le relève. **Limite assumée** : ni les doubles encodages (`stripe%252ecom`) ni d'autres
+ * obfuscations (Unicode, espaces insérés) ne sont reconnus ; c'est un filet, la garantie première restant qu'aucun champ
+ * de `LogFields` ne porte le lien et que le lien ne quitte jamais la conservation du reçu ni le rendu de `R9-recu`.
+ */
+const MOTIF_LIEN_STRIPE = /stripe\.com|stripe%2ecom/i;
+
+/** Vrai si la valeur (chaîne, ou chaîne d'un tableau ou d'un objet imbriqué) correspond au motif d'un lien de Stripe. */
+export function contientLienStripe(valeur: unknown, profondeur = 0): boolean {
+  if (typeof valeur === "string") return MOTIF_LIEN_STRIPE.test(valeur);
+  if (typeof valeur !== "object" || valeur === null) return false;
+  // Au-delà de cette profondeur, la valeur est tenue pour suspecte (retirée) : aucun champ admis n'en approche.
+  if (profondeur >= 8) return true;
+  return Object.values(valeur).some((element) => contientLienStripe(element, profondeur + 1));
+}
+
+/** Dernier filet (0144 § 5.3 point 5) : ligne sérialisée, clés comprises, remplacée si elle répond encore au motif. */
+export function ligneSansLienStripe(ligne: string, level: LogLevel): string {
+  return MOTIF_LIEN_STRIPE.test(ligne) ? JSON.stringify({ level, event: "log.unknown_event", dropped: 1 }) : ligne;
+}
+
+/**
+ * Ligne écrite pour un événement : champs filtrés, `dropped` si des champs ont été retirés. Après le filtrage par champ,
+ * **contrôle global** (0144 § 5.3 point 5) : toute valeur retenue qui porte un lien de Stripe est retirée et comptée, puis
+ * la ligne sérialisée passe par `ligneSansLienStripe`.
+ */
 export function formatLogLine(event: string, fields: object = {}, level: LogLevel = "info"): string {
   const ligne: Record<string, unknown> = { level, event: EVENEMENTS.has(event) ? event : "log.unknown_event" };
   let retires = 0;
@@ -965,11 +1004,11 @@ export function formatLogLine(event: string, fields: object = {}, level: LogLeve
         : propre !== undefined
           ? (v: unknown) => propre.evenements.has(event) && propre.controle(v)
           : CONTROLES.get(cle);
-    if (controle !== undefined && controle(valeur)) ligne[cle] = valeur;
+    if (controle !== undefined && controle(valeur) && !contientLienStripe(valeur)) ligne[cle] = valeur;
     else retires += 1;
   }
   if (retires > 0) ligne.dropped = retires;
-  return JSON.stringify(ligne);
+  return ligneSansLienStripe(JSON.stringify(ligne), level);
 }
 
 /** Écrit un événement. Ne lève jamais : une entrée inattendue est retirée, pas écrite. */

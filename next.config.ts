@@ -21,6 +21,15 @@ export const RESPONSE_HEADERS = [
     headers: [{ key: "Cache-Control", value: "private, no-store" }],
   },
   {
+    // B4e (décision 0144 § 5.3 point 7) : reçu `R9-recu`, seul HTML qui porte le lien du reçu de Stripe. Ni cache partagé
+    // ni cache du navigateur, et aucun référent envoyé (ni vers Stripe ni ailleurs), pour ce seul chemin.
+    source: "/voyages/:id/debloquer/recu",
+    headers: [
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "no-referrer" },
+    ],
+  },
+  {
     // Vue partagée (`RP`, `RPJ` ; F10-TL-8) : toutes les réponses sous `/p/`, 200, 404 et 500 comprises. Ni cache
     // partagé (un lien désactivé cesse de fonctionner dès la requête suivante), ni indexation, et seule l'origine
     // part dans `Referer` : le chemin, donc le jeton, n'est jamais envoyé à une autre origine.
