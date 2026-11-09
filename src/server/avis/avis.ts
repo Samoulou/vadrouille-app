@@ -11,10 +11,8 @@ import {
   type TripReview,
 } from "@/contracts";
 import type { StopRating } from "@/contracts/values";
-import { accesApresVoyage, etapesAEvaluer, type EtapeAEvaluer } from "@/domain/apres-voyage";
-import { localDateAt } from "@/features/voyage/today";
-import { accessUntil } from "@/lib/dates";
-import { OFFER_CONFIG } from "@/server/config/offer";
+import { etapesAEvaluer, type EtapeAEvaluer } from "@/domain/apres-voyage";
+import { accesAuMoment } from "@/server/avis/acces";
 import { checkRateLimit } from "@/server/rate-limit";
 import { verrouillerVersions } from "@/server/versions/ecrire";
 import { executerActionVoyage, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
@@ -72,7 +70,15 @@ export const SQL_ECRIRE_AVIS = `INSERT INTO public.stop_reviews (organization_id
   VALUES ($1, $2, $3, $4, $5, $6, $7)
   ON CONFLICT (organization_id, trip_id, stop_id, (COALESCE(place_id, ''))) DO UPDATE
   SET opinion = EXCLUDED.opinion, request_id = EXCLUDED.request_id, updated_at = now()
-  WHERE stop_reviews.request_id IS DISTINCT FROM EXCLUDED.request_id`;
+  WHERE stop_reviews.request_id IS DISTINCT FROM EXCLUDED.request_id
+  RETURNING opinion`;
+
+/**
+ * Valeur enregistrée de l'étape et du lieu, lue quand l'écriture n'a rien fait (rejeu au même `request_id`) : le rejeu
+ * rend la valeur en base, même si la demande rejouée en portait une autre (revue de la PR 1068, mineur 11).
+ */
+export const SQL_AVIS_ENREGISTRE = `SELECT opinion FROM public.stop_reviews
+  WHERE organization_id = $1 AND trip_id = $2 AND stop_id = $3 AND COALESCE(place_id, '') = COALESCE($4::text, '')`;
 
 /** Effacement (spécification § 3.2 point 3) : la ligne de l'étape et du lieu de la version courante, s'il y en a une. */
 export const SQL_EFFACER_AVIS = `DELETE FROM public.stop_reviews
@@ -82,10 +88,9 @@ const VALEURS: ReadonlySet<string> = new Set<StopRating>(["liked", "disliked", "
 
 type Ligne = Record<string, unknown>;
 
-/** Accès du voyage à l'instant `maintenant`, à la date locale de la destination. */
+/** Accès du voyage à l'instant `maintenant` (calcul unique de `./acces`). */
 function accesDu(etat: Pick<EtatApresVoyage, "end" | "timeZone">, maintenant: number): TripReview["access"] {
-  const finAcces = accessUntil(etat.end, OFFER_CONFIG.accessDaysAfterReturn);
-  return accesApresVoyage(etat.end, finAcces, localDateAt(maintenant, etat.timeZone));
+  return accesAuMoment(etat.end, etat.timeZone, maintenant);
 }
 
 /** Avis visibles : ceux dont `(stop_id, place_id)` est une étape à évaluer de la version courante (critère 4). */
@@ -159,8 +164,11 @@ export async function donnerAvis(dependances: DependancesAvis, entree: unknown):
       await executeur.query(SQL_EFFACER_AVIS, [org, demande.tripId, etape.stopId, etape.placeId]);
       return { type: "fait", avis: null };
     }
-    await executeur.query(SQL_ECRIRE_AVIS, [org, demande.tripId, etape.stopId, etape.placeId, demande.rating, ctx.userId, demande.requestId]);
-    return { type: "fait", avis: { stopId: etape.stopId, rating: demande.rating } };
+    const [ecrit] = (await executeur.query(SQL_ECRIRE_AVIS, [org, demande.tripId, etape.stopId, etape.placeId, demande.rating, ctx.userId, demande.requestId])).rows;
+    const [enBase] = ecrit === undefined ? (await executeur.query(SQL_AVIS_ENREGISTRE, [org, demande.tripId, etape.stopId, etape.placeId])).rows : [ecrit];
+    const valeur = enBase?.opinion;
+    if (typeof valeur !== "string" || !VALEURS.has(valeur)) return { type: "refus", erreur: fail("internal") };
+    return { type: "fait", avis: { stopId: etape.stopId, rating: valeur as StopRating } };
   });
   if (!resultat.ok) return resultat;
   return resultat.value.type === "refus" ? resultat.value.erreur : ok(resultat.value.avis);

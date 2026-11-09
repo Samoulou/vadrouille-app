@@ -8,15 +8,13 @@ import {
   type TrialRevisionResult,
   type TripReview,
 } from "@/contracts";
-import { accesApresVoyage } from "@/domain/apres-voyage";
-import { localDateAt } from "@/features/voyage/today";
-import { accessUntil } from "@/lib/dates";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR } from "@/server/config/lieux";
 import { RATE_LIMITS } from "@/server/config/limites";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { OFFER_CONFIG } from "@/server/config/offer";
+import { accesAuMoment } from "@/server/avis/acces";
 import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
 
 import { apiCreationAdapter } from "./api-creation-instance";
@@ -548,8 +546,7 @@ export async function getTripReview(
   const trip = await getTripReader(options.scope === undefined ? {} : { scope: options.scope }).getTrip(ctx, tripId);
   if (trip === null || !trip.unlocked) return null;
   const scope = options.scope ?? (await getSimulationScope());
-  const aujourdhui = localDateAt(scope.clock.now(), trip.timeZone);
-  const access = accesApresVoyage(trip.end, finAccesApresVoyage(trip.end), aujourdhui);
+  const access = accesAuMoment(trip.end, trip.timeZone, scope.clock.now());
   return TripReviewSchema.parse({ tripId: trip.id, access, reviews: [], tasteCandidates: [], retainedIds: [] });
 }
 
@@ -562,10 +559,6 @@ export function apresVoyageDisponible(value: string | undefined = process.env.DA
   return choice === "mock" || choice === "api";
 }
 
-/** Dernier jour où l'écran 16 est modifiable (`accessUntil(end, accessDaysAfterReturn)`, Q149) : même calcul que l'accès. */
-export function finAccesApresVoyage(end: string): string {
-  return accessUntil(end, OFFER_CONFIG.accessDaysAfterReturn);
-}
 
 /**
  * Avis sur une étape côté serveur (M8a) : `TripAdapter.reviews` sur `api` seulement ; `null` sinon (`mock` garde ses avis

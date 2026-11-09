@@ -16,6 +16,7 @@ import {
   donnerAvis,
   lireRevue,
   SQL_AVIS_DU_VOYAGE,
+  SQL_AVIS_ENREGISTRE,
   SQL_ECRIRE_AVIS,
   SQL_EFFACER_AVIS,
   SQL_PROPRIETAIRE,
@@ -42,7 +43,7 @@ const PREMIERE = ETAPES[0]!;
 const ETAT: EtatApresVoyage = { end: "2026-09-03", timeZone: "Europe/London", debloque: true, jours: JOURS };
 
 type Requete = { texte: string; valeurs: unknown[] };
-type Base = { voyage?: boolean; proprietaire?: string | null; avis?: Record<string, unknown>[] };
+type Base = { voyage?: boolean; proprietaire?: string | null; avis?: Record<string, unknown>[]; enregistre?: string };
 
 function doubleWithOrg(base: Base = {}) {
   const requetes: Requete[] = [];
@@ -72,7 +73,10 @@ function doubleWithOrg(base: Base = {}) {
         if (texte === SQL_VERROU_VERSIONS) return { rows: [{}] };
         if (texte === SQL_PROPRIETAIRE) return { rows: base.proprietaire === null ? [] : [{ created_by: base.proprietaire ?? CTX.userId }] };
         if (texte === SQL_AVIS_DU_VOYAGE) return { rows: base.avis ?? [] };
-        if (texte === SQL_ECRIRE_AVIS || texte === SQL_EFFACER_AVIS) return { rows: [] };
+        // Rejeu (`enregistre` posé) : l'`ON CONFLICT … WHERE` n'écrit rien ; la valeur en base est relue.
+        if (texte === SQL_ECRIRE_AVIS) return { rows: base.enregistre === undefined ? [{ opinion: valeurs[4] }] : [] };
+        if (texte === SQL_AVIS_ENREGISTRE) return { rows: base.enregistre === undefined ? [] : [{ opinion: base.enregistre }] };
+        if (texte === SQL_EFFACER_AVIS) return { rows: [] };
         throw new Error(`requête inattendue : ${texte}`);
       },
     };
@@ -104,6 +108,12 @@ describe("donnerAvis : écriture", () => {
     expect(await donnerAvis(dependances, demande())).toEqual({ ok: true, value: { stopId: PREMIERE.stopId, rating: "liked" } });
     expect(ecritures()).toEqual([{ texte: SQL_ECRIRE_AVIS, valeurs: [CTX.organizationId, TRIP, PREMIERE.stopId, PREMIERE.placeId, "liked", CTX.userId, REQUETE] }]);
     expect(limiteur).toHaveBeenCalledOnce();
+  });
+
+  it("rejeu au même requestId avec une autre valeur : rien d'écrit, la valeur en base est rendue (mineur 11)", async () => {
+    const { dependances, requetes } = banc({ enregistre: "disliked" });
+    expect(await donnerAvis(dependances, demande({ rating: "liked" }))).toEqual({ ok: true, value: { stopId: PREMIERE.stopId, rating: "disliked" } });
+    expect(requetes.filter((r) => r.texte === SQL_AVIS_ENREGISTRE)).toEqual([{ texte: SQL_AVIS_ENREGISTRE, valeurs: [CTX.organizationId, TRIP, PREMIERE.stopId, PREMIERE.placeId] }]);
   });
 
   it("rating null : effacement de la ligne de l'étape et du lieu courant ; réponse null", async () => {
