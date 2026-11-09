@@ -269,8 +269,10 @@ const estPoint = (ligne: DayLineItemSnapshot): boolean => ligne.type === "termin
  * **exactement un** segment au mode `mode` (`estimated: false`, sans durée : la lecture suivante la mesure pour le couple réel)
  * est posé juste avant le point le plus tardif du couple, comme l'assemblage. Aucun segment à travers un changement de ville
  * (0148 § 1 point 3, 0151 § 4) ni hors de la ligne (jour sans terminus) ; aucun vers ni depuis une étape sans `placeId`.
+ * Exportée pour le voyage complet de la chaîne inversée (M1c : segments d'une étape qui reçoit son `placeId` après le
+ * déblocage, la même règle que l'assemblage).
  */
-function avecSegmentsDuLieu(items: readonly DayLineItemSnapshot[], stopId: string, mode: SegmentSnapshot["mode"]): DayLineItemSnapshot[] {
+export function avecSegmentsDuLieu(items: readonly DayLineItemSnapshot[], stopId: string, mode: SegmentSnapshot["mode"]): DayLineItemSnapshot[] {
   const rang = items.findIndex((ligne) => ligne.type === "stop" && ligne.stop.id === stopId);
   const lieu = items[rang];
   if (lieu?.type !== "stop" || lieu.stop.placeId === undefined) return [...items];

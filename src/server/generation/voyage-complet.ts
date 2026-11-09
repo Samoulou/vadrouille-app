@@ -85,6 +85,14 @@ export function requestIdDeVersion(ligne: Pick<LigneVoyageComplet, "id" | "repri
 }
 
 /**
+ * `request_id` de la version qu'écrit le voyage complet de la **chaîne inversée** pendant le passage courant (M1c, ticket
+ * 1048) : `full:<id>:<passage>:lieux`, distinct de toute version d'un jour (`requestIdDeVersion` finit par un nombre).
+ */
+export function requestIdDeVerification(ligne: Pick<LigneVoyageComplet, "id" | "reprisesPersonne" | "reprisesStudio">): string {
+  return uuidV5(`full:${ligne.id}:${passageDe(ligne)}:lieux`);
+}
+
+/**
  * Identifiant du forfait d'un passage (`usage_ledger.generation_run_id`) : `forfait:<id>:<passage>`. Chaque passage réserve
  * son propre forfait (une reprise n'hérite pas de ce que le passage précédent a dépensé, et le cumul par organisation et
  * par jour compte chaque passage, 0087 « Questions ouvertes » point 4) ; un rejeu d'étape du même passage retrouve le même.
