@@ -1,25 +1,27 @@
 # M9 — Exporter ou supprimer mes données sur la vraie app
 
-Rédaction : Product Owner · Date : 2026-11-09 · `main` relu : `ea950a5` · Ticket : #1079 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 9, ligne M9-spec (§ 9 (c)) et § 0 (sens de « brancher sur la vraie app ») · Rôles des tâches qui suivent : backend (M9a), backend avec data (M9b), frontend (M9c), UX/UI (rendus et textes) · Revue : Tech Lead, Sécurité, UX/UI.
+Rédaction : Product Owner · Date : 2026-11-09 · `main` relu : `ea950a5` (correction 1 le même jour : revue consolidée du head `c63b632`, bloquants 1 à 4, mineurs 5 à 12) · Ticket : #1079 · Plan : `docs/plans/mvp-etapes-1-9.md`, étape 9, ligne M9-spec (§ 9 (c)) et § 0 (sens de « brancher sur la vraie app ») · Rôles des tâches qui suivent : backend (M9a), backend avec data (M9b), frontend (M9c), UX/UI (rendus et textes) · Revue : Tech Lead, Sécurité, UX/UI.
 
 Références : `docs/handovers/backend.md` (§ 4 ligne « Compte : export et suppression », § 5 contrat `AccountExport`, § 6 « Règles communes » et lignes `organizations`, `memberships`, `billing`, `usage_ledger`, § 12 « Export et suppression des données » : étapes 1 à 5 de `deleteAccount`, réauthentification récente ; § 17 Q48), décisions 0007 (rôles, `purge_organization_data`, « Ajout seulement »), 0008 (Better Auth), 0011 et 0027 (règles Google, règle provisoire de Q5), 0093 (décisions déléguées définitives à la fusion), 0157 § 1.8 (accords aux rappels), 0160 (avis et goûts, § 1.1 et § 1.3), 0162 (relais des rappels), `db/migrations/0027_rappels_relais.sql` (l. 107-157 : dernière version de `purge_organization_data`), `src/server/auth/reprise.ts` (point d'appel de la reprise, vide), `src/tenancy/options.ts` (code : 6 chiffres, 10 minutes, 3 essais ; session : 7 jours), `src/server/routes/calendrier.ts` (modèle d'un téléchargement), `specs/F11-mes-voyages-apres-etats.md` (F11-PO-19), `specs/M8-apres-le-voyage-api.md` (modèle de forme), `docs/handovers/frontend.md` (§ 6, § 10 vocabulaire, § 11 accessibilité, § 13 hors ligne), `QUESTIONS.md` (Q5, Q27, Q48, Q56, Q150, Q153, Q215, Q438, Q610).
 
 **Prérequis, dans cet ordre** :
 1. cette spécification fusionnée ;
 2. réponses du **Tech Lead** aux questions T1 à T9 du § 8, avec l'**avis de la Sécurité** sur S1 à S9 (dans leur revue ou par une décision à part, comme M8-TL) ;
-3. M9a et M9b (indépendantes ; une seule tâche par cycle sur `db/migrations`, et M9b seule en a besoin) ;
+3. M9a, puis M9b : M9a crée `src/server/account/reauthentification.ts`, le code `reauthentication_required` et `src/i18n/fr/compte.json`, que M9b reprend (décision du CEO, correction 1) ; une seule tâche par cycle sur `db/migrations` ;
 4. M9c, après M9a et M9b ;
 5. avant toute personne autre que Samuel : **action S6** du plan (§ 11), validation par Samuel des textes, des durées et du sort de `billing` et `usage_ledger` (Q48).
 
 Si la réponse du Tech Lead ou de la Sécurité change un point de cette spécification, elle prime pour ce point.
 
-**Une spécification, trois tâches** : règle du CEO pour une étape du plan (Q826, appliquée à M6 et M8). Chaque tâche a sa branche et sa PR. Le découpage est celui du plan (§ 9 (c)) : aucun écart.
+**Une spécification, trois tâches** : règle du CEO pour une étape du plan (Q826, appliquée à M6 et M8). Chaque tâche a sa branche et sa PR. Le découpage est celui du plan (§ 9 (c)) ; ses prérequis s'en écartent (voir « Écarts », premier tiret).
 
 **Écarts relevés dans les documents**, sans effet sur le fond, soumis au Tech Lead ou à la Sécurité (§ 8) :
+- **Prérequis de M9b différents du plan.** Le plan (`docs/plans/mvp-etapes-1-9.md`, § 9 (c), l. 255) donne pour M9b « M9-spec ; Q48 ». Cette spécification donne « M9-spec ; M9a ; Q48 seulement pour l'option B » (§ 2, § 4.4) : M9b reprend le module et le code d'erreur créés par M9a, et l'option A ne demande ni migration ni décision. Le plan n'est pas modifié ici ; le CEO le mettra à jour (C5).
+- **Codes d'erreur nouveaux.** Ni `reauthentication_required` ni `forbidden` n'existent dans `API_ERROR_CODES` (`src/contracts/values.ts`, l. 313-343, qui finit par `not_unlocked`). Cette spécification ajoute les deux (§ 6.1) ; le handover (§ 4, ligne « Compte : export et suppression ») les cite, mais `not_found` est le code habituel de ce qui n'est pas à soi. Le Tech Lead tranche à la revue entre `forbidden` et `not_found` (T9) ; s'il retient `not_found`, les critères qui citent `forbidden` s'alignent.
 - **Rien de B11 n'existe dans le code.** Aucune occurrence de `exportAccount`, `deleteAccount`, `AccountExport` ni `reauthentication_required` dans `src/` ; `src/server/account/` n'existe pas ; `reprendreSuppression` (`src/server/auth/reprise.ts`) est vide (« B11 le remplit »). Le handover range l'export et la suppression dans B11 ; le plan les reprend en M9a et M9b. M9 les crée.
 - **Aucune page de compte, aucun bouton de déconnexion.** L'action `signOut` existe (`src/server/actions/compte.ts`, l. 78), mais aucun écran ne l'appelle (aucune occurrence dans `src/features`, `src/app`, `src/components`). Le handover front (§ 6) n'a pas de ligne « Compte » hors de `/connexion`. F11-PO-19 renvoyait la page à une tâche dédiée ; le CEO l'a ouverte (Q153). M9c la crée, déconnexion comprise.
-- **`place_coordinates` n'est pas purgée avec le compte.** Le handover (§ 6, « Règles communes », tiret « Suppressions ») et 0011 (« Conséquences » : « `purge_organization_data` étendue à cette table ») disent que la purge du compte couvre `place_coordinates`. La dernière version de la fonction (`0027_rappels_relais.sql`, l. 107-157) ne la supprime pas, et aucune migration n'accorde `DELETE` sur cette table à `vadrouille_fn_purge`. Les lignes expirent à 30 jours au plus, mais la purge des lignes expirées n'est pas activée (Q438, #527). Par ailleurs, la clé de `place_coordinates.organization_id` vers `organizations` n'a pas d'action à la suppression : elle bloquerait la suppression finale de l'organisation (option B de Q48). M9b corrige l'écart ou le Tech Lead amende 0011 (T4).
-- **Q48 : deux lectures.** 0027 § 6 consigne « recommandations du studio validées » pour Q48 et Q27 ; `QUESTIONS.md` garde Q48 « Ouverte (juridique) », et le handover (§ 12) garde `billing` et `usage_ledger` « tant que Q48 est ouverte ». Cette spécification suit `QUESTIONS.md` et le handover : Q48 est ouverte, la décision revient à Samuel (§ 4.4).
+- **`place_coordinates` n'est pas purgée avec le compte.** Le handover (§ 6, « Règles communes », tiret « Suppressions ») 0011 (« Conséquences » : « `purge_organization_data` étendue à cette table »), 0007 (l. 43 : `DELETE` « `place_coordinates` comprise (amendement 0011) ») et `db/migrations/0001_securite.sql` (l. 220 et l. 358 : « B8 l'étend à place_coordinates ») disent que la purge du compte couvre `place_coordinates`. La dernière version de la fonction (`0027_rappels_relais.sql`, l. 107-158) ne la supprime pas, et aucune migration n'accorde `DELETE` sur cette table à `vadrouille_fn_purge`. Les lignes expirent à 30 jours au plus, mais la purge des lignes expirées n'est pas activée (Q438, #527). Par ailleurs, la clé de `place_coordinates.organization_id` vers `organizations` n'a pas d'action à la suppression : elle bloquerait la suppression finale de l'organisation (option B de Q48). M9b corrige l'écart ou le Tech Lead amende 0011 (T4).
+- **Q48 : deux lectures.** 0027 § 6 consigne « recommandations du studio validées » pour Q48 et Q27 ; `QUESTIONS.md` garde Q48 « Ouverte (juridique) », et le handover (§ 12) garde `billing` et `usage_ledger` « tant que Q48 est ouverte ». `QUESTIONS.md` (l. 52) écrit : « Ouverte (juridique, liée à Q27) — 38e cycle : recommandation du studio validée par Samuel (#studio, 2026-10-12 09:46 CEST, décision 0027) », sans dire quelle était cette recommandation. La seule position écrite du studio est celle du handover (§ 17, Q48 : « d'ici là, la suppression de compte les garde, avec la ligne `organizations` en état « suppression en cours » »), qui correspond à l'option A du § 4.4. Cette spécification suit `QUESTIONS.md` et le handover : Q48 est ouverte, la décision revient à Samuel (§ 4.4) ; l'écart est signalé à Samuel (question 1) et au CEO (C1).
 - **Q215 est déléguée à l'UX/UI et au Product Owner** (parcours de réauthentification). Ce document fixe le parcours fonctionnel (§ 1.3, M9-PO-5) ; le rendu reste à l'UX/UI (U2).
 
 ---
@@ -41,7 +43,7 @@ Les textes du § 7 sont des propositions. Ce que la suppression garde (Q48), les
 ### 1.3 Réauthentification par code (parcours fonctionnel, réponse à Q215)
 
 1. L'export et la suppression exigent une **connexion récente** : une vérification de code réussie depuis **moins de 10 minutes** (handover § 12). Au-delà, le serveur répond `reauthentication_required`, sans rien lire ni supprimer.
-2. L'écran « Confirme que c'est toi » montre l'adresse de la session (non modifiable), envoie un code par « Recevoir un code » (même envoi, mêmes limites et mêmes messages d'erreur que `/connexion` : `invalid_code`, `code_expired`, `too_many_attempts`, `rate_limited`, `email_cap_reached`), puis le fait saisir (`OtpInput`).
+2. L'écran « Confirme que c'est toi » montre l'adresse de la session (non modifiable), envoie un code par « Recevoir un code » (même envoi, mêmes limites, sauf avis contraire de la Sécurité (S1), et mêmes messages d'erreur que `/connexion` : `invalid_code`, `code_expired`, `too_many_attempts`, `rate_limited`, `email_cap_reached`), puis le fait saisir (`OtpInput`).
 3. Après un code juste, la personne revient **à l'action qu'elle avait choisie** (le téléchargement démarre, ou l'écran de confirmation de la suppression s'affiche), sans la choisir de nouveau.
 4. Une connexion de moins de 10 minutes passe directement à l'étape 3 : pas de code de plus juste après `/connexion`.
 5. Si les 10 minutes expirent entre la confirmation et « Supprimer définitivement », la réponse `reauthentication_required` ramène à l'étape 2, sans rien supprimer.
@@ -55,8 +57,8 @@ Le mécanisme (nouvelle session, horodatage de réauthentification, ou autre) es
 
 | ID | Tâche | Rôle | Prérequis | Migration |
 |---|---|---|---|---|
-| M9a | Exporter mes données : contrat `AccountExport`, construction depuis la base, téléchargement, réauthentification récente | backend | M9-spec ; T1 à T3, S1 à S4 | Non, sauf si T1 retient un horodatage de réauthentification (alors M9a en a besoin ou M9b la porte : T1) |
-| M9b | Supprimer mon compte : `deleteAccount` (étapes 1 à 5 du handover § 12), reprise dans `verifyCode`, `place_coordinates`, `billing` et `usage_ledger` selon Q48 | backend, data | M9-spec ; T1, T4 à T6, S1, S5 à S8 ; **Q48** pour l'option B seulement (§ 4.4) | Oui si T4 étend la purge à `place_coordinates`, ou si Samuel retient l'option B de Q48 |
+| M9a | Exporter mes données : contrat `AccountExport`, construction depuis la base, téléchargement ; **propriétaire** de la réauthentification récente (`src/server/account/reauthentification.ts`), des codes `reauthentication_required` et `forbidden` (T9) et de `src/i18n/fr/compte.json` | backend | M9-spec ; T1 à T3, T9, S1 à S4 | Non, sauf si T1 retient un horodatage de réauthentification (migration portée par M9a) |
+| M9b | Supprimer mon compte : `deleteAccount` (étapes 1 à 5 du handover § 12), reprise dans `verifyCode`, `place_coordinates`, `billing` et `usage_ledger` selon Q48 | backend, data | M9-spec ; **M9a** ; T4 à T6, S5 à S8 ; **Q48** pour l'option B seulement (§ 4.4 ; écart au plan) | Oui si T4 étend la purge à `place_coordinates`, ou si Samuel retient l'option B de Q48 |
 | M9c | Écrans et textes : « Ton compte », réauthentification, confirmation de la suppression, déconnexion | frontend | M9a, M9b ; T7, T8 ; U1 à U4 | Non |
 
 M9a et M9b se codent et se testent en `local` et en `ci` sans aucun appel payant (plan § 0.3) : export et suppression ne touchent ni l'IA, ni Google, ni Stripe.
@@ -69,7 +71,7 @@ M9a et M9b se codent et se testent en `local` et en `ci` sans aucun appel payant
 
 1. **Qui** : la personne connectée sur `api`, **propriétaire** de son organisation personnelle (handover § 6 « Règles communes » : export et suppression réservés au propriétaire), avec une connexion récente (§ 1.3). Sinon : sans session, `unauthenticated` ; conseiller, `forbidden` ; connexion trop ancienne, `reauthentication_required`.
 2. **Organisation partagée** (hors MVP : une autre adhésion que celle de la personne) : `forbidden`, rien n'est lu. Raison : l'export ne contient **aucune donnée d'une autre personne** (§ 3.4), et trier ce qui appartient à chacun dans une organisation partagée est une autre tâche (§ 10).
-3. **Ce qui est exporté** : ce que la base garde de la personne et de ses voyages, **lu dans les tables**, jamais reconstruit à partir des écrans. Raison : un `Trip` lu pour l'affichage contient des données chargées à la demande (durées de trajet relues sur Google, B8b, 0074 ; photos ; positions) qui ne doivent pas sortir (§ 3.3).
+3. **Ce qui est exporté** : ce que la base garde de la personne et de ses voyages, **lu dans les tables**, jamais reconstruit à partir des écrans. Raison : un `Trip` lu pour l'affichage contient des données chargées à la demande (durées de trajet relues sur Google, jamais stockées : 0011, handover § 5, `Segment.minutes` et Q38 ; photos ; positions) qui ne doivent pas sortir (§ 3.3).
 
 ### 3.2 Contenu (proposition ; forme du contrat : T3)
 
@@ -84,7 +86,7 @@ Une liste blanche, comme la vue partagée (0007, `shared_trip_version`) : une cl
 | `trips[].commitments[]` | `trip_commitments` | `kind`, `label`, `date`, `startTime`, `endTime` | `rank` (ordre du tableau) |
 | `trips[].versions[]` | `trip_versions`, **toutes les versions** | `version`, `parentVersion`, `authorKind`, `createdAt`, `days` (instantané `TripSnapshot` en liste blanche de clés, dont le nom maison, la catégorie, l'heure, le `placeId`, les sources web et les infos pratiques rédigées par l'outil d'une étape) | `patch`, `request_id`, `author_user_id` (techniques ; le contenu de chaque version suffit) |
 | `trips[].currentVersion` | `trips.current_version` | numéro de la version courante | — |
-| `trips[].deck` | `proposals` (phase `preview` et `deck`), `preference_signals`, `deck_closures` | propositions montrées (`day`, `time`, `kind`, nom maison, catégorie, `placeId`) ; gestes du tri (`signal`, `category`, `placeId`, `status`, `createdAt`, `cancelledAt`) ; fin du tri (`closedAt`) | `candidates` non montrés, `research_runs`, `generation_runs`, `event_occurrences`, `preference_prompts`, `seq`, `request_id` (données de travail du moteur ; voir question 3 à Samuel) |
+| `trips[].deck` | `proposals` (phase `preview` et `deck`), `preference_signals`, `deck_closures` | propositions montrées (`day`, `time`, `kind`, nom maison, catégorie, `placeId`) ; gestes du tri (`signal`, `category`, `placeId`, `status`, `createdAt`, `cancelledAt`) ; fin du tri (`deck_closures` : `phase`, `through_position`, `created_at` ; forme dans le contrat : T3) | `candidates` non montrés, `research_runs`, `generation_runs`, `event_occurrences`, `preference_prompts`, `seq`, `request_id` (données de travail du moteur ; voir question 3 à Samuel) |
 | `trips[].checklist[]` | `checklist_items` | libellé, `moment`, `done`, `bookingUrl` | `sponsored` (interne) |
 | `trips[].reports[]` | `feedback` (signalements) | `stopId`, `placeId`, `reason`, `createdAt` | `text` (toujours nul) |
 | `trips[].reviews[]` | `stop_reviews` de la personne | `stopId`, `placeId`, `opinion`, `updatedAt` | `request_id` |
@@ -127,7 +129,7 @@ La personne connectée sur `api`, propriétaire de son organisation personnelle,
 
 ### 4.2 Étapes (handover § 12, repris sans changement)
 
-1. **Marque et purge métier**, une transaction `withOrg` puis `SET LOCAL ROLE vadrouille_account_admin` : `purge_organization_data` pose `deletion_requested_at`, puis supprime les données métier (dernière version : `0027_rappels_relais.sql`, l. 107-157 : de `stop_reviews` à `trips`), sauf `billing` et `usage_ledger` (§ 4.4). À compléter de `place_coordinates` selon T4.
+1. **Marque et purge métier**, une transaction `withOrg` puis `SET LOCAL ROLE vadrouille_account_admin` : `purge_organization_data` pose `deletion_requested_at`, puis supprime les données métier (dernière version : `0027_rappels_relais.sql`, l. 107-158 : de `stop_reviews` à `trips`), sauf `billing` et `usage_ledger` (§ 4.4). À compléter de `place_coordinates` selon T4.
 2. **Authentification**, depuis `src/server/account/delete.ts` seulement : `sessions` (toutes, sur tous les appareils), `accounts`, `verifications` de l'adresse, entrées du limiteur sous les clés HMAC de l'adresse, adhésions, puis `users`.
 3. **Organisation** : la ligne reste en « suppression en cours », sans adhésion ni donnée personnelle, tant que `billing` ou `usage_ledger` la référencent (§ 4.4).
 4. **Reprise** : `getRequestContext()` refuse toute session d'une organisation en suppression ; `verifyCode` reprend l'étape 2 au lieu d'ouvrir une session (`reprendreSuppression`, `src/server/auth/reprise.ts`) et répond `unauthenticated`.
@@ -182,17 +184,18 @@ Exemple commun : Samuel, organisation personnelle, voyage d'Édimbourg (2026-08-
 
 ### 6.1 Commun
 
-- Code d'erreur `reauthentication_required` ajouté **à la fin** de `API_ERROR_CODES` (`src/contracts/values.ts`), sans renommer ni réordonner ; ligne du handover § 5 au besoin.
+- Codes d'erreur `reauthentication_required` et `forbidden` ajoutés par **M9a**, **à la fin** de `API_ERROR_CODES` (`src/contracts/values.ts`), sans renommer ni réordonner ; ligne du handover § 5 au besoin. `forbidden` : sous réserve de T9 (le Tech Lead peut retenir `not_found` ; les critères s'alignent alors).
+- `src/server/account/reauthentification.ts` (contrôle de la connexion récente) et `src/i18n/fr/compte.json` (nouveau, exporté par `src/i18n/messages.ts`) sont créés par **M9a** ; M9b et M9c les reprennent et les complètent.
 - Les deux actions lisent le contexte par la session seule (`src/server/session.ts`) : aucun identifiant d'organisation ou de personne dans l'entrée.
 - Aucune adresse e-mail, aucun code, aucun contenu de voyage dans les journaux (test `journaux: aucun email ni code dans les journaux`, étendu aux deux actions).
 
 ### 6.2 M9a — Exporter mes données
 
-**Fichiers** : `src/contracts/account-export.ts` (nouveau, `AccountExportSchema` strict ; nom : T3) et son test ; `src/server/account/export.ts` (nouveau, construction depuis la base, une transaction en lecture) ; point d'entrée du téléchargement (route `src/app/api/v1/compte/export/route.ts` sur le modèle du calendrier, ou action : T2) ; `src/server/account/reauthentification.ts` (contrôle de la connexion récente, partagé avec M9b ; forme : T1) ; `src/server/config/limites.ts` (limite `export`, S7) ; `src/i18n/fr/compte.json` (texte `notice`) ; `tests/db/export-compte.test.ts` ; `tests/unit/account/export.test.ts`.
+**Fichiers** : `src/contracts/account-export.ts` (nouveau, `AccountExportSchema` strict ; nom : T3) et son test ; `src/server/account/export.ts` (nouveau, construction depuis la base, une transaction en lecture) ; point d'entrée du téléchargement (route `src/app/api/v1/compte/export/route.ts` sur le modèle du calendrier, ou action : T2) ; `src/server/account/reauthentification.ts` (nouveau, contrôle de la connexion récente, repris par M9b ; forme : T1) ; `src/contracts/values.ts` (codes du § 6.1) ; `src/server/config/limites.ts` (limite `export`, S7) ; `src/i18n/fr/compte.json` (nouveau, texte `notice`) et `src/i18n/messages.ts` (export de l'espace de noms) ; `tests/db/export-compte.test.ts` (crée le test `compte: export et suppression exigent une réauthentification récente`, partie export) ; `tests/unit/account/export.test.ts`.
 
 **Critères d'acceptation** :
 1. Sans session : `unauthenticated` ; conseiller : `forbidden` ; organisation avec un second membre : `forbidden` ; aucune lecture dans ces trois cas.
-2. Connexion de plus de 10 minutes : `reauthentication_required`, rien lu ; juste après un code : export rendu (horloge injectée, bornes à 9 min 59 s et 10 min 00 s).
+2. `compte: export et suppression exigent une réauthentification récente` (créé ici, étendu par M9b) : connexion de plus de 10 minutes, `reauthentication_required`, rien lu ; juste après un code : export rendu (horloge injectée, bornes à 9 min 59 s et 10 min 00 s).
 3. L'export valide `AccountExportSchema` (strict) ; il contient les blocs du § 3.2 pour l'exemple commun (trois versions, deux avis, un goût, un accord retiré avec `withdrawnAt`, un paiement).
 4. **Aucune donnée de Léa** : aucune valeur sentinelle de son organisation (destination, récit, nom d'étape, `placeId`) n'apparaît ; aucun identifiant d'un autre utilisateur.
 5. **Aucune donnée Google hors `placeId`** : avec des doubles Places et Routes qui renvoient des sentinelles (`SENTINELLE-NOM-GOOGLE-M9A`, `SENTINELLE-ADRESSE-M9A`, une durée de trajet de 4321 minutes, des coordonnées 12.3456/65.4321), et une ligne `place_coordinates` aux mêmes coordonnées, aucune sentinelle n'apparaît dans le fichier ; aucun appel aux doubles Places et Routes pendant l'export (compteurs à zéro).
@@ -205,10 +208,10 @@ Exemple commun : Samuel, organisation personnelle, voyage d'Édimbourg (2026-08-
 
 ### 6.3 M9b — Supprimer mon compte
 
-**Fichiers** : `src/server/account/delete.ts` (nouveau ; seul fichier hors de `db/` où figure `purge_organization_data`, règle ESLint de 0007) ; `src/server/actions/compte.ts` (action `deleteAccount`) ; `src/server/auth/reprise.ts` (rempli) ; `src/tenancy/` au besoin (lecture des sessions, adhésions) ; migration **seulement si** T4 étend la purge à `place_coordinates` (ou T1 ajoute un horodatage) : `db/migrations/0028_…sql` et `.down.sql`, test de migration ; `src/server/config/limites.ts` (limite `suppression`, S7) ; `tests/db/suppression-compte.test.ts` ; `tests/unit/account/delete.test.ts`.
+**Fichiers** : `src/server/account/delete.ts` (nouveau ; seul fichier hors de `db/` où figure `purge_organization_data`, règle ESLint de 0007) ; `src/server/actions/compte.ts` (action `deleteAccount`) ; `src/server/auth/reprise.ts` (rempli) ; `src/server/account/reauthentification.ts` (repris de M9a, sans changement de forme) ; `src/i18n/fr/compte.json` (complété) ; `src/tenancy/` au besoin (lecture des sessions, adhésions) ; migration **seulement si** T4 étend la purge à `place_coordinates` (ou T1 ajoute un horodatage) : `db/migrations/0028_…sql` et `.down.sql`, test de migration ; `src/server/config/limites.ts` (limite `suppression`, S7) ; `tests/db/suppression-compte.test.ts` ; `tests/unit/account/delete.test.ts`.
 
 **Critères d'acceptation** (noms de tests du handover § 12 repris) :
-1. `compte: export et suppression exigent une réauthentification récente` : connexion de plus de 10 minutes, `reauthentication_required`, rien supprimé, `deletion_requested_at` nul.
+1. `compte: export et suppression exigent une réauthentification récente` (test créé par M9a, étendu ici à la suppression) : connexion de plus de 10 minutes, `reauthentication_required`, rien supprimé, `deletion_requested_at` nul.
 2. `compte: la suppression efface les données métier et d'authentification` : pour l'exemple commun, plus aucune ligne de Samuel dans les tables purgées, ni `sessions` (deux sessions sur deux appareils), `accounts`, `verifications` de son adresse, entrées du limiteur sous la clé de son adresse, `memberships`, `users` ; `billing` et `usage_ledger` intacts (option A) ; l'organisation reste avec `deletion_requested_at` posé, sans adhésion ; **Léa intacte**, ligne pour ligne.
 3. `place_coordinates` de Samuel : supprimées (si T4 retient l'extension de la purge), sinon le critère suit la réponse de T4 ; celles de Léa intactes.
 4. `compte: une suppression interrompue reprend sans erreur ni doublon` : panne injectée entre les étapes 1 et 2, puis entre deux suppressions de l'étape 2 ; la session restante est refusée entre-temps (`unauthenticated`) ; `verifyCode` pour l'adresse reprend l'étape 2, ne pose aucun cookie et répond `unauthenticated` ; une relance de `deleteAccount` termine.
@@ -224,7 +227,7 @@ Exemple commun : Samuel, organisation personnelle, voyage d'Édimbourg (2026-08-
 
 ### 6.4 M9c — Écrans et textes
 
-**Fichiers** : page « Ton compte » (adresse proposée `/compte` ; groupe et méthode de routes : T7) ; `src/features/compte/AccountScreen.tsx`, `ReauthStep.tsx`, `DeleteAccountScreen.tsx` (noms libres) ; lien « Ton compte » dans `src/features/compte/TripsScreen.tsx` ; `src/i18n/fr/compte.json` ; `tests/e2e/routes.ts` ; `tests/e2e/compte.e2e.spec.ts` (`mock`), `tests/e2e/compte-api.api.spec.ts` ; `tests/e2e/compte.a11y.spec.ts`.
+**Fichiers** : page « Ton compte » (adresse proposée `/compte` ; groupe et méthode de routes : T7) ; `src/features/compte/AccountScreen.tsx`, `ReauthStep.tsx`, `DeleteAccountScreen.tsx` (noms libres) ; lien « Ton compte » dans `src/features/compte/TripsScreen.tsx` ; `src/i18n/fr/compte.json` (créé par M9a, complété ici) ; `tests/e2e/routes.ts` ; `tests/e2e/compte.e2e.spec.ts` (`mock`), `tests/e2e/compte-api.api.spec.ts` ; `tests/e2e/compte.a11y.spec.ts`.
 
 **Critères d'acceptation** :
 1. « Mes voyages » a un lien « Ton compte » ; la page montre l'adresse de la session, « Exporter mes données », « Supprimer mon compte » et « Se déconnecter ». Sans session (`api`) : page de connexion, puis retour à la page.
@@ -281,7 +284,7 @@ Exemple commun : Samuel, organisation personnelle, voyage d'Édimbourg (2026-08-
 Rien n'est tranché ici à la place de son destinataire. Le CEO les reporte dans `QUESTIONS.md`.
 
 **Samuel** (réservées : juridique, données personnelles, argent) :
-1. **Q48 — `billing` et `usage_ledger` à la suppression du compte** : option A (garder, avec une durée de conservation à fixer) ou option B (supprimer avec le compte, et l'organisation avec eux), § 4.4. Recommandation du Product Owner : A, avec une durée légale à confirmer. Bloque : rien pour le code de A (M9b) ; l'option B demanderait une tâche de plus. Bloque l'ouverture à d'autres personnes (S6).
+1. **Q48 — `billing` et `usage_ledger` à la suppression du compte** (`QUESTIONS.md` l. 52 note une « recommandation du studio validée » le 2026-10-12 sans la décrire ; la position écrite du handover § 17 est l'option A : la confirmes-tu ?) : option A (garder, avec une durée de conservation à fixer) ou option B (supprimer avec le compte, et l'organisation avec eux), § 4.4. Recommandation du Product Owner : A, avec une durée légale à confirmer. Bloque : rien pour le code de A (M9b) ; l'option B demanderait une tâche de plus. Bloque l'ouverture à d'autres personnes (S6).
 2. **Textes, durées, information (S6 ; Q27, Q150)** : (a) les textes du § 7 conviennent-ils, et faut-il une mention de plus (droits nLPD et RGPD, délai de réponse) ? (b) délai dans lequel la suppression est effective, y compris dans les sauvegardes de la base et chez les sous-traitants (Stripe, envoi d'e-mails, hébergeur) : que dit-on à la personne ? (c) faut-il un e-mail qui confirme la suppression (recommandation : non, il faudrait garder l'adresse après la suppression) ? Bloque : l'ouverture à d'autres personnes, pas le code.
 3. **Contenu de l'export (droit d'accès et portabilité)** : la liste des exclusions du § 3.2 (données de travail du moteur, propositions non montrées, `billing`, `usage_ledger`, données d'authentification) est-elle admissible, et l'historique complet des versions suffit-il ? Recommandation : oui, avec ces exclusions nommées dans la politique de confidentialité. Bloque : rien pour le code (les exclusions s'ajoutent sans changer la forme).
 4. **Q5 — `placeId` dans un fichier remis à la personne** : seul élément Google de l'export (§ 3.3). Recommandation : l'exporter. Bloque : rien avant la production.
@@ -297,7 +300,7 @@ Rien n'est tranché ici à la place de son destinataire. Le CEO les reporte dans
 6. **T6 — Paiement en attente et webhook tardif** : code d'erreur du refus (`forbidden` avec une raison, ou code nouveau), seuil « en attente » (statut `pending` et session Stripe non expirée), traitement d'un `checkout.session.completed` dont le `checkouts` a été purgé.
 7. **T7 — Adresse de « Ton compte »** : `/compte` (proposition) ; méthode de routes ; place dans la navigation (lien depuis « Mes voyages ») ; inscription à `tests/e2e/routes.ts`.
 8. **T8 — `mock`** : export construit depuis le jeu simulé et suppression non proposée (proposition), ou suppression simulée.
-9. **T9 — Code `reauthentication_required`** : ajouté par M9a (premier des deux à fusionner) ; ligne du handover § 5 et cas de `verifyCode` pour la réauthentification (même action ou action dédiée).
+9. **T9 — Codes `reauthentication_required` et `forbidden`** : ajoutés par M9a (décision du CEO, correction 1) ; `forbidden` (conseiller, organisation partagée) ou `not_found` (code habituel de ce qui n'est pas à soi) : à trancher à la revue ; ligne du handover § 5 et cas de `verifyCode` pour la réauthentification (même action ou action dédiée).
 
 **Sécurité** :
 1. **S1 — Réauthentification** : fenêtre de 10 minutes et sa mesure, ancienne session, distinction éventuelle du code de réauthentification (§ 5 point 1, avec T1).
@@ -317,10 +320,11 @@ Rien n'est tranché ici à la place de son destinataire. Le CEO les reporte dans
 4. **U4 — Textes du § 7**, dont le `notice` du fichier ; faut-il des libellés français à côté des codes dans l'export (recommandation : non, codes seuls et `notice`) ?
 
 **CEO** :
-1. **C1 — Écart de Q48** : 0027 § 6 dit « recommandations du studio validées » pour Q48 et Q27, `QUESTIONS.md` les garde ouvertes ; à clarifier avec Samuel et à reporter.
+1. **C1 — Écart de Q48** : 0027 § 6 et `QUESTIONS.md` (l. 52) disent « recommandation du studio validée par Samuel » sans dire laquelle, tout en gardant Q48 ouverte ; la seule position écrite (handover § 17 : garder `billing` et `usage_ledger`) correspond à l'option A. À clarifier avec Samuel et à reporter.
 2. **C2 — Q215** : parcours fonctionnel fixé ici (M9-PO-5) ; rendu en attente de l'UX/UI (U2). À reporter dans `QUESTIONS.md`.
 3. **C3 — Écart `place_coordinates`** (en tête) : à reporter dans `STATUS.md` jusqu'à la réponse à T4.
 4. **C4 — Tâche M9b-2** : à ajouter au plan seulement si Samuel retient l'option B de Q48.
+5. **C5 — Mettre le plan à jour** (§ 9 (c), l. 255) : prérequis de M9b « M9-spec ; M9a ; Q48 seulement pour l'option B ».
 
 ---
 
@@ -333,9 +337,9 @@ Rien n'est tranché ici à la place de son destinataire. Le CEO les reporte dans
 - **M9-PO-3 — Contenu de l'export.** Liste blanche du § 3.2, lue dans les tables, toutes les versions du programme, données de la personne seulement ; exclusions nommées ; aucune donnée Google hors `placeId`, aucun appel à Google.
 - **M9-PO-4 — Format.** JSON indenté, clés du contrat, codes fermés, en-tête `format`, `version`, `exportedAt`, `notice` ; nom `vadrouille-mes-donnees-AAAA-MM-JJ.json` (date de Zurich) ; téléchargement direct, aucune copie.
 - **M9-PO-5 — Parcours de réauthentification (Q215, partie fonctionnelle).** Code demandé seulement au-delà de 10 minutes ; adresse de la session non modifiable ; retour à l'action choisie ; expiration en cours de route ramène au code sans rien supprimer.
-- **M9-PO-6 — Confirmation de la suppression.** Écran d'explication (supprimé, gardé, irréversible, invitation à exporter), puis le code si nécessaire, puis « Supprimer définitivement » ; aucun « Annuler » après coup ; aucun e-mail de confirmation (sous réserve de la question 2 (c) à Samuel).
+- **M9-PO-6 — Confirmation de la suppression.** Écran d'explication (supprimé, gardé, irréversible, invitation à exporter), puis le code si nécessaire, puis « Supprimer définitivement » ; aucun « Annuler » après coup ; aucun e-mail de confirmation : **comportement par défaut révocable**, pas une décision, en attendant la question 2 (c) à Samuel.
 - **M9-PO-7 — Après la suppression.** Accueil, déconnecté, annonce « Ton compte est supprimé. » ; la même adresse ouvre ensuite un compte neuf.
-- **M9-PO-8 — Comportement par défaut pour Q48.** M9b code l'option A, déjà décrite au handover § 12, sans la décider ; le texte affiché suit la réponse de Samuel.
+- **M9-PO-8 — Comportement par défaut pour Q48.** M9b code l'option A, déjà décrite au handover § 12 : **comportement par défaut révocable**, pas une décision (Q48 reste à Samuel) ; le texte affiché suit sa réponse.
 - **M9-PO-9 — Page « Ton compte » avec déconnexion.** Elle répond à Q153 (export, suppression, déconnexion) ; lien depuis « Mes voyages ».
 - **M9-PO-10 — Aucun événement de mesure nouveau** pour l'export et la suppression.
 
