@@ -1,5 +1,7 @@
 # 0002 — Hébergement sur Vercel, portabilité préservée
 
+**Amendée par 0163** (ticket #1050) : tant que le compte Vercel reste sur l'offre gratuite, seules `main` et `p0-reel` sont construites par Vercel (`ignoreCommand` de `vercel.json`) ; la « préversion par PR » de la décision ci-dessous ne vaut plus.
+
 Statut : accepté · Date : 2026-10-07 · Décideur : Samuel
 
 ## Contexte
