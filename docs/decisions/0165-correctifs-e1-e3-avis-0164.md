@@ -1,8 +1,8 @@
 # 0165 — Après l'avis 0164 : forme des correctifs E1 (essais du code d'accès) et E3 (page de saisie) ; avis sur E4
 
-Statut : **définitive (0093, fusion de la PR #1066) ; SE1 confirmée par la Sécurité (PR #NUMPR, section « Amendements ») : la voie (c) du § 1 est la forme définitive d'E1 ; la voie de repli (b) du § 1.5 et le ticket E1-repli (§ 4.2) sont sans objet**. Décision déléguée du **Tech Lead** (architecture, bibliothèques, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`, l. 37-43). Elle répond à **T1** et **T2** de l'avis 0164 (§ 3, « Questions nouvelles ») et à **Q841** de `QUESTIONS.md`, et fixe ce que livrent les tickets E1 et E3 que le CEO ouvrira (§ 4). Rien n'est tranché ici de ce qui revient à la **Sécurité** (confirmation de la forme de E1 : question SE1) ni à **Samuel** (reprise des risques acceptés S1 à S5 de 0164, réglages Vercel et Google, donnée personnelle : questions SA1 à SA3). À lister dans la prochaine note de version (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment par une nouvelle décision.
+Statut : **définitive (0093, fusion de la PR #1066) ; SE1 confirmée par la Sécurité (PR #1072, section « Amendements ») : la voie (c) du § 1 est la forme définitive d'E1 ; la voie de repli (b) du § 1.5 et le ticket E1-repli (§ 4.2) sont sans objet**. Décision déléguée du **Tech Lead** (architecture, bibliothèques, outillage, tests : « Qui décide quoi » de `docs/CONTEXT.md`, l. 37-43). Elle répond à **T1** et **T2** de l'avis 0164 (§ 3, « Questions nouvelles ») et à **Q841** de `QUESTIONS.md`, et fixe ce que livrent les tickets E1 et E3 que le CEO ouvrira (§ 4). Rien n'est tranché ici de ce qui revient à la **Sécurité** (confirmation de la forme de E1 : question SE1) ni à **Samuel** (reprise des risques acceptés S1 à S5 de 0164, réglages Vercel et Google, donnée personnelle : questions SA1 à SA3). À lister dans la prochaine note de version (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment par une nouvelle décision.
 
-Date : 2026-11-09 · Décideur : Tech Lead (T1, T2, forme des tickets E1 et E3, avis sur E4) ; SE1 : confirmée par la Sécurité (Amendements, PR #NUMPR) · Ticket : #1063 · `main` relu : `bd21c14` (après #1057)
+Date : 2026-11-09 · Décideur : Tech Lead (T1, T2, forme des tickets E1 et E3, avis sur E4) ; SE1 : confirmée par la Sécurité (Amendements, PR #1072) · Ticket : #1063 · `main` relu : `bd21c14` (après #1057)
 
 Numérotation : `main` va jusqu'à 0164 ; la seule PR ouverte au 2026-11-09 (#1058) ne touche pas `docs/decisions/`.
 
@@ -184,7 +184,7 @@ Ces amendements ne valent qu'à la fusion du ticket E1 (§ 4.1), donc après la 
 
 ## Amendements
 
-### Amendée par la PR #NUMPR (ticket #1070, 2026-11-09) — verdict de la Sécurité sur SE1
+### Amendée par la PR #1072 (ticket #1070, 2026-11-09) — verdict de la Sécurité sur SE1
 
 Statut : **avis de l'agent securite**, qui répond à SE1. La Sécurité n'a pas de domaine délégué (`docs/CONTEXT.md`, « Qui décide quoi » ; 0164, en-tête) : cet amendement ne tranche rien d'autre que la réserve SE1 que le Tech Lead a posée au § 1. Il ne modifie aucun code, aucun test, aucune migration, aucun réglage. Code relu sur `origin/main` au commit `dbcd736` (après #1058) : `src/server/p0/acces.ts` (en-tête l. 21-36, `memeCode` l. 64-68, `SQL_VERROU` à `SQL_ESSAI` l. 196-199, `essaiAccepte` l. 202-206, `saisirCodeAcces` l. 208-246), `src/server/env/p0.ts` (`decoderJetonSaisi`, l. 120-126), `src/server/env/index.ts` (`OCTETS_MIN = 32` et `OCTETS_DISTINCTS_MIN = 16`, l. 260-261 ; `decodeSecret`, l. 317-330), `src/server/actions/p0-acces.ts` (l. 19-29), `src/server/p0/base.ts` (l. 15-18). Les lignes citées par 0165 sont inchangées depuis `bd21c14`.
 
