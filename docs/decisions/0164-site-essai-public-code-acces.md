@@ -1,18 +1,39 @@
-# 0164 — Site d'essai public, sans protection Vercel : le code d'accès suffit-il à bloquer tout appel payant ?
+# 0164 — Avis de la Sécurité : site d'essai public, sans protection Vercel ; le code d'accès suffit-il à bloquer tout appel payant ?
 
-Statut : **proposée par l'agent securite, définitive à la fusion (0093)**. Décision de la **Sécurité** (verdict sur les secrets, les gardes et les chemins vers un fournisseur payant : `.claude/agents/securite.md`), sans délai de veto ; à lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment par une nouvelle décision.
+Statut : **avis de l'agent securite, relu par le Tech Lead à la fusion**. Ce n'est **pas** une décision déléguée : la Sécurité n'a pas de domaine délégué dans « Qui décide quoi » (`docs/CONTEXT.md`, l. 33-45), et 0093 ne s'applique donc pas. Le document porte un numéro de décision, comme l'avis du § 2 de 0157. Ce qu'il propose se répartit ainsi :
+- **Tech Lead** : l'outillage et l'architecture (T1, T2, correctifs E1 à E3).
+- **Samuel** : le redéploiement de `p0-reel`, l'exposition publique (compte externe) et la reprise des risques acceptés (S1 à S4).
+- **CEO** : l'ordre des tickets.
 
-Date : 2026-11-09 · Décideur : Sécurité · Ticket : #1049 · Lecture faite sur `main` au commit `0188767` · Décisions liées : 0002, 0034, 0055 (S-1, S-2), 0062 § 6, 0063 points 4 et 8, 0065, 0069, 0077 § 5.1, 0081 B9-TL-8, 0086 § 2.1, 0093, 0123, 0125, 0126, 0128, 0129, 0135, 0139, 0141, 0157.
+Numérotation : 0164 était réservé pour ce ticket. 0163 est porté par la PR #1052 (ticket 1050, ouverte), qui n'est pas encore fusionnée.
 
-**Ce que cette décision n'engage pas.** Aucun redéploiement, aucun réglage Vercel, Google, OpenRouter ou Neon, aucune valeur de secret lue, aucun code modifié, aucun test touché. Les réglages et les acceptations de risque listés plus bas restent à Samuel.
+Date : 2026-11-09 · Auteur : Sécurité (avis) · Ticket : #1049 · Lecture faite sur `0188767`, puis relue sur `main` au commit `f9adc17` (après #1044 et #1054). Les fichiers cités en `fichier:ligne` sont inchangés entre les deux commits. #1054 touche la génération de `api` (`src/server/generation/`, `src/server/composition/generation.ts`), qui reste derrière la barrière B9-TL-8 (`src/server/generation/etapes-complet.ts:127-128`, `src/server/generation/dependances.ts:109`, `:119`) · Décisions liées : 0002, 0034, 0055 (S-1, S-2), 0062 § 6, 0063 points 4 et 8, 0065, 0069, 0077 § 5.1, 0081 B9-TL-8, 0086 § 2.1, 0093, 0123, 0125, 0126, 0128, 0129, 0135, 0139, 0141, 0157.
 
-## Verdict
+**Ce que cet avis n'engage pas.** Aucun redéploiement, aucun réglage Vercel, Google, OpenRouter ou Neon, aucune valeur de secret lue, aucun code modifié, aucun test touché. Les réglages et les acceptations de risque listés plus bas restent à Samuel.
 
-**`p0-reel` peut être redéployé.** Dans le code de `main` (`0188767`), aucun chemin ne permet à une personne sans le code d'accès de déclencher un appel payant côté serveur (modèle via OpenRouter, Google Places, Routes ou photos). Chaque chemin passe par la garde du mode réel (`ouvertureP0`) **et** par le cookie `__Host-p0_acces`, que seule la saisie du code pose. Le contrôle est fait avant toute lecture de clé, toute réservation et tout appel. La protection Vercel des préversions n'était **pas** une barrière dont dépendait le coût : c'était une barrière de plus.
+## Recommandation
 
-Deux réserves, qui ne bloquent pas le redéploiement :
-- **Avant le premier lancement réel** qui suit le redéploiement, il faut refaire le relevé de la route de flux (0063 point 8, méthode de 0069), cette fois **sans cookie** (écart E2).
-- Le seul appel Google payant **qui ne dépend pas du code** est le chargement de la carte dans le navigateur (Maps JavaScript API, clé publique `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`). Ce n'est pas nouveau : la clé est déjà publique sur la production de `main` depuis le 2026-10-12. Mais aucun plafond n'est consigné pour elle (écart E4, question à Samuel).
+**Recommandation de la Sécurité : `p0-reel` peut être redéployé, sous trois réserves.**
+- **S1** : Samuel reprend l'acceptation de 0055 S-2. Elle avait été donnée « derrière la protection Vercel ».
+- **S4** : Samuel dit si ce site public vaut « mise en public » au sens de 0034. Si oui, la passe de sécurité de 0034 précède le redéploiement.
+- **E2** : le relevé de la route de flux sans cookie est fait **avant** que la garde du mode réel soit ouverte (voir plus bas).
+
+La décision de redéployer revient à Samuel.
+
+Constat, dans le code de `main` (`f9adc17`) :
+- **Entrées utilisateur.** Chaque entrée qui peut mener à un appel payant côté serveur passe par la garde du mode réel (`ouvertureP0`) **et** par le cookie `__Host-p0_acces`, que seule la saisie du code pose. C'est vrai pour les actions serveur, les pages et la lecture des voyages, et le contrôle est fait avant toute lecture de clé, toute réservation et tout appel. Appels concernés : modèle via OpenRouter, Google Places, Routes, photos.
+- **Vue partagée `/p/…`.** Elle ne demande pas de cookie, mais n'appelle aucun fournisseur payant côté serveur.
+- **Étapes de workflow** (`p0Run`, `p0Revision`, route `/.well-known/workflow/v1/flow`). Elles ne lisent **aucun cookie**. Elles sont **bornées** par la garde du mode réel et par une exécution réservée en cours, donc par son forfait. Une exécution ne se réserve qu'avec le cookie. Que la route soit inaccessible sans cookie n'est **pas prouvé** : le seul relevé (0069) a été fait avec le cookie de la protection Vercel (E2).
+- **Protection Vercel.** Pour les entrées utilisateur, elle était une barrière de plus et non la barrière du coût. Pour la route de flux, elle masquait le cas « sans cookie », qui reste à relever.
+
+**Condition E2, avant d'ouvrir la garde.** Procédure proposée, à décider par Samuel :
+1. Premier redéploiement de `p0-reel` avec `P0_REAL_RUNS` différent de `enabled`. La garde est alors fermée (`src/server/env/p0.ts:92`) et aucun appel payant n'est possible.
+2. Relevé E2 sans cookie sur ce déploiement.
+3. Seulement ensuite, redéploiement avec `P0_REAL_RUNS=enabled`.
+
+Un relevé en échec arrête l'étape 3.
+
+Autre réserve, hors code d'accès : le seul appel Google payant qui ne dépend pas du code est le chargement de la carte dans le navigateur (Maps JavaScript API, clé publique `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`). Ce n'est pas nouveau : la clé est déjà publique sur la production de `main` depuis le 2026-10-12. Mais aucun plafond n'est consigné pour elle (écart E4, question S2).
 
 `main`, déployée en cible production et publique : les gardes `api` et `better-auth` y sont **fermées**, et la barrière de sortie refuse toute construction d'un client réel (§ 2).
 
@@ -26,8 +47,8 @@ Deux réserves, qui ne bloquent pas le redéploiement :
 | Déploiement de production | `src/server/p0/acces.ts:156-157` | `isProductionDeployment` ferme en plus des conditions de `lireEnvP0`. |
 | Force du code | `src/server/env/index.ts:260`, `:317-328` | 32 octets au moins ; les codes triviaux sont refusés (répétitions, suites). |
 | Comparaison | `src/server/p0/acces.ts:65-68`, `:202-206` | Temps constant (`timingSafeEqual` sur des empreintes HMAC) ; saisie de plus de 256 caractères refusée sans calcul. |
-| Essais | `src/server/p0/acces.ts:213-246` | 5 essais par heure glissante, tous comptés (l. 229), sous verrou consultatif, échec fermé si la base ne répond pas (l. 240-242). Avec un code de 32 octets ou plus, deviner le code en 5 essais par heure n'est pas réaliste. |
-| Cookie | `src/server/p0/acces.ts:48-54`, `:86-106` | `HttpOnly`, `Secure`, `SameSite=Strict`, préfixe `__Host-`, échéance de 12 h intégrée au MAC, vérification en temps constant. |
+| Essais | `src/server/p0/acces.ts:213-246` | 5 essais par heure glissante (refus à 5, l. 229). Chaque essai, accepté ou refusé, est compté par l'insertion de la l. 235 (`SQL_ESSAI`, l. 199). Le tout se fait sous verrou consultatif, échec fermé si la base ne répond pas (l. 240-242). Avec un code de 32 octets ou plus, deviner le code en 5 essais par heure n'est pas réaliste. |
+| Cookie | `src/server/p0/acces.ts:38-39`, `:48-54`, `:86-106` | `HttpOnly`, `Secure`, `SameSite=Strict`, préfixe `__Host-`, échéance de 12 h intégrée au MAC, vérification en temps constant. |
 | Action de saisie | `src/server/actions/p0-acces.ts:20-29` | Seule voie qui pose le cookie, et seulement après `saisirCodeAcces` accepté. |
 | Page de saisie | `src/app/prototype/executions/page.tsx:23`, `next.config.ts:37` | Garde fermée : 404. Pages `/prototype/` en `private, no-store`, jamais indexées (0055 S-2 point 5). |
 
@@ -75,13 +96,15 @@ Seul appel payant possible sur `main` : la carte Google dans le navigateur, avec
 
 ## 3. Écarts et correctifs (tickets à ouvrir par le CEO)
 
-Aucun écart ne permet un appel payant côté serveur sans le code.
+Aucun écart relevé dans le code ne permet un appel payant côté serveur par une entrée utilisateur sans le code. La route de flux reste à relever (E2). La forme des correctifs E1 à E3 revient au Tech Lead.
 
-- **E1 — Disponibilité : un inconnu peut bloquer Samuel une heure** (0055 S-2 point 2, risque accepté « derrière la protection Vercel »). Le compteur de 5 essais par heure est global, sans adresse (`src/server/p0/acces.ts:197-199`, `:229`). Désormais, n'importe qui sur Internet peut l'épuiser. Aucun coût, aucune fuite. Ticket `[back]`/`[secu]` proposé : compter aussi par adresse, avec l'en-tête de confiance `x-vercel-forwarded-for` (`src/adapters/share-guard.ts:39`, 0051 point 2.1), en gardant le plafond global comme filet. La forme est à trancher par le Tech Lead. En attendant, l'acceptation du risque doit être reprise par Samuel (question S1).
-- **E2 — Relevé de la route de flux à refaire, sans cookie** (0063 point 8, 0069 « Risques résiduels »). Le relevé de 0069 a été fait avec le cookie de la protection Vercel. Il ne prouvait rien pour un appelant sans cookie, puisque la protection répondait à sa place. Avec la protection désactivée, ce cas est maintenant le cas réel. Condition **avant le premier lancement réel** qui suit le redéploiement : la Sécurité rejoue les sondes de `tests/e2e/p0-flux.e2e.spec.ts` (bloc « préversion ») sans cookie ni jeton de contournement. Attendu : 401, 403 ou 404 prouvé, selon le critère de 0069 point 3. La barrière de chaque étape (§ 1.2) borne la dépense même en cas d'échec, mais le relevé reste une condition écrite. Ticket `[secu]` proposé, plus un ticket `[qa]` pour aligner le bloc versionné (le jeton `E2E_P0_REEL_BYPASS` n'a plus d'objet tant que la protection est désactivée).
-- **E3 — Commentaire devenu faux, et journal ouvert à tous** : `src/server/p0/acces.ts:169-172` dit que les préversions sont « derrière la protection Vercel ». Sur une préversion d'une autre branche (garde fermée, `branch_refused`), chaque affichage de `/prototype/executions` écrit `p0.guard_closed` (l. 177-179), et n'importe qui peut maintenant l'inonder. Pas de coût (offre gratuite), mais du bruit dans un journal qui ne garde qu'une heure (§ 4). Petit ticket `[back]` : corriger le commentaire, et décider (Tech Lead) si l'affichage cesse de journaliser hors de `p0-reel`.
+- **E1 — Disponibilité : un inconnu peut bloquer Samuel une heure** (0055 S-2 point 2, risque accepté « derrière la protection Vercel »). Le compteur de 5 essais par heure est global, sans adresse (`src/server/p0/acces.ts:197-199`, `:229`). Désormais, n'importe qui sur Internet peut l'épuiser. Aucun coût, aucune fuite. Piste proposée au Tech Lead : compter aussi par adresse, avec l'en-tête de confiance `x-vercel-forwarded-for` (`src/adapters/share-guard.ts:39`, 0051 point 2.1), en gardant le plafond global comme filet. La forme est à trancher par lui (T1). Deux points à chiffrer :
+  - la durée de conservation de `prototype.run_attempts`, fixée par `expires_at` (`db/migrations/0003_prototype.sql:227`, purge l. 504) et non relevée ici ;
+  - la donnée personnelle qu'ajouterait une adresse IP, même hachée. En attendant, l'acceptation du risque doit être reprise par Samuel (question S1).
+- **E2 — Relevé de la route de flux à refaire, sans cookie** (0063 point 8, 0069 « Risques résiduels »). Le relevé de 0069 a été fait avec le cookie de la protection Vercel. Il ne prouvait rien pour un appelant sans cookie, puisque la protection répondait à sa place. Avec la protection désactivée, ce cas est maintenant le cas réel. Condition **avant le premier lancement réel** qui suit le redéploiement : la Sécurité rejoue les sondes de `tests/e2e/p0-flux.e2e.spec.ts` (bloc « préversion ») sans cookie ni jeton de contournement. Attendu : 401, 403 ou 404 prouvé, selon le critère de 0069 point 3. La barrière de chaque étape (§ 1.2) borne la dépense, mais elle ne remplace pas le relevé. Celui-ci est une **condition préalable à l'ouverture de la garde**, selon la procédure en trois temps de la recommandation. Ticket `[secu]` proposé, plus un ticket `[qa]` pour aligner le bloc versionné (le jeton `E2E_P0_REEL_BYPASS` n'a plus d'objet tant que la protection est désactivée).
+- **E3 — Commentaire devenu faux, et journal ouvert à tous** : `src/server/p0/acces.ts:169-172` dit que les préversions sont « derrière la protection Vercel ». Sur une préversion d'une autre branche (garde fermée, `branch_refused`), chaque affichage de `/prototype/executions` écrit `p0.guard_closed` (l. 177-179), et n'importe qui peut maintenant l'inonder. Pas de coût (offre gratuite), mais du bruit dans un journal qui ne garde qu'une heure (§ 4). Petit ticket `[back]` : corriger le commentaire. Le Tech Lead décide si l'affichage cesse de journaliser hors de `p0-reel` (T2). La PR #1052, si elle fusionne, ne fait plus construire que `main` et `p0-reel`, ce qui réduit ce point.
 - **E4 — Carte Google dans le navigateur, hors du code d'accès.** La clé `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` est publique par nature. Elle est acceptée par tout `*.vercel.app` (`docs/deploiement/variables-environnement.md` l. 159-169) et aucun plafond de quota n'est consigné pour elle. La vue partagée `/p/` du site d'essai n'est pas limitée en débit (`src/proxy.ts:38`) : chaque visite d'un lien partagé charge la carte (Dynamic Maps). Le coût reste borné par le palier gratuit de Google et par le quota que Samuel posera, mais aucun code ne le borne. Réglage de Samuel (question S2). Ticket `[back]` facultatif : limiter `/p/` aussi sur le site d'essai.
-- **E5 — Toutes les préversions sont publiques, avec les clés réelles.** D'après 0034 (état du 2026-10-12, non revérifié ici), `OPENROUTER_API_KEY`, `GOOGLE_MAPS_SERVER_KEY` et l'identifiant propriétaire Neon sont posés sur **toutes** les préversions, pas seulement sur `p0-reel`. Le code ferme ces chemins hors de `p0-reel` (§ 1.1, condition 4, et § 1.3). Mais une préversion d'une branche `claude/…` non encore revue est désormais joignable par n'importe qui. La branche hérite des gardes de `main`, sauf si sa PR les touche, et c'est justement ce que la revue Sécurité doit attraper. Réglage de Samuel (question S3) : limiter ces variables à la branche `p0-reel` dans Vercel (« Preview » avec une branche précise). C'est le point 2 de la passe de 0034.
+- **E5 — Toutes les préversions sont publiques, avec les clés réelles (état à confirmer par Samuel, S3).** D'après 0034 (état du 2026-10-12, que je n'ai pas revérifié : aucun réglage Vercel n'a été lu), `OPENROUTER_API_KEY`, `GOOGLE_MAPS_SERVER_KEY` et l'identifiant propriétaire Neon sont posés sur **toutes** les préversions, pas seulement sur `p0-reel`. Le code ferme ces chemins hors de `p0-reel` (§ 1.1, condition 4, et § 1.3). Mais une préversion d'une branche `claude/…` non encore revue est désormais joignable par n'importe qui. La branche hérite des gardes de `main`, sauf si sa PR les touche, et c'est justement ce que la revue Sécurité doit attraper. Réglage de Samuel (question S3) : limiter ces variables à la branche `p0-reel` dans Vercel (« Preview » avec une branche précise). C'est le point 2 de la passe de 0034. La PR #1052 (ne construire que `main` et `p0-reel`) réduirait le nombre de préversions exposées, mais pas la portée des variables.
 
 ## 4. Ce que changent des journaux gardés une heure
 
@@ -95,19 +118,20 @@ Aucun écart ne permet un appel payant côté serveur sans le code.
 - **0055 S-2 point 1** (cookie volé valable 12 h au plus) : la protection Vercel n'y changeait rien pour qui détient le cookie (`HttpOnly`, `SameSite=Strict`, il ne se lit pas par une autre origine). Avis : maintenu, sous réserve de la reprise de l'acceptation par Samuel (question S1).
 - **0055 S-2 point 2** (5 essais globaux) : aggravé, voir E1.
 - **0062 § 6 et 0065 § 2** (fichier OpenSSL, pas de protection post-quantique) : ces risques portent sur la configuration de la plateforme et sur le trafic sortant, pas sur l'accès au site. La protection des préversions ne les bornait pas. Avis : inchangés.
-- **0034 « mise en public »** : une adresse joignable sans authentification n'est pas, au sens de 0034, un « premier accès au produit pour une personne extérieure », tant que personne d'extérieur n'est invité. La passe de sécurité de 0034 n'est donc pas déclenchée par ce seul changement. Samuel peut en juger autrement (question S4).
+- **0034 « mise en public »** : avis de la Sécurité, non tranché ici. Une adresse joignable sans authentification ne semble pas être, au sens de 0034, un « premier accès au produit pour une personne extérieure », tant que personne d'extérieur n'est invité. L'interprétation de 0034 revient à Samuel (question S4).
 
 ## Questions nouvelles, par destinataire
 
 **Samuel** (argent, comptes externes, acceptation de risque : réservé)
-- **S1** — Reprends-tu l'acceptation de 0055 S-2 points 1 et 2 maintenant que `p0-reel` sera joignable par tous ? Conséquence : n'importe qui peut te bloquer la saisie du code pendant une heure, sans coût, jusqu'au correctif E1. Bloque : rien (le redéploiement reste possible).
+- **S1** — Reprends-tu l'acceptation de 0055 S-2 points 1 et 2 maintenant que `p0-reel` sera joignable par tous ? Conséquence : n'importe qui peut te bloquer la saisie du code pendant une heure, sans coût, jusqu'au correctif E1. Bloque : le redéploiement, réserve de la recommandation.
+- **S5** — Acceptes-tu la procédure de la condition E2 : redéploiement garde fermée, relevé, puis ouverture de la garde ? Bloque : l'ouverture de la garde.
 - **S2** — Peux-tu poser un quota journalier sur Maps JavaScript API dans Google Cloud Console, et confirmer que les quotas Places et Routes, ainsi que la limite de crédit OpenRouter (0034 point 5), sont toujours en place ? Ce sont les seules bornes de coût hors du code, et les seules alarmes depuis que le journal ne garde qu'une heure. Bloque : rien ; recommandé avant le redéploiement.
-- **S3** — Limiter dans Vercel `OPENROUTER_API_KEY`, `GOOGLE_MAPS_SERVER_KEY`, `P0_RUN_TOKEN`, `P0_DATABASE_URL` et l'identifiant Neon à la seule branche `p0-reel` des préversions ? Bloque : rien ; réduit E5.
-- **S4** — Considères-tu qu'un site joignable sans protection est une « mise en public » au sens de 0034 ? Si oui, la passe de sécurité de 0034 (six points) doit être faite avant le redéploiement. Bloque : le redéploiement, seulement si la réponse est oui.
+- **S3** — Peux-tu confirmer l'état réel de ces variables dans Vercel, par environnement, sans les valeurs ? L'état de 0034 date du 2026-10-12. Et faut-il limiter `OPENROUTER_API_KEY`, `GOOGLE_MAPS_SERVER_KEY`, `P0_RUN_TOKEN`, `P0_DATABASE_URL` et l'identifiant Neon à la seule branche `p0-reel` des préversions ? Bloque : rien ; réduit E5.
+- **S4** — Considères-tu qu'un site joignable sans protection est une « mise en public » au sens de 0034 ? Si oui, la passe de sécurité de 0034 (six points) doit être faite avant le redéploiement. Bloque : le redéploiement (réserve de la recommandation) ; si la réponse est oui, la passe de 0034 le précède.
 
 **Tech Lead**
-- **T1** — Forme du compteur par adresse d'E1 : en plus du compteur global ou à sa place, quelle durée de conservation de l'adresse (ou de son empreinte), et quel contrat de schéma (`prototype.run_attempts`) ? Bloque : le ticket E1.
+- **T1** — Forme du correctif E1 : faut-il un compteur par adresse, en plus du compteur global ou à sa place ? Avec quelle durée de conservation (`expires_at` actuel à relever), quelle donnée personnelle (adresse IP, même hachée, à justifier) et quel contrat de schéma (`prototype.run_attempts`) ? Bloque : le ticket E1.
 - **T2** — E3 : l'affichage de `/prototype/executions` doit-il cesser d'écrire `p0.guard_closed` hors de `p0-reel` ? Bloque : rien.
 
 **CEO**
-- **C1** — Ouvrir les tickets E1 (`[back]`/`[secu]`), E2 (`[secu]` et `[qa]`) et E3 (`[back]`), plus E4 si le Tech Lead le juge utile, et reporter S1 à S4 dans `QUESTIONS.md`. Le relevé E2 se programme juste après le redéploiement de `p0-reel` par Samuel.
+- **C1** — Ouvrir les tickets E1 (`[back]`/`[secu]`), E2 (`[secu]` et `[qa]`) et E3 (`[back]`), plus E4 si le Tech Lead le juge utile, et reporter S1 à S5 dans `QUESTIONS.md`. Le relevé E2 se programme juste après le redéploiement de `p0-reel` par Samuel.
