@@ -65,6 +65,16 @@ const ProfilGenerationSchema = z.strictObject({
  * Plafonds d'une relecture (décision 0100 § 1) : Text Search des villes, fiches (tous masques) et Routes, aucun coût de
  * modèle. Deux profils du même schéma, choisis par la portée de la lecture (`jour`, `voyage`).
  */
+/**
+ * Plafonds de la vérification des lieux restants (M1c, ticket 1048 ; réponse de Samuel à Q638) : Text Search et fiches
+ * seulement. **Aucun coût de modèle ni aucune requête Routes** : le forfait dérivé porte `coutModelesMicros: null`, si bien que
+ * le registre refuse toute requête de modèle, et une part Routes nulle (Q639 : 2 USD d'IA par voyage, aucun pour ce passage).
+ */
+const ProfilVerificationSchema = z.strictObject({
+  placesTextSearch: requetes,
+  placesDetails: requetes,
+});
+
 const ProfilRelectureSchema = z.strictObject({
   placesTextSearch: requetes,
   placesDetails: requetes,
@@ -80,7 +90,8 @@ export const PlafondsUsageSchema = z.strictObject({
    * Routes ; plafond d'un recalcul, question 3 de la spécification B10, à Samuel) ; `programme` (aperçu de la chaîne inversée,
    * workflow `generateProgramme`, décision 0136 § 6 : une requête de modèle, Text Search et fiches, aucune requête Routes) ;
    * `revision` (« Pas pour moi » de la chaîne inversée, exécution `batch` du workflow 5, décision 0142 : une requête `revision`,
-   * vérification de toute la version, aucune requête Routes).
+   * vérification de toute la version, aucune requête Routes) ; `verification` (voyage complet de la chaîne inversée, workflow 4
+   * après le déblocage, M1c : vérification des lieux restants, Text Search et fiches seulement, ni modèle ni Routes).
    */
   generations: z.strictObject({
     apercu: ProfilGenerationSchema,
@@ -89,6 +100,7 @@ export const PlafondsUsageSchema = z.strictObject({
     lot: ProfilGenerationSchema,
     programme: ProfilGenerationSchema,
     revision: ProfilGenerationSchema,
+    verification: ProfilVerificationSchema,
   }),
   /** Relectures (0100 § 1.3) : `jour` (un jour, une présentation : `getDay`, `listProposals`, `listPreviewSlots`) et `voyage` (`getTrip`). */
   relecture: z.strictObject({ jour: ProfilRelectureSchema, voyage: ProfilRelectureSchema }),
@@ -171,6 +183,9 @@ export const PLAFONDS_VARIANTE_SIMULEE: PlafondsUsage = chargerPlafondsUsage({
     // textes de la version de base), toute la version revérifiée (Text Search et fiches du profil `programme`), aucune requête
     // Routes. Valeurs de test, pas des montants : la barrière ne les lit jamais.
     revision: { coutModelesMicros: 700_000, placesTextSearch: 100, placesDetails: 100, routesRequetes: 0, routesElements: 0 },
+    // Voyage complet de la chaîne inversée (M1c) : les lieux des journées hors de l'aperçu (au plus ceux du profil `programme`)
+    // et les logements, Text Search et fiches seulement. Valeurs de test, pas des montants : la barrière ne les lit jamais.
+    verification: { placesTextSearch: 100, placesDetails: 100 },
   },
   relecture: {
     jour: { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 },

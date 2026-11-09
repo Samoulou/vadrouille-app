@@ -205,7 +205,7 @@ export const cibleDuForfait = (contexte: CibleForfait): CibleForfait => ({
 async function forfaitEntierReserve(
   dependances: DependancesResolues,
   contexte: CibleForfait,
-  profil: "lot" | "programme" | "revision",
+  profil: "lot" | "programme" | "revision" | "verification",
   avant: (entier: Forfait) => void = () => undefined,
 ): Promise<Forfait> {
   const regles = dependances.reglesPour(contexte.barriere);
@@ -253,6 +253,25 @@ export async function forfaitDeLaRevision(
   contexte: CibleForfait,
 ): Promise<ForfaitDeLEtape> {
   const forfait = await forfaitEntierReserve(dependances, contexte, "revision");
+  const registre = creerRegistreForfait(forfait, contexte.generationRunId, dependances.horloge);
+  return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
+}
+
+/**
+ * Forfait du voyage complet de la chaîne inversée (M1c, ticket 1048 ; profil `verification`) : vérification des lieux restants
+ * après le déblocage, **sans aucune requête de modèle** (`coutModelesMicros: null` : le registre la refuse) ni Routes. Réservé
+ * par l'étape `a` de la ligne `full` sous l'identifiant **du passage** (`identifiant`, `identifiantForfait` : une reprise
+ * réserve son propre forfait, comme l'ancienne chaîne), retrouvé par l'étape `l` (idempotent), entier à `l`. Le registre en
+ * mémoire porte l'identifiant de l'exécution. Plafond par organisation et par jour : celui de `reserverForfait` (Q639 : 10 USD
+ * quand Samuel posera `PLAFONDS_USAGE`, M1h). Variante simulée : en mémoire, sans ligne dans `usage_ledger`, sauf
+ * `reserverEnSimulee`.
+ */
+export async function forfaitDeLaVerification(
+  dependances: DependancesResolues,
+  contexte: CibleForfait,
+  identifiant: string,
+): Promise<ForfaitDeLEtape> {
+  const forfait = await forfaitEntierReserve(dependances, { ...contexte, generationRunId: identifiant }, "verification");
   const registre = creerRegistreForfait(forfait, contexte.generationRunId, dependances.horloge);
   return { forfait, registre, plafonds: plafondsDuForfait(forfait) };
 }

@@ -2,6 +2,7 @@ import "server-only";
 
 import { ChecklistItemSchema, type Trip, type TripSnapshot } from "@/contracts";
 import { identifiantLigneAFaire, lignesDuProgramme } from "@/domain/a-faire";
+import { joursCandidatsApercu } from "@/domain/apercu";
 import {
   lieuxHorsPart,
   reduireSiteDuProgramme,
@@ -282,6 +283,24 @@ export function compteursInitiaux(): CompteursProgramme {
   };
 }
 
+/**
+ * Contrôle fait avant chaque appel de la vérification des lieux (part de la méthode et échéance moins la marge), commun à
+ * l'étape « programme », à la révision et au voyage complet de la chaîne inversée (M1c).
+ */
+export function controleDeLaVerification(
+  contexte: Pick<Contexte, "dep" | "echeance">,
+  forfait: ForfaitDeLEtape["forfait"],
+  registre: ForfaitDeLEtape["registre"],
+): ControleVerification {
+  return async (methode) => {
+    const methodeGoogle = methode === "textSearch" ? "places_text_search" : "places_details";
+    if (contexte.dep.maintenant() + DELAI_REQUETE_MS.places + MARGE_VERIFICATION_MS > contexte.echeance) return "temps";
+    const consomme = await registre.consumption(null, { methode: methodeGoogle });
+    const plafond = methode === "textSearch" ? forfait.textSearchRequetes : forfait.placeDetailsRequetes;
+    return consomme.requetes + 1 > plafond ? "part" : "ok";
+  };
+}
+
 /** Programme rédigé, vérifié et assemblé, en mémoire jusqu'à la publication de l'appelant. */
 export type ProgrammeVerifie = {
   readonly complet: ReturnType<typeof assemblerProgrammeIa>;
@@ -310,6 +329,12 @@ export async function redigerEtVerifier(
     readonly forfait: ForfaitDeLEtape["forfait"];
     readonly registre: ForfaitDeLEtape["registre"];
     readonly compteurs: CompteursProgramme;
+    /**
+     * Aperçu seulement (M1c, ticket 1048 ; réponse de Samuel à Q638) : vrai pour la génération, avant le paiement, où Google ne
+     * vérifie que les lieux des journées de l'aperçu (`joursAVerifier`) ; le voyage complet vérifie les autres après le
+     * déblocage. Absent (révision M1b) : toute la version, inchangé.
+     */
+    readonly apercuSeulement?: boolean;
   },
   rediger: (capacite: CapaciteProgramme) => Promise<RedactionProgramme>,
 ): Promise<ProgrammeVerifie> {
@@ -346,16 +371,13 @@ export async function redigerEtVerifier(
   Object.assign(compteurs, compteursNonSoumis(sites.adresses.length));
 
   // 3. Vérification des lieux distincts dans l'ordre écrit, part et échéance avant chaque appel, sans réserve de trajets.
-  const lieux = capacite.lieux(programme);
+  // Aperçu seulement (Q638) : les créneaux des autres journées sont vidés pour la vérification (indices `(jour, rang)` des
+  // journées gardées inchangés) ; leurs étapes sont écrites sans `placeId`, et le voyage complet les vérifie après le déblocage.
+  const aVerifier = entree.apercuSeulement === true ? joursAVerifier(programme, { tripId: contexte.tripId, organizationId: contexte.organizationId, brief, logements }) : programme;
+  const lieux = capacite.lieux(aVerifier);
   compteurs.placesToVerify = lieux.nombre;
   compteurs.unverifiedForCap = lieuxHorsPart(lieux.nombre, forfait.textSearchRequetes, brief.logements.length);
-  const controle: ControleVerification = async (methode) => {
-    const methodeGoogle = methode === "textSearch" ? "places_text_search" : "places_details";
-    if (contexte.dep.maintenant() + DELAI_REQUETE_MS.places + MARGE_VERIFICATION_MS > contexte.echeance) return "temps";
-    const consomme = await registre.consumption(null, { methode: methodeGoogle });
-    const plafond = methode === "textSearch" ? forfait.textSearchRequetes : forfait.placeDetailsRequetes;
-    return consomme.requetes + 1 > plafond ? "part" : "ok";
-  };
+  const controle = controleDeLaVerification(contexte, forfait, registre);
   // Sites en parallèle (0121 § 2.1 points 2 et 4), sans donnée commune ; 60 s au plus, jamais au-delà de l'échéance. Si
   // la vérification des lieux lève, les vérifications de sites en cours sont abandonnées et attendues.
   const abandonSites = new AbortController();
@@ -395,6 +417,36 @@ export async function redigerEtVerifier(
   return { complet, instantane: instantaneDuProgramme(complet.trip), verifies, logements, obtenuesA };
 }
 
+/**
+ * Programme réduit aux journées de l'aperçu pour la vérification d'avant le paiement (M1c ; Q638) : les journées que
+ * `joursCandidatsApercu` retient sur le programme **assemblé sans lieu** (même assemblage, même cadrage, même règle des
+ * changements de ville que les cases et la lecture avant le déblocage) gardent leurs créneaux ; les autres ont des créneaux
+ * vides, si bien que `lieuxDuProgramme` n'en tire aucun lieu et que les indices des journées gardées ne changent pas.
+ * Fonction pure, aucun appel.
+ */
+export function joursAVerifier<P extends ProgrammeVerifiable>(
+  programme: P,
+  voyage: { readonly tripId: string; readonly organizationId: string; readonly brief: BriefDuVoyage; readonly logements: readonly string[] },
+): P {
+  const sansLieu = assemblerProgrammeIa({
+    tripId: voyage.tripId,
+    organizationId: voyage.organizationId,
+    brief: voyage.brief,
+    jours: programme.jours,
+    bonsPlans: [],
+    logements: voyage.logements,
+    configuration: CONFIGURATION_MOTEUR,
+    mode: modeDeTrajet(voyage.brief),
+    trajets: () => undefined,
+  });
+  const gardes = joursCandidatsApercu(sansLieu.trip.days);
+  const dates = new Set(sansLieu.trip.days.filter((jour) => gardes.has(jour.index)).map((jour) => jour.date));
+  return { ...programme, jours: programme.jours.map((jour) => (dates.has(jour.date) ? jour : { ...jour, creneaux: [] })) };
+}
+
+/** Programme lu tel que `joursAVerifier` le reçoit (forme de `ProgrammeRedige`). */
+type ProgrammeVerifiable = Parameters<typeof assemblerProgrammeIa>[0] extends { readonly jours: infer J } ? { readonly jours: J } : never;
+
 const SQL_A_FAIRE = `INSERT INTO public.checklist_items (id, organization_id, trip_id, stop_id, kind, label, moment, sponsored, done, done_at)
   VALUES ($3::uuid, $1, $2, $4, $5, $6, '{"type":"beforeDeparture"}'::jsonb, false, $7, CASE WHEN $7 THEN now() END)`;
 
@@ -423,7 +475,7 @@ export function etapeProgrammeEcriture(entree: unknown, dependances?: Dependance
       try {
         const { complet, instantane, verifies, logements, obtenuesA } = await redigerEtVerifier(
           contexte,
-          { brief, capacite, forfait, registre, compteurs },
+          { brief, capacite, forfait, registre, compteurs, apercuSeulement: true },
           // Plusieurs villes : prompt `programme` v5 (0148 § 8 point 3), entrée tirée de la table des villes, jamais d'un libellé
           // de billet ni d'une donnée Google ; une seule ville : v4, inchangé.
           (c) =>
