@@ -888,6 +888,9 @@ export const reminderConsents = pgTable(
       .on(t.organizationId, t.tripId, t.userId)
       .where(sql`${t.withdrawnAt} IS NULL`),
     check("reminder_consents_withdrawn_after_consented_check", sql`${t.withdrawnAt} IS NULL OR ${t.withdrawnAt} >= ${t.consentedAt}`),
+    // R-D (migration 0027, décision 0162 § 2 point 0) : cible de la clé étrangère composée de `reminder_relays`
+    // (additive : `id` est déjà unique, la paire l'est donc aussi).
+    unique(uniqueKeyName("reminder_consents_organization_id_id")).on(t.organizationId, t.id),
   ],
 );
 
@@ -917,6 +920,36 @@ export const reminderSends = pgTable(
       foreignColumns: [memberships.organizationId, memberships.userId],
     }),
     check("reminder_sends_day_index_check", sql`${t.dayIndex} >= 1`),
+  ],
+);
+
+/**
+ * Réclamations des relais de rappels (R-D, migration 0027, décision 0162 § 2) : l'insertion de la ligne
+ * `(organization_id, consent_id, relay_n)` est la réclamation de la génération `relay_n` de la chaîne d'exécutions d'un
+ * accord ; la clé primaire refuse la seconde. Insertion seulement (aucun `UPDATE` ni `DELETE` pour l'application, purge
+ * du compte seule). `claimed_run_id` : identifiant de l'exécution qui a réclamé (`wrun_` puis un ULID), pour reconnaître
+ * une étape rejouée ; `claimed_at` posé par la base. Aucune adresse, aucun texte, aucune donnée Google.
+ */
+export const reminderRelays = pgTable(
+  "reminder_relays",
+  {
+    organizationId: organizationId(),
+    consentId: uuid("consent_id").notNull(),
+    relayN: smallint("relay_n").notNull(),
+    claimedRunId: text("claimed_run_id").notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "reminder_relays_pkey", columns: [t.organizationId, t.consentId, t.relayN] }),
+    // Accord de la même organisation (contrainte unique `(organization_id, id)` de `reminder_consents`).
+    foreignKey({
+      name: "reminder_relays_consent_fk",
+      columns: [t.organizationId, t.consentId],
+      foreignColumns: [reminderConsents.organizationId, reminderConsents.id],
+    }),
+    check("reminder_relays_relay_n_check", sql`${t.relayN} >= 1`),
+    // Borne lâche proposée par 0162 § 2 point 2 (format exact : question S-R5 à la Sécurité).
+    check("reminder_relays_claimed_run_id_check", sql`${t.claimedRunId} ~ '^wrun_[0-9A-Za-z]{1,59}$'`),
   ],
 );
 
