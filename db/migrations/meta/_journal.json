@@ -183,6 +183,13 @@
       "when": 1793530568052,
       "tag": "0025_recu_stripe",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794212611257,
+      "tag": "0026_apres_voyage",
+      "breakpoints": true
     }
   ]
 }
