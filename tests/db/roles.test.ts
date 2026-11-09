@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 
-import { BOOTSTRAP_ROLE, BUSINESS_TABLES, closeAll, connect, type DbClient, PURGED_TABLES, REMINDER_TABLES, seedOrganization } from "./helpers";
+import { BOOTSTRAP_ROLE, BUSINESS_TABLES, closeAll, connect, type DbClient, PURGED_TABLES, REMINDER_TABLES, REVIEW_TABLES, seedOrganization } from "./helpers";
 
 /**
  * Tests `rôles` et `fonctions` de la décision 0007 et de la spécification B1, amendés par la décision 0046 (P0r2 :
@@ -65,7 +65,10 @@ const SIUD = ["SELECT", "INSERT", "UPDATE", "DELETE"];
 const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
   vadrouille_app: {
     checklist_items: SIUD,
-    preferences: SIUD,
+    // M8-D (migration 0026_apres_voyage, proposition de 0160 § 2.1, S1, verdict de la Sécurité attendu) : un goût s'insère
+    // par colonnes (droits par colonne ci-dessous) et ne se modifie jamais ; un avis s'insère et se modifie par colonnes.
+    preferences: ["SELECT", "DELETE"],
+    stop_reviews: ["SELECT", "DELETE"],
     stays: SIUD,
     // B9b (migration 0012_creation_voyage) : même modèle que `stays`.
     trip_commitments: SIUD,
@@ -130,7 +133,8 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
   vadrouille_fn_coords: { place_coordinates: ["INSERT", "DELETE"] },
   // M6c-D (0024, décision 0157 § 1.8) : les deux tables des rappels, hors de BUSINESS_TABLES (aucune ligne dans le
   // peuplement commun : `tests/db/rappels.test.ts`), purgées comme les autres.
-  vadrouille_fn_purge: Object.fromEntries([...PURGED_TABLES, ...REMINDER_TABLES].map((t) => [t, ["DELETE"]])),
+  // M8-D (0026, 0160 § 1.1) : `stop_reviews`, hors de BUSINESS_TABLES pour la même raison (`tests/db/apres-voyage.test.ts`).
+  vadrouille_fn_purge: Object.fromEntries([...PURGED_TABLES, ...REMINDER_TABLES, ...REVIEW_TABLES].map((t) => [t, ["DELETE"]])),
   // 0046 D15 point 6 : lecture de place_coordinates seulement (organisation fixe, lignes vivantes) ; aucun droit sur
   // une autre table de public, ni organizations ni usage_ledger.
   vadrouille_prototype: { place_coordinates: ["SELECT"] },
@@ -163,6 +167,14 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     // `withdrawn_at` (instants posés par la base) ; retrait seulement ; une réclamation n'est jamais modifiée.
     reminder_consents: { UPDATE: ["withdrawn_at"], INSERT: ["organization_id", "trip_id", "user_id"] },
     reminder_sends: { UPDATE: [] },
+    // M8-D (0026, 0160 § 2.1, S1) : ni `id`, ni `consented_at`, ni `created_at` à l'insertion (valeurs de la base) ;
+    // aucune mise à jour d'un goût. Avis : ni `id`, ni `created_at`, ni `updated_at` à l'insertion ; valeur, dernier
+    // geste et instant seulement en mise à jour.
+    preferences: { INSERT: ["category", "direction", "organization_id", "origin", "source_trip_id", "subject_kind", "user_id"], UPDATE: [] },
+    stop_reviews: {
+      INSERT: ["created_by", "opinion", "organization_id", "place_id", "request_id", "stop_id", "trip_id"],
+      UPDATE: ["opinion", "request_id", "updated_at"],
+    },
   },
   vadrouille_auth: {
     users: { UPDATE: ["email_verified", "updated_at"] },
@@ -201,7 +213,7 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
   vadrouille_fn_purge: {
     memberships: { SELECT: ["organization_id", "role", "user_id"] },
     organizations: { SELECT: ["deletion_requested_at", "id"], UPDATE: ["deletion_requested_at"] },
-    ...Object.fromEntries([...PURGED_TABLES, ...REMINDER_TABLES].map((t) => [t, { SELECT: ["organization_id"] }])),
+    ...Object.fromEntries([...PURGED_TABLES, ...REMINDER_TABLES, ...REVIEW_TABLES].map((t) => [t, { SELECT: ["organization_id"] }])),
     // B10b (migration 0015_recalcul_lot, décision 0119 § 5.2) : `kind` lue pour vider les lignes `batch` avant les clôtures.
     generation_runs: { SELECT: ["kind", "organization_id"] },
   },
@@ -448,7 +460,7 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
 
   it("vadrouille_auth n'a aucun droit sur une table métier ; vadrouille_share n'en a sur aucune table, seulement SELECT sur les vues partagées", async () => {
     for (const table of tables) {
-      for (const role of ["vadrouille_share", ...([...BUSINESS_TABLES, ...REMINDER_TABLES].includes(table as never) ? ["vadrouille_auth"] : [])]) {
+      for (const role of ["vadrouille_share", ...([...BUSINESS_TABLES, ...REMINDER_TABLES, ...REVIEW_TABLES].includes(table as never) ? ["vadrouille_auth"] : [])]) {
         const { rows } = await app.query(
           `SELECT pg_catalog.has_any_column_privilege($1, ('public.' || $2)::regclass, 'SELECT, INSERT, UPDATE, REFERENCES') AS columns,
                   bool_or(pg_catalog.has_table_privilege($1, ('public.' || $2)::regclass, p)) AS any

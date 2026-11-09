@@ -508,6 +508,15 @@ export const LIGNES_CAPACITE = [
     capacites: [{ capacite: "module:stripe", formes: ["default"], nombre: 1 }],
     ecart: "B4c (0140 § 9) : verdict Sécurité rendu sur le head final de la PR de la décision 0140 (PR 848), à confirmer au head de la PR de B4c",
   },
+  // Ticket 1050 (décision 0163) : étape « Ignored Build Step » de Vercel. Verdict Sécurité à rendre sur la PR 1052.
+  {
+    fichier: "tests/unit/vercel-ignore-build.test.ts",
+    portee: "test",
+    usage:
+      "joue `/bin/sh scripts/vercel/ignore-build.sh` (chemin absolu, aucun `PATH`) avec un environnement construit réduit à `NODE_ENV` et `VERCEL_GIT_COMMIT_REF` ; le script n'utilise que des commandes internes du shell (`case`, `echo`, `exit`), sans réseau ni fichier",
+    capacites: [{ capacite: "module:node:child_process", formes: ["spawnSync"], nombre: 1 }],
+    ecart: "sous-processus dans un test (section 4), fichier apparu après `40b6738` (ticket 1050, PR 1052) : ligne ordinaire B, 0040 D4 ; verdict Sécurité à rendre",
+  },
 ] as const satisfies readonly LigneCapacite[];
 
 /** Lignes de textes (hôtes, fragments, noms secrets), lues dans les données du régime. */

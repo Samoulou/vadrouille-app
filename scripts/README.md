@@ -7,3 +7,5 @@ Scripts du projet (serveur autonome pour les tests).
 `ci/` : logique des workflows GitHub, en fonctions pures testées dans `tests/unit/ci/` (décision 0023) :
 - `techlead-gate.mjs` : décision de la porte `techlead-gate` ;
 - `release-note.mjs` : tag d'une note de version et message Slack du workflow `release`.
+
+`vercel/ignore-build.sh` : étape « Ignored Build Step » de Vercel (`ignoreCommand` de `vercel.json`, décision 0163) : seules `main` et `p0-reel` sont construites (sortie 1), toute autre branche est ignorée (sortie 0). Testé dans `tests/unit/vercel-ignore-build.test.ts`.

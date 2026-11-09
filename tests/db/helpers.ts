@@ -148,6 +148,14 @@ export type BusinessTable = (typeof BUSINESS_TABLES)[number];
  */
 export const REMINDER_TABLES = ["reminder_consents", "reminder_sends"] as const;
 
+/**
+ * Table des avis après le voyage (M8-D, migration 0026_apres_voyage, décision 0160 § 1.1) : table métier (RLS, purgée
+ * par `purge_organization_data`), hors de `BUSINESS_TABLES` et du peuplement commun pour la même raison que les rappels :
+ * une ligne d'avis empêcherait la purge de 0014 rétablie par `0015_recalcul_lot.down.sql` (clé `NO ACTION` vers `trips`)
+ * et la descente de 0026 (refusée dès qu'une ligne existe). Isolation, droits et purge : `tests/db/apres-voyage.test.ts`.
+ */
+export const REVIEW_TABLES = ["stop_reviews"] as const;
+
 /** Tables purgées par `purge_organization_data` : toutes sauf `billing` et `usage_ledger` (Q48). */
 export const PURGED_TABLES = BUSINESS_TABLES.filter((t) => t !== "billing" && t !== "usage_ledger");
 
@@ -263,7 +271,9 @@ export function insertSql(table: BusinessTable, ids: SeedIds): { sql: string; pa
       };
     case "preferences":
       return {
-        sql: "INSERT INTO preferences (organization_id, user_id, category, value, consented_at) VALUES ($1, $2, 'museum', 'like', now()) RETURNING id",
+        // M8-D (migration 0026_apres_voyage, décision 0160 § 1.3) : un sujet de catégorie, sans `consented_at` (posé par
+        // la base : `INSERT` par colonnes), pour la personne propriétaire (politiques par personne, S1).
+        sql: "INSERT INTO preferences (organization_id, user_id, subject_kind, category, direction, origin) VALUES ($1, $2, 'category', 'museum', 'less', 'confirmed') RETURNING id",
         params: [org, owner],
       };
     case "checklist_items":

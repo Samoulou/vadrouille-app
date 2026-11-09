@@ -697,7 +697,53 @@ export const preferencePrompts = pgTable(
   ],
 );
 
-/** Goûts retenus avec l'accord de la personne (« Retenir mes goûts »). */
+/** Valeurs de `STOP_RATINGS` (`src/contracts/values.ts`), comparées par `tests/unit/db/migration-apres-voyage.test.ts`. */
+const STOP_REVIEW_OPINIONS = ["liked", "disliked", "notDone"] as const;
+/** Valeurs de `PREFERENCE_DIRECTIONS` et de `PREFERENCE_ORIGINS` (`src/contracts/values.ts`), comparées par le même test. */
+const TASTE_DIRECTIONS = ["more", "less"] as const;
+const TASTE_ORIGINS = ["confirmed", "inferred"] as const;
+
+/**
+ * Avis rapide après le voyage (M8-D, migration 0026_apres_voyage ; décision 0160 § 1.1, T1) : une ligne par étape et par
+ * lieu pour le voyage (`stop_id` maison, `place_id` de l'étape dans la version courante, seule donnée Google de la
+ * ligne, 0011), modifiable et supprimable par la personne qui l'a donné. Aucun texte libre, aucun nom. La colonne de la
+ * valeur s'appelle `opinion` (valeurs de `STOP_RATINGS`) : un nom en `rating` serait refusé par le test « schéma :
+ * aucune colonne de contenu Google » (motif `rating`, note de Google), que la spécification M8 § 6.2 critère 4 veut vert
+ * sans exception nouvelle. RLS, politiques et droits : migration.
+ */
+export const stopReviews = pgTable(
+  "stop_reviews",
+  {
+    id: id(),
+    organizationId: organizationId(),
+    tripId: uuid("trip_id").notNull(),
+    stopId: text("stop_id").notNull(),
+    placeId: text("place_id"),
+    opinion: text("opinion").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    requestId: uuid("request_id").notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    tripFk("stop_reviews_trip_fk", t),
+    // Même raison que `feedback_stop_dedup_idx` : les identifiants d'étape sont réutilisés d'une version à l'autre (0142
+    // § 5.1). Cible de l'`INSERT … ON CONFLICT` de l'avis (0160 § 1.1 point 4).
+    uniqueIndex("stop_reviews_stop_place_idx").on(t.organizationId, t.tripId, t.stopId, sql`COALESCE(${t.placeId}, '')`),
+    check("stop_reviews_opinion_check", oneOf(t.opinion, STOP_REVIEW_OPINIONS)),
+  ],
+);
+
+/**
+ * Goûts retenus avec l'accord de la personne (« Retenir mes goûts » ; table de B1 durcie en place par M8-D, migration
+ * 0026_apres_voyage, décision 0160 § 1.3, T3). Un sujet (`preferenceKey` : catégorie et sens, ou distance) au plus une
+ * fois par personne et par organisation ; jamais modifié (« Annuler » un retrait réinsère la ligne). `consented_at` est
+ * posé par la base, jamais par l'application (`INSERT` par colonnes). Le voyage d'origine survit à sa suppression :
+ * la migration écrit `ON DELETE SET NULL ("source_trip_id")` (liste de colonnes, Postgres 15 et suivants), que Drizzle
+ * ne sait pas écrire : la clé est déclarée ici en `set null`, le SQL de la migration fait foi (0160 § 1.3 point 4).
+ */
 export const preferences = pgTable(
   "preferences",
   {
@@ -706,12 +752,44 @@ export const preferences = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    category: text("category").notNull(),
-    value: text("value").notNull(),
-    consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
+    subjectKind: text("subject_kind").notNull(),
+    category: text("category"),
+    direction: text("direction"),
+    origin: text("origin").notNull(),
+    sourceTripId: uuid("source_trip_id"),
+    consentedAt: timestamp("consented_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
   },
-  (t) => [index("preferences_organization_id_user_id_idx").on(t.organizationId, t.userId)],
+  (t) => [
+    index("preferences_organization_id_user_id_idx").on(t.organizationId, t.userId),
+    // La personne est membre de l'organisation du goût (clé unique existante de `memberships`), comme `reminder_consents`.
+    foreignKey({
+      name: "preferences_membership_fk",
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [memberships.organizationId, memberships.userId],
+    }),
+    // `ON DELETE SET NULL ("source_trip_id")` dans la migration (voir ci-dessus) : `organization_id` reste intact.
+    foreignKey({
+      name: "preferences_source_trip_fk",
+      columns: [t.organizationId, t.sourceTripId],
+      foreignColumns: [trips.organizationId, trips.id],
+    }).onDelete("set null"),
+    uniqueIndex("preferences_subject_idx").on(
+      t.organizationId,
+      t.userId,
+      t.subjectKind,
+      sql`COALESCE(${t.category}, '')`,
+      sql`COALESCE(${t.direction}, '')`,
+    ),
+    check("preferences_subject_kind_check", oneOf(t.subjectKind, ["category", "distance"])),
+    check(
+      "preferences_subject_check",
+      sql`((${t.subjectKind} = 'category') = (${t.category} IS NOT NULL AND ${t.direction} IS NOT NULL)) AND (${t.subjectKind} <> 'distance' OR (${t.category} IS NULL AND ${t.direction} IS NULL))`,
+    ),
+    check("preferences_category_check", sql`${t.category} IS NULL OR ${oneOf(t.category, SIGNAL_CATEGORIES)}`),
+    check("preferences_direction_check", sql`${t.direction} IS NULL OR ${oneOf(t.direction, TASTE_DIRECTIONS)}`),
+    check("preferences_origin_check", oneOf(t.origin, TASTE_ORIGINS)),
+  ],
 );
 
 /** Liste à réserver ; `moment` est un `ChecklistMoment` (PO-2), jamais un libellé. */

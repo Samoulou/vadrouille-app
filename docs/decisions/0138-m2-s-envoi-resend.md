@@ -159,6 +159,8 @@ Notes : le 403 `validation_error` couvre à la fois « testing emails to your ow
 
 ## 8. M2-S-8 — Épuisement du plafond par des demandes anonymes
 
+**Voir 0163** (ticket #1050, 2026-11-09) : le compte Vercel est sur l'offre gratuite, sans protection des préversions, et la branche `mvp-essai` n'est pas construite par Vercel ; la condition 1 ci-dessous n'est donc pas remplie aujourd'hui.
+
 **Risque accepté pour l'essai de Samuel seul**, sur les trois raisons du Product Owner, **aux conditions suivantes** :
 1. **Protection des déploiements de Vercel active sur la préversion `mvp-essai`** au moment de l'action S1, pour que seules les personnes que Samuel autorise atteignent l'écran 4 ; et **clé portée par la seule branche `mvp-essai`** (§ 2.7). C'est un réglage de Samuel (hors dépôt) : la Sécurité en fait la **condition de son acceptation**. Si Samuel choisit de ne pas protéger la préversion, cette acceptation tombe et le risque revient à la Sécurité avant S1 (plafond par adresse ou autre mesure, spécification nouvelle). La décision de S1 reste à Samuel.
 2. Le limiteur par adresse IP et par adresse e-mail (0050, 0051) reste **devant** la réservation (aucune réservation pour une demande qu'il refuse, B3d-PO-2).
