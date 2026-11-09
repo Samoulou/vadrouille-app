@@ -112,10 +112,13 @@ describe("p0: page de saisie du code d'accès", () => {
     expect(etat.poses).toHaveLength(1);
   });
 
-  it("6e essai de l'heure → too_many_attempts ; champ absent → essai refusé", async () => {
+  it("6e essai de l'heure (mauvais code) → too_many_attempts, puis le bon code passe (0165 § 1.2) ; champ absent → essai refusé", async () => {
     expect(await saisirCodeAccesP0({ statut: "attente" }, new FormData())).toEqual({ statut: "invalid_code" });
     for (let i = 0; i < 4; i += 1) await saisirCodeAccesP0({ statut: "attente" }, formulaire("faux"));
-    expect(await saisirCodeAccesP0({ statut: "attente" }, formulaire(CODE_HEX))).toEqual({ statut: "too_many_attempts" });
+    expect(await saisirCodeAccesP0({ statut: "attente" }, formulaire("faux"))).toEqual({ statut: "too_many_attempts" });
+    expect(etat.poses).toEqual([]);
+    expect(await saisirCodeAccesP0({ statut: "attente" }, formulaire(CODE_HEX))).toEqual({ statut: "accepte" });
+    expect(etat.poses).toHaveLength(1);
   });
 
   it("le fichier d'action n'exporte que la saisie (aucun état de la garde appelable par un client)", async () => {

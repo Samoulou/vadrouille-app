@@ -26,8 +26,10 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
  * - Saisie : décodée par `decoderJetonSaisi` (même `decodeSecret` que la variable, sans `trim()`), puis comparée en
  *   temps constant : `K_cmp = HMAC-SHA-256(code, "vadrouille/p0/comparaison/v1")`, empreintes `HMAC(K_cmp, ·)` des deux
  *   suites d'octets, `timingSafeEqual` sur 32 octets (aucune dépendance du temps à la longueur ou au contenu du code).
- * - Essais : 5 par heure glissante, acceptés compris, comptés sous verrou consultatif dans `prototype.run_attempts`
- *   (seule la colonne `resultat` est écrite ; aucune adresse, aucune empreinte, aucune longueur).
+ * - Essais (décision 0165 § 1, voie (c), confirmée par la Sécurité) : 5 refus par heure glissante ; le bon code n'est
+ *   jamais compté contre lui. La saisie est comparée d'abord ; le bon code est accepté sans verrou ni compte ; seuls les
+ *   refus sont comptés, sous verrou consultatif, dans `prototype.run_attempts` (seule la colonne `resultat` est écrite ;
+ *   aucune adresse, aucune empreinte, aucune longueur).
  * - Cookie `__Host-p0_acces` = `v1.<exp>.<mac>`, `mac = hex(HMAC(K_cookie, "p0/v1/acces/p0-reel/" + exp))`,
  *   `K_cookie = HMAC-SHA-256(code, "vadrouille/p0/cookie/v1")` ; échéance fixe de 12 heures, jamais prolongée ; une
  *   rotation du code invalide tous les cookies au déploiement suivant.
@@ -39,7 +41,7 @@ import type { ClientSql, PoolSql } from "@/server/usage/neon";
 export const NOM_COOKIE_ACCES = "__Host-p0_acces";
 /** Durée du cookie : 12 heures (0055, section 2 point 4). */
 export const DUREE_COOKIE_S = 43_200;
-/** Essais par heure glissante (0055, section 2 point 3). */
+/** Refus par heure glissante (0055, section 2 point 3, amendé par 0165 § 1.2) ; le bon code n'est jamais compté contre lui. */
 export const ESSAIS_PAR_HEURE = 5;
 /** Saisie au-delà de cette longueur : essai refusé et compté, sans décodage ni calcul (0055, section 2 point 2). */
 export const LONGUEUR_SAISIE_MAX = 256;
@@ -198,7 +200,7 @@ export type ResultatSaisie =
 
 const SQL_VERROU = "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('p0_run_attempts'))";
 const SQL_COMPTE = `SELECT pg_catalog.count(*) AS n FROM prototype.run_attempts
-WHERE created_at > pg_catalog.now() - pg_catalog.make_interval(mins => 60)`;
+WHERE resultat = 'refuse' AND created_at > pg_catalog.now() - pg_catalog.make_interval(mins => 60)`;
 const SQL_ESSAI = "INSERT INTO prototype.run_attempts (resultat) VALUES ($1)";
 
 /** Résultat d'un essai : la saisie est-elle le code attendu ? Une saisie trop longue ou indécodable est refusée. */
@@ -209,13 +211,20 @@ function essaiAccepte(saisie: unknown, attendu: Buffer): boolean {
 }
 
 /**
- * Saisie du code (formulaire `POST` de l'action serveur) : garde (sans base si elle est fermée), puis une transaction
- * `vadrouille_prototype` : verrou consultatif, compte des essais des 60 dernières minutes ; à 5 ou plus,
- * `too_many_attempts` sans comparaison ni ligne nouvelle ; sinon ligne `accepte` ou `refuse`, puis réponse.
+ * Saisie du code (formulaire `POST` de l'action serveur ; décision 0165 § 1.2) : 5 refus par heure glissante ; le bon
+ * code n'est jamais compté contre lui.
+ * 1. Garde, sans base si elle est fermée (`fermee`).
+ * 2. Comparaison (`essaiAccepte`), avant toute connexion : calcul local seulement.
+ * 3. Bon code : transaction `vadrouille_prototype` sans verrou ni compte, ligne `accepte`, `COMMIT`, puis cookie (rendu
+ *    seulement après un `COMMIT` réussi).
+ * 4. Mauvais code (ou saisie hors forme) : transaction avec verrou consultatif et compte des seuls refus des
+ *    60 dernières minutes ; à 5 ou plus, `too_many_attempts` sans ligne nouvelle ; sinon ligne `refuse`, `invalid_code`.
+ * Base injoignable, compte illisible ou toute erreur : `indisponible`, jamais un cookie (échec fermé).
  */
 export async function saisirCodeAcces(saisie: unknown, pool: () => PoolSql, dependances: DependancesAcces = {}): Promise<ResultatSaisie> {
   const ouverture = ouvertureP0(dependances);
   if (!ouverture.ok) return { ok: false, code: "fermee" };
+  const accepte = essaiAccepte(saisie, ouverture.attendu);
   let client: ClientSql;
   try {
     client = await pool().connect();
@@ -226,15 +235,16 @@ export async function saisirCodeAcces(saisie: unknown, pool: () => PoolSql, depe
   try {
     await client.query("BEGIN");
     enTransaction = true;
-    await client.query(SQL_VERROU);
-    const essais = Number((await client.query(SQL_COMPTE)).rows[0]?.n);
-    if (!Number.isSafeInteger(essais)) throw new Error("p0: essais illisibles");
-    if (essais >= ESSAIS_PAR_HEURE) {
-      await client.query("ROLLBACK");
-      enTransaction = false;
-      return { ok: false, code: "too_many_attempts" };
+    if (!accepte) {
+      await client.query(SQL_VERROU);
+      const refus = Number((await client.query(SQL_COMPTE)).rows[0]?.n);
+      if (!Number.isSafeInteger(refus)) throw new Error("p0: refus illisibles");
+      if (refus >= ESSAIS_PAR_HEURE) {
+        await client.query("ROLLBACK");
+        enTransaction = false;
+        return { ok: false, code: "too_many_attempts" };
+      }
     }
-    const accepte = essaiAccepte(saisie, ouverture.attendu);
     await client.query(SQL_ESSAI, [accepte ? "accepte" : "refuse"]);
     await client.query("COMMIT");
     enTransaction = false;

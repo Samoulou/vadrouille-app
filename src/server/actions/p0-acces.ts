@@ -16,7 +16,10 @@ import { poolPrototype } from "@/server/p0/base";
 /** État du formulaire de saisie : statut seulement, jamais la saisie. */
 export type EtatSaisieCodeP0 = { readonly statut: "attente" | "accepte" | "invalid_code" | "too_many_attempts" | "erreur" };
 
-/** Saisie du code : essai compté (5 par heure glissante) ; accepté, le cookie d'accès de 12 heures est posé. */
+/**
+ * Saisie du code : 5 refus par heure glissante ; le bon code n'est jamais compté contre lui (décision 0165 § 1.2) ;
+ * accepté, le cookie d'accès de 12 heures est posé.
+ */
 export async function saisirCodeAccesP0(_precedent: EtatSaisieCodeP0, donnees: FormData): Promise<EtatSaisieCodeP0> {
   const saisie = donnees.get("code");
   const resultat = await saisirCodeAcces(typeof saisie === "string" ? saisie : null, poolPrototype);

@@ -13,7 +13,8 @@ import { closeAll, connect, type DbClient } from "./helpers";
 /**
  * Garde et accès du mode réel sur une vraie base Postgres (P0r3b ; décision 0055, section 1 point 2 et section 2
  * point 3 ; revue du head 6be9299, bloquant 2) : les trois requêtes de `src/server/p0/acces.ts` (verrou consultatif,
- * compte des essais de l'heure glissante, ligne d'essai) et celle de `src/server/p0/garde.ts` (exécution réservée)
+ * compte des refus de l'heure glissante, ligne d'essai ; décision 0165 § 1.2 : le bon code ne prend ni le verrou ni le
+ * compte) et celle de `src/server/p0/garde.ts` (exécution réservée)
  * tournent sous `vadrouille_prototype` (`VADROUILLE_DB_PROTOTYPE_URL`), avec ses droits, la RLS, `make_interval`,
  * `quota_day_at` et `pg_advisory_xact_lock` sous concurrence réelle.
  *
@@ -203,9 +204,9 @@ describe("p0: essais du code d'accès sur la base (vadrouille_prototype)", () =>
     const codes = resultats.map((r) => (r.ok ? "ok" : r.code)).sort();
     expect(codes).toEqual([...Array<string>(ESSAIS_PAR_HEURE).fill("invalid_code"), "too_many_attempts"].sort());
     expect(await essaisDeLHeure()).toEqual({ accepte: 0, refuse: ESSAIS_PAR_HEURE });
-    // Le bon code ne passe plus : refusé sans comparaison ni ligne nouvelle.
-    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "too_many_attempts" });
-    expect(await essaisDeLHeure()).toEqual({ accepte: 0, refuse: ESSAIS_PAR_HEURE });
+    // Le bon code passe (décision 0165 § 1.2) : une ligne « accepte » de plus, aucun refus de plus.
+    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await essaisDeLHeure()).toEqual({ accepte: 1, refuse: ESSAIS_PAR_HEURE });
   });
 
   it(`saisie de plus de ${LONGUEUR_SAISIE_MAX} caractères : refusée et comptée`, async () => {
@@ -216,12 +217,27 @@ describe("p0: essais du code d'accès sur la base (vadrouille_prototype)", () =>
   });
 
   it("un essai de plus d'une heure n'est pas compté ; un essai de moins d'une heure l'est", async () => {
+    // Essais posés : des refus (décision 0165 § 4.1). Le bon code passe dans les deux cas.
     await poserEssais(ESSAIS_PAR_HEURE, 61);
     expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "invalid_code" });
     await viderFenetre();
     await poserEssais(ESSAIS_PAR_HEURE, 59);
-    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "too_many_attempts" });
+    expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "too_many_attempts" });
     expect(await essaisDeLHeure()).toEqual({ accepte: 0, refuse: ESSAIS_PAR_HEURE });
+    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await essaisDeLHeure()).toEqual({ accepte: 1, refuse: ESSAIS_PAR_HEURE });
+  });
+
+  it("après 5 refus dans l'heure, le bon code (hexadécimal ou base64) est accepté et sa ligne « accepte » écrite ; un mauvais code reçoit too_many_attempts sans ligne", async () => {
+    for (let i = 0; i < ESSAIS_PAR_HEURE; i += 1) {
+      expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "invalid_code" });
+    }
+    expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "too_many_attempts" });
+    expect(await essaisDeLHeure()).toEqual({ accepte: 0, refuse: ESSAIS_PAR_HEURE });
+    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await saisirCodeAcces(code.toString("base64"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await essaisDeLHeure()).toEqual({ accepte: 2, refuse: ESSAIS_PAR_HEURE });
   });
 });
 
