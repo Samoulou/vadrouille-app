@@ -835,6 +835,59 @@
         }
       ],
       "ecart": "B4c (0140 § 4 et § 6 ligne 8) ; verdict Sécurité rendu sur le head final de la PR de la décision 0140 (#848), à confirmer au head de la PR de B4c"
+    },
+    {
+      "fichier": "tests/db/recu-stripe.test.ts",
+      "portee": "test",
+      "usage": "tests de base de la migration 0025_recu_stripe (B4e, ticket 887 ; décision 0144 § 5.4) : liens admis et refusés par la contrainte checkouts_stripe_receipt_url_check, écrits en base de test ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xVGVzdEV4ZW1wbGUwMDAwKKCw_pi_3TestExemple",
+            "http://pay.stripe.com/receipts/x",
+            "https://pay.stripe.com.example/receipts/x",
+            "https://pay.stripe.com/receiptsx",
+            "https://pay.stripe.com/receipts/",
+            "https://PAY.STRIPE.COM/receipts/x",
+            "HTTPS://pay.stripe.com/receipts/x",
+            "https://pay.stripe.com/receipts/../x",
+            "https://pay.stripe.com/receipts/%2e%2e/x",
+            "https://pay.stripe.com/receipts/%2E%2E/x",
+            "https://pay.stripe.com/receipts/.%2e/x",
+            "https://pay.stripe.com/receipts/%2E./x",
+            "https://pay.stripe.com/receipts/a b",
+            "https://pay.stripe.com/receipts/x#fragment",
+            "https://u@pay.stripe.com/receipts/x",
+            "https://pay.stripe.com:443/receipts/x",
+            "https://pay.stripe.com/receipts/x\n",
+            "https://pay.stripe.com/receipts/a.b~c_d-e%20f/g?h=i&j=k.l~m"
+          ]
+        },
+        {
+          "capacite": "hote:checkout.stripe.com",
+          "formes": [
+            "https://checkout.stripe.com/receipts/x"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B4e partie data (0144 § 5.4, liste des liens hors préfixe) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "tests/unit/db/migration-recu-stripe.test.ts",
+      "portee": "test",
+      "usage": "motif de la Sécurité (0144 § 5.2) recopié pour comparer le texte de la contrainte de 0025_recu_stripe ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:pay.stripe.com",
+          "formes": [
+            "^https://pay.stripe.com/receipts/[A-Za-z0-9_%./~-]+(?[A-Za-z0-9_%=&.~-]*)?$"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "B4e partie data (0144 § 5.3 point 1) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
     }
   ]
 }

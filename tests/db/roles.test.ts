@@ -170,7 +170,9 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
   },
   vadrouille_webhook: {
     billing: { SELECT: ["checkout_id", "id", "outcome", "stripe_event_id"] },
-    checkouts: { UPDATE: ["status", "updated_at"] },
+    // B4e (migration 0025_recu_stripe, décision 0144 § 5.3 point 1) : lien du reçu de Stripe, seul droit de mise à jour
+    // de la colonne (écriture unique : déclencheur `checkouts_receipt_once`, `tests/db/recu-stripe.test.ts`).
+    checkouts: { UPDATE: ["status", "stripe_receipt_url", "updated_at"] },
   },
   vadrouille_fn_share: { share_links: { SELECT: ["expires_at", "organization_id", "revoked_at", "token_hash", "trip_id"] } },
   vadrouille_fn_share_views: {
