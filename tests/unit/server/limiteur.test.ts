@@ -554,6 +554,8 @@ describe("module de journal", () => {
       // M6c : relais du workflow 7 en échec, fin sur pannes répétées ; nom seul.
       "rappels.relay_failed",
       "rappels.abandoned",
+      // R-B (décision 0162 § 3 point 3) : réclamation du relais tenue par une autre exécution ; nom seul.
+      "rappels.relay_duplicate",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",
