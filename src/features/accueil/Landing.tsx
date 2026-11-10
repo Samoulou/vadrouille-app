@@ -89,6 +89,8 @@ function Section({ id, title, children }: { id: string; title: string; children:
 export interface LandingProps {
   /** Adresse de « Créer un voyage » (écran 1, avec `?site=essai` sur le site d'essai). */
   createHref: string;
+  /** En tête de page : annonce à l'arrivée (« Ton compte est supprimé. », M9c). */
+  notice?: ReactNode;
   /** Sous le premier bouton : « Mes voyages » (site d'essai). */
   secondary?: ReactNode;
   /** En fin de page : section « Démonstration » (données simulées, spécification D1). */
@@ -100,9 +102,10 @@ export interface LandingProps {
  * étapes, ce que l'on reçoit, fiabilité, puis le bouton une seconde fois. Composant serveur, aucun JavaScript client.
  * Règles de Ligne : un seul aplat de destination, le bleu pour la ligne et l'action seulement, ni ombre ni emoji.
  */
-export function Landing({ createHref, secondary, footer }: LandingProps) {
+export function Landing({ createHref, notice, secondary, footer }: LandingProps) {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-10 px-5 pt-10 pb-16">
+      {notice}
       <header className="flex flex-col gap-4">
         <h1 className="text-destination font-extrabold tracking-(--ligne-destination-approche) text-ink">{PRODUCT_NAME}</h1>
         <p className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">{t.accroche}</p>

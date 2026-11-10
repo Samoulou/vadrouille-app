@@ -60,3 +60,13 @@ describe("en-têtes de `/precommande`", () => {
     expect(RESPONSE_HEADERS.filter((entry) => entry.source.startsWith("/precommande"))).toHaveLength(1);
   });
 });
+
+// « Ton compte » (M9c ; revue consolidée de la PR 1127, mineur 3) : la page rend l'adresse e-mail de la session.
+describe("en-têtes de `/compte`", () => {
+  it("ni cache partagé ni cache du navigateur, seule l'origine en référent", () => {
+    expect(RESPONSE_HEADERS.find((entry) => entry.source === "/compte/:path*")?.headers).toEqual([
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+    ]);
+  });
+});

@@ -62,6 +62,15 @@ export const RESPONSE_HEADERS = [
     ],
   },
   {
+    // « Ton compte » (M9c ; revue consolidée de la PR 1127, mineur 3) : la page rend l'adresse e-mail de la session. Ni
+    // cache partagé ni cache du navigateur, et seule l'origine part dans `Referer`.
+    source: "/compte/:path*",
+    headers: [
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+    ],
+  },
+  {
     source: "/sw.js",
     headers: [{ key: "Cache-Control", value: "no-cache" }],
   },

@@ -201,9 +201,14 @@ test("écrans 11, 12 et 17 avec DATA_ADAPTER=api : même rendu que mock ; autre 
   const CREER = "/voyages/nouveau";
   expect(liensApi.filter((href) => href === CREER)).toEqual(liensMock.filter((href) => href === CREER));
   expect(liensApi.indexOf(CREER)).toBe(liensMock.indexOf(CREER));
+  // « Ton compte » (M9c, ticket 1122) : même adresse des deux côtés, une seule fois, à la même place ; ce n'est pas un voyage.
+  const COMPTE = "/compte";
+  expect(liensMock.filter((href) => href === COMPTE)).toEqual([COMPTE]);
+  expect(liensApi.filter((href) => href === COMPTE)).toEqual([COMPTE]);
+  expect(liensApi.indexOf(COMPTE)).toBe(liensMock.indexOf(COMPTE));
   const correspondance = new Map<string, string>();
   liensMock.forEach((href, i) => {
-    if (href === CREER) return;
+    if (href === CREER || href === COMPTE) return;
     const mock = LIEN.exec(href);
     const reel = LIEN.exec(liensApi[i] ?? "");
     expect(reel?.[2], href).toBe(mock?.[2]);

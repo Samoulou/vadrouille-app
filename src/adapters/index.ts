@@ -99,6 +99,11 @@ export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
  * comme `MOCK_DEMO_TRIP`. Jamais lu par une route produit.
  */
 export { MOCK_DEMO_TRIP_DRAFT as MOCK_DEMO_DRAFT } from "@/mocks/creation-edimbourg";
+/**
+ * Adresse du compte du jeu simulé (M9c, ticket 1122) : affichée par « Ton compte » et écrite dans l'export simulé avec la
+ * connexion simulée, qui ne garde aucune adresse en clair (0017 § 3.5). Jamais lue avec la connexion réelle.
+ */
+export { MOCK_KNOWN_EMAIL as ADRESSE_COMPTE_SIMULE } from "@/mocks/auth-simule";
 export { authAdapterChoice, betterAuthAllowed, mockAuthAllowed } from "./auth-guard";
 export { assertApiAdapter } from "./api-guard";
 export { getRequestContext, SessionRequiseError } from "./context";
