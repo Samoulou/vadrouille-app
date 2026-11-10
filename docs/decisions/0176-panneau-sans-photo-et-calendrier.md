@@ -27,4 +27,4 @@ Fil du projet « Retirer le look IA du design ». Question posée le 2026-11-10 
 
 ## Suite
 
-Références visuelles à régénérer (`update-snapshots`) : création, présentation.
+Références visuelles régénérées par `update-snapshots` (commit `3444748`) : création (quatre captures), présentation (cinq), catalogue des composants. Le même passage reprend cinq captures venues de main en conflit de fusion (`lancement-erreur`, `mes-voyages-*`) et deux captures qui ne tiennent pas à cette décision (`connexion-code`, `revision-deplacer-jours`) : à surveiller si elles bougent encore sans changement d'écran.
