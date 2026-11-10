@@ -25,7 +25,7 @@ import { ancrerLogementsDuSejour, capacitesAncrage, verifierLieuxDuProgramme } f
 import type { RectangleZone } from "@/grounding/interfaces";
 import { positionsFraiches } from "@/grounding/fiches";
 import { capturer, valeurOuEchec, type ResultatAncrage } from "@/grounding/resultat";
-import { creerLecteurPages, creerVerificateurStatut, reduireSite, type LecteurPages } from "@/research/fetch-page";
+import { creerLecteurPages, reduireSite, type LecteurPages } from "@/research/fetch-page";
 import { creerRecherche, type ConfigurationRecherche } from "@/research/recherche";
 import { versLignes, type LignesCandidat } from "@/research/candidat-trouve";
 import { classerSource } from "@/research/sources";
@@ -793,7 +793,12 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
   };
 }
 
-/** Vérificateur de sites de la variante simulée : barrière fermée, aucune adresse soumise, ni résolution ni connexion (0139 § 4.2). */
+/**
+ * Vérificateur de sites **fermé** : barrière fermée, aucune adresse soumise, ni résolution ni connexion (0139 § 4.2). Celui
+ * de la variante simulée et, depuis la décision 0169 § 4, **celui de la variante réelle** : la condition S4-2 de 0139 (refus,
+ * avant toute résolution, d'une adresse reprenant un texte du brief) n'est pas posée ; tant qu'elle ne l'est pas, le serveur
+ * n'envoie aucune requête vers un site proposé par l'IA et aucun lien « Site officiel » n'est gardé.
+ */
 const SITES_SIMULES: VerificateurDesSites = { barriereFermee: true, verifier: async () => ({ ok: false }) };
 
 // --- Variante simulée --------------------------------------------------------------------------------------------------
@@ -892,7 +897,8 @@ export function composerReelle(options: OptionsReelle = {}): FabriqueGeneration 
     // de sortie (0122 § 1 condition 11, amendée par 0139 § 4.2).
     programme: (o) => {
       const client = clientModeles(o);
-      return capaciteProgramme(clientsGoogle(o).places, { envoyer: (requete) => client.envoyer(requete) }, creerVerificateurStatut(createUndiciTransport()));
+      // Sites : vérificateur fermé tant que S4-2 de 0139 n'est pas posée (décision 0169 § 4) ; aucune requête vers un site.
+      return capaciteProgramme(clientsGoogle(o).places, { envoyer: (requete) => client.envoyer(requete) }, SITES_SIMULES);
     },
   };
 }

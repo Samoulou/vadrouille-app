@@ -8,8 +8,11 @@ import "server-only";
 /** Seul en-tête d'adresse IP de confiance admis (décision 0051 § 2.1 ; `TRUSTED_IP_HEADERS` de `@/server/env`). */
 export type EnteteIpDeConfiance = "x-vercel-forwarded-for";
 
-/** Environnements où `better-auth` est admis (décision 0077 § 5.1, B3-TL-2). */
-export type EnvironnementAuth = "local" | "ci";
+/**
+ * Environnements où `better-auth` est admis (décision 0077 § 5.1, B3-TL-2) ; `staging` : la préversion Vercel de la
+ * seule branche `mvp-essai` (décision 0169 § 1), jamais un autre déploiement.
+ */
+export type EnvironnementAuth = "local" | "ci" | "staging";
 
 /** Code : 6 chiffres, 10 minutes, 3 essais (B3-PO-5). */
 export const CODE_CONNEXION = Object.freeze({ chiffres: 6, dureeSecondes: 10 * 60, essais: 3 });

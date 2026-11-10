@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { isProductionTarget } from "@/dev/flags";
+import { isProductionTarget, previewMvpEssai } from "@/dev/flags";
 
 import { resolveServerEnvironment, type ServerEnvironment } from "./resolve";
 
@@ -131,10 +131,11 @@ export type TrustedIpHeader = (typeof TRUSTED_IP_HEADERS)[number];
 
 /**
  * Réglages de la connexion réelle (B3b), présents seulement avec `AUTH_ADAPTER=better-auth`, admis en `local` et `ci`
- * seulement (B3-TL-2) : octets décodés de `BETTER_AUTH_SECRET` (jamais la chaîne), `BETTER_AUTH_URL` et `APP_URL`.
+ * (B3-TL-2) et, en `staging`, sur la préversion Vercel de la seule branche `mvp-essai` (décision 0169 § 1) : octets
+ * décodés de `BETTER_AUTH_SECRET` (jamais la chaîne), `BETTER_AUTH_URL` et `APP_URL`.
  */
 export type BetterAuthSettings = {
-  readonly environment: "local" | "ci";
+  readonly environment: "local" | "ci" | "staging";
   readonly secret: Buffer;
   readonly baseUrl: string;
   readonly appUrl: string;
@@ -519,11 +520,13 @@ export function parseServerEnv(env: Env): ServerEnv {
   if (env.AUTH_SECRET !== undefined) throw new ServerEnvError(V.AUTH_SECRET, "forbidden");
 
   // AUTH_ADAPTER (même normalisation que `adapterChoice` : `trim()`, vide = `mock`) : `better-auth` admis en `local`
-  // et `ci` seulement, `forbidden` en `staging` et `production` (B3-TL-2, 0077 § 5.1) ; toute autre valeur est
-  // inconnue. `assertAuthAdapter` (src/adapters/auth-guard.ts) est amendée par B3c.
+  // et `ci`, et en `staging` sur la préversion Vercel de la seule branche `mvp-essai` (`previewMvpEssai`, prédicat
+  // partagé avec `betterAuthAllowed` de `src/adapters/auth-guard.ts` ; décision 0169 § 1, qui amende 0077 § 5.1) ;
+  // `forbidden` sur tout autre `staging` et en `production` (B3-TL-2) ; toute autre valeur est inconnue.
   const choix = brut.AUTH_ADAPTER?.trim() || "mock";
   if (choix !== "mock" && choix !== "better-auth") throw new ServerEnvError(V.AUTH_ADAPTER, "invalid_value");
-  if (choix === "better-auth" && environment !== "local" && environment !== "ci") throw new ServerEnvError(V.AUTH_ADAPTER, "forbidden");
+  const mvpEssai = environment === "staging" && previewMvpEssai(env as NodeJS.ProcessEnv);
+  if (choix === "better-auth" && environment !== "local" && environment !== "ci" && !mvpEssai) throw new ServerEnvError(V.AUTH_ADAPTER, "forbidden");
 
   // EMAIL_TRANSPORT (0098 § 4 points 3 à 6, amendés par 0138 § 10.4) : après `trim()`, exactement `smtp` (minuscules),
   // avec `AUTH_ADAPTER=better-auth` en `local` ou `ci` seulement, `SMTP_URL` requise avec lui et refusée sans lui ; ou
@@ -633,8 +636,10 @@ export function parseServerEnv(env: Env): ServerEnv {
   // Connexion réelle (B3b) : secret, URL de la bibliothèque, URL de l'application et URL de connexion du rôle
   // `vadrouille_auth` requis au démarrage ; cette dernière n'est lue que pour sa présence (sa valeur n'est lue que par
   // `db/connection.ts`). Avec `mock`, ces variables sont ignorées, sauf le secret, validé s'il est présent (0051 § 3.6).
+  // Sur la préversion `mvp-essai` (0169 § 1), en plus : les deux URL en `https://`, et le secret du limiteur et
+  // l'en-tête d'adresse IP de confiance requis **au démarrage** (ailleurs, le limiteur échoue fermé à l'usage).
   let betterAuth: BetterAuthSettings | null = null;
-  if (choix === "better-auth" && (environment === "local" || environment === "ci")) {
+  if (choix === "better-auth" && (environment === "local" || environment === "ci" || (environment === "staging" && mvpEssai))) {
     if (betterAuthSecret === null) throw new ServerEnvError(V.BETTER_AUTH_SECRET, "missing");
     if (!presente(brut.BETTER_AUTH_URL)) throw new ServerEnvError(V.BETTER_AUTH_URL, "missing");
     const baseUrl = origineHttp(brut.BETTER_AUTH_URL.trim());
@@ -643,6 +648,12 @@ export function parseServerEnv(env: Env): ServerEnv {
     const appUrl = origineHttp(brut.APP_URL.trim());
     if (appUrl === null) throw new ServerEnvError(V.APP_URL, "invalid_value");
     if (!presente(env.VADROUILLE_DATABASE_URL_AUTH)) throw new ServerEnvError(V.VADROUILLE_DATABASE_URL_AUTH, "missing");
+    if (environment === "staging") {
+      if (!baseUrl.startsWith("https://")) throw new ServerEnvError(V.BETTER_AUTH_URL, "invalid_value");
+      if (!appUrl.startsWith("https://")) throw new ServerEnvError(V.APP_URL, "invalid_value");
+      if (rateLimitHmacSecret === null) throw new ServerEnvError(V.RATE_LIMIT_HMAC_SECRET, "missing");
+      if (trustedIpHeader === null) throw new ServerEnvError(V.TRUSTED_IP_HEADER, "missing");
+    }
     betterAuth = Object.freeze({ environment, secret: betterAuthSecret, baseUrl, appUrl });
   }
 

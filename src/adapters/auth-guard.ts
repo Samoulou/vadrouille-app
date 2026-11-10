@@ -1,4 +1,4 @@
-import { isProductionDeployment } from "@/dev/flags";
+import { isProductionDeployment, previewMvpEssai } from "@/dev/flags";
 
 import { adapterChoice } from "./payment-guard";
 
@@ -29,22 +29,33 @@ export function mockAuthAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
 const ENVIRONNEMENTS_BETTER_AUTH: ReadonlySet<string> = new Set(["local", "development", "ci"]);
 
 /**
- * Vrai seulement si le serveur tourne en `local` ou en `ci` (décision 0077 § 5.1, B3-TL-2) : `better-auth` reste refusé
- * en `staging` et en `production`, et quand aucun environnement n'est déclaré. Chaque variable déclarée
+ * Vrai seulement si le serveur tourne en `local` ou en `ci` (décision 0077 § 5.1, B3-TL-2). Chaque variable déclarée
  * (`VADROUILLE_ENV`, `VERCEL_ENV`, comparaison `trim().toLowerCase()`) doit désigner `local` ou `ci` : c'est le
  * résultat de `resolveServerEnvironment` (B3a, règles 1 à 5, la plus restrictive l'emporte, valeur inconnue =
  * `production`), recalculé ici sans importer `src/server/env`, que `src/features` ne doit pas atteindre (test
- * « p0: clé côté serveur seulement »). Équivalence vérifiée par `tests/unit/server/env.test.ts`.
+ * « p0: clé côté serveur seulement »). Équivalence vérifiée par `tests/unit/server/env.test.ts`. Faux quand aucun
+ * environnement n'est déclaré.
  */
-export function betterAuthAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+export function betterAuthLocalOuCi(env: NodeJS.ProcessEnv = process.env): boolean {
   const declarees = [env.VADROUILLE_ENV, env.VERCEL_ENV].map((valeur) => valeur?.trim().toLowerCase() ?? "").filter((valeur) => valeur !== "");
   return declarees.length > 0 && declarees.every((valeur) => ENVIRONNEMENTS_BETTER_AUTH.has(valeur));
 }
 
 /**
+ * Vrai si la connexion `better-auth` peut servir : en `local` ou en `ci` (`betterAuthLocalOuCi`, 0077 § 5.1), **ou** sur
+ * la préversion Vercel de la seule branche `mvp-essai` (`previewMvpEssai`, décision 0169 § 1, qui amende 0077 § 5.1 sur
+ * les réponses de Samuel à Q634 et Q635). Refusée partout ailleurs : toute autre préversion, `staging` déclaré par
+ * l'opérateur, `production`, et quand aucun environnement n'est déclaré. Même règle que `parseServerEnv`
+ * (`src/server/env/index.ts`), qui lit le même prédicat.
+ */
+export function betterAuthAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  return betterAuthLocalOuCi(env) || previewMvpEssai(env);
+}
+
+/**
  * Lève une erreur à l'appel (jamais à l'import ni au build) si la connexion ne peut pas servir : adaptateur `mock`
  * hors de `mockAuthAllowed`, adaptateur `better-auth` hors de `betterAuthAllowed` (B3c ; refusé en `staging` et en
- * `production` tant que B3-TL-2 tient, décision 0077 § 5.1), ou adaptateur inconnu. Aucun repli vers un mode
+ * `production`, décision 0077 § 5.1, sauf la préversion de `mvp-essai`, décision 0169 § 1), ou adaptateur inconnu. Aucun repli vers un mode
  * permissif ; l'écran qui l'appelle affiche l'erreur générique. Aucune connexion à la base n'est ouverte ici.
  */
 export function assertAuthAdapter(env: NodeJS.ProcessEnv = process.env): "mock" | "better-auth" {
@@ -57,7 +68,7 @@ export function assertAuthAdapter(env: NodeJS.ProcessEnv = process.env): "mock" 
       return "mock";
     case "better-auth":
       if (!betterAuthAllowed(env)) {
-        throw new Error("connexion better-auth refusée hors local et ci (décision 0077 § 5.1, B3-TL-2)");
+        throw new Error("connexion better-auth refusée hors local et ci, préversion mvp-essai exceptée (décisions 0077 § 5.1, B3-TL-2, et 0169 § 1)");
       }
       return "better-auth";
     default:
