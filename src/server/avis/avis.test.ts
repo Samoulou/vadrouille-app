@@ -6,6 +6,7 @@ import type { DaySnapshot } from "@/contracts";
 import { etapesAEvaluer } from "@/domain/apres-voyage";
 import { edimbourgDebloque } from "@/mocks/edimbourg";
 import { RATE_LIMITS } from "@/server/config/limites";
+import { SQL_GOUTS_DE_LA_PERSONNE } from "@/server/gouts/lecture";
 import { SQL_VERROU_VERSIONS } from "@/server/versions/ecrire";
 import type { DependancesAction } from "@/server/voyages/actions";
 import type { EtatApresVoyage } from "@/server/voyages/lecture";
@@ -77,6 +78,8 @@ function doubleWithOrg(base: Base = {}) {
         if (texte === SQL_ECRIRE_AVIS) return { rows: base.enregistre === undefined ? [{ opinion: valeurs[4] }] : [] };
         if (texte === SQL_AVIS_ENREGISTRE) return { rows: base.enregistre === undefined ? [] : [{ opinion: base.enregistre }] };
         if (texte === SQL_EFFACER_AVIS) return { rows: [] };
+        // M8c-1 (ticket 1121) : goûts déjà retenus de la personne, aucun dans ces tests d'avis (`gouts.test.ts` les éprouve).
+        if (texte === SQL_GOUTS_DE_LA_PERSONNE) return { rows: [] };
         throw new Error(`requête inattendue : ${texte}`);
       },
     };
@@ -95,6 +98,8 @@ function banc(base: Base = {}, options: { etat?: EtatApresVoyage | null; mainten
     limiteur,
     maintenant: () => Date.parse(options.maintenant ?? "2026-09-10T12:00:00+01:00"),
     lireEtat: async () => etat,
+    // M8c-1 : aucun signal du tri, donc aucun candidat de goût dans ces tests d'avis.
+    lireSignaux: async () => [],
   };
   const ecritures = () => requetes.filter((r) => r.texte === SQL_ECRIRE_AVIS || r.texte === SQL_EFFACER_AVIS);
   return { dependances, requetes, limiteur, ecritures };
