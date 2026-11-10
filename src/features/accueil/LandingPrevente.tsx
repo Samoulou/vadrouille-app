@@ -233,30 +233,30 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
               aria-hidden="true"
               className="absolute top-7 right-0 left-0 hidden h-1 bg-line lg:block"
             />
-          <ol
-            role="list"
-            className="relative grid gap-8 lg:grid-cols-3 lg:gap-6"
-          >
-            {t.etapes.liste.map((etape, index) => (
-              <li key={etape.titre} className="relative flex flex-col gap-4">
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    TITRE,
-                    "flex size-14 items-center justify-center rounded-full border-4 border-line bg-raised text-montant text-line",
-                  )}
-                >
-                  {index + 1}
-                </span>
-                <h3 className="text-montant font-extrabold text-ink">
-                  {etape.titre}
-                </h3>
-                <p className="text-arret font-normal text-ink-soft">
-                  {etape.texte}
-                </p>
-              </li>
-            ))}
-          </ol>
+            <ol
+              role="list"
+              className="relative grid gap-8 lg:grid-cols-3 lg:gap-6"
+            >
+              {t.etapes.liste.map((etape, index) => (
+                <li key={etape.titre} className="relative flex flex-col gap-4">
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      TITRE,
+                      "flex size-14 items-center justify-center rounded-full border-4 border-line bg-raised text-montant text-line",
+                    )}
+                  >
+                    {index + 1}
+                  </span>
+                  <h3 className="text-montant font-extrabold text-ink">
+                    {etape.titre}
+                  </h3>
+                  <p className="text-arret font-normal text-ink-soft">
+                    {etape.texte}
+                  </p>
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>

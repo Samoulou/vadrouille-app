@@ -35,7 +35,7 @@
   "vise": {
     "titre": "Ce que {produit} cherche à garantir",
     "liste": [
-      { "titre": "Fiable", "texte": "Chaque lieu contrôlé avant d'apparaître. Horaires et dates avec leur source. Ce qui reste incertain marqué « À confirmer »." },
+      { "titre": "Fiable", "texte": "Chaque lieu contrôlé avant d'apparaître. Horaires et dates avec leur source et leur date. Ce qui reste incertain marqué « À confirmer »." },
       { "titre": "Choisi", "texte": "Pour chaque adresse, la raison pour laquelle elle est là pour toi, avec sa source." },
       { "titre": "D'actualité", "texte": "Les événements réellement prévus pendant tes dates. Un événement sans source relue marqué « Non confirmé »." },
       { "titre": "Adaptable", "texte": "Une étape changée en quelques gestes, sans casser tes réservations ni tes horaires fixes." }
