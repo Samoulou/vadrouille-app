@@ -1,9 +1,14 @@
 "use server";
 
-import { getAuthAdapter } from "@/adapters";
+import { headers } from "next/headers";
+
+import { authAdapterChoice, getAuthAdapter, isApiAdapter, sessionBranchee } from "@/adapters";
 import { getSimulationScope } from "@/adapters/simulation";
 import { CodeRequestSchema, CodeVerificationSchema, fail, ok, type ApiError, type Result } from "@/contracts";
 import type { ApiErrorCode } from "@/contracts/values";
+import { ACTION_LIMITEUR_SUPPRESSION, type CompteSupprime, supprimerMonCompte, suppressionCompte } from "@/server/account/delete";
+import { controleConnexionRecente } from "@/server/account/reauthentification";
+import { verdictRateLimit } from "@/server/rate-limit";
 
 import { parseInput } from "../parse-input";
 
@@ -98,4 +103,31 @@ export async function hasSession(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export type AccountDeleted = CompteSupprime;
+
+/**
+ * « Supprimer mon compte » (M9b, ticket 1106 ; spécification M9 § 4 et § 6.3 ; handover § 12). **Aucune entrée** :
+ * l'organisation et la personne viennent de la session seule. Tout est dans `supprimerMonCompte`
+ * (`src/server/account/delete.ts`), qui fixe l'ordre des contrôles ; erreurs : `not_found` (hors de `api` avec la connexion
+ * réelle : la suppression n'est pas proposée sur `mock`), `unauthenticated`, `forbidden` (conseiller, organisation
+ * partagée ; avec `field: "payment"` : paiement en attente, forme T6 à confirmer), `reauthentication_required`,
+ * `rate_limited`, `internal`. Après la réussite, plus aucune session n'existe ; le cookie est effacé si possible.
+ */
+export async function deleteAccount(): Promise<Result<AccountDeleted>> {
+  return supprimerMonCompte({
+    disponible: () => isApiAdapter() && authAdapterChoice() === "better-auth",
+    session: async () => {
+      const filtres = new Headers();
+      const cookie = (await headers()).get("cookie");
+      if (cookie !== null) filtres.set("cookie", cookie);
+      return sessionBranchee(filtres);
+    },
+    connexionRecente: controleConnexionRecente,
+    limiteur: async (userId) => verdictRateLimit({ action: ACTION_LIMITEUR_SUPPRESSION, headers: new Headers(await headers()), userId }),
+    compte: { decision: (ctx) => suppressionCompte().decision(ctx), supprimer: (ctx) => suppressionCompte().supprimer(ctx) },
+    maintenant: () => new Date(),
+    effacerCookie: async () => getAuthAdapter({ scope: await getSimulationScope() }).signOut(),
+  });
 }

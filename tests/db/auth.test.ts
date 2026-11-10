@@ -366,8 +366,12 @@ describe("B3b : sessions", () => {
     const cookiesAvant = banc.setCookies.length;
     expect(await verifier(email, code)).toEqual({ ok: false, code: "unauthenticated" });
     expect(banc.setCookies.length).toBe(cookiesAvant);
+    // M9b (ticket 1106 ; spécification M9 § 4.2 point 4, handover § 12 étape (d)) : la reprise de `verifyCode`, vide en
+    // B3b, est remplie : elle termine l'étape 2. Aucune session n'est ouverte, et celle qui restait est supprimée avec
+    // la personne (avant M9b, ce relevé attendait la seule session d'origine : toujours aucune session nouvelle).
     const { rows } = await auth.query("SELECT id FROM sessions WHERE user_id = $1", [ouverte.userId]);
-    expect(rows).toEqual([{ id: ouverte.sessionId }]);
+    expect(rows).toEqual([]);
+    expect((await auth.query("SELECT id FROM users WHERE id = $1", [ouverte.userId])).rows).toEqual([]);
     // Session existante de cette organisation : refusée.
     expect(await creerContexteServeur(banc.operations)(cookiesSession)).toBeNull();
   });
