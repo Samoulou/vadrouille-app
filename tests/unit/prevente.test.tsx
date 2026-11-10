@@ -97,7 +97,7 @@ describe("accueil : précommande", () => {
     vi.stubEnv("PREVENTE", "1");
     vendeur();
     render(await HomePage({ searchParams: Promise.resolve({}) }));
-    expect(screen.getAllByRole("navigation", { name: "Informations légales" })).toHaveLength(2);
+    expect(screen.getAllByRole("navigation", { name: "Informations légales" })).toHaveLength(1);
     for (const [href, attendus] of Object.entries(LIENS_LEGAUX)) {
       const liens = screen.getAllByRole("link").filter((lien) => lien.getAttribute("href") === href);
       expect(liens, href).toHaveLength(attendus);

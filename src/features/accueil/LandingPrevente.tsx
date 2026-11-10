@@ -419,7 +419,7 @@ export function LandingPrevente({
               <p className="text-corps-s text-ink-soft">{t.prix.moyens}</p>
               <p className="text-corps-s text-ink-soft">{t.prix.sansAide}</p>
             </div>
-            {legal ? <LiensLegaux /> : null}
+            {legal ? <LiensLegaux repere={false} /> : null}
           </div>
         </div>
       </Troncon>
