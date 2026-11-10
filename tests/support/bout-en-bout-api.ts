@@ -54,3 +54,10 @@ export const ADRESSE_PARTAGE_CREATION = "m6a-partage-creation@exemple.test";
  * le monde local du Workflow SDK (durées accélérées, `RAPPELS_ACCELERATION`), puis le retire.
  */
 export const ADRESSE_RAPPELS = "m6c-rappels@exemple.test";
+
+/**
+ * Avis rapide sur `api` (M8a, ticket 1062 ; `tests/e2e/apres-voyage-api.api.spec.ts`) : une organisation propre, un seul
+ * voyage débloqué (Édimbourg du jeu simulé, décalé pour finir 2 jours avant l'écriture), donc l'écran 16 ouvert aux avis
+ * (accès jusqu'à 30 jours après le retour). Le scénario donne un avis, recharge, le change puis l'efface.
+ */
+export const ADRESSE_AVIS = "m8a-avis@exemple.test";

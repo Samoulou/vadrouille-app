@@ -194,9 +194,9 @@ test("écrans 11, 12 et 17 avec DATA_ADAPTER=api : même rendu que mock ; autre 
   expect(rendu17Api).toBe(await texte(page, main));
   const liensMock = await page.getByRole("main").getByRole("link").evaluateAll((e) => e.map((l) => l.getAttribute("href") ?? ""));
   expect(liensApi).toHaveLength(liensMock.length);
-  // Mêmes voyages dans le même ordre, mêmes suffixes (`/presentation` pour un voyage non débloqué, F11a) :
-  // `mock_trip_*` d'un côté, `uuid` de la base de l'autre.
-  const LIEN = /^\/voyages\/([^/]+)(\/presentation)?$/;
+  // Mêmes voyages dans le même ordre, mêmes suffixes (`/presentation` pour un voyage non débloqué, F11a ; `/retour` pour
+  // « Donner ton avis » d'un voyage débloqué terminé, M8a) : `mock_trip_*` d'un côté, `uuid` de la base de l'autre.
+  const LIEN = /^\/voyages\/([^/]+)(\/presentation|\/retour)?$/;
   // « Créer un voyage » (F11-PO-4, ticket 803) : même adresse des deux côtés, ce n'est pas un voyage.
   const CREER = "/voyages/nouveau";
   expect(liensApi.filter((href) => href === CREER)).toEqual(liensMock.filter((href) => href === CREER));

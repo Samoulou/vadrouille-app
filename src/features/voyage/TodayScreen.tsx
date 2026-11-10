@@ -62,6 +62,12 @@ export interface TodayScreenProps {
   now?: () => number;
   /** Fuseau de l'appareil (tests) ; celui du navigateur par défaut. */
   deviceTimeZone?: string;
+  /**
+   * Écran 16 (M8a, ticket 1062) : adresse de « Donner ton avis », fournie par la page pour un voyage qui a cet écran
+   * (débloqué, hors du site d'essai). Le lien n'apparaît qu'à l'état « Ton voyage est terminé », sans borne haute (après
+   * 30 jours, l'écran 16 s'ouvre en lecture seule). Absent : aucun lien.
+   */
+  review?: { href: string };
 }
 
 /** « Samedi 29 août » → « samedi 29 août » : date d'un jour dans une phrase (`redaction.md`). */
@@ -295,7 +301,7 @@ function During({ trip, day, time, current, next, online }: DuringProps) {
  * écran ouvert : bandeau hors ligne, contenu gardé en mémoire, liens réseau désactivés ; rien n'est enregistré
  * sur l'appareil.
  */
-export function TodayScreen({ trip, placesFromGoogle, recorderKind = "none", recorder, now: clock, deviceTimeZone }: TodayScreenProps) {
+export function TodayScreen({ trip, placesFromGoogle, recorderKind = "none", recorder, now: clock, deviceTimeZone, review }: TodayScreenProps) {
   const now = useClientNow({ now: clock, tickEveryMinute: true });
   const online = useOnline();
   const routes = tripRoutes("/voyages", trip.id);
@@ -380,6 +386,11 @@ export function TodayScreen({ trip, placesFromGoogle, recorderKind = "none", rec
                   : format(t.avant, { date: first ? inSentence(formatTitreJour(first.date)) : "" })}
             </p>
             {moment.kind === "before" && moment.eve ? <TomorrowBlock day={first} /> : null}
+            {moment.kind === "after" && review ? (
+              <Link href={review.href} prefetch={false} data-part="donner-avis" className={cn(LINK, "text-corps text-line")}>
+                {t.avis}
+              </Link>
+            ) : null}
             <Link href={routes.sejour()} prefetch={false} data-part="voir-sejour" className={cn(LINK, "text-corps text-line")}>
               {t.voirSejour}
             </Link>

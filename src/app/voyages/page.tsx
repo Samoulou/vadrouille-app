@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 
-import { getPaymentAdapter, getTripReader, paymentAvailable, siteEssaiAutorise } from "@/adapters";
+import { apresVoyageDisponible, getPaymentAdapter, getTripReader, paymentAvailable, siteEssaiAutorise } from "@/adapters";
+import type { TripSummary } from "@/contracts";
 import { PRODUCT_NAME } from "@/config/site";
 import { exigerSession } from "@/features/compte/session";
 import { TripsScreen } from "@/features/compte/TripsScreen";
 import { creationRoutes } from "@/features/creation/routes";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { loadReceiptLinks } from "@/features/presentation/unlock-load";
-import { mesVoyagesRoute } from "@/features/sejour/routes";
+import type { ReviewLink } from "@/features/compte/trips";
+import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
@@ -31,11 +33,34 @@ export const metadata: Metadata = {
  * Reçus (B4d) : avec un adaptateur de paiement qui en a (`simulated`), un lien « Voir le reçu » sous chaque voyage payé
  * par la personne ; aucun sans paiement disponible (garde lue avant, 0020 § 2.3) ni avec `mock`.
  *
+ * « Donner ton avis » (M8a, ticket 1062) : voir `reviewLinksOf`.
+ *
  * Sans session (`better-auth`, B3c) : redirection vers `/connexion?suite=/voyages`.
  */
 export default async function MesVoyagesPage() {
   const ctx = await exigerSession(mesVoyagesRoute());
   const trips = await getTripReader().listTrips(ctx);
   const receiptHrefs = paymentAvailable() ? await loadReceiptLinks(getPaymentAdapter(), ctx, (id) => unlockRoutes(id).recu()) : {};
-  return <TripsScreen trips={trips} receiptHrefs={receiptHrefs} createHref={creationRoutes.nouveau({ essai: siteEssaiAutorise() })} />;
+  return (
+    <TripsScreen
+      trips={trips}
+      receiptHrefs={receiptHrefs}
+      reviewLinks={reviewLinksOf(trips)}
+      createHref={creationRoutes.nouveau({ essai: siteEssaiAutorise() })}
+    />
+  );
+}
+
+/**
+ * « Donner ton avis » (M8a, ticket 1062) : pour chaque voyage débloqué, l'adresse de l'écran 16 ; l'écran ne montre le
+ * lien qu'à partir du dernier jour du voyage. Aucun lien sur le site d'essai.
+ */
+function reviewLinksOf(trips: readonly TripSummary[]): Record<string, ReviewLink> {
+  if (!apresVoyageDisponible()) return {};
+  const links: Record<string, ReviewLink> = {};
+  for (const trip of trips) {
+    const href = tripRoutes("/voyages", trip.id).apresVoyage();
+    if (trip.unlocked && href !== null) links[trip.id] = { href };
+  }
+  return links;
 }

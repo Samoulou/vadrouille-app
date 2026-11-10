@@ -74,3 +74,21 @@ export function reopenTarget(summary: TripSummary, now: number, lastTab: LastTab
   if (!summary.unlocked && summary.end >= today) return presentationRoute(summary.id);
   return routes.sejour();
 }
+
+/**
+ * Lien de l'écran 16 « Donner ton avis » (M8a, ticket 1062 ; spécification M8 § 3.1 point 5, F11-PO-9) : adresse et
+ * dernier jour d'accès modifiable (`accessUntil`, calculé par la page serveur), fournis par la page pour les seuls voyages
+ * qui ont un écran 16 (débloqués, hors du site d'essai).
+ */
+export interface ReviewLink {
+  href: string;
+}
+
+/**
+ * Vrai à partir du dernier jour du voyage, à la date de la destination : jamais avant (F11-PO-8), sans borne haute
+ * (spécification M8 § 2, § 3.1 points 4 et 5 ; revue de la PR 1068, bloquant 2) : après 30 jours, l'écran 16 s'ouvre en
+ * lecture seule.
+ */
+export function reviewLinkShown(summary: Pick<TripSummary, "timeZone" | "end">, now: number): boolean {
+  return tripToday(summary, now) >= summary.end;
+}

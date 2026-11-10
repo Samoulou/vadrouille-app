@@ -17,6 +17,7 @@ import {
   TripVersionPageSchema,
   type Result,
 } from "@/contracts";
+import { donnerAvis, lireRevue } from "@/server/avis/avis";
 import { appliquerAjout, proposerAjout } from "@/server/lieux/ajout";
 import { annulerAjout } from "@/server/lieux/annulation";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
@@ -28,7 +29,7 @@ import { basculerAFaire } from "@/server/voyages/a-faire";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
 import { signalerEtape } from "@/server/voyages/signalement";
 
-import type { AddPlaceAdapter, AdapterContext, RevisionAdapter, StopReportAdapter, TripAdapter, TripVersionsAdapter } from "./types";
+import type { AddPlaceAdapter, AdapterContext, RevisionAdapter, StopReportAdapter, TripAdapter, TripReviewAdapter, TripVersionsAdapter } from "./types";
 
 /**
  * Adaptateur `api` (spécification B6, B6a point 5 ; handover § 11 : aucun appel HTTP vers soi-même) : implémente
@@ -86,6 +87,20 @@ function signalementsApi(options: OptionsAdaptateurApi): StopReportAdapter {
 }
 
 /**
+ * Après le voyage (M8a, ticket 1062) : cas d'usage de `src/server/avis/avis.ts`, dans le même processus, avec le contexte de
+ * la session reçu de la page ou de l'action serveur. Aucun appel du port de relectures (les étapes à évaluer se lisent dans
+ * l'instantané de la version courante). Le cas d'usage valide déjà sa sortie (`TripReviewSchema`).
+ */
+function avisApi(options: OptionsAdaptateurApi): TripReviewAdapter {
+  const { withOrg } = options;
+  const avecOrg = withOrg === undefined ? {} : { withOrg };
+  return {
+    getTripReview: (ctx, tripId) => lireRevue(avecOrg, ctx, tripId),
+    rateStop: (ctx, input) => donnerAvis({ contexte: async () => ctx, ...avecOrg }, input),
+  };
+}
+
+/**
  * Lieu à soi, aperçu et application d'un ajout (M5d-1, ticket 939) : cas d'usage de `src/server/lieux/ajout.ts`, dans le même
  * processus, avec le contexte de la session et **le même port de relectures** que la lecture (un appel par aperçu ou
  * application, hors transaction ; décision 0147 § 4). Chaque réponse est validée par son contrat. Un refus est rendu tel que
@@ -127,6 +142,7 @@ export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter
   return {
     revision: revisionApi(options),
     reports: signalementsApi(options),
+    reviews: avisApi(options),
     places: lieuxApi(options),
     versions: versionsApi(options),
     async listTrips(ctx) {

@@ -1,11 +1,20 @@
 import type { PlacePhoto } from "@/contracts/photo";
-import { APP_TRIAL_TRIP_ID_PATTERN, type RevisionFixtures, type Trip, type TrialRevisionRequest, type TrialRevisionResult } from "@/contracts";
+import {
+  APP_TRIAL_TRIP_ID_PATTERN,
+  TripReviewSchema,
+  type RevisionFixtures,
+  type Trip,
+  type TrialRevisionRequest,
+  type TrialRevisionResult,
+  type TripReview,
+} from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR } from "@/server/config/lieux";
 import { RATE_LIMITS } from "@/server/config/limites";
 import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { OFFER_CONFIG } from "@/server/config/offer";
+import { accesAuMoment } from "@/server/avis/acces";
 import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
 
 import { apiCreationAdapter } from "./api-creation-instance";
@@ -62,6 +71,7 @@ import type {
   ShareAdapter,
   StopReportAdapter,
   TripAdapter,
+  TripReviewAdapter,
   TripVersionsAdapter,
 } from "./types";
 
@@ -514,6 +524,50 @@ export async function signalementsDuVoyage(
     plafond: SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR,
     max: MAX_STOP_REPORTS_PER_SCOPE,
   });
+}
+
+/**
+ * Écran 16 « Après le voyage » (tâche M8a, ticket 1062 ; décision 0021 § 2, amendée par 0160 § 1.2 point 5) : fonction à
+ * part, pas une méthode de `TripAdapter`. `null` (404 de la page) pour un voyage inconnu, d'une autre organisation ou non
+ * débloqué, et pour `prototype` (le site d'essai n'a pas d'écran 16).
+ *
+ * - `api` : `TripAdapter.reviews` (`src/server/avis/avis.ts`), qui contrôle aussi la personne propriétaire ;
+ * - `mock` : voyage lu par `getTripReader()` de la portée (débloqué par le paiement simulé compris), accès calculé à
+ *   l'horloge de la portée (`options.scope`, sinon celle de la requête) et au fuseau du voyage, par la même fonction pure
+ *   que le serveur ; aucun avis lu (ils vivent dans la mémoire de l'onglet, 0021 § 4) ; aucun goût avant M8c-1.
+ */
+export async function getTripReview(
+  ctx: AdapterContext,
+  tripId: string,
+  value: string | undefined = process.env.DATA_ADAPTER,
+  options: { scope?: SimulationScope } = {},
+): Promise<TripReview | null> {
+  const choice = adapterChoice(value);
+  if (choice === "api") return (await getTripAdapter(value).reviews?.getTripReview(ctx, tripId)) ?? null;
+  if (choice !== "mock") return null;
+  const trip = await getTripReader(options.scope === undefined ? {} : { scope: options.scope }).getTrip(ctx, tripId);
+  if (trip === null || !trip.unlocked) return null;
+  const scope = options.scope ?? (await getSimulationScope());
+  const access = accesAuMoment(trip.end, trip.timeZone, scope.clock.now());
+  return TripReviewSchema.parse({ tripId: trip.id, access, reviews: [], tasteCandidates: [], retainedIds: [] });
+}
+
+/**
+ * Écran 16 disponible avec cet adaptateur (M8a) : `mock` et `api` ; jamais `prototype` (le site d'essai n'en a pas). Lu par
+ * les pages de « Mes voyages » et de l'écran 15 pour proposer « Donner ton avis » (aucun lien vers une 404).
+ */
+export function apresVoyageDisponible(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  const choice = adapterChoice(value);
+  return choice === "mock" || choice === "api";
+}
+
+
+/**
+ * Avis sur une étape côté serveur (M8a) : `TripAdapter.reviews` sur `api` seulement ; `null` sinon (`mock` garde ses avis
+ * dans la mémoire de l'onglet, `prototype` n'a pas d'écran 16). Lu par l'action serveur `rateStop` (`src/server/actions/avis.ts`).
+ */
+export function avisEnregistres(value: string | undefined = process.env.DATA_ADAPTER): TripReviewAdapter | null {
+  return adapterChoice(value) === "api" ? (getTripAdapter(value).reviews ?? null) : null;
 }
 
 /** Recherches par voyage et par 24 heures sur `mock` : la règle `trip` de `lieu-recherche` (décision 0147 § 6.4 point 1). */
