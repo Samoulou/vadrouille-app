@@ -13,6 +13,7 @@ import {
 import type { StopRating } from "@/contracts/values";
 import { etapesAEvaluer, type EtapeAEvaluer } from "@/domain/apres-voyage";
 import { accesAuMoment } from "@/server/avis/acces";
+import { candidatsDuVoyage, clesRetenues, type LectureDesSignaux } from "@/server/gouts/lecture";
 import { checkRateLimit } from "@/server/rate-limit";
 import { verrouillerVersions } from "@/server/versions/ecrire";
 import { executerActionVoyage, type DependancesAction, type ExecuteurAction } from "@/server/voyages/actions";
@@ -57,6 +58,8 @@ export type DependancesAvis = DependancesAction & {
   readonly limiteur?: () => Promise<Result<void>>;
   /** **Tests sans base seulement** : lecture du voyage dans la transaction ; `lireEtatApresVoyage` par défaut. */
   readonly lireEtat?: (executeur: ExecuteurAction, ctx: AdapterContext, tripId: string) => Promise<EtatApresVoyage | null>;
+  /** **Tests sans base seulement** : signaux actifs du voyage (candidats de goûts, M8c-1) ; `lireSignauxActifs` par défaut. */
+  readonly lireSignaux?: LectureDesSignaux;
 };
 
 /** Propriétaire du voyage (0160 § 1.5 point 5 ; M6-PO-2) : seule elle lit et écrit l'écran 16. */
@@ -110,8 +113,8 @@ export function avisVisibles(etapes: readonly EtapeAEvaluer[], lignes: readonly 
   return avis.sort((x, y) => (rang.get(x.stopId) ?? 0) - (rang.get(y.stopId) ?? 0));
 }
 
-/** Voyage de la propriétaire, débloqué : son état, sinon `null` (404 sans distinguer les cas). */
-async function lireVoyageDeLaPersonne(
+/** Voyage de la propriétaire, débloqué : son état, sinon `null` (404 sans distinguer les cas). Lu aussi par `src/server/gouts/gouts.ts`. */
+export async function lireVoyageDeLaPersonne(
   dependances: Pick<DependancesAvis, "lireEtat">,
   executeur: ExecuteurAction,
   ctx: AdapterContext,
@@ -124,7 +127,11 @@ async function lireVoyageDeLaPersonne(
   return etat;
 }
 
-/** Lecture de l'écran 16 (`getTripReview` sur `api`), en lecture seule ; aucun goût avant M8c-1. */
+/**
+ * Lecture de l'écran 16 (`getTripReview` sur `api`), en lecture seule. Goûts (M8c-1, ticket 1121 ; spécification § 5.1) :
+ * candidats calculés depuis les signaux actifs de ce voyage et clés des goûts déjà retenus par la personne ; rien avant le
+ * dernier jour (`notEnded`).
+ */
 export async function lireRevue(dependances: Omit<DependancesAvis, "contexte" | "limiteur">, ctx: AdapterContext, tripId: string): Promise<TripReview | null> {
   if (!identifiantLisible(tripId)) return null;
   const withOrg = dependances.withOrg ?? withOrgParDefaut;
@@ -135,8 +142,9 @@ export async function lireRevue(dependances: Omit<DependancesAvis, "contexte" | 
     const access = accesDu(etat, maintenant);
     const reviews =
       access === "notEnded" ? [] : avisVisibles(etapesAEvaluer(etat.jours), (await executeur.query(SQL_AVIS_DU_VOYAGE, [ctx.organizationId, tripId])).rows);
-    // Goûts : M8c-1 (spécification § 6.5) ; aucun candidat ni goût retenu dans M8a.
-    return TripReviewSchema.parse({ tripId, access, reviews, tasteCandidates: [], retainedIds: [] });
+    const tasteCandidates = access === "notEnded" ? [] : await candidatsDuVoyage(executeur, ctx, tripId, dependances.lireSignaux);
+    const retainedIds = access === "notEnded" ? [] : await clesRetenues(executeur, ctx);
+    return TripReviewSchema.parse({ tripId, access, reviews, tasteCandidates, retainedIds });
   });
 }
 

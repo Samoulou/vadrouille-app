@@ -61,3 +61,11 @@ export const ADRESSE_RAPPELS = "m6c-rappels@exemple.test";
  * (accès jusqu'à 30 jours après le retour). Le scénario donne un avis, recharge, le change puis l'efface.
  */
 export const ADRESSE_AVIS = "m8a-avis@exemple.test";
+
+/**
+ * Goûts retenus sur `api` (M8c-1, ticket 1121 ; `tests/e2e/gouts-api.api.spec.ts`) : une organisation propre, un seul
+ * voyage débloqué (Édimbourg du jeu simulé, décalé pour finir 2 jours avant l'écriture) et deux réponses « éviter »
+ * actives de la présentation (`answerYes`, catégories `museum` et `nature`), donc deux candidats de goûts confirmés. Le
+ * scénario en retient un, le retrouve dans « Mes voyages », le retire, annule, puis retire tout.
+ */
+export const ADRESSE_GOUTS = "m8c-gouts@exemple.test";
