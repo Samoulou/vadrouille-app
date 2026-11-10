@@ -23,6 +23,8 @@ import { executerActionVoyage, type DependancesAction, type ExecuteurAction } fr
 import { identifiantLisible } from "@/server/voyages/conversion";
 import { executeurSql, withOrg as withOrgParDefaut } from "@/server/with-org";
 
+import { GOUT_DISTANCE_PROPOSE } from "@/server/config/gouts";
+
 import { candidatsDuVoyage, goutDeLigne, sujetDeCle } from "./lecture";
 
 /**
@@ -42,16 +44,19 @@ import { candidatsDuVoyage, goutDeLigne, sujetDeCle } from "./lecture";
  *   Le limiteur est compté, son verdict ignoré, sa panne comprise. Le goût est **supprimé** ; `removeTaste` le rend pour
  *   « Annuler ». Un goût absent, d'une autre personne ou d'une autre organisation : `not_found`, sans distinguer les cas.
  * - `restaurerGout` (`restoreTaste`) : « Annuler » un retrait dans les 5 s. Le serveur ne garde rien du goût supprimé :
- *   l'écran renvoie le `RetainedTaste` reçu de `removeTaste`, validé par le schéma strict (codes fermés). Le voyage
- *   d'origine doit être un voyage de la personne dans l'organisation (sinon `validation_failed`, `field: "taste"`).
- *   L'origine vient du client (seul champ non recalculable) et l'instant de l'accord est un **nouvel** instant posé par la
- *   base : **forme proposée par 0160 § 2.2, option (a), que la Sécurité n'a pas encore confirmée (S2)**.
+ *   l'écran renvoie le `RetainedTaste` reçu de `removeTaste`, validé par le schéma strict (codes fermés). Un goût que la
+ *   règle des candidats ne peut pas produire est refusé avant tout (`validation_failed`, `field: "taste"`) : « distance »
+ *   tant que `GOUT_DISTANCE_PROPOSE` est faux (0160 § 1.7 point 2), ou une origine qui ne va pas avec le sens (« éviter »
+ *   est toujours confirmé, « aimer » toujours déduit). Puis la limite `gouts`, puis le voyage d'origine, qui doit être un
+ *   voyage de la personne dans l'organisation (même refus). L'instant de l'accord est un **nouvel** instant posé par la
+ *   base : forme de 0160 § 2.2, option (a), **confirmée par la Sécurité (S2, revue consolidée de la PR 1124)**. L'origine
+ *   n'est qu'un libellé d'affichage : aucune décision de sécurité ne doit distinguer `confirmed` de `inferred`.
  *
  * Aucune trace de l'accord ni du retrait n'est gardée après la suppression (option (a) de S2). Rien n'est journalisé d'un
  * goût : une erreur inattendue écrit `voyages.action_failed` (nom de l'action, classe de l'erreur), rien d'autre.
  */
 
-/** Action du limiteur des goûts (`RATE_LIMITS`, proposition de 0160 § 2.3 : 20 par heure et par adresse IP, S3). */
+/** Action du limiteur des goûts (`RATE_LIMITS`, 0160 § 2.3 : 20 par heure et par adresse IP ; S3, confirmé en revue de la PR 1124). */
 export const ACTION_LIMITEUR_GOUTS = "gouts";
 
 export type DependancesGouts = DependancesAction &
@@ -85,6 +90,18 @@ const limiteurParDefaut = async (): Promise<Result<void>> => {
 /** Colonnes du sujet : `category` et `direction` nuls pour la distance (`CHECK` de 0026). */
 function colonnesDuSujet(sujet: PreferenceSubject): { kind: string; category: string | null; direction: string | null } {
   return sujet.kind === "distance" ? { kind: "distance", category: null, direction: null } : { kind: "category", category: sujet.category, direction: sujet.direction };
+}
+
+/** Règle « distance » lue comme un réglage (et non comme une constante figée dans le code de l'action). */
+const REGLES: { readonly distance: boolean } = { distance: GOUT_DISTANCE_PROPOSE };
+
+/**
+ * Vrai si la règle des candidats (`candidatsDeGouts`) peut produire ce goût : « éviter » confirmé, « aimer » déduit,
+ * « distance » confirmé et seulement si elle est proposée. Un goût rétabli ne peut donc pas être d'une forme jamais proposée.
+ */
+function goutPossible(taste: Pick<RetainedTaste, "origin" | "subject">): boolean {
+  if (taste.subject.kind === "distance") return REGLES.distance && taste.origin === "confirmed";
+  return taste.origin === (taste.subject.direction === "less" ? "confirmed" : "inferred");
 }
 
 type Issue<T> = { readonly type: "fait"; readonly valeur: T } | { readonly type: "refus"; readonly erreur: Result<never> };
@@ -178,13 +195,16 @@ export async function restaurerGout(dependances: DependancesGouts, entree: unkno
   const limiteur = dependances.limiteur ?? limiteurParDefaut;
   return executerActionGout("restore-taste", dependances, RestoreTasteRequestSchema, entree, async (executeur, ctx, demande) => {
     const { taste } = demande;
+    // Refus sans lecture : forme que la règle ne produit pas, identifiant de voyage illisible.
+    if (!goutPossible(taste)) return fail("validation_failed", "taste");
+    if (taste.fromTripId !== null && !identifiantLisible(taste.fromTripId)) return fail("validation_failed", "taste");
+    // La limite avant toute requête (revue de la PR 1124, mineur 2).
+    const debit = await limiteur();
+    if (!debit.ok) return debit;
     if (taste.fromTripId !== null) {
-      if (!identifiantLisible(taste.fromTripId)) return fail("validation_failed", "taste");
       const voyage = (await executeur.query(SQL_VOYAGE_DE_LA_PERSONNE, [ctx.organizationId, taste.fromTripId, ctx.userId])).rows;
       if (voyage.length !== 1) return fail("validation_failed", "taste");
     }
-    const debit = await limiteur();
-    if (!debit.ok) return debit;
     const { kind, category, direction } = colonnesDuSujet(taste.subject);
     await executeur.query(SQL_RETENIR_GOUT, [ctx.organizationId, ctx.userId, kind, category, direction, taste.origin, taste.fromTripId]);
     return ok(undefined);

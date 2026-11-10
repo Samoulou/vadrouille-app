@@ -32,6 +32,8 @@ export interface RetainedTastesProps {
   actions?: Pick<ReviewActions, "removeTaste" | "restoreTaste" | "removeAllTastes">;
   /** Cible du focus quand il ne reste aucun « Retirer » : le titre « Mes voyages ». */
   focusFallbackId: string;
+  /** Niveau du titre de la section : `h2` sous le `h1` de l'écran ; `h4` quand « Mes voyages » est incrusté sous un `h3`. */
+  headingLevel?: "h2" | "h4";
   recorderKind?: RecorderKind;
   recorder?: EventRecorder;
 }
@@ -54,10 +56,10 @@ const AUCUNE_ETAPE: ReadonlySet<string> = new Set();
  *   goûts sont retirés. » est annoncé. Pas d'annulation (la confirmation la remplace).
  * - Erreur : la ligne reste, message du § 7 et « Réessayer ». Hors ligne : bandeau, boutons en `aria-disabled="true"`.
  *
- * Mesure : `taste_removed { category, origin }` à l'expiration du délai sans « Annuler », et pour chaque goût retiré par
- * « Retirer tous mes goûts ». Rien n'est gardé dans le navigateur. Rendu provisoire (UX/UI, U3) : composants Ligne existants.
+ * Mesure : `taste_removed { category, origin }` à l'expiration du délai sans « Annuler » (ou si l'écran est quitté pendant
+ * ce délai : le retrait est alors définitif), et pour chaque goût retiré par « Retirer tous mes goûts ». Rien n'est gardé dans le navigateur. Rendu provisoire (UX/UI, U3) : composants Ligne existants.
  */
-export function RetainedTastes({ tastes, destinations, actions: injected, focusFallbackId, recorderKind = "none", recorder }: RetainedTastesProps) {
+export function RetainedTastes({ tastes, destinations, actions: injected, focusFallbackId, headingLevel: Heading = "h2", recorderKind = "none", recorder }: RetainedTastesProps) {
   const online = useOnline();
   const memory = useOptionalTripSession();
   const track = useMemo(() => createLazyTrack(recorderKind, recorder), [recorderKind, recorder]);
@@ -107,6 +109,20 @@ export function RetainedTastes({ tastes, destinations, actions: injected, focusF
       // Mesure perdue (chargement impossible) : rien à montrer, elle n'est pas réessayée.
     });
   };
+
+  // Écran quitté pendant le délai d'annulation : le retrait est définitif, sa mesure part au démontage.
+  const pending = useRef<{ readonly taste: RetainedTaste; readonly send: (taste: RetainedTaste) => void } | null>(null);
+  useEffect(() => {
+    pending.current = undo === null ? null : { taste: undo.taste, send: measure };
+  });
+  useEffect(
+    () => () => {
+      const last = pending.current;
+      pending.current = null;
+      if (last !== null) last.send(last.taste);
+    },
+    [],
+  );
 
   /** Le retrait en attente d'annulation devient définitif (délai expiré, ou nouveau geste). */
   const settleUndo = () => {
@@ -213,9 +229,9 @@ export function RetainedTastes({ tastes, destinations, actions: injected, focusF
       </p>
       {visible ? (
         <section ref={sectionRef} aria-labelledby="mes-voyages-gouts" data-section="gouts" className="flex flex-col gap-2">
-          <h2 id="mes-voyages-gouts" className="text-section font-extrabold text-ink">
+          <Heading id="mes-voyages-gouts" className="text-section font-extrabold text-ink">
             {t.titre}
-          </h2>
+          </Heading>
           <div id={OFFLINE_ID} role="status" data-part="hors-ligne">
             {online ? null : <StatusBanner kind="offline" message={t.horsLigne} announce={false} />}
           </div>

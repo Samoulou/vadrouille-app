@@ -126,6 +126,8 @@ describe("Retenir mes goûts : accord explicite (critère 2)", () => {
     expect(within(section()).getByRole("link", { name: "Voir dans Mes voyages" })).toHaveAttribute("href", "/voyages");
     expect(within(section()).getByRole("status")).toHaveTextContent("2 goûts retenus.");
     expect(within(section()).queryByRole("button")).toBeNull();
+    // Le bouton qui avait le focus est démonté : le focus va sur « Goûts retenus : » (revue de la PR 1124, bloquant 2).
+    expect(within(section()).getByText("Goûts retenus :")).toHaveFocus();
     await flush();
     expect(recorder.events).toEqual([{ name: "tastes_retained", properties: { count: 2, inferred_count: 1 } }]);
   });
@@ -177,6 +179,39 @@ describe("Retenir mes goûts : déjà retenu, aucun candidat, lecture seule, hor
     expect(calls[0]!.ids).toEqual([AIMER_DEGUSTATIONS.id]);
   });
 
+  it("tous les candidats déjà retenus : chacun coché, indisponible, « Déjà retenu » ; jamais « Goûts retenus : » ; plus de bouton (revue de la PR 1124, bloquant 1)", async () => {
+    const { container } = renderScreen({ review: review({ retainedIds: [EVITER_MUSEES.id, AIMER_DEGUSTATIONS.id] }) });
+    for (const nom of [LIBELLE_MUSEES, `${LIBELLE_DEGUSTATIONS}, déduit`]) {
+      expect(choix(nom)).toHaveAttribute("aria-pressed", "true");
+      expect(choix(nom)).toHaveAttribute("aria-disabled", "true");
+      expect(choix(nom)).toHaveAccessibleDescription("Déjà retenu");
+    }
+    expect(within(section()).getAllByText("Déjà retenu")).toHaveLength(2);
+    expect(within(section()).queryByText(t.retenus)).toBeNull();
+    expect(within(section()).queryByRole("button", { name: t.retenir })).toBeNull();
+    expect(within(section()).getByText(t.accord)).toBeInTheDocument();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("un seul candidat, déjà retenu : coché, indisponible, « Déjà retenu »", () => {
+    renderScreen({ review: review({ tasteCandidates: [EVITER_MUSEES], retainedIds: [EVITER_MUSEES.id] }) });
+    expect(choix(LIBELLE_MUSEES)).toHaveAttribute("aria-pressed", "true");
+    expect(choix(LIBELLE_MUSEES)).toHaveAttribute("aria-disabled", "true");
+    expect(within(section()).getByText("Déjà retenu")).toBeInTheDocument();
+    expect(within(section()).queryByText(t.retenus)).toBeNull();
+  });
+
+  it("l'annonce compte les goûts nouvellement retenus par le serveur, pas les choix envoyés (revue de la PR 1124, mineur 5)", async () => {
+    const { actions, calls } = actionsDeGouts();
+    renderScreen({ actions });
+    fireEvent.click(choix(LIBELLE_MUSEES));
+    fireEvent.click(choix(`${LIBELLE_DEGUSTATIONS}, déduit`));
+    fireEvent.click(retenir());
+    // Le second était déjà retenu ailleurs : le serveur n'en rend qu'un.
+    await act(async () => calls[0]!.resolve(retenus(EVITER_MUSEES)));
+    expect(within(section()).getByRole("status")).toHaveTextContent("1 goût retenu.");
+  });
+
   it("aucun candidat : « Aucun goût à retenir pour ce voyage. », ni choix ni bouton", () => {
     renderScreen({ review: review({ tasteCandidates: [] }) });
     expect(within(section()).getByText("Aucun goût à retenir pour ce voyage.")).toBeInTheDocument();
@@ -208,7 +243,9 @@ describe("Retenir mes goûts : déjà retenu, aucun candidat, lecture seule, hor
     const { container } = renderScreen({ actions });
     const musees = choix(LIBELLE_MUSEES);
     expect(musees).toHaveAttribute("aria-disabled", "true");
-    expect(musees).toHaveAttribute("aria-describedby", "apres-hors-ligne");
+    // La source du goût, puis le bandeau hors ligne (revue de la PR 1124, mineur 11).
+    expect(musees).toHaveAttribute("aria-describedby", "apres-gout-source-0 apres-hors-ligne");
+    expect(musees).toHaveAccessibleDescription(/^Confirmé par toi pendant la présentation/);
     expect(retenir()).toHaveAttribute("aria-disabled", "true");
     expect(retenir()).toHaveAttribute("aria-describedby", "apres-hors-ligne");
     fireEvent.click(musees);

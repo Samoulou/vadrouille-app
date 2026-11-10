@@ -256,6 +256,7 @@ export function TripsScreen({
       {...(retainedTastes === undefined ? {} : { tastes: retainedTastes })}
       destinations={destinations}
       focusFallbackId="mes-voyages-titre"
+      headingLevel={embedded ? "h4" : "h2"}
       {...(recorderKind === undefined ? {} : { recorderKind })}
       {...(recorder === undefined ? {} : { recorder })}
     />

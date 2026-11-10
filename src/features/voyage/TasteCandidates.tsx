@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { LazyTrack } from "@/analytics/lazy";
 import { Button } from "@/components/ligne/Button";
@@ -42,9 +42,12 @@ type Phase = "idle" | "sending" | "failed" | "done";
  * « Retenir mes goûts » de l'écran 16 (M8c-1, ticket 1121 ; spécification M8 § 5.1, § 5.2 et § 7 ; F11, écran 16 point 5).
  * Accord **explicite** : le texte d'accord, puis un choix par candidat, **tous décochés au départ** ; rien n'est retenu sans
  * un choix coché et un appui sur « Retenir ces goûts ». Un candidat déduit a le contour pointillé de `Chip` `inferred` et
- * un nom accessible qui contient « déduit » ; un candidat déjà retenu est coché, indisponible, « Déjà retenu ».
+ * un nom accessible qui contient « déduit » ; un candidat déjà retenu est coché, indisponible, « Déjà retenu », aussi
+ * quand tous les candidats le sont (le bouton « Retenir ces goûts » n'est alors plus rendu : il n'y a plus rien à retenir).
  *
- * Après l'accord : « Goûts retenus : », leurs libellés et « Voir dans Mes voyages » ; « {n} goûts retenus. » est annoncé.
+ * **Juste après l'accord seulement** : « Goûts retenus : », leurs libellés et « Voir dans Mes voyages » ; le focus va sur
+ * « Goûts retenus : » (le bouton qui l'avait est démonté) et « {n} goûts retenus. » est annoncé, `n` étant le nombre de
+ * goûts nouvellement retenus par le serveur.
  * Erreur : rien n'est affiché comme retenu, message du § 7 et « Réessayer ». Un envoi à la fois. Mesure :
  * `tastes_retained { count, inferred_count }` sur les goûts nouvellement retenus. Rendu provisoire (UX/UI, U3) : composants
  * Ligne existants seulement (`Chip`, `Button`, `StatusBanner`).
@@ -55,8 +58,15 @@ export function TasteCandidates({ tripId, candidates, retainedIds, editable, off
   const [phase, setPhase] = useState<Phase>("idle");
   const [missing, setMissing] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const retainedHeading = useRef<HTMLParagraphElement>(null);
+
+  // Après l'accord, la liste et le bouton qui avait le focus sont démontés : le focus va sur « Goûts retenus : ».
+  useEffect(() => {
+    if (phase === "done") retainedHeading.current?.focus();
+  }, [phase]);
 
   const alreadyRetained = candidates.filter((candidate) => retained.has(candidate.id));
+  const allRetained = alreadyRetained.length === candidates.length;
   const sending = phase === "sending";
 
   const toggle = (id: string, selected: boolean) => {
@@ -89,8 +99,9 @@ export function TasteCandidates({ tripId, candidates, retainedIds, editable, off
         setRetained((current) => new Set([...current, ...ids]));
         setChecked(new Set());
         setPhase("done");
-        setAnnouncement(ids.length === 1 ? t.annonceUn : format(t.annoncePlusieurs, { n: ids.length }));
         const count = result.value.length;
+        // Aucun goût nouveau (tous retenus entre-temps, ailleurs) : rien n'est annoncé comme retenu à l'instant.
+        setAnnouncement(count === 0 ? "" : count === 1 ? t.annonceUn : format(t.annoncePlusieurs, { n: count }));
         if (count > 0) {
           const inferred_count = result.value.filter((taste) => taste.origin === "inferred").length;
           track({ name: "tastes_retained", properties: { count, inferred_count } }).catch(() => {
@@ -109,7 +120,7 @@ export function TasteCandidates({ tripId, candidates, retainedIds, editable, off
         {t.aucun}
       </p>
     );
-  } else if (phase === "done" || !editable || alreadyRetained.length === candidates.length) {
+  } else if (phase === "done" || !editable) {
     body =
       alreadyRetained.length === 0 ? (
         <p data-part="aucun-gout" className="text-corps text-ink-soft">
@@ -117,7 +128,9 @@ export function TasteCandidates({ tripId, candidates, retainedIds, editable, off
         </p>
       ) : (
         <div data-part="gouts-retenus" className="flex flex-col gap-2">
-          <p className="text-corps font-bold text-ink">{t.retenus}</p>
+          <p ref={retainedHeading} tabIndex={-1} data-part="gouts-retenus-titre" className="rounded-control text-corps font-bold text-ink">
+            {t.retenus}
+          </p>
           <ul className="flex flex-col gap-1">
             {alreadyRetained.map((candidate) => (
               <li key={candidate.id} data-taste={candidate.id} className="text-corps text-ink">
@@ -134,9 +147,11 @@ export function TasteCandidates({ tripId, candidates, retainedIds, editable, off
     body = (
       <>
         <ul aria-label={t.groupe} className="flex flex-col gap-3">
-          {candidates.map((candidate) => {
+          {candidates.map((candidate, index) => {
             const isRetained = retained.has(candidate.id);
             const unavailable = isRetained || offline;
+            // La source du goût (ou « Déjà retenu ») décrit le choix, avant le bandeau hors ligne.
+            const sourceId = `apres-gout-source-${index}`;
             return (
               <li key={candidate.id} data-taste={candidate.id} className="flex flex-col items-start gap-1">
                 <Chip
@@ -145,12 +160,14 @@ export function TasteCandidates({ tripId, candidates, retainedIds, editable, off
                   inferred={candidate.origin === "inferred"}
                   selected={isRetained || checked.has(candidate.id)}
                   aria-disabled={unavailable || undefined}
-                  aria-describedby={offline && !isRetained ? describedBy : undefined}
+                  aria-describedby={offline && !isRetained ? `${sourceId} ${describedBy}` : sourceId}
                   onSelectedChange={(selected) => toggle(candidate.id, selected)}
                   // Mise en page seulement : un libellé long passe à la ligne au lieu de déborder à 390 px.
                   className="max-w-full justify-start py-2 text-left"
                 />
-                <p className="text-legende text-ink-soft">{isRetained ? t.dejaRetenu : t.origine[candidate.origin]}</p>
+                <p id={sourceId} className="text-legende text-ink-soft">
+                  {isRetained ? t.dejaRetenu : t.origine[candidate.origin]}
+                </p>
               </li>
             );
           })}
@@ -177,16 +194,19 @@ export function TasteCandidates({ tripId, candidates, retainedIds, editable, off
             }
           />
         ) : null}
-        <Button
-          className="w-full"
-          data-part="retenir"
-          aria-disabled={offline || sending || undefined}
-          aria-describedby={offline ? describedBy : undefined}
-          aria-busy={sending || undefined}
-          onClick={submit}
-        >
-          {t.retenir}
-        </Button>
+        {/* Tous les candidats déjà retenus : plus rien à retenir, le bouton n'est pas rendu. */}
+        {allRetained ? null : (
+          <Button
+            className="w-full"
+            data-part="retenir"
+            aria-disabled={offline || sending || undefined}
+            aria-describedby={offline ? describedBy : undefined}
+            aria-busy={sending || undefined}
+            onClick={submit}
+          >
+            {t.retenir}
+          </Button>
+        )}
       </>
     );
   }

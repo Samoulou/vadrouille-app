@@ -299,7 +299,7 @@ describe("retenirGouts (critères 2 et 3)", () => {
     expect(ecritures()).toEqual([]);
   });
 
-  it("limite `gouts` : proposition de 0160 § 2.3 (S3), 20 par heure et par adresse IP", () => {
+  it("limite `gouts` : 0160 § 2.3 (S3), 20 par heure et par adresse IP", () => {
     expect(RATE_LIMITS[ACTION_LIMITEUR_GOUTS]).toEqual([{ kind: "ip", windowSeconds: 3600, threshold: 20 }]);
   });
 });
@@ -409,10 +409,34 @@ describe("restaurerGout (« Annuler », critère 4)", () => {
     expect(requetes).toEqual([]);
   });
 
-  it("limite `gouts` atteinte : rate_limited, rien d'écrit", async () => {
-    const { dependances, ecritures } = banc({}, { limiteur: async () => ({ ok: false, error: { code: "rate_limited" } }) });
+  it("limite `gouts` atteinte : rate_limited, rien d'écrit, et aucune requête avant la limite (revue de la PR 1124, mineur 2)", async () => {
+    const { dependances, ecritures, requetes } = banc({}, { limiteur: async () => ({ ok: false, error: { code: "rate_limited" } }) });
     expect(await restaurerGout(dependances, { taste: GOUT_MUSEES, requestId: REQUETE })).toEqual({ ok: false, error: { code: "rate_limited" } });
     expect(ecritures()).toEqual([]);
+    expect(requetes).toEqual([]);
+  });
+
+  it("goût que la règle des candidats ne produit pas : validation_failed (taste), ni limite comptée ni requête (revue de la PR 1124, mineur 1)", async () => {
+    const { dependances, requetes, limiteur } = banc();
+    const refus = { ok: false, error: { code: "validation_failed", field: "taste" } };
+    const impossibles = [
+      // « distance » tant que GOUT_DISTANCE_PROPOSE est faux (0160 § 1.7 point 2), quelle que soit l'origine.
+      { id: "distance", origin: "confirmed", subject: { kind: "distance" }, fromTripId: TRIP },
+      { id: "distance", origin: "inferred", subject: { kind: "distance" }, fromTripId: null },
+      // « éviter » n'est jamais déduit ; « aimer » n'est jamais confirmé.
+      { ...GOUT_MUSEES, origin: "inferred" },
+      { id: AIMER_DEGUSTATIONS, origin: "confirmed", subject: { kind: "category", category: "tasting", direction: "more" }, fromTripId: TRIP },
+    ];
+    for (const taste of impossibles) expect(await restaurerGout(dependances, { taste, requestId: REQUETE }), JSON.stringify(taste)).toEqual(refus);
+    expect(requetes).toEqual([]);
+    expect(limiteur).not.toHaveBeenCalled();
+  });
+
+  it("« aimer » déduit, jamais candidat de ce voyage : rétabli (le serveur ne garde rien du retrait, option (a) de S2)", async () => {
+    const { dependances, de } = banc({}, { signaux: [] });
+    const taste = { id: AIMER_DEGUSTATIONS, origin: "inferred", subject: { kind: "category", category: "tasting", direction: "more" }, fromTripId: TRIP };
+    expect(await restaurerGout(dependances, { taste, requestId: REQUETE })).toEqual({ ok: true, value: undefined });
+    expect(de(SQL_RETENIR_GOUT).map((r) => r.valeurs)).toEqual([[CTX.organizationId, CTX.userId, "category", "tasting", "more", "inferred", TRIP]]);
   });
 });
 

@@ -132,6 +132,31 @@ describe("Tes goûts retenus : « Retirer » et « Annuler » (critères 4 et 8)
     expect(recorder.events).toEqual([{ name: "taste_removed", properties: { category: "museum", origin: "confirmed" } }]);
   });
 
+  it("écran quitté pendant les 5 s : le retrait est définitif, la mesure part au démontage, une seule fois (revue de la PR 1124, mineur 6)", async () => {
+    const { recorder, unmount } = renderTastes([MUSEES, DEGUSTATIONS]);
+    fireEvent.click(retirer(LIBELLE_MUSEES));
+    await settle();
+    expect(recorder.events).toEqual([]);
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(recorder.events).toEqual([{ name: "taste_removed", properties: { category: "museum", origin: "confirmed" } }]);
+  });
+
+  it("écran quitté après l'expiration, ou sans retrait en attente : aucune mesure de plus au démontage", async () => {
+    const { recorder, unmount } = renderTastes([MUSEES, DEGUSTATIONS]);
+    fireEvent.click(retirer(LIBELLE_MUSEES));
+    await settle();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(recorder.events).toHaveLength(1);
+    unmount();
+    await settle();
+    expect(recorder.events).toHaveLength(1);
+  });
+
   it("dernier de la liste : focus sur le « Retirer » précédent ; goût « distance » mesuré avec category distance", async () => {
     const { recorder } = renderTastes([MUSEES, DISTANCE]);
     fireEvent.click(retirer(LIBELLE_DISTANCE));
