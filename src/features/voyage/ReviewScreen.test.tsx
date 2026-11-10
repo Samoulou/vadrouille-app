@@ -20,6 +20,15 @@ import { TripSessionProvider } from "./TripSessionProvider";
  */
 
 vi.mock("@/server/actions/avis", () => ({ rateStop: vi.fn() }));
+vi.mock("@/server/actions/gouts", () => ({ retainTastes: vi.fn(), removeTaste: vi.fn(), restoreTaste: vi.fn(), removeAllTastes: vi.fn() }));
+
+/** Actions de goûts (M8c-1) sans objet dans ces tests d'avis : jamais appelées (éprouvées dans `TasteCandidates.test.tsx`). */
+const SANS_GOUTS: Omit<ReviewActions, "rateStop"> = {
+  retainTastes: async () => ({ ok: false, error: { code: "internal" } }),
+  removeTaste: async () => ({ ok: false, error: { code: "internal" } }),
+  restoreTaste: async () => ({ ok: false, error: { code: "internal" } }),
+  removeAllTastes: async () => ({ ok: false, error: { code: "internal" } }),
+};
 
 const t = messages.apres;
 const TRIP = projectReviewTrip(edimbourgDebloque);
@@ -39,6 +48,7 @@ type Deferred = { resolve: (value: Result<StopReview | null>) => void; request: 
 function deferredActions() {
   const calls: Deferred[] = [];
   const actions: ReviewActions = {
+    ...SANS_GOUTS,
     rateStop: (_tripId, stopId, rating) =>
       new Promise((resolve) => {
         calls.push({ resolve, request: { stopId, rating } });
@@ -277,7 +287,8 @@ describe("ReviewScreen : adresses découvertes (M8b, critère 6)", () => {
   it("aucune adresse : titre de niveau 2, sous-titre et « Aucune adresse découverte pendant ce voyage. », après « Tes étapes »", () => {
     renderScreen();
     const titres = screen.getAllByRole("heading", { level: 2 }).map((titre) => titre.textContent);
-    expect(titres).toEqual([t.etapes, "Adresses découvertes"]);
+    // M8c-1 (ticket 1121) : « Retenir mes goûts » suit les adresses découvertes.
+    expect(titres).toEqual([t.etapes, "Adresses découvertes", "Retenir mes goûts"]);
     const section = screen.getByRole("region", { name: "Adresses découvertes" });
     expect(within(section).getByText("Les lieux que tu as ajoutés pendant ton voyage.")).toBeInTheDocument();
     expect(within(section).getByText("Aucune adresse découverte pendant ce voyage.")).toBeInTheDocument();

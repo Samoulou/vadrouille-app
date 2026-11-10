@@ -21,7 +21,8 @@ import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
 import type { ReviewTrip } from "./review";
-import { createMemoryReviewActions, createServerReviewActions, type ReviewActions, type ReviewMemory } from "./review-actions";
+import { createLocalTasteMemory, createMemoryReviewActions, createServerReviewActions, type ReviewActions, type ReviewMemory } from "./review-actions";
+import { TasteCandidates } from "./TasteCandidates";
 import { useOptionalTripSession } from "./TripSessionProvider";
 
 const t = messages.apres;
@@ -143,6 +144,10 @@ function ChoiceGroup({
  * Adresses découvertes (M8b, ticket 1111 ; spécification § 4.2 point 2) : sous « Tes étapes », une ligne « {nom} · Jour {n} »
  * par étape marquée `discovered` (`estAdresseDecouverte`), nom saisi par la personne ; sinon « Aucune adresse découverte… ».
  *
+ * Goûts (M8c-1, ticket 1121 ; spécification § 5.1 et § 5.2) : sous les adresses découvertes, « Retenir mes goûts »
+ * (`TasteCandidates`) : candidats calculés par le serveur, tous décochés, accord explicite ; en lecture seule, seulement les
+ * goûts déjà retenus, sans bouton. Sur `mock`, candidats du jeu simulé et goûts dans la mémoire de l'onglet.
+ *
  * Hors ligne : bandeau, choix en `aria-disabled="true"` décrits par le bandeau et rendus indisponibles (contour et texte
  * `ink-soft`, fond `muted`), avis déjà donnés affichés. Rien n'est
  * gardé dans le navigateur (ni stockage, ni adresse) ; sur `mock`, mémoire de l'onglet et mention de démonstration.
@@ -170,11 +175,18 @@ export function ReviewScreen({ trip, review, mode, actions: injected, recorderKi
   }, [trip.days, etapes]);
 
   // Hors du fournisseur de l'onglet (tests isolés) : rien n'est gardé au-delà de l'état de l'écran.
+  const [localTastes] = useState(createLocalTasteMemory);
+  const tasteMemory = memory ?? localTastes;
   const actions = useMemo<ReviewActions>(() => {
     if (injected) return injected;
     if (mode === "server") return createServerReviewActions();
-    return createMemoryReviewActions(memory ?? SANS_MEMOIRE, new Set(etapes.map((etape) => etape.stopId)));
-  }, [injected, mode, etapes, memory]);
+    return createMemoryReviewActions(memory ?? SANS_MEMOIRE, new Set(etapes.map((etape) => etape.stopId)), {
+      memory: tasteMemory,
+      candidates: review.tasteCandidates,
+    });
+  }, [injected, mode, etapes, memory, tasteMemory, review.tasteCandidates]);
+  // Goûts déjà retenus au chargement : lus par le serveur (`api`), ou dans la mémoire de l'onglet (`mock`).
+  const [retainedIds] = useState<readonly string[]>(() => (mode === "memory" ? tasteMemory.tastes().map((taste) => taste.id) : review.retainedIds));
 
   const [ratings, setRatings] = useState<ReadonlyMap<string, StopRating>>(() =>
     mode === "memory" ? new Map(memory?.reviews(trip.id)) : new Map(review.reviews.map((avis) => [avis.stopId, avis.rating])),
@@ -367,6 +379,16 @@ export function ReviewScreen({ trip, review, mode, actions: injected, recorderKi
             </ul>
           )}
         </section>
+        <TasteCandidates
+          tripId={trip.id}
+          candidates={review.tasteCandidates}
+          retainedIds={retainedIds}
+          editable={editable}
+          offline={disabled}
+          describedBy={OFFLINE_ID}
+          retainTastes={actions.retainTastes}
+          track={track}
+        />
       </>
     );
   }

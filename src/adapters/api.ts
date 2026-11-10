@@ -18,6 +18,8 @@ import {
   type Result,
 } from "@/contracts";
 import { donnerAvis, lireRevue } from "@/server/avis/avis";
+import { restaurerGout, retenirGouts, retirerGout, retirerTousLesGouts } from "@/server/gouts/gouts";
+import { lireGoutsRetenus } from "@/server/gouts/lecture";
 import { appliquerAjout, proposerAjout } from "@/server/lieux/ajout";
 import { annulerAjout } from "@/server/lieux/annulation";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
@@ -29,7 +31,7 @@ import { basculerAFaire } from "@/server/voyages/a-faire";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
 import { signalerEtape } from "@/server/voyages/signalement";
 
-import type { AddPlaceAdapter, AdapterContext, RevisionAdapter, StopReportAdapter, TripAdapter, TripReviewAdapter, TripVersionsAdapter } from "./types";
+import type { AddPlaceAdapter, AdapterContext, RevisionAdapter, StopReportAdapter, TasteAdapter, TripAdapter, TripReviewAdapter, TripVersionsAdapter } from "./types";
 
 /**
  * Adaptateur `api` (spécification B6, B6a point 5 ; handover § 11 : aucun appel HTTP vers soi-même) : implémente
@@ -101,6 +103,23 @@ function avisApi(options: OptionsAdaptateurApi): TripReviewAdapter {
 }
 
 /**
+ * Goûts retenus (M8c-1, ticket 1121) : cas d'usage de `src/server/gouts/`, dans le même processus, avec le contexte de la
+ * session reçu de la page ou de l'action serveur. Les cas d'usage valident leur sortie (`RetainedTasteSchema`).
+ */
+function goutsApi(options: OptionsAdaptateurApi): TasteAdapter {
+  const { withOrg } = options;
+  const avecOrg = withOrg === undefined ? {} : { withOrg };
+  const dependances = (ctx: AdapterContext | null) => ({ contexte: async () => ctx, ...avecOrg });
+  return {
+    listRetainedTastes: (ctx) => lireGoutsRetenus(avecOrg, ctx),
+    retainTastes: (ctx, input) => retenirGouts(dependances(ctx), input),
+    removeTaste: (ctx, input) => retirerGout(dependances(ctx), input),
+    restoreTaste: (ctx, input) => restaurerGout(dependances(ctx), input),
+    removeAllTastes: (ctx, input) => retirerTousLesGouts(dependances(ctx), input),
+  };
+}
+
+/**
  * Lieu à soi, aperçu et application d'un ajout (M5d-1, ticket 939) : cas d'usage de `src/server/lieux/ajout.ts`, dans le même
  * processus, avec le contexte de la session et **le même port de relectures** que la lecture (un appel par aperçu ou
  * application, hors transaction ; décision 0147 § 4). Chaque réponse est validée par son contrat. Un refus est rendu tel que
@@ -143,6 +162,7 @@ export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter
     revision: revisionApi(options),
     reports: signalementsApi(options),
     reviews: avisApi(options),
+    tastes: goutsApi(options),
     places: lieuxApi(options),
     versions: versionsApi(options),
     async listTrips(ctx) {

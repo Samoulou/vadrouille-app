@@ -32,5 +32,28 @@
     "sousTitre": "Les lieux que tu as ajoutés pendant ton voyage.",
     "aucune": "Aucune adresse découverte pendant ce voyage.",
     "ligne": "{name} · Jour {n}"
+  },
+  "gouts": {
+    "titre": "Retenir mes goûts",
+    "accord": "Facultatif. Si tu les retiens, on te les proposera quand tu prépareras ton prochain voyage, sans les appliquer d'office. On les garde tant que tu ne les retires pas. Tu peux les retirer à tout moment dans Mes voyages.",
+    "groupe": "Goûts à retenir",
+    "aime": "Tu aimes {categorie}",
+    "evite": "Tu préfères éviter {categorie}",
+    "distance": "Tu préfères rester près de ton hôtel",
+    "origine": {
+      "confirmed": "Confirmé par toi pendant la présentation",
+      "inferred": "Déduit de tes J'aime"
+    },
+    "nomDeduit": "{libelle}, déduit",
+    "dejaRetenu": "Déjà retenu",
+    "retenir": "Retenir ces goûts",
+    "aucuneCase": "Coche au moins un goût à retenir.",
+    "aucun": "Aucun goût à retenir pour ce voyage.",
+    "aucunRetenu": "Aucun goût retenu pour ce voyage.",
+    "retenus": "Goûts retenus :",
+    "voirMesVoyages": "Voir dans Mes voyages",
+    "annonceUn": "1 goût retenu.",
+    "annoncePlusieurs": "{n} goûts retenus.",
+    "erreur": "Impossible de retenir tes goûts pour le moment."
   }
 }

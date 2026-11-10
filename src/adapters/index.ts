@@ -9,6 +9,7 @@ import {
   type TripReview,
 } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
+import { candidatsSimules } from "@/mocks/avis";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR } from "@/server/config/lieux";
 import { RATE_LIMITS } from "@/server/config/limites";
@@ -70,6 +71,7 @@ import type {
   RevisionAdapter,
   ShareAdapter,
   StopReportAdapter,
+  TasteAdapter,
   TripAdapter,
   TripReviewAdapter,
   TripVersionsAdapter,
@@ -106,6 +108,7 @@ export { apiShareAvailable, realShareAvailable, shareAvailable, shareDemoAvailab
 export { adressePaiementPrevente, getPrevente, sourcePrevente, type Prevente } from "./prevente";
 // Mesure de la prévente (spécification C2, C2b) : compteur de visites et disponibilités ; le reste se lit dans `./prevente-mesure`.
 export { compterVisitePrevente, compteurPreventeDisponible, provenancePrevente, questionnairePreventeDisponible } from "./prevente-mesure";
+export { getPagesLegales, pagesLegalesDisponibles, type PagesLegales } from "./pages-legales";
 export { getSimulationScope, type SimulationScope } from "./simulation";
 export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype-instance";
 
@@ -537,7 +540,8 @@ export async function signalementsDuVoyage(
  * - `api` : `TripAdapter.reviews` (`src/server/avis/avis.ts`), qui contrôle aussi la personne propriétaire ;
  * - `mock` : voyage lu par `getTripReader()` de la portée (débloqué par le paiement simulé compris), accès calculé à
  *   l'horloge de la portée (`options.scope`, sinon celle de la requête) et au fuseau du voyage, par la même fonction pure
- *   que le serveur ; aucun avis lu (ils vivent dans la mémoire de l'onglet, 0021 § 4) ; aucun goût avant M8c-1.
+ *   que le serveur ; aucun avis lu (ils vivent dans la mémoire de l'onglet, 0021 § 4) ; candidats de goûts du jeu simulé
+ *   (`src/mocks/avis.ts`, M8c-1), aucun avant le dernier jour ; goûts retenus : mémoire de l'onglet, jamais lus ici.
  */
 export async function getTripReview(
   ctx: AdapterContext,
@@ -552,7 +556,8 @@ export async function getTripReview(
   if (trip === null || !trip.unlocked) return null;
   const scope = options.scope ?? (await getSimulationScope());
   const access = accesAuMoment(trip.end, trip.timeZone, scope.clock.now());
-  return TripReviewSchema.parse({ tripId: trip.id, access, reviews: [], tasteCandidates: [], retainedIds: [] });
+  const tasteCandidates = access === "notEnded" ? [] : candidatsSimules(trip.id);
+  return TripReviewSchema.parse({ tripId: trip.id, access, reviews: [], tasteCandidates, retainedIds: [] });
 }
 
 /**
@@ -571,6 +576,15 @@ export function apresVoyageDisponible(value: string | undefined = process.env.DA
  */
 export function avisEnregistres(value: string | undefined = process.env.DATA_ADAPTER): TripReviewAdapter | null {
   return adapterChoice(value) === "api" ? (getTripAdapter(value).reviews ?? null) : null;
+}
+
+/**
+ * Goûts retenus côté serveur (M8c-1, ticket 1121) : `TripAdapter.tastes` sur `api` seulement ; `null` sinon (`mock` garde
+ * ses goûts dans la mémoire de l'onglet, `prototype` n'en a pas). Lu par les actions serveur de
+ * `src/server/actions/gouts.ts` et par la page « Mes voyages » (« Tes goûts retenus »).
+ */
+export function goutsEnregistres(value: string | undefined = process.env.DATA_ADAPTER): TasteAdapter | null {
+  return adapterChoice(value) === "api" ? (getTripAdapter(value).tastes ?? null) : null;
 }
 
 /** Recherches par voyage et par 24 heures sur `mock` : la règle `trip` de `lieu-recherche` (décision 0147 § 6.4 point 1). */

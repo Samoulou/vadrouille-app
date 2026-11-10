@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 
-import { apresVoyageDisponible, getPaymentAdapter, getTripReader, paymentAvailable, siteEssaiAutorise } from "@/adapters";
+import { apresVoyageDisponible, getPaymentAdapter, getTripReader, goutsEnregistres, paymentAvailable, siteEssaiAutorise } from "@/adapters";
 import type { TripSummary } from "@/contracts";
 import { PRODUCT_NAME } from "@/config/site";
+import { devPagesEnabled } from "@/dev/flags";
 import { exigerSession } from "@/features/compte/session";
 import { TripsScreen } from "@/features/compte/TripsScreen";
 import { creationRoutes } from "@/features/creation/routes";
@@ -35,17 +36,23 @@ export const metadata: Metadata = {
  *
  * « Donner ton avis » (M8a, ticket 1062) : voir `reviewLinksOf`.
  *
+ * « Tes goûts retenus » (M8c-1, ticket 1121) : sur `api`, les goûts de la personne de la session, lus à chaque requête
+ * (`goutsEnregistres`) ; sur `mock`, rien n'est lu ici (mémoire de l'onglet) ; aucun sur le site d'essai.
+ *
  * Sans session (`better-auth`, B3c) : redirection vers `/connexion?suite=/voyages`.
  */
 export default async function MesVoyagesPage() {
   const ctx = await exigerSession(mesVoyagesRoute());
   const trips = await getTripReader().listTrips(ctx);
   const receiptHrefs = paymentAvailable() ? await loadReceiptLinks(getPaymentAdapter(), ctx, (id) => unlockRoutes(id).recu()) : {};
+  const retainedTastes = await goutsEnregistres()?.listRetainedTastes(ctx);
   return (
     <TripsScreen
       trips={trips}
       receiptHrefs={receiptHrefs}
       reviewLinks={reviewLinksOf(trips)}
+      {...(retainedTastes === undefined ? {} : { retainedTastes })}
+      recorderKind={devPagesEnabled() ? "console" : "none"}
       createHref={creationRoutes.nouveau({ essai: siteEssaiAutorise() })}
     />
   );
