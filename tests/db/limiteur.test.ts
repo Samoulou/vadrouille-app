@@ -128,6 +128,41 @@ describe("limiteur", () => {
   });
 });
 
+describe("limiteur: seuil à part du compartiment commun (C2c, ticket 1137 ; décision 0177 § 1)", () => {
+  it("10 appels concurrents du compartiment commun, seuil à part de 4 : quatre appels admis, jamais plus ; une seule clé, compteur à 10", async () => {
+    capturer();
+    const nom = action("commun");
+    const l = limiteur({ [nom]: [{ kind: "ip", windowSeconds: 600, threshold: 2, noTrustedIpThreshold: 4 }] });
+    const resultats = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => l.check({ action: nom, headers: new Headers({ "x-forwarded-for": `198.51.100.${i + 1}`, [ENTETE]: i % 2 === 0 ? "inconnu" : "" }) })),
+    );
+    expect(resultats.filter((r) => r.ok)).toHaveLength(4);
+    expect(resultats.filter((r) => !r.ok)).toHaveLength(6);
+    expect(await compteur(cleCommune(nom, 600))).toBe(10);
+    // Le onzième reste refusé, avec l'espèce `ip`.
+    expect(await l.verdict({ action: nom, headers: new Headers() })).toEqual({ ok: false, kind: "ip" });
+  });
+
+  it("adresse lisible : le seuil d'une adresse s'applique (troisième appel refusé), le compartiment commun n'est pas touché", async () => {
+    capturer();
+    const nom = action("lisible");
+    const l = limiteur({ [nom]: [{ kind: "ip", windowSeconds: 600, threshold: 2, noTrustedIpThreshold: 4 }] });
+    const resultats = [];
+    for (let i = 0; i < 3; i += 1) resultats.push((await l.check({ action: nom, headers: new Headers({ [ENTETE]: "192.0.2.60" }) })).ok);
+    expect(resultats).toEqual([true, true, false]);
+    expect(await compteur(cleIp(nom, 600, "192.0.2.60"))).toBe(3);
+    expect(await compteur(cleCommune(nom, 600))).toBeUndefined();
+  });
+
+  it("seuil effectif invalide : refus fermé, aucune ligne écrite", async () => {
+    capturer();
+    const nom = action("invalide");
+    const l = limiteur({ [nom]: [{ kind: "ip", windowSeconds: 600, threshold: 2, noTrustedIpThreshold: Number.NaN }] });
+    expect(await l.verdict({ action: nom, headers: new Headers() })).toEqual({ ok: false });
+    expect(await compteur(cleCommune(nom, 600))).toBeUndefined();
+  });
+});
+
 describe("auth: aucune adresse IP ni email en clair dans les limiteurs", () => {
   it("aucune ligne ne contient une sentinelle, sa forme normalisée, ni son encodage hexadécimal ou base64", async () => {
     capturer();

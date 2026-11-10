@@ -27,8 +27,8 @@ import { creerBase, supprimerBases } from "./workflows-harnais";
  * qu'à lire et vider les trois tables, à reculer le jour par SQL (jamais par l'horloge du processus), à poser un jeu
  * connu et à prouver un refus de contrainte.
  *
- * Les tables sont globales (aucune organisation) : chaque test les vide d'abord (fichiers de base exécutés en série,
- * aucun autre fichier n'y écrit).
+ * Les tables sont globales (aucune organisation) : chaque test les vide d'abord (fichiers de base exécutés en série ;
+ * `prevente-compteur.test.ts` et `prevente-reponses.test.ts` y écrivent aussi, et les vident de même).
  */
 
 const TABLES = ["prevente_visites", "prevente_reponses_jour", "prevente_reponses"] as const;

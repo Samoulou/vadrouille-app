@@ -1,7 +1,8 @@
 import "server-only";
 
-import { createDatabase } from "../../../db/index.ts";
 import { PreventeProvenanceSchema, type PreventeProvenance } from "@/contracts/prevente-mesure";
+
+import { poolPrevente, type PoolPrevente } from "@/server/prevente/pool";
 
 /**
  * Compteur de visites de la page de prévente sur Postgres (spécification `specs/C2-prevente-mesure.md`, § 2.2 points 5
@@ -17,8 +18,8 @@ import { PreventeProvenanceSchema, type PreventeProvenance } from "@/contracts/p
  *   de `vadrouille_app` est posée. **Créer le pool n'ouvre aucune connexion** (`pg` connecte à la première requête) et
  *   n'écrit aucun journal ; aucune variable n'est lue ici (seul `db/connection.ts` les lit). Indisponible : la création
  *   est retentée à l'appel suivant, sans coût (une comparaison et une lecture de variable).
- * - **Pool propre** (modèle de `src/server/villes/compteurs.ts`) : 2 connexions, attente et requête bornées à 2 s. Une
- *   base trop lente ne retient donc rien au-delà ; la visite est perdue (C2-PO-6).
+ * - **Pool propre** de la mesure (`pool.ts`, partagé avec l'écriture des réponses, décision 0177 § 3) : 2 connexions,
+ *   attente et requête bornées à 2 s. Une base trop lente ne retient donc rien au-delà ; la visite est perdue (C2-PO-6).
  * - **Branchement** : `visitesPrevente()` est branché au démarrage sur `src/adapters/prevente-mesure-instance.ts` par
  *   `src/instrumentation.ts` (`@/adapters` n'atteint pas `db/` statiquement).
  * - **Erreurs** : `compter` lève. L'appelant (`src/adapters/prevente-mesure.ts`) les avale et n'en journalise que le
@@ -26,7 +27,7 @@ import { PreventeProvenanceSchema, type PreventeProvenance } from "@/contracts/p
  */
 
 /** Pool minimal (`pg.Pool`), injectable par les tests. */
-export type PoolVisitesPrevente = { query(text: string, values?: unknown[]): Promise<unknown> };
+export type PoolVisitesPrevente = PoolPrevente;
 
 export type VisitesPrevente = {
   /** Vrai si une écriture peut être tentée ; n'ouvre aucune connexion. */
@@ -36,14 +37,12 @@ export type VisitesPrevente = {
 };
 
 export type VisitesPreventeOptions = {
-  /** Tests seulement : fabrique du pool (sinon le pool propre de `vadrouille_app`) ; elle lève si la garde refuse. */
+  /** Tests seulement : fabrique du pool (sinon le pool de la mesure, `pool.ts`) ; elle lève si la garde refuse. */
   readonly creerPool?: () => PoolVisitesPrevente;
 };
 
 /** Seule requête du compteur : la fonction d'écriture, jamais la table. */
 export const REQUETE_COMPTER_VISITE = "SELECT public.prevente_compter_visite($1::text)";
-
-const POOL_VISITES = { max: 2, connectionTimeoutMillis: 2_000, query_timeout: 2_000 } as const;
 
 /** Indisponibilité : ne porte aucune valeur. */
 export class CompteurPreventeIndisponibleError extends Error {
@@ -54,10 +53,8 @@ export class CompteurPreventeIndisponibleError extends Error {
   }
 }
 
-const poolParDefaut = (): PoolVisitesPrevente => createDatabase("vadrouille_app", undefined, POOL_VISITES).$client;
-
 export function creerVisitesPrevente(options: VisitesPreventeOptions = {}): VisitesPrevente {
-  const creerPool = options.creerPool ?? poolParDefaut;
+  const creerPool = options.creerPool ?? poolPrevente;
   let pool: PoolVisitesPrevente | undefined;
 
   /** Pool créé au premier besoin et gardé ; `null` tant que la garde de connexion refuse (aucune connexion ouverte). */
@@ -84,7 +81,7 @@ export function creerVisitesPrevente(options: VisitesPreventeOptions = {}): Visi
 
 let parDefaut: VisitesPrevente | undefined;
 
-/** Compteur du serveur (pool propre de `vadrouille_app`, créé au premier appel). */
+/** Compteur du serveur (pool de la mesure, créé au premier appel). */
 export function visitesPrevente(): VisitesPrevente {
   return (parDefaut ??= creerVisitesPrevente());
 }

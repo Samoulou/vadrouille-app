@@ -34,6 +34,9 @@ import { createDatabase } from "../../db/index.ts";
  *   l'appelant **avant** le limiteur ; message `rl/v1/<action>/<fenêtre>s/trip/<tripId>`, clé HMAC comme les autres.
  * - Purge à l'écriture, dans une transaction distincte ouverte après la validation de l'incrément, par lot de 100,
  *   les plus anciennes `expires_at` d'abord ; un échec de la purge ne change ni l'incrément ni la décision.
+ * - Compartiment commun `no-trusted-ip` (aucune adresse lisible) : seuil d'une adresse de la règle `ip`, ou son
+ *   `noTrustedIpThreshold` s'il est défini (décision 0177 § 1) ; même clé, même fenêtre, même verdict (`kind: "ip"`).
+ *   Seuil effectif qui n'est pas un entier sûr supérieur ou égal à 1 : refus fermé (`InvalidRule`), aucun incrément.
  * - Échec fermé : variable du limiteur absente ou invalide, erreur de base, adresse non canonique → `rate_limited`
  *   avec `retryable: true`, jamais une absence de limite ; aucune erreur ne remonte non rattrapée (0051 point 6.1.2).
  * - Compteurs durables : rien en mémoire du processus, hors de l'étouffement de l'alerte du plafond de lignes.
@@ -275,8 +278,15 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
             : regle.kind === "trip"
               ? `trip/${voyage}`
               : `user/${personne}`;
-      return { cle: rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, espece)), regle };
+      // Seuil à part du compartiment commun (décision 0177 § 1 point 2) : une clé, un seuil.
+      const seuil = regle.kind === "ip" && ip === null && regle.noTrustedIpThreshold !== undefined ? regle.noTrustedIpThreshold : regle.threshold;
+      return { cle: rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, espece)), regle, seuil };
     });
+    // Garde (0177 § 1 point 5) : un seuil `NaN` ne refuserait jamais (`compte > NaN` est faux). Refus fermé, aucune écriture.
+    if (cles.some(({ seuil }) => !Number.isSafeInteger(seuil) || seuil < 1)) {
+      logEvent("rate_limit.failed", { action, errorName: "InvalidRule" }, "error");
+      return REFUS_FERME;
+    }
 
     let refusee: RateLimitKind | undefined;
     let client: RateLimitClient | undefined;
@@ -284,11 +294,11 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
       client = await (pool ??= poolParDefaut()).connect();
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE vadrouille_limiter");
-      for (const { cle, regle } of cles) {
+      for (const { cle, regle, seuil } of cles) {
         const ligne = (await client.query(INCREMENT, [cle, regle.windowSeconds])).rows[0] as { count?: unknown } | undefined;
         const compte = Number(ligne?.count);
         // Au-delà du seuil (ou compteur illisible) : refus, et les clés suivantes ne sont ni lues ni incrémentées.
-        if (!Number.isSafeInteger(compte) || compte > regle.threshold) {
+        if (!Number.isSafeInteger(compte) || compte > seuil) {
           refusee = regle.kind;
           break;
         }
