@@ -299,14 +299,16 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
   // insertion par la fonction de purge) ; le test couvre USING (true) et WITH CHECK (true), dans tous les schémas.
   // Amendée par B7c (0010_usage_forfait) : usage_ledger pour vadrouille_fn_usage ; par B3d (0020_plafond_emails) :
   // email_daily_counts pour vadrouille_mail_counter ; par M1f-D (0021_compteurs_autocompletion) : autocomplete_daily_counts
-  // pour vadrouille_autocomplete_counter.
+  // pour vadrouille_autocomplete_counter ; par C2a (0029_prevente_mesure) : les trois tables de la mesure de la prévente,
+  // sans organisation, pour les deux seuls rôles propriétaires de leurs fonctions.
   it("liste fermée des politiques USING (true) et WITH CHECK (true)", async () => {
     const { rows } = await app.query(
       `SELECT CASE WHEN schemaname = 'public' THEN '' ELSE schemaname || '.' END || tablename || ':' || array_to_string(roles::text[], ',') AS policy
        FROM pg_catalog.pg_policies
        WHERE qual = 'true' OR with_check = 'true' ORDER BY 1`,
     );
-    expect(rows.map((r) => r.policy)).toEqual(
+    // Tri des deux côtés par le même ordre (celui de JavaScript) : l'ordre de la base dépend de sa collation.
+    expect(rows.map((r) => r.policy as string).sort()).toEqual(
       [
         "accounts:vadrouille_auth",
         "action_rate_limits:vadrouille_limiter",
@@ -317,6 +319,17 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
         "email_daily_counts:vadrouille_mail_counter",
         "memberships:vadrouille_auth",
         "organizations:vadrouille_auth",
+        // C2a (migration 0029_prevente_mesure ; forme à confirmer, T1 et S1) : tables globales anonymes ; une politique
+        // par commande pour la fonction d'écriture, une lecture pour le relevé (tests/db/prevente-mesure.test.ts).
+        "prevente_reponses:vadrouille_fn_prevente",
+        "prevente_reponses:vadrouille_fn_prevente_releve",
+        "prevente_reponses_jour:vadrouille_fn_prevente",
+        "prevente_reponses_jour:vadrouille_fn_prevente",
+        "prevente_reponses_jour:vadrouille_fn_prevente",
+        "prevente_visites:vadrouille_fn_prevente",
+        "prevente_visites:vadrouille_fn_prevente",
+        "prevente_visites:vadrouille_fn_prevente",
+        "prevente_visites:vadrouille_fn_prevente_releve",
         "sessions:vadrouille_auth",
         "users:vadrouille_auth",
         "verifications:vadrouille_auth",

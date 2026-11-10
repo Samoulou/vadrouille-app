@@ -11,10 +11,11 @@ Aucun mot de passe ni chaîne de connexion n'apparaît dans ce dépôt, dans une
 
 | Chemin | Rôle |
 | --- | --- |
-| `db/bootstrap/roles.sql` | Amorçage idempotent des 20 rôles des décisions 0007, 0046 et 0060 (§ 3.2 : `vadrouille_coords_purge`), de B7c (`vadrouille_fn_usage`, migration `0010_usage_forfait`), de B3d (`vadrouille_mail_counter`, décision 0138 § 11, migration `0020_plafond_emails`) et de M1f-D (`vadrouille_autocomplete_counter`, migration `0021_compteurs_autocompletion`), une fois par base, avant les migrations. Aucun mot de passe. |
+| `db/bootstrap/roles.sql` | Amorçage idempotent des 23 rôles des décisions 0007, 0046 et 0060 (§ 3.2 : `vadrouille_coords_purge`), de B7c (`vadrouille_fn_usage`, migration `0010_usage_forfait`), de B3d (`vadrouille_mail_counter`, décision 0138 § 11, migration `0020_plafond_emails`) de M1f-D (`vadrouille_autocomplete_counter`, migration `0021_compteurs_autocompletion`) et de C2a (`vadrouille_fn_prevente`, `vadrouille_fn_prevente_releve`, `vadrouille_prevente_releve`, migration `0029_prevente_mesure`, section 5), une fois par base, avant les migrations. Aucun mot de passe. |
 | `db/maintenance/coords-purge-repli.sql` | Repli manuel de la purge du MVP (0060 § 3.5), exécuté par Samuel seul dans la console Neon quand `coords-purge.yml` ne peut pas réussir ; jamais par le studio (section 4). |
-| `db/schema/` | Schéma Drizzle (`auth.ts` : utilisateurs, organisations, appartenances, limiteur d'actions ; `business.ts` : tables métier). |
+| `db/schema/` | Schéma Drizzle (`auth.ts` : utilisateurs, organisations, appartenances, limiteur d'actions ; `business.ts` : tables métier ; `prevente.ts` : mesure de la prévente, hors organisation, section 5). |
 | `db/jsonb-keys.ts` | Listes de clés des colonnes JSONB, partagées par le schéma (contraintes `CHECK`) et les tests. |
+| `db/prevente-codes.ts` | Listes fermées de la mesure de la prévente (provenances, parcours, codes des questions, rubriques du relevé), partagées par le schéma (contraintes `CHECK`) et les tests ; le domaine `prevente_code` de la migration `0029_prevente_mesure` porte les mêmes valeurs (test). |
 | `db/migrations/` | Migrations SQL relues. `0000_socle` est générée par drizzle-kit puis complétée à la main ; `0001_securite` est écrite à la main (RLS, politiques, droits, déclencheurs, fonctions `SECURITY DEFINER`, vues partagées) ; `0002_place_coordinates` (cache des coordonnées et ses trois fonctions, 0011 § 6 amendée par 0046) et `0003_prototype` (schéma `prototype`, `org_prototype`, purge, gardes de `usage_ledger`) aussi, dans cet ordre (0046 D17) ; `0005_prototype_coordinates_run` (écrite à la main) remplace `store_prototype_coordinates` par sa forme à quatre paramètres liée à une exécution en cours (0052 § 1.7 et § 1.9), sans aucun `EXECUTE` hors de son propriétaire (verrou S8) ; `0008_positions_mvp_29_jours` (écrite à la main) passe l'expiration des positions du MVP à 29 jours et donne au rôle de purge du MVP son seul `EXECUTE` (0060 § 2 et § 3.2) ; `0009_verifications_updated_at` (générée, commentée à la main) ajoute la colonne `updated_at` que Better Auth 1.7.7 écrit dans `verifications` (B3b) ; `0011_trajets_prototype` (écrite à la main) crée `prototype.trajets`, temps de trajet des programmes du prototype supprimés avec eux par `prototype.purge_expired()` (décision 0092) ; `0013_secteurs_prototype` (écrite à la main) étend les clés admises de `prototype.run_candidates` aux cinq champs du candidat enrichi et crée `prototype.run_secteurs`, plan de secteurs d'une exécution (noms, voisins, incontournables, clés fermées, 24 h), supprimé à la clôture de l'exécution et à l'écriture du programme, et vidé par `prototype.purge_expired()` (décision 0094 § 1, verdict 0103, question 1) ; `0017_brief_saisi_prototype` (écrite à la main) admet le marqueur `saisi` dans `prototype.runs.brief` et crée `prototype.run_briefs`, brief saisi dans l'app lié à son exécution (clés de `BriefSchema` fermées au premier niveau, 16 Kio au plus, clé d'idempotence `request_id`, 29 jours comme le programme), jamais avec un fichier ni sans brief, vidé par `prototype.purge_expired()` (spécification E2E-essai, lot 3 ; décision 0125 § 1). |
 | `db/migrate.ts` | Applique les migrations sous `vadrouille_migrator`, une transaction par migration, journal dans `vadrouille_migrations.applied` (empreinte SHA-256 : une migration déjà appliquée et modifiée est refusée). |
 | `db/connection.ts` | Seul point d'entrée des connexions applicatives : garde de production (0034, sur l'environnement injecté **et** le vrai `process.env`, 0046 D21), liste d'autorisation de `vadrouille_prototype` (préversion ou développement seulement, D21) et garde de rôle (B1-PO-6). |
@@ -120,6 +121,7 @@ des tables ou des colonnes porteuses de données n'est donc jamais écrite.
 | `0026_apres_voyage` | `0026_apres_voyage.down.sql` | Après le voyage sur la vraie app (M8-D, ticket 1055 ; décision 0160 § 1.1, § 1.3 et § 3.2 ; droits et politiques : proposition de 0160 § 2.1, S1 ; **verdict de la Sécurité favorable**, sous réserve des mineurs 1 à 3, consignés : revue consolidée du head `dd23bce` de la PR #1057, amendement de 0160 par la PR #1066) : table `stop_reviews` (avis rapide : une ligne par étape et par lieu pour le voyage, index unique `(organization_id, trip_id, stop_id, COALESCE(place_id, ''))`, valeur fermée `opinion` de `STOP_RATINGS`, aucune colonne de texte libre ni de nom, clés `NO ACTION` vers `organizations`, `users` et `trips`) ; `preferences` durcie en place (garde de table vide ; `value` retirée, `category` nullable, `consented_at` posée par la base, `subject_kind`, `direction`, `origin`, `source_trip_id` ; cinq `CHECK` ; sujet unique par personne ; clé vers `memberships` ; clé du voyage d'origine en `ON DELETE SET NULL ("source_trip_id")`, écrite à la main : Drizzle ne sait pas écrire la liste de colonnes, le SQL fait foi) ; RLS activée et forcée sur `stop_reviews`, politiques par personne (`created_by` pour l'écriture des avis, `user_id` en lecture comme en écriture pour les goûts, qui remplacent `preferences_app` de 0001) ; `vadrouille_app` : `stop_reviews` `SELECT`, `INSERT` et `UPDATE` par colonnes, `DELETE` ; `preferences` `SELECT`, `INSERT` par colonnes, `DELETE`, plus d'`UPDATE` ; `vadrouille_fn_purge` : `SELECT (organization_id)`, `DELETE` sur `stop_reviews` ; `purge_organization_data` vide les avis avant le reste de la purge de 0024. Règle du rôle `data` : aucune suppression de données. La migration inverse **refuse** de s'exécuter (exception `55000`, rien modifié) dès qu'une ligne existe dans `stop_reviews` ou dans `preferences` (garde `CHECK (false)` posée puis retirée : validée sur toutes les lignes, sans égard à la RLS, que `vadrouille_owner` subit) ; sur deux tables vides seulement, elle défait la migration entière : purge de 0024 rétablie à l'identique, `stop_reviews` supprimée (vide), `preferences` rendue au plus près du schéma de B1 (`value text NOT NULL` recréée en dernière colonne, `category NOT NULL`, politique type et droits de 0001). Elle rouvre ce que la Sécurité aura fermé : descente d'urgence seulement, hors de tout code M8a ou M8c déployé. Le texte de 0026 se rejoue après elle (test : `tests/db/apres-voyage.test.ts`, base jetable ; il refuse aussi une table `preferences` non vide), mais le journal garde 0026 appliquée : un retour passe par une migration corrective vers l'avant. Appliquée sur Neon seulement après sa ligne dans `MIGRATIONS_APPROUVEES` (PR de workflow à part, `owner-approved` de Samuel). |
 | `0027_rappels_relais` | `0027_rappels_relais.down.sql` (partielle) | Réclamation des relais de rappels (R-D, ticket 1061 ; décision 0162 § 2 ; droits et politiques : propositions du Tech Lead ; **S-R1 à S-R6 de 0162 § 4 confirmées par la Sécurité**, revues consolidées des heads `c9d2ba1` et `d4523c2` de la PR #1067) : table insert-only `reminder_relays` (`organization_id`, `consent_id`, `relay_n`, `claimed_run_id`, `claimed_at` ; clé primaire `(organization_id, consent_id, relay_n)` : l'insertion est la réclamation d'une génération ; `CHECK (relay_n >= 1)` ; `CHECK` `^wrun_[0-9A-Za-z]{1,59}$` de l'identifiant d'exécution, borne lâche, S-R5 ; `claimed_at` posé par la base ; clés `NO ACTION` vers `organizations` et `reminder_consents (organization_id, id)`) ; contrainte unique `(organization_id, id)` ajoutée à `reminder_consents` (cible de la clé, aucune ligne modifiée) ; RLS activée et forcée, politiques de `vadrouille_app` bornées à l'organisation et à la personne de l'accord (`EXISTS` sur `reminder_consents`), insertion refusée pour un accord retiré ; `vadrouille_app` : `SELECT`, `INSERT (organization_id, consent_id, relay_n, claimed_run_id)`, ni `UPDATE`, ni `DELETE`, aucun déclencheur ; `vadrouille_fn_purge` : `SELECT (organization_id)`, `DELETE` ; `purge_organization_data` de 0026 vide les relais avant les réclamations et les accords. Règle du rôle `data` : aucune suppression de données. La migration inverse retire seulement les droits de `vadrouille_app` (`SELECT`, `INSERT (…)`) ; la table, ses lignes, ses clés, `CHECK`, RLS, politiques, les droits de la purge, la contrainte unique de `reminder_consents` et la purge de 0027 restent (la purge de 0026 échouerait sur la clé `NO ACTION` dès qu'un relais existe). Ordre d'une descente : le code de R-B retiré du déploiement d'abord (sinon chaque réclamation échoue en `42501` et la chaîne se termine au 24e essai, 0162 § 2 point 10), puis la descente. **0027 ne se rejoue pas** après sa descente (sa contrainte et sa table existent ; test : `tests/db/rappels-relais.test.ts`, base jetable) : un retour passe par une migration corrective vers l'avant. Appliquée sur Neon seulement après sa ligne dans `MIGRATIONS_APPROUVEES` (PR de workflow à part, `owner-approved` de Samuel), et après 0022 à 0026 (0162 § 1 point 3). |
 | `0028_purge_place_coordinates` | `0028_purge_place_coordinates.down.sql` | Purge du compte étendue à `place_coordinates` (ticket 1091 ; décision 0167, option (a) ; droits et politique : proposition du Tech Lead, SP1 à SP3 de 0167 ; **Sécurité : approuvé, aucun bloquant**, revue consolidée du head `4ae8340` de la PR #1095, 2026-11-09 ; l'en-tête de `0028_purge_place_coordinates.sql` dit encore « verdict de la Sécurité attendu » : le texte SQL n'est pas modifié (empreinte approuvée), le verdict se lit ici et dans cette revue), écrite à la main (aucune table ni colonne ne change : instantané de `meta/` égal à celui de 0027) : `vadrouille_fn_purge` reçoit `SELECT (organization_id)` et `DELETE` sur `place_coordinates`, rien d'autre (ni `INSERT`, ni `UPDATE`, ni lecture de `place_id`, `lat`, `lng` ou des instants), et la politique `place_coordinates_fn_purge` (`FOR ALL`, organisation de la transaction) ; `purge_organization_data` de 0027 recréée sous son propriétaire avec `place_coordinates` vidée **en tête**, lignes expirées comprises. Rien d'autre ne change : `vadrouille_fn_coords`, ses fonctions et ses cinq politiques, les droits de `vadrouille_app` et de `vadrouille_prototype`, la clé vers `organizations` (gardée en `NO ACTION`, 0167 point 3). Elle rend vrais 0007 (tableau des rôles), 0011 (§ 6, « Conséquences ») et les commentaires de `0001_securite.sql` (« B8 l'étend à place_coordinates »), non réécrits. Règle du rôle `data` : aucune suppression de données. La migration inverse rétablit la purge de 0027 **à l'identique**, puis supprime la politique et retire les deux droits ; la table et toutes ses lignes restent. Après elle, une suppression de compte laisse de nouveau les lignes de `place_coordinates` de l'organisation : descente d'urgence seulement, hors de tout code M9b déployé. Le texte de 0028 se rejoue après elle (test : `tests/db/purge.test.ts`, base jetable), mais le journal garde 0028 appliquée : un retour passe par une migration corrective vers l'avant. Prérequis de M9b (0167, « Effet sur M9b ») ; appliquée sur Neon seulement après sa ligne dans `MIGRATIONS_APPROUVEES` (PR de workflow à part, `owner-approved` de Samuel), et après 0022 à 0027. |
+| `0029_prevente_mesure` | `0029_prevente_mesure.down.sql` (partielle) | Mesure de la prévente (C2a, ticket 1117 ; spécification `specs/C2-prevente-mesure.md`, § 4 et § 5 ; forme, rôles et droits : proposition de la spécification, **à confirmer par le Tech Lead, T1, et par la Sécurité, S1**) : tables `prevente_visites`, `prevente_reponses_jour` et `prevente_reponses` (aucune organisation, aucune donnée d'une personne hors le texte libre `destination`), RLS activée et forcée, domaine `prevente_code`, deux fonctions d'écriture (`vadrouille_fn_prevente`, `EXECUTE` à `vadrouille_app`) et trois fonctions de relevé (`vadrouille_fn_prevente_releve`, `EXECUTE` à `vadrouille_prevente_releve`). Règle du rôle `data` : aucune suppression de données. La migration inverse retire les cinq fonctions, le domaine, les politiques et les droits ; les trois tables et leurs lignes restent, RLS forcée, sans aucun accès : le compteur et l'envoi du questionnaire échouent fermés (`42883`), la page de prévente s'affiche comme sans base. 0029 ne se rejoue pas après cette descente (son `CREATE TABLE` échouerait) : un retour passe par une migration corrective vers l'avant. |
 
 Une migration déjà appliquée n'est jamais modifiée (`db/migrate.ts` refuse une empreinte différente). Le retour
 arrière se fait **vers l'avant**, par une migration corrective :
@@ -197,9 +199,9 @@ spécification B1).
 Console Neon, projet de staging, branche principale, **SQL Editor**, base de l'application : coller le contenu de
 `db/bootstrap/roles.sql` et l'exécuter. Il peut être rejoué sans effet.
 
-Contrôle (20 lignes ; `super` et `bypassrls` à `false` partout ; `login` à `true` seulement pour
-`vadrouille_migrator`, `vadrouille_app`, `vadrouille_auth`, `vadrouille_prototype`, `vadrouille_prototype_purge` et
-`vadrouille_coords_purge`) :
+Contrôle (23 lignes ; `super` et `bypassrls` à `false` partout ; `login` à `true` seulement pour
+`vadrouille_migrator`, `vadrouille_app`, `vadrouille_auth`, `vadrouille_prototype`, `vadrouille_prototype_purge`,
+`vadrouille_coords_purge` et `vadrouille_prevente_releve`) :
 
 ```sql
 SELECT rolname, rolsuper AS super, rolbypassrls AS bypassrls, rolcanlogin AS login
@@ -208,7 +210,7 @@ FROM pg_catalog.pg_roles WHERE rolname LIKE 'vadrouille\_%' ORDER BY rolname;
 
 Contrôle des appartenances (attendu : `vadrouille_app` membre de `vadrouille_share`, `vadrouille_webhook`,
 `vadrouille_account_admin`, `vadrouille_limiter`, `vadrouille_mail_counter`, `vadrouille_autocomplete_counter` avec `inherit = false` ; `vadrouille_migrator` membre de
-`vadrouille_owner` avec `inherit = true`, et des six `vadrouille_fn_*` avec `admin = true`, `inherit = false`,
+`vadrouille_owner` avec `inherit = true`, et des neuf `vadrouille_fn_*` avec `admin = true`, `inherit = false`,
 `set = false` ; décision 0036, B1-TL-2. La ligne `ADMIN` seule du rôle d'amorçage sur chaque `vadrouille_fn_*`,
 créée par Postgres 16 et suivants quand il n'est pas superutilisateur, est admise ; elle n'apparaît pas ici) :
 
@@ -335,3 +337,62 @@ ou l'absence de ligne : exercice échoué, signalé au Tech Lead et à la Sécur
 **Coexistence** : `p0-purge.yml` reste en place jusqu'à la fin de la phase 0 et purge aussi ces lignes quand il
 réussit ; seuls les succès de `coords-purge.yml` et les purges manuelles comptent pour le calcul de 0060 § 2.
 Surveillance : CEO, à chaque cycle (0060 § 3.5).
+
+## 5. Mesure de la prévente (spécification C2, tâche C2a)
+
+Migration `0029_prevente_mesure` (ticket 1117 ; `specs/C2-prevente-mesure.md`, § 4 et § 5). Forme des tables, rôles et
+droits : proposition de la spécification, **à confirmer par le Tech Lead (T1) et par la Sécurité (S1)**. Rien ici
+n'ouvre la production : `db/connection.ts` refuse toujours toute connexion en production (décision 0034).
+
+Trois tables **sans organisation** (visiteurs anonymes, avant tout compte ; exception à `organization_id`, comme
+`email_daily_counts`), RLS activée et forcée, **aucun droit direct pour un rôle applicatif ou de connexion** :
+
+| Table | Contenu | Écrite par |
+| --- | --- | --- |
+| `prevente_visites` | un nombre par jour (UTC) et par provenance ; jamais une ligne par visite | `prevente_compter_visite` |
+| `prevente_reponses_jour` | le nombre de réponses stockées du jour (UTC) ; sert au seul plafond | `prevente_enregistrer_reponse` |
+| `prevente_reponses` | une ligne par réponse : identifiant aléatoire, jour, provenance, parcours, codes des questions 2 à 5, texte libre `destination` (question 1) | `prevente_enregistrer_reponse` |
+
+Aucune colonne ne peut recevoir une adresse IP, un agent utilisateur, une heure ni un identifiant de paiement ou de
+session (liste des colonnes figée par `tests/db/prevente-mesure.test.ts`). Les codes admis sont ceux de
+`db/prevente-codes.ts` ; `interne` n'est pas une provenance : la base le refuse dans les deux tables. Aucune purge
+n'existe : la durée de conservation des réponses n'est pas fixée (question 3 de la spécification, à Samuel).
+
+Fonctions, toutes `SECURITY DEFINER`, `search_path` figé, `PUBLIC` exclu :
+
+| Fonction | Propriétaire | `EXECUTE` | Rend |
+| --- | --- | --- | --- |
+| `prevente_compter_visite(p_src text)` | `vadrouille_fn_prevente` | `vadrouille_app` | rien (`void`) ; + 1 pour le jour UTC de la base et la provenance, incrément atomique |
+| `prevente_enregistrer_reponse(p_src text, p_parcours text, p_destination text, p_periode text, p_preparation text[], p_motifs text[], p_decouverte text, p_plafond integer DEFAULT 200)` | `vadrouille_fn_prevente` | `vadrouille_app` | le verdict seul : `admise` ou `plafond_atteint` |
+| `prevente_releve_visites()` | `vadrouille_fn_prevente_releve` | `vadrouille_prevente_releve` | `semaine` (le lundi, jours UTC), `src`, `visites` |
+| `prevente_releve_reponses()` | `vadrouille_fn_prevente_releve` | `vadrouille_prevente_releve` | `rubrique`, `code`, `reponses` : une ligne `total` (code nul), puis `src`, `parcours`, `periode`, `preparation`, `motifs-precommande`, `motifs-visite`, `decouverte` |
+| `prevente_releve_destinations()` | `vadrouille_fn_prevente_releve` | `vadrouille_prevente_releve` | deux nombres : réponses qui citent une destination ; destinations distinctes citées au moins 2 fois (minuscules, espaces nettoyés) |
+
+À savoir pour le code applicatif (C2b, C2c) :
+
+- **Plafond du jour** : tenu dans la base, dans la transaction de l'appel. `p_plafond` est borné de 1 à 200 (hors
+  bornes : `22023`) ; un appelant ne peut que l'abaisser (tests). Au plafond, la fonction n'incrémente ni n'insère rien
+  et rend `plafond_atteint`. L'application ne compte jamais elle-même les réponses du jour.
+- **Refus** : une valeur hors liste, `interne`, une `destination` vide, faite d'espaces, de plus de 80 caractères ou
+  portant un caractère de contrôle (U+0001 à U+001F, U+007F), des motifs de l'autre parcours ou une réponse entièrement
+  vide font échouer l'appel (`23514`, nom de la contrainte dans l'erreur ; `23502` pour une provenance ou un parcours
+  absents), sans rien écrire ni consommer le plafond. L'erreur ne cite jamais la ligne refusée. La validation par le
+  schéma strict de `src/contracts` reste le premier verrou : ces refus ne doivent pas se produire en fonctionnement
+  normal.
+- **Listes de codes** (`preparation`, `motifs`) : une liste absente vaut une liste vide ; les doublons sont retirés
+  et les codes triés par la fonction.
+- **Texte libre** : la base ne nettoie pas `destination` (espaces de début et de fin, suites d'espaces) : c'est le
+  travail de C2c (spécification § 3.3 point 3).
+
+Relevé : les fonctions de relevé ne rendent que des `bigint`, des `date` et des valeurs du domaine
+`public.prevente_code` (les codes des listes fermées et les rubriques ci-dessus) ; aucune ne rend `destination`, `id`
+ni le jour d'une réponse, et `vadrouille_prevente_releve` n'a aucun droit sur une table. Ce rôle de connexion (deux
+connexions au plus, aucune appartenance) n'a **aucun mot de passe** tant que le workflow du relevé n'existe pas : son
+mot de passe, l'environnement GitHub et les secrets viennent avec la tâche C2e et sont posés par Samuel (spécification
+§ 5 et « Questions ouvertes », 2). La lecture des destinations pour D3 (requête de `db/maintenance/`, exécutée par
+Samuel) vient aussi avec C2e.
+
+Application à une base réelle : comme toute migration, par `db-migrate.yml` après l'ajout de la ligne
+`0029_prevente_mesure <sha256>` à `MIGRATIONS_APPROUVEES` par une PR de workflow à part (tâche C2a-2) ; l'amorçage
+`db/bootstrap/roles.sql` est rejoué sur la base **avant** (trois rôles nouveaux), sans quoi la migration échoue
+(`42704`) sans rien appliquer.

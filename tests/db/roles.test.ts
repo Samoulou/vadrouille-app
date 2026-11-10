@@ -9,8 +9,10 @@ import { BOOTSTRAP_ROLE, BUSINESS_TABLES, closeAll, connect, type DbClient, PURG
  * `place_coordinates`, schéma `prototype`, fonctions de coordonnées et de purge), par la décision 0060 (B8c, § 4 :
  * rôle de purge du MVP), par B7c (migration 0010_usage_forfait : `vadrouille_fn_usage`, propriétaire de
  * `usage_forfait_totals()`), par B3d (décision 0138 § 11, migration 0020_plafond_emails : `vadrouille_mail_counter`,
- * rôle du plafond global des e-mails) et par M1f-D (migration 0021_compteurs_autocompletion : 20 rôles,
- * `vadrouille_autocomplete_counter`, rôle des compteurs de la ville par autocomplétion).
+ * rôle du plafond global des e-mails), par M1f-D (migration 0021_compteurs_autocompletion : 20 rôles,
+ * `vadrouille_autocomplete_counter`, rôle des compteurs de la ville par autocomplétion) et par C2a (migration
+ * 0029_prevente_mesure : 23 rôles, `vadrouille_fn_prevente`, `vadrouille_fn_prevente_releve` et
+ * `vadrouille_prevente_releve` ; test complet : `tests/db/prevente-mesure.test.ts`).
  */
 
 const ROLES = {
@@ -39,6 +41,11 @@ const ROLES = {
   vadrouille_coords_purge: true,
   // B7c (migration 0010_usage_forfait) : propriétaire de la fonction des sommes de consommation.
   vadrouille_fn_usage: false,
+  // C2a (migration 0029_prevente_mesure ; forme à confirmer par le Tech Lead, T1, et la Sécurité, S1) : propriétaires
+  // des fonctions d'écriture et de relevé de la mesure de la prévente ; connexion du relevé (workflow de C2e).
+  vadrouille_fn_prevente: false,
+  vadrouille_fn_prevente_releve: false,
+  vadrouille_prevente_releve: true,
 } as const;
 /** Attribut LOGIN attendu par rôle, lu par `Map` (clé venue de la base : aucun accès calculé, spécification P0c, 2.6). */
 const LOGIN_BY_ROLE = new Map<string, boolean>(Object.entries(ROLES));
@@ -156,6 +163,16 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
   vadrouille_coords_purge: {},
   // B7c : lecture par colonnes seulement (droits par colonne ci-dessous), aucun droit de table.
   vadrouille_fn_usage: {},
+  // C2a (migration 0029_prevente_mesure) : seuls rôles qui touchent les trois tables de la mesure de la prévente ;
+  // `UPDATE` par colonne seulement (droits par colonne ci-dessous) ; ni DELETE ni TRUNCATE. Le rôle de connexion du
+  // relevé n'a aucun droit de table.
+  vadrouille_fn_prevente: {
+    prevente_visites: ["SELECT", "INSERT"],
+    prevente_reponses_jour: ["SELECT", "INSERT"],
+    prevente_reponses: ["INSERT"],
+  },
+  vadrouille_fn_prevente_releve: { prevente_visites: ["SELECT"] },
+  vadrouille_prevente_releve: {},
 };
 
 /** Droits par colonne attendus, en plus des droits de table. */
@@ -233,6 +250,18 @@ const EXPECTED_COLUMN_PRIVILEGES: Record<string, Record<string, Record<string, s
     // Migration 0028 (décision 0167, Décision 1.1, SP2) : `organization_id` seule lue ; ni `place_id`, ni `lat`, ni `lng`,
     // ni les instants ; aucune écriture par colonne.
     place_coordinates: { SELECT: ["organization_id"], INSERT: [], UPDATE: [], REFERENCES: [] },
+  },
+  // C2a (0029) : le nombre seul se met à jour, jamais le jour ni la provenance ; le relevé ne lit ni `id` ni `jour` d'une
+  // réponse, et rien du compteur du jour.
+  vadrouille_fn_prevente: {
+    prevente_visites: { UPDATE: ["visites"] },
+    prevente_reponses_jour: { UPDATE: ["reponses"] },
+    prevente_reponses: { SELECT: [], UPDATE: [] },
+  },
+  vadrouille_fn_prevente_releve: {
+    prevente_reponses: { SELECT: ["decouverte", "destination", "motifs", "parcours", "periode", "preparation", "src"], INSERT: [], UPDATE: [] },
+    prevente_reponses_jour: { SELECT: [], INSERT: [], UPDATE: [] },
+    prevente_visites: { INSERT: [], UPDATE: [] },
   },
 };
 
@@ -379,6 +408,9 @@ describe("rôles: aucun rôle ne contourne la RLS", () => {
       ["vadrouille_fn_prototype_purge", ["purge_expired"]],
       // B7c (0010_usage_forfait) : la seule fonction des sommes de consommation.
       ["vadrouille_fn_usage", ["usage_forfait_totals"]],
+      // C2a (0029_prevente_mesure) : les deux fonctions d'écriture ; les trois fonctions de relevé.
+      ["vadrouille_fn_prevente", ["prevente_compter_visite", "prevente_enregistrer_reponse"]],
+      ["vadrouille_fn_prevente_releve", ["prevente_releve_destinations", "prevente_releve_reponses", "prevente_releve_visites"]],
     ] as const) {
       const tablesPossedees = await app.query("SELECT count(*) AS n FROM pg_catalog.pg_class WHERE relowner = $1::regrole", [role]);
       expect(Number(tablesPossedees.rows[0].n), role).toBe(0);
@@ -573,10 +605,17 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
     purge_expired: { owner: "vadrouille_fn_prototype_purge", execute: ["vadrouille_prototype_purge"] },
     // B7c (0010_usage_forfait) : sommes de consommation, à vadrouille_app seul.
     usage_forfait_totals: { owner: "vadrouille_fn_usage", execute: ["vadrouille_app"] },
+    // C2a (0029_prevente_mesure ; spécification C2, § 4 et § 5, critère B4) : écriture de la mesure de la prévente à
+    // vadrouille_app seul ; relevé au rôle de connexion du relevé seul.
+    prevente_compter_visite: { owner: "vadrouille_fn_prevente", execute: ["vadrouille_app"] },
+    prevente_enregistrer_reponse: { owner: "vadrouille_fn_prevente", execute: ["vadrouille_app"] },
+    prevente_releve_visites: { owner: "vadrouille_fn_prevente_releve", execute: ["vadrouille_prevente_releve"] },
+    prevente_releve_reponses: { owner: "vadrouille_fn_prevente_releve", execute: ["vadrouille_prevente_releve"] },
+    prevente_releve_destinations: { owner: "vadrouille_fn_prevente_releve", execute: ["vadrouille_prevente_releve"] },
   } as const;
   const EXPECTED_BY_NAME = new Map<string, (typeof EXPECTED)[keyof typeof EXPECTED]>(Object.entries(EXPECTED));
 
-  it("seules les huit fonctions prévues sont SECURITY DEFINER, avec search_path fixé, leur propriétaire vadrouille_fn_* et EXECUTE nominatif", async () => {
+  it("seules les treize fonctions prévues sont SECURITY DEFINER, avec search_path fixé, leur propriétaire vadrouille_fn_* et EXECUTE nominatif", async () => {
     const { rows } = await app.query(
       `SELECT p.oid, p.proname, pg_catalog.pg_get_userbyid(p.proowner) AS owner, p.proconfig,
               COALESCE((SELECT array_agg(CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(acl.grantee)::text END ORDER BY 1)::text[]
@@ -617,17 +656,24 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
     const { rows } = await app.query(
       "SELECT proname, prosrc FROM pg_catalog.pg_proc WHERE prosecdef AND pronamespace IN ('public'::regnamespace, 'prototype'::regnamespace)",
     );
-    expect(rows.length).toBe(8);
+    expect(rows.length).toBe(13);
+    // C2a (0029) : `ON CONFLICT … DO UPDATE SET` ne nomme aucun objet (sa cible est la table de l'`INSERT INTO`, déjà
+    // contrôlée) : seul ce `UPDATE`, précédé de `DO`, sort du contrôle ; tout autre `UPDATE` y reste soumis.
+    const CONTROLE = /\b(FROM|(?<!\bDO\s+)UPDATE|INTO|JOIN)\s+(?!(public|prototype)\.)[a-z_]+\b(?!\s*\()/i;
     for (const row of rows) {
       expect(row.prosrc, row.proname).not.toMatch(/\bEXECUTE\b/i);
-      expect(row.prosrc, row.proname).not.toMatch(/\b(FROM|UPDATE|INTO|JOIN)\s+(?!(public|prototype)\.)[a-z_]+\b(?!\s*\()/i);
+      expect(row.prosrc, row.proname).not.toMatch(CONTROLE);
     }
+    // Le contrôle reste vif après l'amendement : un `UPDATE` sans schéma est vu, un `DO UPDATE SET` ne l'est pas.
+    expect("UPDATE prevente_visites SET visites = 1").toMatch(CONTROLE);
+    expect("DO NOTHING; UPDATE prevente_visites SET visites = 1").toMatch(CONTROLE);
+    expect("ON CONFLICT (jour) DO UPDATE SET visites = 1").not.toMatch(CONTROLE);
   });
 });
 
 /**
  * Schéma `prototype` (décision 0046, D15 point 6, D16 points 3 et 5) : droits de table et par colonne exacts, pour
- * chacun des 20 rôles. Tout droit absent est refusé.
+ * chacun des 23 rôles. Tout droit absent est refusé.
  */
 describe("rôles: droits sur le schéma prototype (décision 0046)", () => {
   // `trajets` : temps de trajet conservés des programmes (décision 0092 § 3, migration 0011_trajets_prototype).
