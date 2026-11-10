@@ -12,6 +12,7 @@ import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { TripReview } from "@/contracts";
 import { STOP_RATINGS, type StopRating } from "@/contracts/values";
 import { etapesAEvaluer, type EtapeAEvaluer } from "@/domain/apres-voyage";
+import { estAdresseDecouverte } from "@/domain/lieu-a-soi";
 import { tripRoutes } from "@/features/sejour/routes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -139,6 +140,9 @@ function ChoiceGroup({
  *   réessai ou à un nouveau geste sur cette étape. Un geste mis en attente pendant un envoi qui échoue n'est pas envoyé :
  *   « Réessayer » rejoue le **dernier** geste (mineur 6).
  *
+ * Adresses découvertes (M8b, ticket 1111 ; spécification § 4.2 point 2) : sous « Tes étapes », une ligne « {nom} · Jour {n} »
+ * par étape marquée `discovered` (`estAdresseDecouverte`), nom saisi par la personne ; sinon « Aucune adresse découverte… ».
+ *
  * Hors ligne : bandeau, choix en `aria-disabled="true"` décrits par le bandeau et rendus indisponibles (contour et texte
  * `ink-soft`, fond `muted`), avis déjà donnés affichés. Rien n'est
  * gardé dans le navigateur (ni stockage, ni adresse) ; sur `mock`, mémoire de l'onglet et mention de démonstration.
@@ -156,6 +160,14 @@ export function ReviewScreen({ trip, review, mode, actions: injected, recorderKi
     for (const day of trip.days) for (const item of day.items) if (item.type === "stop") map.set(item.stop.id, item.stop.start);
     return map;
   }, [trip.days]);
+
+  // Adresses découvertes (M8b, spécification § 4.2 point 2) : les étapes à évaluer marquées `discovered`, dans l'ordre du
+  // programme ; chacune garde aussi sa ligne d'avis dans « Tes étapes ».
+  const decouvertes = useMemo(() => {
+    const ids = new Set<string>();
+    for (const day of trip.days) for (const item of day.items) if (item.type === "stop" && estAdresseDecouverte(item.stop)) ids.add(item.stop.id);
+    return etapes.filter((etape) => ids.has(etape.stopId));
+  }, [trip.days, etapes]);
 
   // Hors du fournisseur de l'onglet (tests isolés) : rien n'est gardé au-delà de l'état de l'écran.
   const actions = useMemo<ReviewActions>(() => {
@@ -333,6 +345,27 @@ export function ReviewScreen({ trip, review, mode, actions: injected, recorderKi
               </ul>
             </div>
           ))}
+        </section>
+        {/* Adresses découvertes (M8b, spécification M8 § 4.2 point 2 et § 7) : noms saisis par la personne et jour, sans
+            adresse ni carte, sans action (plus d'ajout après le voyage) ; affichée aussi en lecture seule. */}
+        <section aria-labelledby="apres-decouvertes" data-part="adresses-decouvertes" className="mt-8 flex flex-col gap-2">
+          <h2 id="apres-decouvertes" className="text-section font-extrabold text-ink">
+            {t.decouvertes.titre}
+          </h2>
+          <p className="text-corps-s text-ink-soft">{t.decouvertes.sousTitre}</p>
+          {decouvertes.length === 0 ? (
+            <p data-part="aucune-adresse" className="text-corps text-ink-soft">
+              {t.decouvertes.aucune}
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {decouvertes.map((etape) => (
+                <li key={etape.stopId} data-stop={etape.stopId} className="text-corps text-ink">
+                  {format(t.decouvertes.ligne, { name: etape.name, n: etape.dayIndex })}
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </>
     );
