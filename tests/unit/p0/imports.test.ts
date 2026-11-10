@@ -819,6 +819,13 @@ const APRES_VOYAGE_DOMAINE = "src/domain/apres-voyage.ts";
  */
 const APRES_VOYAGE_ECRAN = "src/features/voyage/ReviewScreen.tsx";
 const APRES_VOYAGE_IMPORTEURS = [APRES_VOYAGE_ECRAN];
+/**
+ * M8b (ticket 1111 ; décision 0160 § 1.4 point 2) : prédicat unique `estLieuASoi` (lieu à soi et adresse découverte), sans
+ * copie côté navigateur. Trois modules d'écran l'importent : la règle de signalement de la fiche, la fiche (texte de la
+ * marque) et l'écran 16 (section « Adresses découvertes »).
+ */
+const LIEU_A_SOI_DOMAINE = "src/domain/lieu-a-soi.ts";
+const LIEU_A_SOI_ECRANS = ["src/features/sejour/signalement.ts", "src/features/sejour/StopSheet.tsx", APRES_VOYAGE_ECRAN];
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 /** Classification des codes de la couche IA (B9b, 0081 B9-TL-1 point 2 ; 0077 § 3 point 4). */
 const NATURES_IA = "src/ai/natures.ts";
@@ -959,6 +966,17 @@ const ARETES_ADMISES: readonly AreteAdmise[] = [
     typeSeulement: false,
     exemple: APRES_VOYAGE_ECRAN,
     horsArete: "src/features/voyage/TodayScreen.tsx",
+  },
+  {
+    // M8b (ticket 1111 ; décision 0160 § 1.4 point 2) : `estLieuASoi` et `estAdresseDecouverte` viennent de
+    // `src/domain/lieu-a-soi.ts` (types de `@/contracts` et de `@/contracts/values` seulement), le même prédicat que le
+    // serveur ; trois modules d'écran l'importent, sans le recopier ; arête exacte : le parcours ne descend pas au-delà.
+    nom: "M8b : fiche, signalement de la fiche et écran 16 → src/domain/lieu-a-soi.ts",
+    de: (chemin) => LIEU_A_SOI_ECRANS.includes(chemin),
+    vers: [LIEU_A_SOI_DOMAINE],
+    typeSeulement: false,
+    exemple: "src/features/sejour/StopSheet.tsx",
+    horsArete: "src/features/sejour/JourneePanel.tsx",
   },
 ];
 
@@ -1639,7 +1657,7 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       // Aucun autre fichier de l'application hors de src/server n'importe src/domain : l'arête ne vaut que pour le double.
       // B10a (0112 § 2) : seule autre arête, l'écran de présentation vers les règles du tri (`src/domain/preferences.ts`).
       const importeurs = application.filter(
-        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/")) && !(c === VILLES_DOMAINE && f === VILLES_ECRANS) && !(c === CHANGEMENT_DOMAINE && CHANGEMENT_ECRANS.includes(f)) && !(c === APRES_VOYAGE_DOMAINE && APRES_VOYAGE_IMPORTEURS.includes(f))),
+        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/")) && !(c === VILLES_DOMAINE && f === VILLES_ECRANS) && !(c === CHANGEMENT_DOMAINE && CHANGEMENT_ECRANS.includes(f)) && !(c === APRES_VOYAGE_DOMAINE && APRES_VOYAGE_IMPORTEURS.includes(f)) && !(c === LIEU_A_SOI_DOMAINE && LIEU_A_SOI_ECRANS.includes(f))),
       );
       expect(importeurs).toEqual([DOUBLE_RELECTURES]);
     });
@@ -2140,6 +2158,12 @@ const FRONTIERE_P0R3B = {
     // Rappels par e-mail de api (M6c, ticket 1021 ; décision 0157 § 1.7 point 5) : `setTripReminders`, `getTripReminders`.
     // Entrée relevée par `pnpm test`, au-delà de 0157 : verdict Sécurité à rendre à la revue de M6c.
     { fichier: "src/server/actions/rappels.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Compte de api (M9b, ticket 1106 ; spécification M9 § 6.3, qui place `deleteAccount` dans ce fichier ; régime des
+    // entrées : décision 0055, section 1 point 2 ; suppression : décisions 0007 et 0167) : `deleteAccount` lit le limiteur
+    // et la base (`src/server/account/delete.ts`), à côté de `requestCode`, `verifyCode`, `signOut` et `hasSession`. Même
+    // propriété que les autres actions : `"use server"`, ses exports ne sont que des références vues du navigateur.
+    // Entrée relevée par `pnpm test`. Verdict Sécurité et Tech Lead : acceptée, revue consolidée du head b601197 (PR 1108).
+    { fichier: "src/server/actions/compte.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
     // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
@@ -2428,6 +2452,7 @@ describe("p0: clé côté serveur seulement", () => {
       "src/server/actions/retouches.ts",
       "src/server/actions/lieux.ts",
       "src/server/actions/rappels.ts",
+      "src/server/actions/compte.ts",
       "src/server/routes/simulated-webhook.ts",
       "src/server/routes/stripe-webhook.ts",
       "src/server/routes/calendrier.ts",

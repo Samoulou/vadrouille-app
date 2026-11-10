@@ -100,6 +100,11 @@ export const RATE_LIMITS: RateLimitConfig = {
   // d'adresse. Vérifié après la session, le rôle, l'organisation personnelle et la connexion récente (refus gratuits), avant
   // toute lecture de l'export ; `api` seulement (limiteur en base).
   export: [{ kind: "user", windowSeconds: 3600, threshold: 5 }],
+  // M9b (ticket 1106 ; spécification M9 § 5 point 7, S7 à confirmer par la Sécurité) : « Supprimer mon compte », 5 par
+  // heure et par personne (proposition). Espèce `user`, comme l'export. Vérifié après la session, le rôle, l'organisation
+  // personnelle et la connexion récente (refus gratuits), avant toute suppression. La reprise par `verifyCode`
+  // (`src/server/auth/reprise.ts`) ne passe pas par cette règle : elle n'est jamais refusée par elle.
+  suppression: [{ kind: "user", windowSeconds: 3600, threshold: 5 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

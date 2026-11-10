@@ -552,8 +552,12 @@ describe("signalement: jamais dans une entrée de modèle (valeurs sentinelles)"
  * capacité de production de la révision (`creerRedigerRevision`), journalisée.
  */
 describe("prompts: lieu à soi jamais dans une entrée de modèle (0147 § 12 S4)", () => {
-  it("entrée et requête de la révision sans le nom saisi, le placeId ni l'identifiant de l'étape ajoutée", async () => {
-    const NOM = "SENTINELLE-NOM-SAISI-M5D";
+  // M8b (ticket 1111 ; spécification M8 § 6.4, critère M8b-3 ; décision 0160 § 1.4 point 3) : une adresse découverte
+  // (`addedBy: "discovered"`) est un lieu à soi partout ; même test, avec sa sentinelle.
+  it.each([
+    ["person", "SENTINELLE-NOM-SAISI-M5D"],
+    ["discovered", "SENTINELLE-NOM-DECOUVERT-M8B"],
+  ] as const)("entrée et requête de la révision sans le nom saisi, le placeId ni l'identifiant de l'étape ajoutée (addedBy: %s)", async (addedBy, NOM) => {
     const PLACE = "SENTINELLE_PLACE_AJOUT_M5D";
     const AJOUT = "ajout-0d000000-0000-4000-8000-0000000000cc";
     const etape = (id: string, name: string, start: string, extra: Record<string, unknown> = {}) => ({
@@ -562,7 +566,7 @@ describe("prompts: lieu à soi jamais dans une entrée de modèle (0147 § 12 S4
     });
     const jour = (items: ReturnType<typeof etape>[]) => ({ index: 1, date: "2027-05-04", theme: "Old Town", travelBudgetMinutes: 90, events: [], items });
     const sans = [jour([etape("j1-1", "Château d'Édimbourg", "10:00"), etape("j1-2", "Royal Mile", "13:00")])];
-    const jours = [jour([etape("j1-1", "Château d'Édimbourg", "10:00"), etape("j1-2", "Royal Mile", "13:00"), etape(AJOUT, NOM, "16:00", { placeId: PLACE, locked: true, addedBy: "person" })])];
+    const jours = [jour([etape("j1-1", "Château d'Édimbourg", "10:00"), etape("j1-2", "Royal Mile", "13:00"), etape(AJOUT, NOM, "16:00", { placeId: PLACE, locked: true, addedBy })])];
     const brief: EntreeProgramme = {
       destination: "Édimbourg",
       pays: "Royaume-Uni",

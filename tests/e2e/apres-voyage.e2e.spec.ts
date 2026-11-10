@@ -26,6 +26,9 @@ test("apres-voyage: le 2026-09-02 à 23:59 (Londres), seulement « Ton voyage n'
   await expect(page.getByRole("heading", { level: 2, name: "Tes étapes" })).toBeVisible();
   await expect(group(page, CHATEAU)).toBeVisible();
   await expect(page.getByText("Démonstration : tes avis ne sont pas conservés après un rechargement de la page.")).toBeVisible();
+  // M8b (ticket 1111 ; spécification M8 § 4.2 point 2) : section « Adresses découvertes » ; le voyage simulé n'en a aucune.
+  await expect(page.getByRole("heading", { level: 2, name: "Adresses découvertes" })).toBeVisible();
+  await expect(page.getByText("Aucune adresse découverte pendant ce voyage.")).toBeVisible();
 });
 
 test("apres-voyage: mock : le choix est gardé à la navigation côté client, perdu au rechargement ; changer, effacer", async ({ page, baseURL }) => {

@@ -14,6 +14,7 @@ import {
   type TripPatch,
   type TripSnapshot,
 } from "@/contracts";
+import type { AddedBy } from "@/contracts/values";
 import { lignesApresVersion, type LigneAFaire } from "@/domain/a-faire";
 import type { ConfigurationMoteur } from "@/domain/configuration";
 import { appliquerPatch, type ResultatPatch } from "@/domain/patch";
@@ -34,6 +35,8 @@ import { executerActionVoyage, type DependancesAction, type ExecuteurAction } fr
 import type { VersionDeChaine } from "@/server/voyages/conversion";
 import { recomposerJourDeRevision, relireRevision } from "@/server/voyages/lecture";
 
+import { marqueAuMoment } from "./marque";
+
 /**
  * Lieu à soi sur l'adaptateur `api` : aperçu et application d'un ajout (tâche M5d-1, ticket 939 ; décision 0147 § 3 point
  * 5, § 4, § 8, § 11, § 6.4 point 4, § 5.3 point 7 et § 12 S4 ; spécification `specs/M5-retouches.md` § 6). Le patch est
@@ -42,7 +45,9 @@ import { recomposerJourDeRevision, relireRevision } from "@/server/voyages/lectu
  *
  * L'étape écrite porte le **nom saisi** (`AddPlaceRequest.name`, `texteMaison`, § 12 S4), le `placeId` du résultat choisi
  * (`resultId`, contrôlé par `PLACE_ID_MOTIF` et jamais revérifié auprès de Google, § 3 point 4), `kind`, jour et heure ; le
- * moteur la marque `addedBy: "person"` et le `lock` la verrouille. Aucun nom ni adresse Google n'atteint ce module : la
+ * moteur la marque (`addedBy`) et le `lock` la verrouille. La marque est calculée à l'**application** par le serveur (M8b,
+ * décision 0160 § 1.4 point 4 : `marqueAuMoment`, horloge du serveur et fuseau du voyage) : `discovered` (adresse découverte)
+ * pendant le voyage pour aujourd'hui ou un jour passé, sinon `person` ; la demande n'a aucun champ pour elle. Aucun nom ni adresse Google n'atteint ce module : la
  * demande stricte n'a aucun champ pour eux (critère 21).
  *
  * **Ordre des contrôles, fixé** : (a) session, (b) entrée stricte, (c) voyage dans l'organisation (`not_found`) — par le
@@ -73,6 +78,12 @@ export type DependancesAjout = DependancesAction & {
   readonly configuration?: ConfigurationMoteur;
   /** **Tests seulement** : identifiant de l'aperçu (sinon `crypto.randomUUID()`). */
   readonly identifiantApercu?: () => string;
+  /**
+   * Horloge du serveur (M8b, décision 0160 § 1.4 point 4 et § 2.6) : `Date.now` par défaut, injectée en test. Lue à
+   * l'**application** pour la marque de l'étape (`marqueAuMoment` : lieu à soi ou adresse découverte), et par l'aperçu pour
+   * son instant de création. Jamais une valeur de la demande.
+   */
+  readonly maintenant?: () => number;
 };
 
 const limiteurParDefaut = async (): Promise<Result<void>> => {
@@ -219,12 +230,17 @@ async function relire(
 const entreeDuMoteur = (dependances: DependancesAjout, contexte: ContexteVoyage, relectures: Relectures) =>
   entreeMoteurDeRevision(contexte, [], relectures, dependances.configuration);
 
-function moteur(dependances: DependancesAjout, contexte: ContexteVoyage, relectures: Relectures, patch: TripPatch): ResultatPatch {
+/**
+ * Moteur d'un ajout. `marqueAjout` (M8b) : marque de l'étape créée, fournie par l'application seule (`marqueAuMoment`) ;
+ * l'aperçu n'en donne pas (`person` par défaut : la marque n'y est pas affichée, décision 0160 § 1.4 point 4).
+ */
+function moteur(dependances: DependancesAjout, contexte: ContexteVoyage, relectures: Relectures, patch: TripPatch, marqueAjout?: AddedBy): ResultatPatch {
   return appliquerPatch({
     moteur: entreeDuMoteur(dependances, contexte, relectures),
     patch,
     versionCourante: contexte.base.version,
     base: contexte.base.snapshot,
+    ...(marqueAjout === undefined ? {} : { marqueAjout }),
   });
 }
 
@@ -305,7 +321,7 @@ export async function proposerAjout(dependances: DependancesAjout, entree: unkno
   const resultat = moteur(dependances, prepare.value.contexte, relectures.value, patch);
   if (!resultat.ok) return refusDuMoteur(resultat);
   try {
-    return { ok: true, value: apercuDeLAjout(prepare.value.contexte, resultat, relectures.value, cible, id, Date.now(), prepare.value.lignes) };
+    return { ok: true, value: apercuDeLAjout(prepare.value.contexte, resultat, relectures.value, cible, id, (dependances.maintenant ?? Date.now)(), prepare.value.lignes) };
   } catch (erreur) {
     journaliser("preview-add-place", erreur, valeur.tripId);
     return { ok: false, error: { code: "internal" } };
@@ -384,7 +400,10 @@ export async function appliquerAjout(dependances: DependancesAjout, entree: unkn
     const { contexte } = prepareAjout;
     if (derniere !== valeur.baseVersion || derniere !== contexte.base.version) return conflit(derniere);
     const patch = patchDeLAjout(valeur.requestId, derniere, valeur);
-    const resultat = moteur(dependances, contexte, relectures.value, patch);
+    // Marque calculée ici, sous les verrous, à l'horloge du serveur et au fuseau du voyage (M8b ; spécification § 4.1 ;
+    // décision 0160 § 2.6) : `discovered` pendant le voyage pour aujourd'hui ou un jour passé, sinon `person`.
+    const marque = marqueAuMoment(contexte.base, valeur.day, (dependances.maintenant ?? Date.now)());
+    const resultat = moteur(dependances, contexte, relectures.value, patch, marque);
     if (!resultat.ok) return refusDuMoteur(resultat);
     try {
       const ecrite = await ecrireVersion(executeur, {

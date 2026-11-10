@@ -3,6 +3,7 @@ import "server-only";
 import type { DayLineItemSnapshot, DaySnapshot, SegmentSnapshot, StopSnapshot, TripSnapshot } from "@/contracts";
 import { arriveeAffichee } from "@/domain/changement-de-ville";
 import type { ConfigurationMoteur } from "@/domain/configuration";
+import { estLieuASoi } from "@/domain/lieu-a-soi";
 import type { TriDuRecalcul } from "@/domain/recalcul";
 import { etapesVerrouilleesModifiees } from "@/domain/verrous";
 import type { CapaciteProgramme, ExecuteurPublication, OptionsEtape } from "@/server/composition/generation";
@@ -51,7 +52,7 @@ import { lireTriClos } from "./signaux";
  * écrit** (`ecrireSi` faux : la ligne finit `ready`, `last_version` nul, comme une version de base dépassée) ; sinon le
  * verrou des étapes gardées est reporté sur la version écrite (`verrousReportes`), que l'assemblage rend déverrouillées.
  *
- * **Lieux à soi** (M5d-1, ticket 939 ; décision 0147 § 12 S4) : une étape ajoutée par la personne (`addedBy: "person"`)
+ * **Lieux à soi** (M5d-1, ticket 939 ; décision 0147 § 12 S4) : une étape ajoutée par la personne (`addedBy` : `person` ou `discovered`, M8b)
  * n'entre jamais dans la requête `revision` (`etapesPourLeModele`) ; elle est **réinjectée** de la version de base dans la
  * version révisée avant R3 (`lieuxASoiReinjectes` : nom, jour, heures, `placeId` et verrou inchangés), si bien que R3 la voit
  * gardée et que la révision s'écrit. Depuis M5d-4 (décision 0155 § 2, Q765), la réinjection réécrit aussi, sans aucun appel
@@ -357,7 +358,7 @@ export function ligneDuJourCoherente(
 
 /**
  * Lieux à soi réinjectés (fonction pure, **sans appel** ; M5d-1, décision 0147 § 12 S4 et addendum A.6 ; M5d-4, décision
- * 0155 § 2) : chaque étape `addedBy: "person"` de la version de base est remise, **telle quelle** (identifiant, nom, jour,
+ * 0155 § 2) : chaque lieu à soi ou adresse découverte (`estLieuASoi` : `addedBy` `person` ou `discovered`, M8b) de la version de base est remise, **telle quelle** (identifiant, nom, jour,
  * heures, `placeId`, verrou), dans le même jour de la version révisée, à son heure (avant la première ligne datée qui
  * commence après elle, sinon avant le terminus de fin). Les lignes de la révision qui la chevauchent sont retirées : étapes,
  * temps libres et repas ouverts ; une étape **verrouillée dans la base** (verrou lu dans `base`, l'assemblage rendant les
@@ -380,7 +381,7 @@ export function reinjecterLieuxASoi(base: TripSnapshot, revisee: TripSnapshot, r
     for (const ligne of jour.items) {
       if (ligne.type !== "stop") continue;
       if (ligne.stop.locked) verrouilleesDansLaBase.add(ligne.stop.id);
-      if (ligne.stop.addedBy === "person") parJour.set(jour.index, [...(parJour.get(jour.index) ?? []), ligne.stop]);
+      if (estLieuASoi(ligne.stop)) parJour.set(jour.index, [...(parJour.get(jour.index) ?? []), ligne.stop]);
     }
   }
   const inchangee: Reinjection = { instantane: revisee, places: 0, stopsRemoved: 0, coherente: true };

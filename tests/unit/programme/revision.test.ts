@@ -108,11 +108,14 @@ describe("révision partagée (PR 868 ; décision 0126 § 3)", () => {
     for (const sentinelle of [PLACE, SITE, "SENTINELLE_TERMINUS", "toReserve", "segment", "locked", "commitment", "placeId", "source"]) expect(texte).not.toContain(sentinelle);
   });
 
-  it("M5d-1 (0147 § 12 S4) : une étape ajoutée par la personne n'entre pas dans l'entrée ; un choix qui la vise est ignoré", () => {
+  // M8b (ticket 1111 ; critère M8b-3) : même règle pour une adresse découverte (`addedBy: "discovered"`).
+  it.each([
+    ["person", "SENTINELLE-NOM-SAISI-M5D"],
+    ["discovered", "SENTINELLE-NOM-DECOUVERT-M8B"],
+  ] as const)("M5d-1 (0147 § 12 S4) : une étape ajoutée par la personne n'entre pas dans l'entrée ; un choix qui la vise est ignoré (addedBy: %s)", (addedBy, NOM) => {
     const AJOUT = "ajout-0d000000-0000-4000-8000-0000000000cc";
-    const NOM = "SENTINELLE-NOM-SAISI-M5D";
     const jours = INSTANTANE.days.map((jour) =>
-      jour.index === 1 ? { ...jour, items: [...jour.items, etape(AJOUT, NOM, { placeId: "SENTINELLE_PLACE_AJOUT", locked: true, addedBy: "person" })] } : jour,
+      jour.index === 1 ? { ...jour, items: [...jour.items, etape(AJOUT, NOM, { placeId: "SENTINELLE_PLACE_AJOUT", locked: true, addedBy })] } : jour,
     );
     const avec = entreeRevisionDepuisJours(TripSnapshotSchema.parse({ days: jours }).days, BRIEF, { pasPourMoi: [AJOUT, "j1-1"], jAime: [AJOUT] });
     expect(avec).toEqual(entreeRevisionDepuisJours(INSTANTANE.days, BRIEF, { pasPourMoi: ["j1-1"], jAime: [] }));
@@ -321,6 +324,23 @@ describe("lieu à soi dans la révision (M5d-1, ticket 939 ; 0147 § 12 S4 ; rev
     const { places, stopsRemoved } = reinjecterLieuxASoi(base, sortie, REGLES);
     expect({ places, stopsRemoved }).toEqual({ places: 1, stopsRemoved: 1 });
     expect(lignesDuJournal(() => journaliserReinjection({ places, stopsRemoved }))).toEqual([{ level: "info", event: "recalcul.lieux_a_soi", places: 1, stopsRemoved: 1 }]);
+  });
+
+  it("M8b : une adresse découverte (addedBy: discovered) est réinjectée telle quelle, comme un lieu à soi (critère M8b-3)", () => {
+    const decouverte = etape(AJOUT, "SENTINELLE-NOM-DECOUVERT-M8B", { start: "15:00", end: "16:00", placeId: "SENTINELLE_PLACE_AJOUT", locked: true, addedBy: "discovered" });
+    const baseDecouverte = TripSnapshotSchema.parse({ days: INSTANTANE.days.map((jour) => (jour.index === 1 ? { ...jour, items: [...jour.items, decouverte] } : jour)) });
+    // Sans réinjection, R3 refuserait la sortie du modèle, qui ne voit pas l'adresse découverte.
+    expect(verrousReportes(baseDecouverte, sortie)).toBeNull();
+    const reinjection = reinjecterLieuxASoi(baseDecouverte, sortie, REGLES);
+    expect({ places: reinjection.places, stopsRemoved: reinjection.stopsRemoved }).toEqual({ places: 1, stopsRemoved: 1 });
+    const tenue = verrousReportes(baseDecouverte, reinjection.instantane);
+    expect(tenue).not.toBeNull();
+    const j1 = tenue!.days.find((jour) => jour.index === 1)!.items;
+    // Même ligne du jour que pour un lieu à soi `person`, et l'étape garde sa marque, son nom, ses heures et son `placeId`.
+    expect(j1.map((l) => (l.type === "stop" ? l.stop.id : l.type))).toEqual(
+      verrousReportes(base, lieuxASoiReinjectes(base, sortie, REGLES))!.days.find((jour) => jour.index === 1)!.items.map((l) => (l.type === "stop" ? l.stop.id : l.type)),
+    );
+    expect(j1.find((l) => l.type === "stop" && l.stop.id === AJOUT)).toEqual(decouverte);
   });
 
   it("sans lieu à soi dans la base, ou déjà présent : rien ne change", () => {

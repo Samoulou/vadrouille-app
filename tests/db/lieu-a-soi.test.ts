@@ -376,6 +376,61 @@ describe("lieu à soi sur api (M5d-1, ticket 939)", () => {
  * § 4) : `annulerAjout` de `src/server/lieux/annulation.ts`, directement et par l'adaptateur `api` (`places.undoAddPlace`),
  * sous `vadrouille_app` avec le `withOrg` réel. Aucun limiteur n'est injecté : l'annulation n'a pas de débit `retouche`.
  */
+/**
+ * Adresse découverte sur `api` (tâche M8b, ticket 1111 ; spécification M8 § 4.1 et § 6.4, critères M8b-1 et M8b-2 ; décision
+ * 0160 § 1.4 point 4 et § 2.6) : la marque est calculée à l'application, à l'horloge du serveur (injectée ici) et au fuseau
+ * du voyage (`trips.time_zone`). Édimbourg : 2026-08-29 au 2026-09-03, `Europe/London` ; la demande vise J2 (30.08).
+ */
+describe("adresse découverte sur api (M8b, ticket 1111)", () => {
+  const appliquerLe = (instant: string, tripId: string, requestId: string, extra: Record<string, unknown> = {}) =>
+    appliquerAjout({ ...dependances(contexte(a)), maintenant: () => Date.parse(instant) }, { tripId, baseVersion: 1, requestId, ...DEMANDE, ...extra });
+
+  it.each([
+    ["pendant le voyage, jour passé (le 31.08 pour J2)", "2026-08-31T12:00:00+01:00", "discovered"],
+    ["pendant le voyage, aujourd'hui (le 30.08 pour J2)", "2026-08-30T00:00:00+01:00", "discovered"],
+    ["pendant le voyage, jour à venir (le 29.08 pour J2)", "2026-08-29T23:59:00+01:00", "person"],
+    ["avant le voyage (le 20.08)", "2026-08-20T12:00:00+01:00", "person"],
+    ["après le dernier jour (le 04.09 à 00:00, Londres)", "2026-09-04T00:00:00+01:00", "person"],
+  ] as const)("marque écrite dans l'instantané : %s", async (_nom, instant, marque) => {
+    const tripId = await nouveauVoyage();
+    const requestId = randomUUID();
+    expect(valeur(await appliquerLe(instant, tripId, requestId)).version).toBe(2);
+    const lignes = await versions(a, tripId);
+    const stopId = identifiantAjout(requestId);
+    expect(etape(instantane(lignes[1]), stopId)).toEqual({
+      jour: 2,
+      stop: { id: stopId, kind: "activity", placeId: LIEU, name: NOM, start: "16:00", end: expect.any(String), facts: {}, exceptions: [], locked: true, addedBy: marque },
+    });
+    // Le patch écrit ne porte aucune marque : elle ne vit que dans l'instantané (spécification § 4.4).
+    expect(JSON.stringify(lignes[1]?.patch)).not.toContain("addedBy");
+    expect(JSON.stringify(lignes[1]?.patch)).not.toContain("discovered");
+  });
+
+  it("l'aperçu reste en person pendant le voyage, et n'écrit rien", async () => {
+    const tripId = await nouveauVoyage();
+    const pendant = { ...dependances(contexte(a)), maintenant: () => Date.parse("2026-08-31T12:00:00+01:00") };
+    const lu = RevisionPreviewSchema.parse(valeur(await proposerAjout(pendant, { tripId, baseVersion: 1, ...DEMANDE })));
+    const ajoutee = lu.days.flatMap((jour) => jour.items).find((item) => item.type === "stop" && item.stop.id === lu.targetStopId);
+    expect(ajoutee).toMatchObject({ type: "stop", stop: { name: NOM, addedBy: "person" } });
+    expect(await versions(a, tripId)).toHaveLength(1);
+  });
+
+  it("une demande qui fournit la marque est refusée par le schéma strict, sans écriture ; un rejeu ne change pas la marque écrite", async () => {
+    const tripId = await nouveauVoyage();
+    for (const extra of [{ addedBy: "discovered" }, { addedBy: "person" }, { marqueAjout: "discovered" }]) {
+      expect(erreur(await appliquerLe("2026-08-20T12:00:00+01:00", tripId, randomUUID(), extra))?.code, JSON.stringify(extra)).toBe("validation_failed");
+    }
+    expect(await versions(a, tripId)).toHaveLength(1);
+    // Écrite avant le voyage (`person`) ; rejouée pendant le voyage : même réponse, aucune version, marque inchangée.
+    const requestId = randomUUID();
+    expect(valeur(await appliquerLe("2026-08-20T12:00:00+01:00", tripId, requestId)).version).toBe(2);
+    expect(valeur(await appliquerLe("2026-08-31T12:00:00+01:00", tripId, requestId)).version).toBe(2);
+    const lignes = await versions(a, tripId);
+    expect(lignes).toHaveLength(2);
+    expect(etape(instantane(lignes[1]), identifiantAjout(requestId))?.stop.addedBy).toBe("person");
+  });
+});
+
 describe("annuler un ajout sur api (M5d-6, ticket 994)", () => {
   const annuler = (tripId: string, version: number, requestId: string = randomUUID(), ctx: AdapterContext | null = contexte(a)) =>
     annulerAjout({ contexte: async () => ctx, withOrg }, { tripId, requestId, version });
@@ -425,6 +480,30 @@ describe("annuler un ajout sur api (M5d-6, ticket 994)", () => {
     expect(etape(instantane(lignes[2]), identifiantAjout(requestIdAjout))).toBeUndefined();
     // Rien n'est supprimé : la version de l'ajout reste dans l'historique.
     expect(etape(instantane(lignes[1]), identifiantAjout(requestIdAjout))?.stop.name).toBe(NOM);
+  });
+
+  // M8b (ticket 1111 ; spécification M8 § 6.4, critère M8b-5 ; décision 0160 § 1.4 point 5).
+  it("M8b : une adresse découverte s'annule comme un lieu à soi (undoAddPlace), et survit à un retour vers la version qui la contient", async () => {
+    const tripId = await nouveauVoyage();
+    const requestIdAjout = randomUUID();
+    const pendantLeVoyage = { ...dependances(contexte(a)), maintenant: () => Date.parse("2026-08-31T12:00:00+01:00") };
+    expect(valeur(await appliquerAjout(pendantLeVoyage, { tripId, baseVersion: 1, requestId: requestIdAjout, ...DEMANDE })).version).toBe(2);
+    const stopId = identifiantAjout(requestIdAjout);
+    expect(etape(instantane((await versions(a, tripId))[1]), stopId)?.stop.addedBy).toBe("discovered");
+
+    const annule = valeur(await annuler(tripId, 2));
+    expect(annule.version).toBe(3);
+    expect(annule.changes).toContainEqual({ type: "removed", label: NOM, before: { day: 2, time: "16:00" } });
+    let lignes = await versions(a, tripId);
+    expect(instantane(lignes[2])).toEqual(instantane(lignes[0]));
+    expect(etape(instantane(lignes[2]), stopId)).toBeUndefined();
+
+    // Retour à la version 2 : l'adresse découverte revient telle quelle, marque comprise.
+    expect(valeur(await appliquerRetour(retouche(), { tripId, requestId: randomUUID(), baseVersion: 3, toVersion: 2 })).version).toBe(4);
+    lignes = await versions(a, tripId);
+    expect(lignes).toHaveLength(4);
+    expect(etape(instantane(lignes[3]), stopId)).toEqual(etape(instantane(lignes[1]), stopId));
+    expect(etape(instantane(lignes[3]), stopId)?.stop).toMatchObject({ name: NOM, placeId: LIEU, locked: true, addedBy: "discovered" });
   });
 
   it("rejeu par requestId : même réponse, sans nouvelle version ni appel ; autre geste sous le même requestId : version_conflict", async () => {

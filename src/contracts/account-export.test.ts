@@ -44,7 +44,10 @@ describe("contrats: AccountExport (M9a)", () => {
 
 describe("contrats: reauthentication_required et forbidden (spécification M9 § 6.1)", () => {
   it("ajoutés à la fin, après not_unlocked, sans renommer ni réordonner", () => {
-    expect(API_ERROR_CODES.slice(-3)).toEqual(["not_unlocked", "reauthentication_required", "forbidden"]);
+    // `payment_pending` (M9b, revue de #1108) les suit : les trois codes gardent leur rang.
+    const rang = API_ERROR_CODES.indexOf("not_unlocked");
+    expect(API_ERROR_CODES.slice(rang, rang + 3)).toEqual(["not_unlocked", "reauthentication_required", "forbidden"]);
+    expect(API_ERROR_CODES.slice(-4)).toEqual(["not_unlocked", "reauthentication_required", "forbidden", "payment_pending"]);
     expect(API_ERROR_CODES.indexOf("validation_failed")).toBe(0);
     expect(new Set(API_ERROR_CODES).size).toBe(API_ERROR_CODES.length);
     expect(ApiErrorSchema.safeParse({ code: "reauthentication_required" }).success).toBe(true);

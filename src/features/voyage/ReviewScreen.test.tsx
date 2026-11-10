@@ -256,3 +256,74 @@ describe("ReviewScreen : mock, mémoire de l'onglet (critère 13)", () => {
     expect(choice(CHATEAU, "Pas pour moi")).toHaveAttribute("aria-pressed", "true");
   });
 });
+
+/**
+ * M8b (ticket 1111 ; spécification M8 § 4.2 point 2, § 6.4 critère M8b-6 et § 7) : section « Adresses découvertes », lue
+ * dans les étapes `discovered` du voyage ; chaque adresse garde sa ligne d'avis dans « Tes étapes ».
+ */
+describe("ReviewScreen : adresses découvertes (M8b, critère 6)", () => {
+  const NOM = "SENTINELLE-NOM-DECOUVERT-M8B";
+  const PLACE = "SENTINELLE_PLACE_DECOUVERT_M8B";
+  /** Voyage simulé où la première étape de J2 est une adresse découverte et celle de J4 un lieu à soi `person`. */
+  const avecDecouvertes = () => {
+    const marquer = (index: number, addedBy: "person" | "discovered", name: string) => (day: (typeof edimbourgDebloque.days)[number]) => {
+      if (day.index !== index) return day;
+      const premiere = day.items.find((item) => item.type === "stop");
+      return { ...day, items: day.items.map((item) => (item === premiere && item.type === "stop" ? { ...item, stop: { ...item.stop, name, placeId: PLACE, addedBy } } : item)) };
+    };
+    return projectReviewTrip({ ...edimbourgDebloque, days: edimbourgDebloque.days.map(marquer(2, "discovered", NOM)).map(marquer(4, "person", "Lieu à soi préparé")) });
+  };
+
+  it("aucune adresse : titre de niveau 2, sous-titre et « Aucune adresse découverte pendant ce voyage. », après « Tes étapes »", () => {
+    renderScreen();
+    const titres = screen.getAllByRole("heading", { level: 2 }).map((titre) => titre.textContent);
+    expect(titres).toEqual([t.etapes, "Adresses découvertes"]);
+    const section = screen.getByRole("region", { name: "Adresses découvertes" });
+    expect(within(section).getByText("Les lieux que tu as ajoutés pendant ton voyage.")).toBeInTheDocument();
+    expect(within(section).getByText("Aucune adresse découverte pendant ce voyage.")).toBeInTheDocument();
+    expect(within(section).queryByRole("list")).toBeNull();
+    expect(within(section).queryByRole("button")).toBeNull();
+  });
+
+  it("« {nom} · Jour {n} » pour chaque étape discovered, jamais pour un lieu à soi person ; ligne d'avis gardée dans « Tes étapes »", async () => {
+    const trip = avecDecouvertes();
+    const { container } = renderScreen({ trip });
+    const section = screen.getByRole("region", { name: "Adresses découvertes" });
+    const lignes = within(section).getAllByRole("listitem").map((ligne) => ligne.textContent);
+    expect(lignes).toEqual([`${NOM} · Jour 2`]);
+    expect(within(section).queryByText("Aucune adresse découverte pendant ce voyage.")).toBeNull();
+    expect(section).not.toHaveTextContent("Lieu à soi préparé");
+    // Sans action ni lien : la section liste, elle n'ajoute rien après le voyage.
+    expect(within(section).queryByRole("button")).toBeNull();
+    expect(within(section).queryByRole("link")).toBeNull();
+    // Les deux lieux ajoutés ont leur ligne d'avis dans « Tes étapes ».
+    const etapes = screen.getByRole("region", { name: t.etapes });
+    expect(within(etapes).getByRole("group", { name: `Ton avis sur ${NOM}` })).toBeInTheDocument();
+    expect(within(etapes).getByRole("group", { name: "Ton avis sur Lieu à soi préparé" })).toBeInTheDocument();
+    // Aucune donnée Google : le `placeId` n'est ni projeté ni rendu.
+    expect(JSON.stringify(trip)).not.toContain(PLACE);
+    expect(container.innerHTML).not.toContain(PLACE);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("lecture seule : la section reste affichée ; avant le dernier jour : absente", () => {
+    const trip = avecDecouvertes();
+    const { unmount } = renderScreen({ trip, review: review("readOnly") });
+    expect(within(screen.getByRole("region", { name: "Adresses découvertes" })).getByText(`${NOM} · Jour 2`)).toBeInTheDocument();
+    unmount();
+    renderScreen({ trip, review: review("notEnded") });
+    expect(screen.queryByRole("region", { name: "Adresses découvertes" })).toBeNull();
+    expect(screen.queryByText(`${NOM} · Jour 2`)).toBeNull();
+  });
+
+  it("projection : seule la marque addedBy s'ajoute aux champs de l'étape, et seulement si elle est posée", () => {
+    const trip = avecDecouvertes();
+    const stops = trip.days.flatMap((day) => day.items.flatMap((item) => (item.type === "stop" ? [item.stop] : [])));
+    expect(stops.filter((stop) => stop.addedBy !== undefined).map((stop) => [stop.name, stop.addedBy])).toEqual([
+      [NOM, "discovered"],
+      ["Lieu à soi préparé", "person"],
+    ]);
+    for (const stop of stops) expect(Object.keys(stop).filter((cle) => !["id", "kind", "name", "start", "addedBy"].includes(cle))).toEqual([]);
+    for (const stop of TRIP.days.flatMap((day) => day.items.flatMap((item) => (item.type === "stop" ? [item.stop] : [])))) expect(Object.keys(stop).sort()).toEqual(["id", "kind", "name", "start"]);
+  });
+});
