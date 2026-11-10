@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../../tests/unit/axe";
 
 import { Calendrier } from "./Calendrier";
+import { DateField } from "./DateField";
 import { TextField } from "./fields";
 
 const jour = (nom: string) => screen.getByRole("button", { name: nom });
@@ -93,7 +94,7 @@ describe("Calendrier de Ligne (décision 0176)", () => {
 
 function Champ() {
   const [value, setValue] = useState("2026-08-29");
-  return <TextField field="start" type="date" label="Arrivée" value={value} min="2026-08-01" onChange={setValue} />;
+  return <DateField field="start" label="Arrivée" value={value} min="2026-08-01" onChange={setValue} />;
 }
 
 describe("champ de date : calendrier de Ligne (décision 0176)", () => {

@@ -25,6 +25,10 @@ Fil du projet « Retirer le look IA du design ». Question posée le 2026-11-10 
 
 `Calendrier.test.tsx` (grille, bornes, changement de mois et d'année, année bissextile, clavier, séjour, champ et feuille, appui au doigt, axe) ; `DeckCard.test.tsx` (panneau, couleur, secteur, axe). Attentes mises à jour sans test retiré : les tests qui lisaient le texte « Photo du lieu » lisent l'état `data-etat="sans-photo"` de l'emplacement ; `load.test.tsx` liste `destinationColor` parmi les données de l'écran.
 
+## Poids du JavaScript
+
+Le champ de date et son calendrier sont dans `src/features/creation/DateField.tsx`, pas dans `fields.tsx` : le séjour importe `fields.tsx`, et le calendrier y ajoutait ses textes à quatre écrans du voyage, au-delà du budget de 200 000 octets (0016 § 3.1 ; CI du head `4167953` : Journée à 211 312 octets). Après la séparation : Journée 191 419, Séjour 191 413, ajout de lieu 194 357, tri 183 988. Le seuil n'est pas relevé.
+
 ## Suite
 
 Références visuelles régénérées par `update-snapshots` (commit `3444748`) : création (quatre captures), présentation (cinq), catalogue des composants. Le même passage reprend cinq captures venues de main en conflit de fusion (`lancement-erreur`, `mes-voyages-*`) et deux captures qui ne tiennent pas à cette décision (`connexion-code`, `revision-deplacer-jours`) : à surveiller si elles bougent encore sans changement d'écran.

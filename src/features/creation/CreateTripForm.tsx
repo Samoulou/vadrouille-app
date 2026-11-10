@@ -28,6 +28,7 @@ import { CreationShell, stepTotal, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { DestinationVille, type ActionsVilles, type MotifIndisponible } from "./DestinationVille";
 import { LODGING_ANSWERS, type LodgingAnswer, type LodgingForm } from "./draft";
+import { DateField } from "./DateField";
 import {
   describedBy,
   EMPTY_LIVE_REGION_CLASS,
@@ -358,9 +359,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
         )}
         <div className="flex flex-col gap-2">
           <FieldRow>
-            <TextField
+            <DateField
               field="start"
-              type="date"
               sejour={sejour}
               aujourdhui={today}
               label={e1.arrivee}
@@ -369,9 +369,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
               onChange={(start) => dispatch({ type: "trip", patch: { start } })}
               error={errorOf("start")}
             />
-            <TextField
+            <DateField
               field="end"
-              type="date"
               sejour={sejour}
               aujourdhui={today}
               label={e1.depart}
@@ -458,9 +457,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
                       error={errorOf(`${base}.name`)}
                     />
                   )}
-                  <TextField
+                  <DateField
                     field={`${base}.arrival`}
-                    type="date"
                     sejour={sejour}
                     aujourdhui={today}
                     label={e1.villes.arrivee}
@@ -576,9 +574,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
                   onChange={(label) => dispatch({ type: "commitment", index, patch: { label } })}
                   error={errorOf(`${base}.label`)}
                 />
-                <TextField
+                <DateField
                   field={`${base}.date`}
-                  type="date"
                   sejour={sejour}
                   aujourdhui={today}
                   label={e1.engagements.date}

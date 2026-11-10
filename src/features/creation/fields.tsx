@@ -1,14 +1,8 @@
 "use client";
 
-import { useState, type ReactNode, type Ref, type TouchEvent } from "react";
+import type { ReactNode, Ref } from "react";
 
-import { IconCalendrier } from "@/components/ligne/icons";
-import { Dialog, DialogClose, DialogSheet, DialogTitle } from "@/components/ui/dialog";
-import { format } from "@/i18n";
-import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
-
-import { Calendrier } from "./Calendrier";
 
 /**
  * Champs de saisie de la création (décision 0018, « Règles communes », « Champ de saisie » et « Message d'erreur
@@ -69,8 +63,6 @@ export function FieldMessage({ id, message }: { id: string; message: string | nu
   ) : null;
 }
 
-const t = messages.creation.calendrier;
-
 export interface TextFieldProps {
   field: string;
   label: string;
@@ -83,9 +75,6 @@ export interface TextFieldProps {
   /** Calendrier : premières et dernières dates proposées (`AAAA-MM-JJ`). */
   min?: string;
   max?: string;
-  /** Champ de date : séjour déjà saisi, teinté dans le calendrier ; et aujourd'hui. */
-  sejour?: { debut: string; fin: string } | null;
-  aujourdhui?: string | null;
   autoComplete?: string;
   inputRef?: Ref<HTMLInputElement>;
   className?: string;
@@ -102,92 +91,31 @@ export function TextField({
   maxLength,
   min,
   max,
-  sejour = null,
-  aujourdhui = null,
   autoComplete = "off",
   inputRef,
   className,
 }: TextFieldProps) {
   const id = fieldId(field);
-  const [calendrier, setCalendrier] = useState(false);
-  // Au doigt, le calendrier de Ligne remplace celui du téléphone : l'appui n'atteint pas le champ (ni focus ni clic).
-  const auDoigt = (event: TouchEvent<HTMLInputElement>) => {
-    event.preventDefault();
-    setCalendrier(true);
-  };
   return (
     <div className={cn("flex min-w-0 flex-col gap-2", className)}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       {help ? <FieldHelp id={helpId(id)}>{help}</FieldHelp> : null}
-      {type === "date" ? (
-        <div className="relative">
-          <input
-            ref={inputRef}
-            id={id}
-            type="date"
-            value={value}
-            min={min}
-            max={max}
-            autoComplete={autoComplete}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={describedBy(help && helpId(id), error && errorId(id))}
-            onChange={(event) => onChange(event.target.value)}
-            onTouchEnd={auDoigt}
-            // Le bouton du navigateur est retiré : le calendrier de Ligne (bouton à droite) le remplace (décision 0176).
-            className={cn(
-              INPUT_CLASS,
-              "pr-13 tabular-nums [&::-webkit-calendar-picker-indicator]:hidden focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-line",
-            )}
-          />
-          <button
-            type="button"
-            data-part="ouvrir-calendrier"
-            aria-haspopup="dialog"
-            onClick={() => setCalendrier(true)}
-            className="absolute inset-y-0 right-0 inline-flex w-13 cursor-pointer items-center justify-center rounded-control text-ink"
-          >
-            <IconCalendrier className="size-5" />
-            {/* Nom du bouton en texte masqué, pas en `aria-label` : une recherche par libellé ne trouve que le champ. */}
-            <span className="sr-only">{format(t.ouvrir, { champ: label })}</span>
-          </button>
-          <Dialog open={calendrier} onOpenChange={setCalendrier}>
-            <DialogSheet aria-describedby={undefined} data-part="feuille-calendrier">
-              <div className="flex items-center justify-between gap-3">
-                <DialogTitle className="text-section font-semibold text-ink">{format(t.titre, { champ: label })}</DialogTitle>
-                <DialogClose className="min-h-(--touch-target) cursor-pointer rounded-control px-2 text-corps text-ink underline underline-offset-2">
-                  {t.fermer}
-                </DialogClose>
-              </div>
-              <Calendrier
-                value={value}
-                min={min}
-                max={max}
-                sejour={sejour}
-                aujourdhui={aujourdhui}
-                onSelect={(date) => {
-                  onChange(date);
-                  setCalendrier(false);
-                }}
-              />
-            </DialogSheet>
-          </Dialog>
-        </div>
-      ) : (
-        <input
-          ref={inputRef}
-          id={id}
-          type={type}
-          value={value}
-          maxLength={maxLength}
-          autoComplete={autoComplete}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(help && helpId(id), error && errorId(id))}
-          onChange={(event) => onChange(event.target.value)}
-          // Heure : la tabulation atteint aussi le bouton interne du navigateur, que seul `:focus-within` voit sur le
-          // champ ; le contour de focus commun (2 px `line`, décalé de 2 px) y est donc aussi posé.
-          className={cn(INPUT_CLASS, type !== "text" && "tabular-nums focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-line")}
-        />
-      )}
+      <input
+        ref={inputRef}
+        id={id}
+        type={type}
+        value={value}
+        maxLength={maxLength}
+        min={min}
+        max={max}
+        autoComplete={autoComplete}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy(help && helpId(id), error && errorId(id))}
+        onChange={(event) => onChange(event.target.value)}
+        // Date et heure : la tabulation atteint aussi le bouton interne du calendrier, que seul `:focus-within` voit
+        // sur le champ ; le contour de focus commun (2 px `line`, décalé de 2 px) y est donc aussi posé.
+        className={cn(INPUT_CLASS, type !== "text" && "tabular-nums focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-line")}
+      />
       <FieldMessage id={errorId(id)} message={error} />
     </div>
   );
