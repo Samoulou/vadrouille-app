@@ -194,6 +194,21 @@
       "ecart": "ligne ordinaire de portée application (B4b, ticket 831 ; spécification B4, B4b point 1), modèle accepté par 0040 D4 ; verdict Sécurité : approuvé (revue de la PR #836, a1a61d7)"
     },
     {
+      "fichier": "src/adapters/prevente-mesure-instance.ts",
+      "portee": "application",
+      "usage": "portée application, justification (0040 D4, modèle de `api-share-instance.ts`) : alias de `globalThis` affecté à la constante `holder`, lu et écrit par la seule clé constante `MESURE_KEY` (`Symbol.for(\"vadrouille.prevente-mesure\")`) ; garde la mise en œuvre de la mesure de la prévente (compteur de visites `visitesPrevente` de `src/server/prevente/visites.ts` et prédicat `limiteurConfigure` de `src/server/rate-limit.ts`) branchée une fois au démarrage par `src/instrumentation.ts`, quel que soit l'adaptateur, entre les copies du module que Next charge par route ; n'atteint aucune capacité (ni `fetch`, ni module à capacité, ni `process`) ; non branchée, rien n'est compté et le questionnaire est tenu pour indisponible (échec fermé). Garde-fou : `brancherMesurePrevente` lève à un second branchement",
+      "capacites": [
+        {
+          "capacite": "global:globalThis",
+          "formes": [
+            "alias:holder",
+            "holder[MESURE_KEY]"
+          ]
+        }
+      ],
+      "ecart": "ligne ordinaire de portée application (C2b, ticket 1130 ; spécification C2 § 2.2 point 6 et § 6.2), modèle accepté par 0040 D4 et par la ligne de `api-share-instance.ts` ; verdict Sécurité : approuvé (revue de la PR #1133, 4bda87f)"
+    },
+    {
       "fichier": "src/adapters/prototype.test.ts",
       "portee": "test",
       "usage": "vérifie que P0b1 n'appelle jamais Google",

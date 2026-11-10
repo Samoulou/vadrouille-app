@@ -159,8 +159,34 @@ vi.mock("@/server/payment/composition-stripe", () => ({
   composerPaiementStripe: () => composerPaiementStripe(),
 }));
 
+// C2b (ticket 1130 ; spécification C2 § 6.2) : branchement de la mesure de la prévente, quel que soit l'adaptateur
+// (doubles : aucun pool, aucune base, aucune variable du limiteur).
+const brancherMesure = vi.fn();
+const visites = { disponible: vi.fn(() => true), compter: vi.fn(async () => undefined) };
+const visitesPrevente = vi.fn(() => visites);
+const limiteurConfigure = vi.fn(() => true);
+let echecMesure: Error | null = null;
+vi.mock("@/adapters/prevente-mesure-instance", () => ({
+  brancherMesurePrevente: (mesure: unknown) => brancherMesure(mesure),
+}));
+vi.mock("@/server/prevente/visites", () => ({
+  get visitesPrevente() {
+    if (echecMesure) throw echecMesure;
+    return () => visitesPrevente();
+  },
+}));
+vi.mock("@/server/rate-limit", () => ({ limiteurConfigure: () => limiteurConfigure() }));
+const journaliserVisitePerdue = vi.fn();
+vi.mock("@/server/prevente/journal", () => ({ journaliserVisitePerdue: (error: unknown) => journaliserVisitePerdue(error) }));
+
 beforeEach(() => {
   vi.resetModules();
+  brancherMesure.mockClear();
+  visitesPrevente.mockClear();
+  visites.disponible.mockClear();
+  visites.compter.mockClear();
+  limiteurConfigure.mockClear();
+  echecMesure = null;
   brancherStripe.mockClear();
   composerPaiementStripe.mockClear();
   brancherPaiement.mockClear();
@@ -526,5 +552,34 @@ describe("instrumentation : branchement du paiement Stripe (spécification B4, B
     vi.stubEnv("PAYMENT_ADAPTER", valeur);
     await register();
     expect(brancherStripe).not.toHaveBeenCalled();
+  });
+});
+
+describe("instrumentation : branchement de la mesure de la prévente (spécification C2, C2b ; ticket 1130)", () => {
+  it.each([undefined, "", "mock", "api", "prototype"])("DATA_ADAPTER=%j : mesure branchée une fois, rien n'est lu ni connecté au démarrage", async (valeur) => {
+    vi.stubEnv("DATA_ADAPTER", valeur);
+    await register();
+    expect(brancherMesure).toHaveBeenCalledTimes(1);
+    expect(visitesPrevente).not.toHaveBeenCalled();
+    expect(limiteurConfigure).not.toHaveBeenCalled();
+    const [mesure] = brancherMesure.mock.calls[0] as [
+      { compteurDisponible: () => boolean; compterVisite: (src: string) => Promise<void>; limiteurConfigure: () => boolean },
+    ];
+    expect(Object.keys(mesure).sort()).toEqual(["compterVisite", "compteurDisponible", "limiteurConfigure", "visitePerdue"]);
+    expect(mesure.compteurDisponible()).toBe(true);
+    expect(visites.disponible).toHaveBeenCalledTimes(1);
+    await mesure.compterVisite("forum");
+    expect(visites.compter).toHaveBeenCalledWith("forum");
+    expect(mesure.limiteurConfigure()).toBe(true);
+    expect(limiteurConfigure).toHaveBeenCalledTimes(1);
+    expect(logEvent.mock.calls.filter(([, champs]) => (champs as { action?: string }).action === "branchement-prevente")).toEqual([]);
+  });
+
+  it("échec du branchement : voyages.action_failed (branchement-prevente) avec le seul nom d'erreur, serveur non arrêté", async () => {
+    echecMesure = Object.assign(new TypeError("postgres://secret@hote"), { cause: "secret" });
+    await register();
+    expect(brancherMesure).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith("voyages.action_failed", { action: "branchement-prevente", errorName: "TypeError" }, "error");
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain("secret");
   });
 });

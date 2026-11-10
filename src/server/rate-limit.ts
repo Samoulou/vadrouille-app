@@ -349,6 +349,27 @@ export function oublierDansLeLimiteur(personne: PersonneDuLimiteur): Promise<voi
   return (limiteurParDefaut ??= createRateLimiter()).oublier(personne);
 }
 
+/**
+ * « Limiteur configuré » (spécification `specs/C2-prevente-mesure.md`, § 6.2 ; tâche C2b, ticket 1130 ; décision
+ * 0175 § 4 point 3) : vrai si les variables que le limiteur exige **à l'usage** sont là, c'est-à-dire si
+ * `rateLimitSettings` ne lève pas (`RATE_LIMIT_HMAC_SECRET` présente et valide partout ; `TRUSTED_IP_HEADER` en plus en
+ * `staging` et en `production`). Aucune liste de variables n'est recopiée. Sans elles le limiteur, fermé par défaut,
+ * refuserait chaque envoi : c'est la seconde condition de « questionnaire disponible », pour que les liens vers le
+ * questionnaire ne mènent pas à un formulaire qui refuse tout.
+ *
+ * Ne lève jamais, n'ouvre aucune connexion, n'écrit aucun journal (à la différence d'un appel du limiteur). `env` : tests
+ * seulement (sinon `serverEnv()`). Branché au démarrage sur `src/adapters/prevente-mesure-instance.ts` par
+ * `src/instrumentation.ts`.
+ */
+export function limiteurConfigure(env?: Readonly<Record<string, string | undefined>>): boolean {
+  try {
+    rateLimitSettings(env === undefined ? serverEnv() : parseServerEnv(env));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Même limiteur, verdict détaillé (espèce de la règle qui refuse ; M5d-1, `lieu.recherche`). */
 export function verdictRateLimit(request: RateLimitRequest): Promise<RateLimitVerdict> {
   return (limiteurParDefaut ??= createRateLimiter()).verdict(request);

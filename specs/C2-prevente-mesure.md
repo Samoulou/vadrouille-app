@@ -60,7 +60,7 @@ Ces règles sont une **proposition du rôle `commercial`, à confirmer par Samue
 
 ### 2.2 Précisions fonctionnelles (décisions C2-PO-1 à C2-PO-6, rubrique « Décisions »)
 1. **La page de prévente** est la page d'accueil `/` quand la précommande est ouverte (`getPrevente()` non nul, décision 0168 point 1). Précommande fermée : rien n'est compté. `/precommande`, `/precommande/merci` et le questionnaire ne sont pas des visites.
-2. **Un affichage** est une réponse `GET` de la page, rendue par le serveur. Ne comptent pas : une requête `HEAD` ; un préchargement (en-tête `Next-Router-Prefetch`, ou `Purpose` ou `Sec-Purpose` contenant `prefetch`) ; une requête de données du routeur qui n'affiche pas la page entière (forme exacte : T3). Le compteur suppose que `/` est **rendue à chaque requête** quand la précommande est ouverte (`dynamic = "force-dynamic"` aujourd'hui) : une page servie depuis un cache ne serait pas comptée (critère A13, T3).
+2. **Un affichage** est une réponse `GET` de la page, rendue par le serveur. Ne comptent pas : une requête `HEAD` (limite de mise en œuvre : elle est comptée, voir la fin de ce point) ; un préchargement (en-tête `Next-Router-Prefetch`, ou `Purpose` ou `Sec-Purpose` contenant `prefetch`) ; une requête de données du routeur qui n'affiche pas la page entière (forme exacte : T3). Le compteur suppose que `/` est **rendue à chaque requête** quand la précommande est ouverte (`dynamic = "force-dynamic"` aujourd'hui) : une page servie depuis un cache ne serait pas comptée (critère A13, T3). **Amendé par la décision 0175 (§ 3)** : la page ne connaît pas la méthode de la requête ; une requête `HEAD` qui porte un agent utilisateur de navigateur est donc comptée. Limite acceptée par le Tech Lead et écrite dans `suivi.md` ; forme exacte des requêtes du routeur : 0175 § 2 point 3.
 3. **Robots déclarés** : agent utilisateur reconnu par une liste embarquée dans le code, sans appel réseau (source de la liste : T2). La liste couvre au moins les cas des tests : `Googlebot`, `bingbot`, `facebookexternalhit`, `Twitterbot`, `Slackbot-LinkExpanding`, `WhatsApp`, `curl`. Un agent utilisateur **absent ou vide** n'est pas compté.
 4. **Provenance gardée**, à partir de `sourcePrevente` (lettres minuscules, chiffres, tirets, 30 au plus) :
    - `interne` : **rien n'est écrit** ;
@@ -259,7 +259,7 @@ Chaque critère est vérifié par un test nommé dans la PR de sa tâche. « Éc
 - [ ] **A3** `GET /?src=interne` : aucune écriture ; la page est identique à celle de `?src=forum`, au lien près.
 - [ ] **A4** `GET /?src=inconnu-123` : + 1 sous `autre` ; `?src=FORUM`, `?src=a&src=b`, `?src=` et une valeur de 31 caractères : + 1 sous `direct`.
 - [ ] **A5** Aucune écriture pour chacun des agents utilisateurs `Googlebot`, `bingbot`, `facebookexternalhit`, `Twitterbot`, `Slackbot-LinkExpanding`, `WhatsApp`, `curl`, ni pour un agent utilisateur absent ou vide (table de cas).
-- [ ] **A6** Aucune écriture pour une requête `HEAD`, ni pour une requête portant `Next-Router-Prefetch`, `Purpose: prefetch` ou `Sec-Purpose: prefetch`.
+- [ ] **A6** Aucune écriture pour une requête portant `Next-Router-Prefetch`, `Purpose: prefetch` ou `Sec-Purpose: prefetch`. (Amendé par la décision 0175 § 3 : la clause « requête `HEAD` » est retirée, la page ne connaît pas la méthode ; limite écrite dans `suivi.md`.)
 - [ ] **A7** `PREVENTE` absent ou différent de `1` : aucune écriture sur `/`. `GET /precommande`, `/precommande/merci` et `/precommande/questionnaire` : aucune écriture de visite.
 - [ ] **A8** Deux `GET /` identiques : deux visites (pas de dédoublonnage) ; la réponse ne pose aucun cookie (`Set-Cookie` absent) et la page ne charge aucun script de mesure.
 - [ ] **A9** La ligne écrite ne contient que `jour`, `src` et `visites` ; l'adresse IP n'est pas lue par le compteur (espion sur `src/server/ip.ts` : aucun appel).
@@ -323,7 +323,7 @@ Chaque critère est vérifié par un test nommé dans la PR de sa tâche. « Éc
 Détails fonctionnels fixés par le Product Owner (délégation, `docs/CONTEXT.md` ; définitifs à la fusion, décision 0093). À lister dans la prochaine note de version.
 
 - **C2-PO-1** La page de prévente comptée est `/` quand la précommande est ouverte ; les pages `/precommande` ne sont pas des visites.
-- **C2-PO-2** Un affichage est un `GET` de la page entière ; `HEAD` et préchargements ne comptent pas.
+- **C2-PO-2** Un affichage est un `GET` de la page entière ; `HEAD` et préchargements ne comptent pas. (Limite de mise en œuvre, décision 0175 § 3 du Tech Lead : une requête `HEAD` n'est pas reconnue et est comptée.)
 - **C2-PO-3** Agent utilisateur absent ou vide : non compté, comme un robot déclaré.
 - **C2-PO-4** Provenance hors liste : `autre` ; absente ou invalide : `direct`. Liste fermée, celle de `suivi.md`.
 - **C2-PO-5** Le compteur garde un nombre par jour UTC et par provenance, jamais une ligne par visite.

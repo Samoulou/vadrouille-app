@@ -112,6 +112,8 @@ export { creationDeSessionBranchee, sessionBranchee } from "./better-auth";
 export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
 export { apiShareAvailable, realShareAvailable, shareAvailable, shareDemoAvailable } from "./share-guard";
 export { adressePaiementPrevente, getPrevente, sourcePrevente, type Prevente } from "./prevente";
+// Mesure de la prévente (spécification C2, C2b) : compteur de visites et disponibilités ; le reste se lit dans `./prevente-mesure`.
+export { compterVisitePrevente, compteurPreventeDisponible, provenancePrevente, questionnairePreventeDisponible } from "./prevente-mesure";
 export { getPagesLegales, pagesLegalesDisponibles, type PagesLegales } from "./pages-legales";
 export { getSimulationScope, type SimulationScope } from "./simulation";
 export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype-instance";
