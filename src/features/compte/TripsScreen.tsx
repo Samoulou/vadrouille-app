@@ -28,6 +28,8 @@ export interface TripsScreenProps {
    * « Créer un voyage » (aucun lien ne mène à une page 404).
    */
   createHref?: string;
+  /** Adresse de « Ton compte » (M9c), lue par la page ; absente (site d'essai, catalogue des états) : aucun lien. */
+  accountHref?: string;
   /**
    * Reçus de la personne (B4d) : identifiant du voyage → adresse de son reçu (`R9-recu`), lue par la page ; un voyage
    * absent de la liste n'a pas de lien « Voir le reçu ».
@@ -239,6 +241,7 @@ function reviewHrefOf(summary: TripSummary, links: Readonly<Record<string, Revie
 export function TripsScreen({
   trips,
   createHref,
+  accountHref,
   receiptHrefs = AUCUN_RECU,
   reviewLinks = AUCUN_AVIS,
   retainedTastes,
@@ -307,6 +310,14 @@ export function TripsScreen({
       <Title embedded={false} />
       {body}
       {tastes}
+      {/* M9c (spécification M9 § 6.4, critère 1) : après les voyages, pour ne pas changer l'ordre de leurs liens. */}
+      {accountHref ? (
+        <Button asChild variant="text" size="sm" className="self-start px-0">
+          <Link href={accountHref} data-part="compte">
+            {messages.compte.lien}
+          </Link>
+        </Button>
+      ) : null}
     </main>
   );
 }

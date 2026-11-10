@@ -3,6 +3,8 @@ import { creationRoutes } from "@/features/creation/routes";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { DAY_PARAM_PATTERN, tripRoutes } from "@/features/sejour/routes";
 
+import { compteRoute } from "./routes";
+
 /**
  * Paramètre `suite` de l'écran 4 (`/connexion?suite=…`, F8-PO-10, décision 0017 § 1) : le module qui écrit
  * l'adresse est celui qui la relit. `suite` ne contient jamais l'email, le récit ni aucune donnée du brouillon.
@@ -34,6 +36,7 @@ const FORBIDDEN = /[\u0000-\u001F\u007F-\u009F\s\\%?#]/u;
  *    `/voyages/{id}/presentation`, et depuis B3c (B3-PO-11) `/voyages/{id}/jour/{n}`, `/voyages/{id}/aujourdhui` et
  *    `/voyages/{id}/debloquer`, avec `{id}` conforme à `TRIP_ID_PATTERN` et `{n}` entier écrit sans zéro initial
  *    (`DAY_PARAM_PATTERN`, partagé avec les pages). Jamais `/jour/{n}/remplacer/…`, ni les pages de paiement simulé (`/debloquer/…`).
+ *    Depuis M9c : `/compte` (« Ton compte »), forme exacte.
  * L'appartenance du voyage à l'organisation n'est pas vérifiée ici : la page cible renvoie 404 sinon.
  */
 export function normaliserSuite(valeur: string | undefined): string {
@@ -45,6 +48,8 @@ export function normaliserSuite(valeur: string | undefined): string {
 
   if (valeur === repli) return repli;
   if (valeur === creationRoutes.lancer()) return creationRoutes.lancer();
+  // M9c (spécification M9 § 6.4, critère 1) : « Ton compte », forme exacte, sans sous-chemin.
+  if (valeur === compteRoute()) return compteRoute();
   const [voyages, id, sous, ...reste] = segments;
   if (voyages !== "voyages" || id === undefined || !TRIP_ID_PATTERN.test(id)) return repli;
   const voyage = tripRoutes("/voyages", id);
