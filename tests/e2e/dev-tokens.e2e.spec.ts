@@ -29,6 +29,10 @@ test.describe("/dev/tokens", () => {
     await expect(sample).toHaveCSS("font-weight", "600");
     const family = await sample.evaluate((el) => getComputedStyle(el).fontFamily);
     expect(family).toMatch(/Bricolage.*Hanken/);
+    // Le texte courant garde la police de lecture : la police de titrage ne déborde pas des titres.
+    const corps = await page.locator("body").evaluate((el) => getComputedStyle(el).fontFamily);
+    expect(corps).toMatch(/Hanken/);
+    expect(corps).not.toMatch(/Bricolage/);
   });
 
   test("tient dans 390 px sans défilement horizontal", async ({ page }) => {

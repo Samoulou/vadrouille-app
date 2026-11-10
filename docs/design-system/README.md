@@ -2,11 +2,11 @@
 
 Ligne est le système de design du planificateur de voyages IA. Chaque journée s'y lit comme une ligne de transport : l'hôtel est le terminus, les étapes sont des arrêts, les trajets sont les segments entre eux. L'interface promet ce que le produit promet : un programme fiable, lisible d'un coup d'œil, dehors, sur un téléphone. La couleur et l'émotion viennent de la destination, pas de l'interface.
 
-Le produit n'a pas encore de nom ni de logo. En attendant, le nom s'écrit en Hanken Grotesk 800, en ink.
+Le produit n'a pas encore de nom ni de logo. En attendant, le nom s'écrit dans la police de titrage (Bricolage Grotesque étroite, 600 ; décisions 0171 et 0173), en ink.
 
 ## Principes
 
-1. **La ligne est la signature.** Le tracé, les arrêts et le terminus portent l'identité. Le bleu `line` ne sert qu'à la ligne, à la sélection et à l'action principale : jamais à décorer.
+1. **La ligne est la signature.** Le tracé, les arrêts et le terminus portent l'identité. Le bleu `line` ne sert qu'à la ligne, à la sélection et aux liens d'action : jamais à décorer. Le bouton principal est un aplat `ink` (décision 0171).
 2. **Le jaune veut dire « agis ».** `quai` marque uniquement ce qui demande une action de la personne : réserver, compléter. Un écran sans action requise n'a pas de jaune.
 3. **Seules les exceptions ont un badge.** Pas de badge « vérifié » : l'absence de badge vaut vérification. On signale « À réserver », « À confirmer », « Non confirmé ».
 4. **Les chiffres s'alignent.** Heures, dates, durées et montants sont en chiffres tabulaires, alignés à droite dans leur colonne.

@@ -3,7 +3,7 @@
   "bandeau": "Précommande · ouverture le 1er février 2027",
   "titre": {
     "avant": "Ton voyage,",
-    "accent": "de l'hôtel à la soirée"
+    "apres": "de l'hôtel à la soirée"
   },
   "sousTitre": "Raconte ton voyage en quelques phrases. {produit} te rend chaque journée prête à suivre : quoi faire, où manger, ce qui se passe pendant ton séjour.",
   "precommander": "Précommander pour {prix}",

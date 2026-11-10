@@ -30,9 +30,12 @@ const ETIQUETTES = new Map<string, TagKind>(
   ]),
 );
 
-/** Titrage : grotesque étroite, graisse maximale (décision 0170). Une seule voix pour tous les titres de la page. */
+/**
+ * Titrage : grotesque étroite en 600 (décisions 0171 et 0173), repli sur la police de texte. Une seule voix pour tous
+ * les titres de la page, qu'ils soient ou non des `h1` / `h2` (ceux-là la reçoivent déjà de `globals.css`).
+ */
 const TITRE =
-  "font-(family-name:--font-titrage) font-semibold font-stretch-85%";
+  "[font-family:var(--font-titrage),var(--font-sans)] font-semibold font-stretch-85%";
 const TITRE_SECTION = cn(
   TITRE,
   "relative text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.05] tracking-[-0.01em]",
@@ -87,14 +90,13 @@ function Precommander({
 }
 
 /** Arrêt du rail de la page : le même anneau que sur la ligne du jour. */
-function Arret({ sombre = false }: { sombre?: boolean }) {
+function Arret() {
   return (
     <span
       aria-hidden="true"
       className={cn(
         SUR_LE_RAIL,
-        "size-5 rounded-full border-4",
-        sombre ? "border-on-line bg-ink" : "border-line bg-raised",
+        "size-5 rounded-(--ligne-rayon-rond) border-4 border-line bg-raised",
       )}
     />
   );
@@ -216,7 +218,7 @@ export function LandingPrevente({
                   )}
                 >
                   <span className="block">{t.titre.avant} </span>
-                  {t.titre.accent}
+                  {t.titre.apres}
                 </h1>
                 <p className="max-w-xl text-arret font-normal text-outline-strong">
                   {format(t.sousTitre, { produit })}
@@ -243,7 +245,7 @@ export function LandingPrevente({
               <figure className="flex w-full max-w-md flex-col gap-4 self-end rounded-t-sheet bg-page px-5 pt-3 pb-8 text-ink">
                 <span
                   aria-hidden="true"
-                  className="mx-auto h-1 w-10 rounded-full bg-outline-strong"
+                  className="mx-auto h-(--ligne-poignee-epaisseur) w-(--ligne-poignee-largeur) rounded-(--ligne-rayon-rond) bg-border-control"
                 />
                 <figcaption className="text-legende text-ink-soft">
                   {t.telephone.etiquette}
@@ -332,12 +334,12 @@ export function LandingPrevente({
               <div className="flex flex-col gap-2">
                 <h3 className={cn(TITRE, "relative text-titre-fiche text-ink")}>
                   <Arret />
-                  <span className="text-ink-soft tabular-nums">
+                  <span className="text-ink-2 tabular-nums">
                     {index + 1}
                   </span>{" "}
                   {etape.titre}
                 </h3>
-                <p className="max-w-md text-arret font-normal text-ink-soft">
+                <p className="max-w-md text-arret font-normal text-ink-2">
                   {etape.texte}
                 </p>
               </div>
@@ -377,8 +379,10 @@ export function LandingPrevente({
         <div className="grid overflow-hidden rounded-plate border border-outline-strong bg-raised lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
           <div className="flex flex-col justify-between gap-10 bg-ink p-6 text-on-line lg:p-10">
             <div className="flex flex-col gap-3">
-              <p className="text-corps font-semibold">{t.prix.surtitre}</p>
               <h2 id="prix-titre" className="relative flex flex-col gap-1">
+                <span className="pb-2 font-sans text-corps font-semibold font-stretch-100%">
+                  {t.prix.surtitre}{" "}
+                </span>
                 <span
                   className={cn(
                     TITRE,
@@ -397,7 +401,7 @@ export function LandingPrevente({
             </div>
           </div>
           <div className="flex flex-col gap-6 border-t border-dashed border-outline-strong p-6 lg:border-t-0 lg:border-l lg:p-10">
-            <h3 className="text-section font-semibold text-ink">
+            <h3 className={cn(TITRE, "text-section text-ink")}>
               {t.prix.inclusTitre}
             </h3>
             <ul role="list" className="border-t border-hairline">

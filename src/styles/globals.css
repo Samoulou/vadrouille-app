@@ -145,10 +145,11 @@
  * Titrage (décisions 0171 et 0173, choix de Samuel du 2026-11-10) : les titres d'écran et de section, et les trois
  * styles d'affichage, sont en grotesque étroite (`--font-titrage`, posée par le layout racine), graisse 600 : la
  * hiérarchie vient de la taille, pas de la graisse. Règle hors couche, pour primer sur les utilitaires de graisse
- * et d'interlettrage posés par les écrans. Sans la variable (`global-error.tsx`), la police de Ligne prend le relais.
+ * et d'interlettrage posés par les écrans. Un petit intertitre (`h2` de la taille du texte) s'en exclut par la classe
+ * `font-sans` et garde la police de lecture. Sans la variable (`global-error.tsx`), la police de Ligne prend le relais.
  */
-h1,
-h2,
+h1:not(.font-sans),
+h2:not(.font-sans),
 .text-destination,
 .text-titre-fiche,
 .text-titre-jour {

@@ -1,6 +1,6 @@
 # 0171 — Toute l'application : titrage en grotesque étroite, bouton principal en `ink`
 
-Statut : **décidée par Samuel**, appliquée par l'UX/UI. Modifie deux règles de Ligne (`docs/design-system/README.md`, « Typographie » et « Couleurs »).
+Statut : **choix de Samuel sur une carte de décision du fil du projet, appliqué par l'UX/UI ; sa trace n'est pas lisible depuis le dépôt**. Tant que le CEO ne l'a pas reportée dans `QUESTIONS.md` (ou que Samuel ne l'a pas confirmée sur la PR), un relecteur la traite comme une proposition en attente de Samuel. Modifie deux règles de Ligne (`docs/design-system/README.md`, « Typographie » et « Couleurs »). La graisse du titrage est ramenée à 600 par 0173.
 
 Date : 2026-11-10 · Rédacteur : UX/UI · Ticket #1107.
 
@@ -10,11 +10,13 @@ Fil du projet « Retirer le look IA du design ». Question posée le 2026-11-10 
 
 ## Décision
 
-1. **Titrage.** Les titres d'écran et de section (`h1`, `h2`) et les styles `destination`, `titre-fiche`, `titre-jour` passent en Bricolage Grotesque, largeur 85 %, graisse 800 (`--font-titrage`, `src/styles/globals.css`). Tout le reste (noms d'arrêt, texte, données, boutons) reste en Hanken Grotesk : la lecture dehors ne change pas.
+1. **Titrage.** Les titres d'écran et de section (`h1`, `h2`) et les styles `destination`, `titre-fiche`, `titre-jour` passent en Bricolage Grotesque, largeur 85 %, graisse 800 puis 600 (0173) (`--font-titrage`, `src/styles/globals.css`). Un petit intertitre (`h2` de la taille du texte) garde Hanken Grotesk par la classe `font-sans`. Tout le reste (noms d'arrêt, texte, données, boutons) reste en Hanken Grotesk : la lecture dehors ne change pas.
 2. **Tailles.** La grotesque étroite paraît plus petite à corps égal : `destination` 44/44 (était 36/40), `titre-fiche` 34/36 (30/34), `titre-jour` 34/36 (28/32), `section` 22/26 (20/26). `tokens.json` et `globals.css` suivent.
 3. **Bouton principal.** `Button` `primary` : aplat `ink`, texte `on-line` (17:1). Le bleu `line` reste à la ligne, aux arrêts, à la sélection (pastille de jour active, option choisie, « J'aime ») et aux liens d'action.
 4. **Inchangés.** Couleurs, rayons, géométrie de la ligne, étiquettes, vocabulaire, absence d'ombres.
-5. **Captures de référence.** Tous les écrans changent : les références de la régression visuelle sont à régénérer par le libellé `update-snapshots` sur la PR. Les PR ouvertes avant celle-ci régénèrent les leurs après sa fusion.
+5. **Sources de vérité.** `docs/design-system/` (README, `tokens.json`, fiches `Button` et `DestinationPlate`) est aligné dans la même PR. `docs/handovers/frontend.md` garde ses valeurs d'origine (§ 2, § 4) sous une note en tête de section : en cas d'écart, cette décision et `docs/design-system/` priment.
+6. **Coût de la police.** Une police variable à deux axes (`opsz`, `wdth`), préchargée sur tous les écrans, sous-ensemble latin : coût non mesuré ici (LCP sur téléphone et réseau lent). À mesurer avant l'ouverture publique ; si c'est trop lourd, retirer l'axe `opsz`.
+7. **Captures de référence.** Tous les écrans changent : les références de la régression visuelle sont à régénérer par le libellé `update-snapshots` sur la PR. Les PR ouvertes avant celle-ci régénèrent les leurs après sa fusion.
 
 ## Suite
 

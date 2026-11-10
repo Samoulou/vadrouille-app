@@ -23,7 +23,7 @@ Grille de l'agent UX/UI (`.claude/agents/ux-ui.md`), demandée par Samuel le 202
 ## Ce qui donne l'identité
 
 1. **La ligne.** Rail, anneaux, terminus carré. Sur une page longue, le rail la traverse et chaque section est un arrêt.
-2. **Le jaune `quai` veut dire « agis ».** Sur une page de vente : le bouton d'achat et l'étiquette d'ouverture, rien d'autre.
+2. **Le jaune `quai` veut dire « agis ».** Sur une page de vente : le bouton d'achat, rien d'autre (un `Tag` de l'application montré dans un fragment d'exemple est un écart à écrire dans la décision).
 3. **Les plaques de destination** portent la couleur. L'interface reste `ink` et `page`.
 4. **Les vrais morceaux de l'application** (ligne du jour, étiquettes, boutons de tri) plutôt qu'une illustration.
 5. **Des chiffres tabulaires et des filets** : horaire, tableau des départs, billet.
