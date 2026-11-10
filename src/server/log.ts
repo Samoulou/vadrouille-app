@@ -200,6 +200,14 @@ export const LOG_EVENTS = [
   // nouvelle tentative ; niveau `warn`. **`errorName` seul** (`CHAMPS_ADMIS_PAR_EVENEMENT`) : jamais la chaîne de
   // connexion, l'hôte, l'agent utilisateur, l'adresse IP, la provenance ni le message de l'erreur (décision 0172 § 6).
   "prevente.visite_perdue",
+  // C2c (ticket 1137 ; spécification C2 § 3.3 point 6 ; décision 0177 § 8) : réponse au questionnaire de la prévente non
+  // écrite (base en panne, trop lente, garde de connexion, contrainte, fonction absente, verdict illisible) ; la personne
+  // a revu son formulaire avec ses réponses ; niveau `warn`. **`errorName` seul** : jamais le message ni le détail de
+  // l'erreur (0172 § 6), la provenance, le parcours, une réponse, le texte de la question 1, une adresse IP ni un en-tête.
+  "prevente.reponse_perdue",
+  // C2c (ticket 1137 ; spécification C2 § 3.4 point 3 ; décision 0177 § 8) : la fonction d'écriture a rendu « plafond
+  // atteint » (plafond global du jour, tenu dans la base) ; niveau `warn`. **Aucun champ.**
+  "prevente.plafond_atteint",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -947,6 +955,10 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   ["compte.suppression_failed", new Set(["errorName"])],
   // C2b (ticket 1130) : nom de l'erreur seulement ; tout autre champ est retiré.
   ["prevente.visite_perdue", new Set(["errorName"])],
+  // C2c (ticket 1137 ; décision 0177 § 8) : nom de l'erreur seulement ; tout autre champ est retiré.
+  ["prevente.reponse_perdue", new Set(["errorName"])],
+  // C2c (ticket 1137 ; décision 0177 § 8) : aucun champ ; tout champ passé est retiré.
+  ["prevente.plafond_atteint", new Set<string>()],
   [
     "generation.programme_written",
     new Set([

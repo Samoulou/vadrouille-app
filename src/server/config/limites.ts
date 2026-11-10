@@ -5,7 +5,8 @@ import "server-only";
  * lue côté serveur seulement, sur le modèle de `offer.ts`. Seuils et durées ne sont jamais codés dans une action.
  *
  * Valeurs de départ : **reprises** de la décision 0008 (B3-PO-6), aucune n'est fixée par le studio ; seuils réels :
- * Q86 (Tech Lead, Sécurité). Compartiment commun (`no-trusted-ip`) : seuils d'une seule adresse IP de l'action.
+ * Q86 (Tech Lead, Sécurité). Compartiment commun (`no-trusted-ip`) : seuils d'une seule adresse IP de l'action,
+ * sauf `noTrustedIpThreshold` (décision 0177 § 1).
  */
 
 /**
@@ -17,7 +18,13 @@ import "server-only";
 export type RateLimitKind = "ip" | "email" | "trip" | "user";
 
 /** Une règle : au plus `threshold` appels admis par fenêtre fixe de `windowSeconds` secondes (horloge de la base). */
-export type RateLimitRule = { readonly kind: RateLimitKind; readonly windowSeconds: number; readonly threshold: number };
+export type RateLimitRule = {
+  readonly kind: RateLimitKind;
+  readonly windowSeconds: number;
+  readonly threshold: number;
+  /** Seuil du compartiment commun `no-trusted-ip`, à la place de `threshold`. Lu pour l'espèce `ip` seulement. */
+  readonly noTrustedIpThreshold?: number;
+};
 
 /**
  * Règles par nom d'action (`^[a-z][a-z0-9-]{0,47}$`), dans l'ordre fixe d'évaluation : adresse IP, puis e-mail, puis voyage
@@ -111,6 +118,11 @@ export const RATE_LIMITS: RateLimitConfig = {
   // personnelle et la connexion récente (refus gratuits), avant toute suppression. La reprise par `verifyCode`
   // (`src/server/auth/reprise.ts`) ne passe pas par cette règle : elle n'est jamais refusée par elle.
   suppression: [{ kind: "user", windowSeconds: 3600, threshold: 5 }],
+  // C2c (ticket 1137 ; spécification C2 § 3.4 ; décision 0177 § 1 ; S2, proposition à confirmer par la Sécurité) : envoi du
+  // questionnaire de la prévente, 5 par heure et par adresse IP ; 30 par heure pour le compartiment commun `no-trusted-ip`
+  // (sans adresse lisible, tous les envois partagent une clé : 5 bloquerait tout le monde au sixième). Vérifié après le
+  // schéma (un envoi refusé par la validation ne consomme rien), avant la fonction d'écriture, qui porte le plafond du jour.
+  "questionnaire-prevente": [{ kind: "ip", windowSeconds: 3600, threshold: 5, noTrustedIpThreshold: 30 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

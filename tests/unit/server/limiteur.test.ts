@@ -283,6 +283,140 @@ describe("limiteur: configuration", () => {
     // Recherche de ville de l'écran 1 de `api` (décision 0141 § 4.1, T19 ; PR 885) : suggestions et choix confondus.
     expect(RATE_LIMITS["ville-recherche"]).toEqual([{ kind: "ip", windowSeconds: 60, threshold: 20 }]);
   });
+
+  it("questionnaire-prevente : une règle ip, 3600 s, 5 par adresse, 30 pour le compartiment commun (décision 0177 § 2)", () => {
+    // C2c (ticket 1137 ; spécification C2 § 3.4) : valeurs proposées, en attente de la lecture de la Sécurité (S2).
+    expect(RATE_LIMITS["questionnaire-prevente"]).toEqual([{ kind: "ip", windowSeconds: 3600, threshold: 5, noTrustedIpThreshold: 30 }]);
+  });
+
+  it("noTrustedIpThreshold : sur une règle ip seulement, entier sûr, jamais sous le seuil d'une adresse (décision 0177 § 1 point 6)", () => {
+    const ecarts: string[] = [];
+    let vues = 0;
+    for (const [action, regles] of Object.entries(RATE_LIMITS)) {
+      for (const regle of regles) {
+        if (!Number.isSafeInteger(regle.threshold) || regle.threshold < 1) ecarts.push(`${action} : seuil invalide`);
+        if (regle.noTrustedIpThreshold === undefined) continue;
+        vues += 1;
+        if (regle.kind !== "ip") ecarts.push(`${action} : seuil à part sur une règle ${regle.kind}`);
+        if (!Number.isSafeInteger(regle.noTrustedIpThreshold)) ecarts.push(`${action} : seuil à part non entier`);
+        if (!(regle.noTrustedIpThreshold >= regle.threshold)) ecarts.push(`${action} : compartiment commun plus étroit qu'une adresse`);
+      }
+    }
+    expect(ecarts).toEqual([]);
+    // Le contrôle a bien vu la règle du questionnaire.
+    expect(vues).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("limiteur: seuil à part du compartiment commun (C2c, ticket 1137 ; décision 0177 § 1)", () => {
+  const A_PART: RateLimitConfig = {
+    "essai-commun": [{ kind: "ip", windowSeconds: 600, threshold: 2, noTrustedIpThreshold: 4 }],
+    "essai-email": [{ kind: "email", windowSeconds: 600, threshold: 2, noTrustedIpThreshold: 4 }],
+  };
+  const ENV_SANS_ENTETE = () => ({ VADROUILLE_ENV: "ci", [HMAC]: secret() });
+
+  it("sans en-tête de confiance : quatre appels admis, le cinquième refusé (kind ip) ; une seule clé, celle de no-trusted-ip", async () => {
+    const octets = randomBytes(32);
+    const { pool, increments } = poolSimule();
+    const journal = capturerJournal();
+    const limiteur = createRateLimiter({ config: A_PART, env: { VADROUILLE_ENV: "ci", [HMAC]: octets.toString("base64url") }, pool });
+    const verdicts = [];
+    for (let i = 1; i <= 5; i += 1) verdicts.push(await limiteur.verdict({ action: "essai-commun", headers: entetes({ "x-forwarded-for": `198.51.100.${i}` }) }));
+    expect(verdicts).toEqual([{ ok: true }, { ok: true }, { ok: true }, { ok: true }, { ok: false, kind: "ip" }]);
+    expect(await limiteur.check({ action: "essai-commun", headers: entetes() })).toEqual(REFUS);
+    expect([...new Set(increments().map((r) => r.values?.[0]))]).toEqual([rateLimitKey(octets, rateLimitMessage("essai-commun", 600, "no-trusted-ip"))]);
+    // Ni la fenêtre, ni l'événement du compartiment commun ne changent.
+    expect(increments().every((r) => r.values?.[1] === 600)).toBe(true);
+    expect(journal.evenements()).toEqual(Array.from({ length: 6 }, () => ({ level: "warn", event: "rate_limit.no_trusted_ip", action: "essai-commun" })));
+  });
+
+  it.each(["192.0.2.7:443", "inconnu", ""])("en-tête configuré, valeur %j non analysable : même clé, même seuil de 4", async (valeur) => {
+    const { pool, increments } = poolSimule();
+    capturerJournal();
+    const limiteur = createRateLimiter({ config: A_PART, env: ENV_CI(), pool });
+    const resultats = [];
+    for (let i = 0; i < 5; i += 1) resultats.push((await limiteur.check({ action: "essai-commun", headers: entetes({ "x-vercel-forwarded-for": valeur }) })).ok);
+    expect(resultats).toEqual([true, true, true, true, false]);
+    expect(new Set(increments().map((r) => r.values?.[0])).size).toBe(1);
+  });
+
+  it("adresse lisible : troisième appel refusé, le seuil à part n'est pas lu ; une autre adresse garde son compteur", async () => {
+    const { pool } = poolSimule();
+    const journal = capturerJournal();
+    const limiteur = createRateLimiter({ config: A_PART, env: ENV_CI(), pool });
+    const requete = { action: "essai-commun", headers: entetes({ "x-vercel-forwarded-for": "192.0.2.7" }) };
+    expect([(await limiteur.check(requete)).ok, (await limiteur.check(requete)).ok]).toEqual([true, true]);
+    expect(await limiteur.verdict(requete)).toEqual({ ok: false, kind: "ip" });
+    expect((await limiteur.check({ action: "essai-commun", headers: entetes({ "x-vercel-forwarded-for": "192.0.2.8" }) })).ok).toBe(true);
+    expect(journal.evenements()).toEqual([]);
+  });
+
+  it("champ posé sur une règle email : ignoré, le seuil de la règle s'applique", async () => {
+    const { pool } = poolSimule();
+    capturerJournal();
+    const limiteur = createRateLimiter({ config: A_PART, env: ENV_SANS_ENTETE(), pool });
+    const requete = { action: "essai-email", headers: entetes(), email: email("a@exemple.test") };
+    const resultats = [];
+    for (let i = 0; i < 3; i += 1) resultats.push((await limiteur.check(requete)).ok);
+    expect(resultats).toEqual([true, true, false]);
+  });
+
+  it.each([
+    ["seuil à part NaN", { kind: "ip", windowSeconds: 600, threshold: 2, noTrustedIpThreshold: Number.NaN }],
+    ["seuil à part 0", { kind: "ip", windowSeconds: 600, threshold: 2, noTrustedIpThreshold: 0 }],
+    ["seuil à part non entier", { kind: "ip", windowSeconds: 600, threshold: 2, noTrustedIpThreshold: 2.5 }],
+    ["seuil à part infini", { kind: "ip", windowSeconds: 600, threshold: 2, noTrustedIpThreshold: Number.POSITIVE_INFINITY }],
+    ["seuil NaN", { kind: "ip", windowSeconds: 600, threshold: Number.NaN }],
+    ["seuil 0", { kind: "ip", windowSeconds: 600, threshold: 0 }],
+    ["seuil non entier", { kind: "ip", windowSeconds: 600, threshold: 1.5 }],
+  ] as const)("%s : refus fermé InvalidRule, aucun incrément, aucune requête", async (_nom, regle) => {
+    const { pool, requetes } = poolSimule();
+    const journal = capturerJournal();
+    const limiteur = createRateLimiter({ config: { "essai-invalide": [regle] }, env: ENV_SANS_ENTETE(), pool });
+    expect(await limiteur.verdict({ action: "essai-invalide", headers: entetes() })).toEqual({ ok: false });
+    expect(await limiteur.check({ action: "essai-invalide", headers: entetes() })).toEqual(REFUS);
+    expect(requetes).toEqual([]);
+    expect(journal.evenements().filter((e) => e.event === "rate_limit.failed")).toEqual([
+      { level: "error", event: "rate_limit.failed", action: "essai-invalide", errorName: "InvalidRule" },
+      { level: "error", event: "rate_limit.failed", action: "essai-invalide", errorName: "InvalidRule" },
+    ]);
+  });
+
+  it("seuil à part invalide, adresse lisible : le champ n'est pas lu, la règle s'applique", async () => {
+    const { pool } = poolSimule();
+    capturerJournal();
+    const config: RateLimitConfig = { "essai-lisible": [{ kind: "ip", windowSeconds: 600, threshold: 1, noTrustedIpThreshold: Number.NaN }] };
+    const limiteur = createRateLimiter({ config, env: ENV_CI(), pool });
+    const requete = { action: "essai-lisible", headers: entetes({ "x-vercel-forwarded-for": "192.0.2.7" }) };
+    expect([(await limiteur.check(requete)).ok, (await limiteur.check(requete)).ok]).toEqual([true, false]);
+  });
+
+  it("une règle sans le champ garde son seuil dans le compartiment commun : rien ne change pour les actions existantes", async () => {
+    const { pool } = poolSimule();
+    capturerJournal();
+    const limiteur = createRateLimiter({ config: CONFIG, env: ENV_SANS_ENTETE(), pool });
+    const resultats = [];
+    for (let i = 0; i < 4; i += 1) resultats.push((await limiteur.check({ action: "essai-ip", headers: entetes() })).ok);
+    expect(resultats).toEqual([true, true, true, false]);
+  });
+});
+
+describe("journal: prevente.reponse_perdue et prevente.plafond_atteint (C2c, ticket 1137 ; décision 0177 § 8)", () => {
+  it("reponse_perdue : errorName seul ; provenance, parcours, réponses, adresse et message retirés", () => {
+    const ligne = formatLogLine(
+      "prevente.reponse_perdue",
+      { errorName: "TypeError", src: "forum", parcours: "visite", destination: SENTINELLE, ip: "192.0.2.7", message: SENTINELLE, reason: SENTINELLE } as never,
+      "warn",
+    );
+    expect(JSON.parse(ligne)).toEqual({ level: "warn", event: "prevente.reponse_perdue", errorName: "TypeError", dropped: 6 });
+    expect(ligne).not.toContain(SENTINELLE);
+  });
+
+  it("plafond_atteint : aucun champ admis", () => {
+    const ligne = formatLogLine("prevente.plafond_atteint", { errorName: "TypeError", rows: 200, action: "questionnaire-prevente", destination: SENTINELLE } as never, "warn");
+    expect(JSON.parse(ligne)).toEqual({ level: "warn", event: "prevente.plafond_atteint", dropped: 4 });
+    expect(ligne).not.toContain(SENTINELLE);
+  });
 });
 
 describe("limitation: échec fermé si la base est indisponible", () => {
@@ -602,6 +736,10 @@ describe("module de journal", () => {
       "compte.suppression_failed",
       // C2b (ticket 1130) : visite de la page de prévente non écrite, nom de l'erreur seulement.
       "prevente.visite_perdue",
+      // C2c (ticket 1137 ; décision 0177 § 8) : réponse au questionnaire non écrite (nom de l'erreur seulement) ; plafond
+      // du jour atteint (aucun champ).
+      "prevente.reponse_perdue",
+      "prevente.plafond_atteint",
       "log.unknown_event",
     ]);
   });
