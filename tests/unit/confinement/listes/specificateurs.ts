@@ -62,7 +62,7 @@ export const SPECIFICATEURS = [
   // l'outil de test de Next.js). Sans capacité. Verdict Sécurité à rendre.
   // C2b (ticket 1130 ; spécification C2 § 2.2 point 6) : `after` seul, dans le compteur de visites de la prévente
   // (l'écriture part après l'envoi de la réponse ; proposition pour T3), et ses deux tests colocalisés, qui le doublent
-  // par une file. Sans capacité. Verdict Sécurité à rendre à la revue de la PR.
+  // par une file. Sans capacité. Verdict Sécurité : approuvé (revue de la PR #1133, 4bda87f).
   {
     specificateur: "next/server",
     zones: [

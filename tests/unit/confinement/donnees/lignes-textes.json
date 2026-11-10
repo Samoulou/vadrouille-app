@@ -206,7 +206,7 @@
           ]
         }
       ],
-      "ecart": "ligne ordinaire de portée application (C2b, ticket 1130 ; spécification C2 § 2.2 point 6 et § 6.2), modèle accepté par 0040 D4 et par la ligne de `api-share-instance.ts` ; verdict Sécurité à rendre à la revue de la PR"
+      "ecart": "ligne ordinaire de portée application (C2b, ticket 1130 ; spécification C2 § 2.2 point 6 et § 6.2), modèle accepté par 0040 D4 et par la ligne de `api-share-instance.ts` ; verdict Sécurité : approuvé (revue de la PR #1133, 4bda87f)"
     },
     {
       "fichier": "src/adapters/prototype.test.ts",

@@ -4,7 +4,7 @@ import path from "node:path";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import HomePage from "@/app/page";
+import HomePage, * as pageAccueil from "@/app/page";
 import PrecommandeMerciPage from "@/app/precommande/merci/page";
 import PrecommandePage from "@/app/precommande/page";
 import { PREVENTE_PROVENANCES_SUIVI } from "@/contracts/prevente-mesure";
@@ -342,5 +342,26 @@ describe("compteur de visites : la page ne casse ni n'attend jamais", () => {
     cleanup();
     await apresLaReponse();
     expect(espion).not.toHaveBeenCalled();
+  });
+});
+
+describe("A13 (garde statique) — la page de prévente est rendue à chaque requête, sans cache partagé", () => {
+  const racine = path.resolve(__dirname, "../..");
+
+  it("src/app/page.tsx : `dynamic` vaut « force-dynamic », aucun `revalidate`", () => {
+    expect(pageAccueil.dynamic).toBe("force-dynamic");
+    expect(Object.keys(pageAccueil)).not.toContain("revalidate");
+    expect(readFileSync(path.join(racine, "src/app/page.tsx"), "utf8")).not.toMatch(/\brevalidate\b/);
+  });
+
+  it("next.config.ts : aucun en-tête `public` ni `s-maxage`, ni pour `/` ni ailleurs", () => {
+    const config = readFileSync(path.join(racine, "next.config.ts"), "utf8");
+    expect(config).toContain("Cache-Control");
+    expect(config).not.toMatch(/s-maxage/i);
+    const valeurs = [...config.matchAll(/key:\s*"Cache-Control",\s*value:\s*"([^"]*)"/g)].map((m) => m[1]!);
+    expect(valeurs.length).toBeGreaterThan(0);
+    for (const valeur of valeurs) expect(valeur).not.toMatch(/\bpublic\b/i);
+    // Aucune règle d'en-têtes ne vise `/` : le cache de la page ne dépend que de son rendu dynamique.
+    expect(config).not.toMatch(/source:\s*"\/"/);
   });
 });
