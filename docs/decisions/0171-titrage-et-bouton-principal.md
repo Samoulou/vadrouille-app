@@ -1,12 +1,12 @@
 # 0171 — Toute l'application : titrage en grotesque étroite, bouton principal en `ink`
 
-Statut : **choix de Samuel sur une carte de décision du fil du projet, appliqué par l'UX/UI ; sa trace n'est pas lisible depuis le dépôt**. Tant que le CEO ne l'a pas reportée dans `QUESTIONS.md` (ou que Samuel ne l'a pas confirmée sur la PR), un relecteur la traite comme une proposition en attente de Samuel. Modifie deux règles de Ligne (`docs/design-system/README.md`, « Typographie » et « Couleurs »). La graisse du titrage est ramenée à 600 par 0173.
+Statut : **décidée par Samuel** (carte de décision du fil du projet, reportée dans `QUESTIONS.md`, Q871), appliquée par l'UX/UI. Modifie deux règles de Ligne (`docs/design-system/README.md`, « Typographie » et « Couleurs »). La graisse du titrage est ramenée à 600 par 0173.
 
 Date : 2026-11-10 · Rédacteur : UX/UI · Ticket #1107.
 
 ## Choix de Samuel
 
-Fil du projet « Retirer le look IA du design ». Question posée le 2026-11-10 à 07:33 UTC, avec deux planches (l'application telle quelle, et la même avec le style de la page de précommande de 0170) : « Donner à toute l'app le style de la nouvelle landing ? ». Réponse de Samuel à 07:36 UTC (`cmsg_0174CRqum9q8GNfZHmNHcYvRUd4q8AEAJuTsDUUJPwj2uX`) : « Oui, comme la proposition » (option décrite : « Tous les écrans prennent les titres à caractère et les boutons sombres »). Contexte : son jugement du 2026-11-10 06:30 UTC sur la première page d'accueil, « des font standard sur un fond blanc avec des bouton bleu » (cité dans 0168). Ces messages ne sont pas lisibles depuis le dépôt ; le CEO les reporte dans `QUESTIONS.md`.
+Fil du projet « Retirer le look IA du design ». Question posée le 2026-11-10 à 07:33 UTC, avec deux planches (l'application telle quelle, et la même avec le style de la page de précommande de 0170) : « Donner à toute l'app le style de la nouvelle landing ? ». Réponse de Samuel à 07:36 UTC (`cmsg_0174CRqum9q8GNfZHmNHcYvRUd4q8AEAJuTsDUUJPwj2uX`) : « Oui, comme la proposition » (option décrite : « Tous les écrans prennent les titres à caractère et les boutons sombres »). Contexte : son jugement du 2026-11-10 06:30 UTC sur la première page d'accueil, « des font standard sur un fond blanc avec des bouton bleu » (cité dans 0168). Choix reporté dans `QUESTIONS.md` (Q871).
 
 ## Décision
 

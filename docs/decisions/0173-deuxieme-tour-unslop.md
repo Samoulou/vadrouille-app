@@ -6,7 +6,7 @@ Date : 2026-11-10 · Rédacteur : UX/UI · Ticket #1107.
 
 ## Demande
 
-Samuel, fil du projet « Retirer le look IA du design », 2026-11-10 10:30 UTC (`cmsg_0174CRqum9q8GNfZHmNHcYvR5j3xiakjZ1NqfXnZySRZ3T`) : « tu vas refaire un tour du design UX et UI, pour ce faire install https://github.com/heydamir/unslop ». Message non lisible depuis le dépôt ; le CEO le reporte dans `QUESTIONS.md`.
+Samuel, fil du projet « Retirer le look IA du design », 2026-11-10 10:30 UTC (`cmsg_0174CRqum9q8GNfZHmNHcYvR5j3xiakjZ1NqfXnZySRZ3T`) : « tu vas refaire un tour du design UX et UI, pour ce faire install https://github.com/heydamir/unslop ». Message reporté dans `QUESTIONS.md` (Q890).
 
 ## Installation
 
