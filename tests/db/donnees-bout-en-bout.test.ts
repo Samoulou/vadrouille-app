@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   ADRESSE_A,
+  ADRESSE_AVIS,
   ADRESSE_B,
   ADRESSE_DEBLOQUER,
   ADRESSE_DEBLOQUER_REFUS,
@@ -227,5 +228,21 @@ describe("données de bout en bout de la création d'un lien sur api (M6a)", () 
     expect(await nombreDeVoyages(id)).toBe(1);
     const accords = await admin.query("SELECT count(*)::int AS n FROM public.reminder_consents c JOIN public.trips t ON t.id = c.trip_id WHERE t.organization_id = $1 AND c.withdrawn_at IS NULL", [id.org]);
     expect(accords.rows[0].n).toBe(0);
+  });
+
+  it(`${ADRESSE_AVIS} : un voyage débloqué terminé depuis 2 jours, sans avis (M8a)`, async () => {
+    const id = await identite(ADRESSE_AVIS);
+    if ((await nombreDeVoyages(id)) === 0) {
+      const converti = convertirVoyagesSimules().find((v) => v.mockId === EDIMBOURG_DEBLOQUE_TRIP_ID);
+      expect(converti).toBeDefined();
+      const donnees = converti!.donnees;
+      const fin = new Date(Date.now() - 2 * JOUR_MS).toISOString().slice(0, 10);
+      const ecart = Math.round((Date.parse(`${fin}T00:00:00Z`) - Date.parse(`${donnees.end}T00:00:00Z`)) / JOUR_MS);
+      const decale: DonneesVoyage = decaler(donnees, ecart);
+      expect(decale.end).toBe(fin);
+      expect(decale.entitlements).toEqual(["tripUnlocked"]);
+      await ecrireVoyage(app, id, decale);
+    }
+    expect(await nombreDeVoyages(id)).toBe(1);
   });
 });

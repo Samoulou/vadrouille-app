@@ -91,7 +91,26 @@ export type RateLimiter = {
   check(request: RateLimitRequest): Promise<Result<void>>;
   /** Même contrôle, mêmes écritures que `check` ; rend l'espèce de la règle qui refuse. */
   verdict(request: RateLimitRequest): Promise<RateLimitVerdict>;
+  /**
+   * Supprime les entrées rattachées à une personne (M9b, suppression du compte : handover § 12, étape 2) : clés des règles
+   * par e-mail de son adresse et des règles par personne de son identifiant, pour toutes les actions de la configuration.
+   * Sans effet si elles manquent déjà. **Lève** (sans valeur) si la configuration, l'entrée ou la base refuse : l'appelant
+   * reprend l'étape.
+   */
+  oublier(personne: PersonneDuLimiteur): Promise<void>;
 };
+
+/** Personne dont les entrées sont supprimées : adresse canonique et identifiant `uuid`, lus en base par l'appelant. */
+export type PersonneDuLimiteur = { readonly email: CanonicalEmail; readonly userId: string };
+
+/** Les entrées d'une personne n'ont pas pu être supprimées ; ne porte aucune valeur. */
+export class OubliLimiteurError extends Error {
+  override name = "OubliLimiteurError";
+
+  constructor() {
+    super("Entrées du limiteur non supprimées.");
+  }
+}
 
 const ACTION = /^[a-z][a-z0-9-]{0,47}$/;
 /** Identifiant de voyage admis dans une espèce `trip` : `uuid` (36 caractères, tirets aux places fixes). */
@@ -133,6 +152,25 @@ RETURNING count`;
 const PURGE = `DELETE FROM action_rate_limits WHERE key IN (
   SELECT key FROM action_rate_limits WHERE expires_at <= now() ORDER BY expires_at LIMIT $1 FOR UPDATE SKIP LOCKED
 )`;
+
+const OUBLI = "DELETE FROM action_rate_limits WHERE key = ANY($1::text[])";
+
+/**
+ * Clés des entrées rattachées à une personne (M9b) : une par règle `email` (adresse) ou `user` (identifiant) de chaque
+ * action de la configuration. Les clés par adresse IP ne sont rattachées à aucun compte (handover § 12, étape 2).
+ */
+export function clesDeLaPersonne(secret: Buffer, config: RateLimitConfig, personne: PersonneDuLimiteur): string[] {
+  const cleEmail = rateLimitEmailKey(personne.email);
+  const identifiant = personne.userId.toLowerCase();
+  const cles: string[] = [];
+  for (const [action, regles] of Object.entries(config)) {
+    for (const regle of regles) {
+      if (regle.kind === "email") cles.push(rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, `email/${cleEmail}`)));
+      else if (regle.kind === "user") cles.push(rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, `user/${identifiant}`)));
+    }
+  }
+  return cles;
+}
 
 const ESTIMATION = "SELECT reltuples::bigint AS n FROM pg_catalog.pg_class WHERE oid = 'public.action_rate_limits'::regclass";
 
@@ -273,7 +311,30 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
     return (await verdict(request)).ok ? ADMIS : REFUS;
   }
 
-  return { check, verdict };
+  async function oublier(personne: PersonneDuLimiteur): Promise<void> {
+    const env = reglages("oubli");
+    if (env === null || !isCanonicalEmail(personne.email) || typeof personne.userId !== "string" || !UUID.test(personne.userId)) throw new OubliLimiteurError();
+    const cles = clesDeLaPersonne(env.secret, config, personne);
+    if (cles.length === 0) return;
+    let client: RateLimitClient | undefined;
+    try {
+      client = await (pool ??= poolParDefaut()).connect();
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE vadrouille_limiter");
+      await client.query(OUBLI, [cles]);
+      await client.query("COMMIT");
+      client.release();
+    } catch (error) {
+      if (client) {
+        await rollback(client);
+        client.release(error instanceof Error ? error : true);
+      }
+      logEvent("rate_limit.failed", { action: "oubli", errorName: errorNameOf(error) }, "error");
+      throw new OubliLimiteurError();
+    }
+  }
+
+  return { check, verdict, oublier };
 }
 
 let limiteurParDefaut: RateLimiter | undefined;
@@ -281,6 +342,11 @@ let limiteurParDefaut: RateLimiter | undefined;
 /** Limiteur du serveur (configuration de `src/server/config/limites.ts`, `serverEnv()`, pool de `vadrouille_app`). */
 export function checkRateLimit(request: RateLimitRequest): Promise<Result<void>> {
   return (limiteurParDefaut ??= createRateLimiter()).check(request);
+}
+
+/** Même limiteur : suppression des entrées d'une personne (M9b, `src/server/account/delete.ts`). */
+export function oublierDansLeLimiteur(personne: PersonneDuLimiteur): Promise<void> {
+  return (limiteurParDefaut ??= createRateLimiter()).oublier(personne);
 }
 
 /** Même limiteur, verdict détaillé (espèce de la règle qui refuse ; M5d-1, `lieu.recherche`). */

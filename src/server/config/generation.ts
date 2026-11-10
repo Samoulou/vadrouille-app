@@ -1,6 +1,7 @@
 import "server-only";
 
 import { MAX_PREVIEW_SLOTS } from "@/contracts/values";
+import { BRANCHE_MVP_ESSAI } from "@/dev/flags";
 
 /**
  * Constantes de la génération (décision 0081, B9-TL-1 : `src/server/config/generation.ts` ; spécification B9, B9b).
@@ -107,10 +108,11 @@ export const TENTATIVES_PUBLICATION = 3;
 export const DUREE_ETAPE_MS = 700_000;
 
 /**
- * Branche de préversion Vercel sur laquelle la barrière (B9-TL-8) peut s'ouvrir : valeur posée par Samuel (question 6).
- * `null` tant qu'il n'en a pas désigné : la barrière reste fermée, la composition simulée.
+ * Branche de préversion Vercel sur laquelle la barrière (B9-TL-8) peut s'ouvrir : `mvp-essai` (décision 0169 § 2 ;
+ * réponses de Samuel à Q634 et Q635 du 2026-11-09 : une branche dédiée, `p0-reel` gardée). Même nom que la garde des
+ * adaptateurs (`BRANCHE_MVP_ESSAI`, `src/dev/flags.ts`). `null` refermerait la barrière : la composition resterait simulée.
  */
-export const BRANCHE_APPELS_REELS: string | null = null;
+export const BRANCHE_APPELS_REELS: string | null = BRANCHE_MVP_ESSAI;
 
 /** Déclarations de déploiement (`VADROUILLE_ENV`, `VERCEL_ENV`) qui ne sont pas la production. */
 const DEPLOIEMENTS_HORS_PRODUCTION: ReadonlySet<string> = new Set(["local", "development", "ci", "test", "preview", "staging"]);
@@ -148,11 +150,14 @@ export const JOURS_PLANIFIES_APERCU: readonly number[] = [1, 2];
 export const ECRITURE_POSITIONS_AUTORISEE = false;
 
 /**
- * Écriture de programmes réels (spécification B9, question 9 à Samuel ; 0011 l. 77 : « d'ici là, B9 ne branche pas
- * l'écriture de programmes réels »). `false` tant qu'il n'a pas répondu : même quand la barrière rend `reelle`, la
- * composition reste simulée. B9e la lie à sa réponse.
+ * Écriture de programmes réels (spécification B9, question 9 à Samuel ; 0011 l. 77). `false` : même quand la barrière rend
+ * `reelle`, la composition reste simulée. **`true` depuis la décision 0169 § 4** : Samuel a répondu oui à Q634 (la préversion
+ * `mvp-essai` lit et écrit la vraie base) et à Q636 (envoi réel au fournisseur de modèles) ; la question 9 portait sur les
+ * horaires calculés par le moteur à partir des durées Routes, que la chaîne inversée (`CHAINE_APERCU`) n'écrit pas : ses
+ * horaires sont rédigés par l'IA, et aucune requête Routes ne part à la génération (0136 § 2.4). L'ancienne chaîne n'est pas
+ * sélectionnée ; la rebrancher en réel demande de reprendre la question 9.
  */
-export const ECRITURE_PROGRAMMES_REELS_AUTORISEE = false;
+export const ECRITURE_PROGRAMMES_REELS_AUTORISEE = true;
 
 /**
  * Reprises d'un voyage complet par la personne (B9-PO-17 point 3 ; décision 0087 § 1.2) : l'échec initial, puis **3**

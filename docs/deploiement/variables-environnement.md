@@ -38,7 +38,7 @@ Aucune valeur par défaut d'`SMTP_URL` dans le code, `.env.example` ou les scrip
 
 ## Envoi réel par Resend (B3d ; décision 0138)
 
-Envoi du code de connexion par l'API HTTPS de Resend (`src/server/mail/resend.ts`), sous un plafond global de **100 e-mails par jour** (jour civil UTC, compteur en base, table `email_daily_counts`). **Après M2a, `resend` ne démarre nulle part** : le cas admis s'arrête sur `AUTH_ADAPTER=better-auth`, encore refusé en `staging` (B3-TL-2) ; c'est M1h qui l'ouvre pour la seule branche `mvp-essai`.
+Envoi du code de connexion par l'API HTTPS de Resend (`src/server/mail/resend.ts`), sous un plafond global de **100 e-mails par jour** (jour civil UTC, compteur en base, table `email_daily_counts`). **Depuis M1h (décision 0169), `resend` ne démarre que sur la préversion de la branche `mvp-essai`** : le cas admis exige `AUTH_ADAPTER=better-auth`, refusé sur tout autre `staging` (B3-TL-2). Liste complète des variables de cette préversion et ordre des gestes : `docs/deploiement/mvp-essai.md`.
 
 | Variable | Valeur | Qui la pose, où |
 |---|---|---|

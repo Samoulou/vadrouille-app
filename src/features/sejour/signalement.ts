@@ -1,16 +1,18 @@
 import type { Stop } from "@/contracts";
 import type { StopReportReason } from "@/contracts/values";
+import { estLieuASoi } from "@/domain/lieu-a-soi";
 
 /**
  * Règles d'écran du signalement d'une erreur (tâche M5c, ticket 904 ; spécification M5 § 5). Le navigateur n'importe pas
  * `src/domain` (décision 0112 § 2) : `etapeSignalableSurFiche` refait `etapeSignalable` de `src/domain/signalement.ts`,
  * équivalence vérifiée par `tests/unit/programme/signalement-regles.test.ts` ; le serveur refait le contrôle
- * (`validation_failed`).
+ * (`validation_failed`). Seule exception (M8b, décision 0160 § 1.4 point 2) : le prédicat `estLieuASoi` de
+ * `@/domain/lieu-a-soi`, module pur importable par le navigateur, n'est pas recopié.
  */
 
-/** Bouton « Signaler une erreur » : ni engagement, ni lieu à soi (un événement n'est pas dans le programme). */
+/** Bouton « Signaler une erreur » : ni engagement, ni lieu à soi ou adresse découverte (un événement n'est pas dans le programme). */
 export function etapeSignalableSurFiche(stop: Pick<Stop, "commitment" | "addedBy">): boolean {
-  return stop.commitment === undefined && stop.addedBy !== "person";
+  return stop.commitment === undefined && !estLieuASoi(stop);
 }
 
 /**

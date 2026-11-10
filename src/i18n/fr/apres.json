@@ -1,0 +1,36 @@
+{
+  "titreDocument": "{destination} · Après le voyage",
+  "retour": "Retour",
+  "avant": {
+    "titre": "Après le voyage",
+    "texte": "Ton voyage n'est pas terminé. Tu pourras donner ton avis à partir du {date}.",
+    "voirSejour": "Voir le séjour"
+  },
+  "titre": "Ton avis sur {destination}",
+  "intro": "Quelques secondes par étape. Tout est facultatif.",
+  "demonstration": "Démonstration : tes avis ne sont pas conservés après un rechargement de la page.",
+  "lectureSeule": "Ton voyage est terminé depuis plus de 30 jours. Tes avis restent visibles, mais ne se modifient plus.",
+  "etapes": "Tes étapes",
+  "aucuneEtape": "Aucune étape à évaluer pour ce voyage.",
+  "groupe": "Ton avis sur {name}",
+  "choix": {
+    "liked": "J'ai aimé",
+    "disliked": "Pas pour moi",
+    "notDone": "Pas fait"
+  },
+  "avisLu": "Ton avis : {choix}",
+  "sansAvis": "Pas d'avis",
+  "enregistrement": "Enregistrement…",
+  "enregistre": "Avis enregistré.",
+  "efface": "Avis effacé.",
+  "horsLigne": "Tu es hors ligne. Tu pourras donner ton avis dès que le réseau revient.",
+  "erreur": "Impossible d'enregistrer ton avis pour le moment.",
+  "reessayer": "Réessayer",
+  "reessayerEtape": "Réessayer : {name}",
+  "decouvertes": {
+    "titre": "Adresses découvertes",
+    "sousTitre": "Les lieux que tu as ajoutés pendant ton voyage.",
+    "aucune": "Aucune adresse découverte pendant ce voyage.",
+    "ligne": "{name} · Jour {n}"
+  }
+}

@@ -39,9 +39,13 @@ const PLACE = "SENTINELLE_PLACE_M5C";
 
 describe("not_unlocked (décision 0147 § 8)", () => {
   it("ajouté en dernier, sans renommer ni réordonner ; retryable faux exigé", () => {
-    // Dernier jusqu'à M9a (spécification M9 § 6.1) : `reauthentication_required` et `forbidden` le suivent, dans cet ordre.
+    // Dernier jusqu'à M9a (spécification M9 § 6.1) : `reauthentication_required` et `forbidden` le suivent, dans cet ordre,
+    // puis `payment_pending` (M9b, revue de #1108).
     expect(API_ERROR_CODES.indexOf("not_unlocked")).toBe(API_ERROR_CODES.indexOf("email_cap_reached") + 1);
-    expect(API_ERROR_CODES.slice(API_ERROR_CODES.indexOf("not_unlocked"))).toEqual(["not_unlocked", "reauthentication_required", "forbidden"]);
+    expect(API_ERROR_CODES.slice(API_ERROR_CODES.indexOf("not_unlocked"))).toEqual(["not_unlocked", "reauthentication_required", "forbidden", "payment_pending"]);
+    expect(ApiErrorSchema.safeParse({ code: "payment_pending", retryable: true }).success).toBe(true);
+    expect(ApiErrorSchema.safeParse({ code: "payment_pending" }).success).toBe(false);
+    expect(ApiErrorSchema.safeParse({ code: "payment_pending", retryable: false }).success).toBe(false);
     expect(API_ERROR_CODES.indexOf("already_unlocked")).toBe(2);
     expect(ApiErrorSchema.safeParse({ code: "not_unlocked", retryable: false }).success).toBe(true);
     expect(ApiErrorSchema.safeParse({ code: "not_unlocked", retryable: true }).success).toBe(false);
@@ -223,6 +227,13 @@ describe("Recherche d'un lieu à soi et demande d'ajout (décision 0147 § 3)", 
     for (const extra of [{ displayName: "Nom Google" }, { address: "Adresse" }, { query: "café" }, { placeId: PLACE }, { requestId: REQUETE }]) {
       expect(AddPlaceRequestSchema.safeParse({ ...demande, ...extra }).success, Object.keys(extra)[0]).toBe(false);
     }
+    // M8b (ticket 1111 ; spécification M8 § 6.4, critère M8b-2 ; décision 0160 § 2.6) : la marque « découvert » est calculée
+    // par le serveur ; ni la demande ni son application n'ont de champ pour elle.
+    for (const extra of [{ addedBy: "discovered" }, { addedBy: "person" }, { discovered: true }, { marqueAjout: "discovered" }]) {
+      expect(AddPlaceRequestSchema.safeParse({ ...demande, ...extra }).success, JSON.stringify(extra)).toBe(false);
+      expect(AddPlaceApplySchema.safeParse({ ...demande, requestId: REQUETE, ...extra }).success, JSON.stringify(extra)).toBe(false);
+    }
+    expect(AddPlaceApplySchema.safeParse({ ...demande, requestId: REQUETE }).success).toBe(true);
     expect(AddPlaceRequestSchema.safeParse({ ...demande, name: "<script>" }).success).toBe(false);
     expect(AddPlaceRequestSchema.safeParse({ ...demande, name: "" }).success).toBe(false);
     expect(AddPlaceRequestSchema.safeParse({ ...demande, kind: "event" }).success).toBe(false);

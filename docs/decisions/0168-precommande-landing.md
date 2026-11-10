@@ -31,7 +31,7 @@ Ces messages ne sont pas lisibles depuis le dépôt : un relecteur ne peut pas l
 
 ## Écarts à `docs/commercial/page-prevente.md`
 
-La page livrée s'écarte de la source sur les points suivants ; chacun est une proposition, à valider par le commercial et l'UX/UI, ou à revenir en arrière :
+La page livrée s'écarte de la source sur les points suivants ; chacun est une proposition, à valider par Samuel (Q357), ou à revenir en arrière :
 
 - **Section « destinations » ajoutée** (« Toute l'Europe, jour par jour », quatre exemples : Édimbourg, Lisbonne, Rome, Zakynthos). Ce sont des exemples illustratifs, pas des programmes disponibles ; le texte de la section le dit.
 - **« Des remplacements »** au lieu de « Jusqu'à [N] remplacements » : N n'est pas tranché (Q88).
@@ -46,7 +46,7 @@ La page livrée s'écarte de la source sur les points suivants ; chacun est une 
 
 ## Écarts au design system Ligne (écran non maquetté)
 
-**Dérogations proposées, en attente de Samuel (Q357).** Aucune n'est validée par l'UX/UI, qui ne déroge pas aux règles de Ligne : une dérogation revient à Samuel. `docs/design-system/README.md` interdit les capitales, l'italique et le mot isolé en couleur dans un titre (l. 39) et les ombres (l. 45). Le code ne se fusionne donc qu'éteint, comme le dit le statut. Origine : le refus par Samuel de la première forme (message du 2026-11-10 06:30 UTC ci-dessus), puis, sur les captures de la forme actuelle, son message du 2026-11-10 06:50 UTC dans le même fil : « C'est déjà beaucoup mieux ! » (non lisible depuis le dépôt).
+**Dérogations proposées, en attente de Samuel (Q357).** Aucune n'est validée par l'UX/UI, qui ne déroge pas aux règles de Ligne : une dérogation revient à Samuel. `docs/design-system/README.md` interdit les capitales, l'italique et le mot isolé en couleur dans un titre (l. 39) et les ombres (l. 45). Le code ne se fusionne donc qu'éteint, comme le dit le statut. Origine : le refus par Samuel de la première forme (message du 2026-11-10 06:30 UTC ci-dessus), puis, sur les captures de la forme actuelle, son message du 2026-11-10 06:50 UTC dans le même fil : « C'est déjà beaucoup mieux ! » (rapporté sans identifiant, non lisible depuis le dépôt).
 
 Outre la police Fraunces (point 6), cette seule page emploie :
 
@@ -59,7 +59,7 @@ Outre la police Fraunces (point 6), cette seule page emploie :
 - des opacités sur du texte secondaire en fond `ink` ;
 - des valeurs hors tokens (`clamp()` pour les titres, rayons du cadre du téléphone, flou des halos) ;
 - la section « prix » en forme de ticket (ombre, surtitre en majuscules) ;
-- sur les fonds `ink`, un contour de focus en `quai` au lieu de l'anneau `focus` (README l. 68) : `quai` #f6c744 sur `ink` #0e1b30 = 10,8:1, alors que le contour global `line` y est sous 3:1.
+- sur les fonds `ink`, un contour de focus en `quai` au lieu de l'anneau `focus` (README l. 68) : `quai` #f6c744 sur `ink` #0e1b30 = 10,8:1, alors que le contour global `line` y est à 2,75:1, sous 3:1.
 
 Le fil « Retirer le look IA du design » reprend ensuite cette page (décision 0170) et peut retirer tout ou partie de ces écarts.
 

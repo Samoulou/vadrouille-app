@@ -132,8 +132,9 @@ describe("génération: barrière, préversion et déclaration du dépôt (B9-TL
 });
 
 describe("génération: plafonds posés et non nuls (B9-PO-10)", () => {
-  it("absents (production), ou nuls : la barrière reste simulée", async () => {
-    expect(PLAFONDS_USAGE).toBeNull();
+  // Attente modifiée par la décision 0169 § 3 (M1h) : `PLAFONDS_USAGE` est posé et non nul.
+  it("absents, ou nuls : la barrière reste simulée ; les plafonds réels de 0169 sont posés et non nuls", async () => {
+    expect(plafondsDeGenerationPoses(PLAFONDS_USAGE)).toBe(true);
     expect(plafondsDeGenerationPoses(null)).toBe(false);
     expect(plafondsDeGenerationPoses(PLAFONDS_USAGE_TEST)).toBe(true);
     const apercu = PLAFONDS_USAGE_TEST.generations.apercu;
@@ -154,17 +155,23 @@ describe("génération: la variante réelle n'est jamais choisie sans la répons
   const reelle = { VERCEL_ENV: "preview", VERCEL_GIT_COMMIT_REF: "claude/x", GENERATION_APPELS_REELS: "1" };
   const ouverte = { env: reelle, branche: "claude/x", cookieValide: async () => true };
 
-  it("les trois garde-fous de configuration sont fermés aujourd'hui", () => {
-    expect(BRANCHE_APPELS_REELS).toBeNull();
-    expect(ECRITURE_PROGRAMMES_REELS_AUTORISEE).toBe(false);
+  // Attente modifiée par la décision 0169 § 2 et § 4 (M1h) : la branche est `mvp-essai` et l'écriture de programmes réels
+  // est autorisée ; l'écriture des positions au cache reste fermée (Q438, purge des coordonnées non activée).
+  it("garde-fous de configuration (0169) : branche mvp-essai, programmes réels autorisés, positions toujours fermées", () => {
+    expect(BRANCHE_APPELS_REELS).toBe("mvp-essai");
+    expect(ECRITURE_PROGRAMMES_REELS_AUTORISEE).toBe(true);
     expect(ECRITURE_POSITIONS_AUTORISEE).toBe(false);
   });
 
-  it("barrière ouverte mais question 9 sans réponse : composition simulée ; sinon réelle ; jamais en production", async () => {
-    const sans = resoudre({ plafonds: PLAFONDS_USAGE_TEST, barriere: ouverte });
+  // Attente modifiée par la décision 0169 § 4 (M1h) : l'écriture de programmes réels est autorisée par défaut ; le
+  // garde-fou reste éprouvé en le refermant (`programmesReelsAutorises: false`).
+  it("barrière ouverte mais écriture de programmes réels refermée : composition simulée ; sinon réelle ; jamais en production", async () => {
+    const sans = resoudre({ plafonds: PLAFONDS_USAGE_TEST, barriere: ouverte, programmesReelsAutorises: false });
     expect((await sans.composer(await sans.barriere())).variante).toBe("simulee");
     const avec = resoudre({ plafonds: PLAFONDS_USAGE_TEST, barriere: ouverte, programmesReelsAutorises: true });
     expect((await avec.composer(await avec.barriere())).variante).toBe("reelle");
+    const parDefaut = resoudre({ plafonds: PLAFONDS_USAGE_TEST, barriere: ouverte });
+    expect((await parDefaut.composer(await parDefaut.barriere())).variante).toBe("reelle");
     const production = resoudre({ plafonds: PLAFONDS_USAGE_TEST, barriere: { env: {} } });
     expect(await production.barriere()).toBe("production");
     await expect(production.composer("production")).rejects.toBeInstanceOf(ArretEtape);

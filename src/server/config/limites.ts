@@ -90,11 +90,21 @@ export const RATE_LIMITS: RateLimitConfig = {
     { kind: "ip", windowSeconds: 3600, threshold: 20 },
     { kind: "trip", windowSeconds: 86_400, threshold: 6 },
   ],
+  // M8a (ticket 1062 ; décision 0160 § 2.3, S3, **proposition à confirmer par la Sécurité**) : avis rapide de l'écran 16
+  // (`rateStop`), 120 gestes par heure et par adresse IP, effacement compris. Vérifié après le contrôle du voyage, de la
+  // personne propriétaire, du déblocage et de l'accès `open`, avant le contrôle de l'étape et toute écriture ; `api`
+  // seulement (sur `mock`, les avis vivent dans la mémoire de l'onglet).
+  avis: [{ kind: "ip", windowSeconds: 3600, threshold: 120 }],
   // M9a (ticket 1097 ; spécification M9 § 5 point 7, S7 à confirmer par la Sécurité) : « Exporter mes données », 5 par heure
   // et par personne (proposition). Espèce `user` : identifiant de la personne de la session, sans dépendre de l'en-tête
   // d'adresse. Vérifié après la session, le rôle, l'organisation personnelle et la connexion récente (refus gratuits), avant
   // toute lecture de l'export ; `api` seulement (limiteur en base).
   export: [{ kind: "user", windowSeconds: 3600, threshold: 5 }],
+  // M9b (ticket 1106 ; spécification M9 § 5 point 7, S7 à confirmer par la Sécurité) : « Supprimer mon compte », 5 par
+  // heure et par personne (proposition). Espèce `user`, comme l'export. Vérifié après la session, le rôle, l'organisation
+  // personnelle et la connexion récente (refus gratuits), avant toute suppression. La reprise par `verifyCode`
+  // (`src/server/auth/reprise.ts`) ne passe pas par cette règle : elle n'est jamais refusée par elle.
+  suppression: [{ kind: "user", windowSeconds: 3600, threshold: 5 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

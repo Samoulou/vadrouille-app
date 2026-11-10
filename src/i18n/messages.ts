@@ -25,4 +25,5 @@ export { default as revision } from "./fr/revision.json";
 export { default as partage } from "./fr/partage.json";
 export { default as prototype } from "./fr/prototype.json";
 export { default as prevente } from "./fr/prevente.json";
+export { default as apres } from "./fr/apres.json";
 export { default as compte } from "./fr/compte.json";

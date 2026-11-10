@@ -2,14 +2,16 @@
 
 import { createContext, useContext, useMemo, useRef, type ReactNode } from "react";
 
-import type { PaymentMethod } from "@/contracts/values";
+import type { PaymentMethod, StopRating } from "@/contracts/values";
 
 import {
   EMPTY_SESSION,
   lastTabOf,
   recordCheckout,
   recordLastTab,
+  recordReview,
   reportCheckout,
+  reviewsOf,
   type LastTab,
   type ReportKind,
   type StartedCheckout,
@@ -82,6 +84,9 @@ export interface TabMemory {
   recordLastTab(tripId: string, tab: LastTab): void;
   /** Dernier onglet consulté du voyage, ou `undefined`. */
   lastTab(tripId: string): LastTab | undefined;
+  /** Avis de l'écran 16 sur `mock` (M8a) : lus et écrits dans la mémoire de l'onglet seulement. */
+  reviews(tripId: string): ReadonlyMap<string, StopRating>;
+  recordReview(tripId: string, stopId: string, rating: StopRating | null): void;
 }
 
 /**
@@ -99,6 +104,12 @@ export function useOptionalTripSession(): TabMemory | null {
             },
             lastTab(tripId) {
               return lastTabOf(provided.get(), tripId);
+            },
+            reviews(tripId) {
+              return reviewsOf(provided.get(), tripId);
+            },
+            recordReview(tripId, stopId, rating) {
+              provided.set(recordReview(provided.get(), tripId, stopId, rating));
             },
           }
         : null,

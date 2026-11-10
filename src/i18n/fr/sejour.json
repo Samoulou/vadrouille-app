@@ -78,7 +78,8 @@
     "dejaReserve": "Déjà réservé : cette étape ne bouge pas.",
     "verrouConflit": "Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.",
     "absente": "Cette étape n'est plus dans ce jour.",
-    "ajouteParToi": "Ajouté par toi."
+    "ajouteParToi": "Ajouté par toi.",
+    "decouvertSurPlace": "Découvert sur place."
   },
   "signaler": {
     "titre": "Signaler une erreur",
