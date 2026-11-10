@@ -1,8 +1,8 @@
 # 0168 — Précommande : la page d'accueil devient la page de prévente
 
-Statut : **décidée par le CEO, par délégation de Samuel ; activation en production sous conditions** (section « Conditions d'activation »). Samuel peut la remettre en cause à tout moment.
+Statut : **proposition du CEO, non tranchée, en attente de Samuel (Q357)**. Le code qu'elle décrit est livré éteint et peut être fusionné ; l'activation en production reste sous conditions (section « Conditions d'activation »).
 
-Date : 2026-11-09, amendée le 2026-11-10 après la revue de la PR #1102 · Rédacteur : CEO · Répond à Q357 (encaissement, conditions, prix) pour ce qui suit.
+Date : 2026-11-09, amendée le 2026-11-10 après les revues de la PR #1102 (heads `280c548` et `ef5d033`) · Rédacteur : CEO · Répond **en partie** à Q357 (encaissement, conditions), qui reste ouverte. La date d'ouverture (1er février 2027) et les règles de remboursement (point 4) sont **provisoires** jusqu'à la réponse de Samuel.
 
 ## Source de la délégation
 
@@ -13,7 +13,7 @@ Date : 2026-11-09, amendée le 2026-11-10 après la revue de la PR #1102 · Réd
 - 2026-11-09 22:25:51 UTC (`cmsg_0174CRqum9q8GNfZHmNHcYvRNbABPGcC7t3q8CY2qihEMn`) : « Rien ne demande mes mains du peux tout faire toi même ».
 - 2026-11-10 06:30 UTC, même fil : « la landing est pas ouf [...] C'est des font standard sur un fond blanc avec des bouton bleu, on faisait ça en 2001 » (origine de la refonte visuelle, point 6).
 
-Ces messages ne sont pas lisibles depuis le dépôt : un relecteur ne peut pas les vérifier. Pour cette raison, la décision ne vaut que pour le code livré **éteint** ; rien n'est activé en production sans les conditions ci-dessous, et le CEO reporte la décision dans `QUESTIONS.md` (Q357) par la PR « chore: status », où Samuel peut la confirmer ou la refuser. Le prix (29 CHF) n'est pas décidé ici : c'est celui de `OFFER_CONFIG`, déjà fixé (Q2, 0020 § 4).
+Ces messages ne sont pas lisibles depuis le dépôt : un relecteur ne peut pas les vérifier. Pour cette raison, le texte reste une proposition et ne vaut que pour le code livré **éteint** ; rien n'est activé en production sans les conditions ci-dessous, et le CEO reporte la décision dans `QUESTIONS.md` (Q357) par la PR « chore: status », où Samuel peut la confirmer ou la refuser. Le prix (29 CHF) n'est pas décidé ici : c'est celui de `OFFER_CONFIG`, déjà fixé (Q2, 0020 § 4).
 
 ## Décision
 
@@ -29,11 +29,28 @@ Ces messages ne sont pas lisibles depuis le dépôt : un relecteur ne peut pas l
 9. **Remise de l'accès.** À l'ouverture, le CEO écrit aux acheteurs à l'adresse du reçu Stripe, avec la marche à suivre ; la page ne le promet pas tant que l'envoi n'est pas outillé. Tâche à ouvrir avant le 1er février 2027.
 10. **En-têtes et mesure.** `/precommande/*` : `Cache-Control: private, no-store`, `Referrer-Policy: strict-origin`, `X-Robots-Tag: noindex, nofollow`. Aucun événement de mesure dans cette PR : le compteur de visites et l'exclusion de `?src=interne` (`docs/commercial/suivi.md`) viennent avec la tâche « questionnaire et compteur ». D'ici là, `src=interne` part en `client_reference_id=src-interne` et s'exclut à la lecture dans Stripe.
 
+## Écarts à `docs/commercial/page-prevente.md`
+
+La page livrée s'écarte de la source sur les points suivants ; chacun est une proposition, à valider par le commercial et l'UX/UI, ou à revenir en arrière :
+
+- **Section « destinations » ajoutée** (« Toute l'Europe, jour par jour », quatre exemples : Édimbourg, Lisbonne, Rome, Zakynthos). Ce sont des exemples illustratifs, pas des programmes disponibles ; le texte de la section le dit.
+- **« Des remplacements »** au lieu de « Jusqu'à [N] remplacements » : N n'est pas tranché (Q88).
+- **Sections ajoutées** : bandeau d'ouverture, trois atouts sous le bouton, cadre de téléphone avec une journée d'exemple (étiquetée « Exemple de journée, pour illustrer »), « Trois gestes, un programme ».
+- **Sections omises** : § 2 « Un programme pensé pour être suivi » ; question « Que devient ce que je saisis ? » (elle attend le texte sur les données, condition d'activation) ; boutons « Payer avec TWINT » et « Payer par carte » (le choix se fait sur la page hébergée de Stripe) ; lien « À réserver ».
+- **Titre principal scindé** en deux lignes (« Ton voyage, » puis « de l'hôtel à la soirée. ») ; réponses des questions fréquentes raccourcies.
+- **Titre final** : « Ton printemps se prépare dès le 1er février » au lieu de « dès janvier », pour ne pas contredire la date d'ouverture.
+- **Badge du téléphone** : « Objectif : aucun trou dans ta journée », formulé en objectif tant que G0 n'est pas passé.
+- **Section « Démonstration »** gardée en fin de page, sur données simulées, avec sa mention.
+
+## Écarts au design system Ligne (écran non maquetté)
+
+Outre la police Fraunces (point 6), cette seule page emploie : un mot d'accent en italique et en couleur `quai` dans le titre principal ; des surtitres en majuscules ; des ombres portées (cadre du téléphone, badge, plaques, ticket de prix) ; `line` et `quai` comme décor (halos, filet des étapes, badge) et non comme seule couleur d'action ; quatre plaques de destination inclinées sur un même écran ; des opacités sur du texte secondaire en fond `ink` ; des valeurs hors tokens (`clamp()` pour les titres, rayons du cadre du téléphone, flou des halos). Sur les fonds `ink`, le contour de focus est en `quai` (le contour global `line` y est sous 3:1). Validés par l'UX/UI à la revue du head `ef5d033` comme décision d'écran non maquetté, à condition d'être écrits ici. Le fil « Retirer le look IA du design » reprend ensuite cette page (décision 0170).
+
 ## Conditions d'activation (`PREVENTE=1` en production)
 
 Aucune n'est remplie par cette PR. Toutes sont requises avant de poser la variable :
 
 - **Mentions du vendeur** sur la page (nom, adresse de contact), conditions de vente et information sur les données : textes à écrire, nom et adresse à fournir par Samuel.
-- **Lien de paiement Stripe** (29 CHF, TWINT et carte, adresse de retour `/precommande/merci`), créé dans le compte de Samuel.
+- **Lien de paiement Stripe** (29 CHF, TWINT et carte, adresse de retour `/precommande/merci`), créé dans le compte de Samuel, **avec les reçus par e-mail activés et une adresse de contact du vendeur sur le reçu** : la page « Merci » et les questions fréquentes y renvoient. Le lien n'est contrôlé que sur son hôte et un chemin non vide : tout compte Stripe passerait, la variable est posée par Samuel ou le CEO seulement.
 - **Offre Vercel** : l'offre gratuite interdit l'usage commercial (0163) ; offre payante avant le premier paiement réel, avec l'accord explicite de Samuel pour la dépense.
 - Questionnaire en ligne et compteur de visites (seuils de 0044) : demandent une base en production ; ils ne bloquent pas l'activation mais les seuils ne se lisent pas sans eux.

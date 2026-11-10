@@ -1,6 +1,6 @@
 {
   "ouverture": "1er février 2027",
-  "bandeau": "Précommande ouverte · printemps 2027",
+  "bandeau": "Précommande · ouverture le 1er février 2027",
   "titre": {
     "avant": "Ton voyage,",
     "accent": "de l'hôtel à la soirée."
@@ -51,7 +51,7 @@
       "ou": "Destination",
       "duree": "Durée"
     },
-    "legende": "Quelques exemples de voyages"
+    "legende": "Quelques exemples de voyages, pour illustrer : ce ne sont pas des programmes déjà prêts."
   },
   "etapes": {
     "titre": "Trois gestes, un programme",
@@ -155,13 +155,13 @@
     ]
   },
   "final": {
-    "titre": "Ton printemps se prépare dès janvier",
-    "texte": "Pâques, l'Ascension, la Pentecôte : les voyages de printemps se préparent de janvier à mars. Précommande dès aujourd'hui, prépare ton voyage dès l'ouverture."
+    "titre": "Ton printemps se prépare dès le 1er février",
+    "texte": "Pâques, l'Ascension, la Pentecôte : précommande aujourd'hui, prépare ton voyage dès l'ouverture, le 1er février 2027."
   },
   "bientot": {
     "titreDocument": "Précommande · {produit}",
     "titre": "La précommande ouvre très bientôt",
-    "texte": "Le paiement n'est pas encore ouvert. Reviens dans quelques jours.",
+    "texte": "Le paiement n'est pas encore ouvert. Reviens bientôt.",
     "retour": "Revenir à l'accueil"
   },
   "merci": {

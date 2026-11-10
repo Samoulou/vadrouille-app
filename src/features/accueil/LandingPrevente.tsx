@@ -44,6 +44,9 @@ const VOIE =
 const SUR_LE_RAIL =
   "absolute top-[0.5em] -left-[1.375rem] -translate-x-1/2 -translate-y-1/2 lg:-left-[2.875rem]";
 
+/** Sur fond `ink`, l'anneau de focus `line` ne se lit pas : il passe en `quai` (revue de la PR 1102). */
+const FOCUS_SUR_INK = "focus-visible:outline-quai";
+
 export interface LandingPreventeProps {
   /** Adresse du bouton « Précommander » (`/precommande`, avec la provenance). */
   href: string;
@@ -71,7 +74,7 @@ function Precommander({
     <a
       href={href}
       className={cn(
-        "inline-flex min-h-14 items-center justify-center rounded-control bg-quai px-7 text-arret font-extrabold whitespace-nowrap text-ink",
+        "inline-flex min-h-14 items-center justify-center rounded-control bg-quai px-6 py-2 text-center text-arret font-extrabold text-ink sm:px-8",
         className,
       )}
     >
@@ -211,11 +214,18 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
                   {format(t.sousTitre, { produit })}
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Precommander href={href} prix={prix} />
+                  <Precommander
+                    href={href}
+                    prix={prix}
+                    className={FOCUS_SUR_INK}
+                  />
                   {demo ? (
                     <a
                       href="#demonstration"
-                      className="inline-flex min-h-14 items-center justify-center rounded-control border-(length:--ligne-trait-controle) border-on-line px-7 text-arret font-bold"
+                      className={cn(
+                        "inline-flex min-h-14 items-center justify-center rounded-control border-(length:--ligne-trait-controle) border-on-line px-6 py-2 text-center text-arret font-bold sm:px-8",
+                        FOCUS_SUR_INK,
+                      )}
                     >
                       {t.demo}
                     </a>
@@ -479,7 +489,7 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
               {t.final.titre}
             </h2>
             <p className="max-w-2xl text-arret font-normal">{t.final.texte}</p>
-            <Precommander href={href} prix={prix} />
+            <Precommander href={href} prix={prix} className={FOCUS_SUR_INK} />
           </div>
         </div>
       </section>
