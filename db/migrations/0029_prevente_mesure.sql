@@ -17,6 +17,8 @@
 -- Plan :
 --   1. tables `prevente_visites` (un nombre par jour et par provenance), `prevente_reponses_jour` (compteur du jour,
 --      pour le seul plafond) et `prevente_reponses` (une ligne par réponse, codes des listes fermées, `CHECK`) ;
+--      `destination` : 1 à 80 caractères, pas seulement des espaces, aucun caractère de contrôle (C0, DEL, C1), de
+--      sens d'écriture, de largeur nulle ni séparateur de ligne (lecture en console par Samuel, § 5 point 5) ;
 --      `interne` est hors de la liste des provenances, donc refusé par les deux tables ;
 --   2. RLS activée et forcée sur les trois ; politiques pour les deux seuls rôles propriétaires de fonctions :
 --      `vadrouille_fn_prevente` (écriture) et `vadrouille_fn_prevente_releve` (lecture) ;
@@ -34,8 +36,8 @@
 --      `prevente_releve_destinations()` (deux nombres ; aucun texte de `destination` n'est rendu).
 --
 -- Prérequis : les rôles `vadrouille_fn_prevente`, `vadrouille_fn_prevente_releve` (sans connexion, ADMIN seule à
--- `vadrouille_migrator`) et `vadrouille_prevente_releve` (connexion du relevé, deux connexions au plus, aucune
--- appartenance) sont créés par `db/bootstrap/roles.sql`, rejoué par un propriétaire avant cette migration ; aucune
+-- `vadrouille_migrator`) et `vadrouille_prevente_releve` (rôle du relevé, sans connexion ni appartenance tant que le
+-- workflow de C2e n'existe pas) sont créés par `db/bootstrap/roles.sql`, rejoué par un propriétaire avant cette migration ; aucune
 -- migration ne crée de rôle. Sans eux, cette migration échoue (`42704`) et rien n'est appliqué.
 SET LOCAL ROLE vadrouille_owner;
 --> statement-breakpoint
@@ -53,7 +55,7 @@ CREATE TABLE "prevente_reponses" (
 	"decouverte" text,
 	CONSTRAINT "prevente_reponses_src_check" CHECK ("prevente_reponses"."src" IN ('proches', 'forum', 'groupe', 'reddit', 'instagram', 'instagram-pub', 'createur', 'direct', 'autre')),
 	CONSTRAINT "prevente_reponses_parcours_check" CHECK ("prevente_reponses"."parcours" IN ('precommande', 'visite')),
-	CONSTRAINT "prevente_reponses_destination_check" CHECK ("prevente_reponses"."destination" IS NULL OR (char_length("prevente_reponses"."destination") BETWEEN 1 AND 80 AND btrim("prevente_reponses"."destination") <> '' AND "prevente_reponses"."destination" !~ '[\x01-\x1F\x7F]')),
+	CONSTRAINT "prevente_reponses_destination_check" CHECK ("prevente_reponses"."destination" IS NULL OR (char_length("prevente_reponses"."destination") BETWEEN 1 AND 80 AND btrim("prevente_reponses"."destination") <> '' AND "prevente_reponses"."destination" !~ '[\x01-\x1F\x7F\u0080-\u009F\u200B-\u200F\u2028-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]')),
 	CONSTRAINT "prevente_reponses_periode_check" CHECK ("prevente_reponses"."periode" IS NULL OR "prevente_reponses"."periode" IN ('paques', 'ascension', 'pentecote', 'printemps', 'plus-tard', 'sans-date')),
 	CONSTRAINT "prevente_reponses_preparation_check" CHECK ("prevente_reponses"."preparation" <@ ARRAY['guides-blogs', 'avis-cartes', 'assistant', 'application', 'agence', 'presque-rien', 'autre']::text[]),
 	CONSTRAINT "prevente_reponses_motifs_check" CHECK (("prevente_reponses"."parcours" = 'precommande' AND "prevente_reponses"."motifs" <@ ARRAY['adresses-sourcees', 'evenements', 'remplacer', 'prix', 'gain-de-temps', 'demonstration', 'autre']::text[]) OR ("prevente_reponses"."parcours" = 'visite' AND "prevente_reponses"."motifs" <@ ARRAY['prix', 'pas-de-voyage', 'attendre', 'assistant-gratuit', 'fiabilite', 'destination', 'autre']::text[])),
@@ -299,7 +301,7 @@ AS $$
      ) AS d)::bigint;
 $$;
 --> statement-breakpoint
--- Droits d'exécution : le rôle de connexion du relevé seul, PUBLIC exclu ; vadrouille_app ne lit aucun agrégat.
+-- Droits d'exécution : le rôle du relevé seul, PUBLIC exclu ; vadrouille_app ne lit aucun agrégat.
 REVOKE ALL ON FUNCTION public.prevente_releve_visites() FROM PUBLIC;
 --> statement-breakpoint
 REVOKE ALL ON FUNCTION public.prevente_releve_reponses() FROM PUBLIC;

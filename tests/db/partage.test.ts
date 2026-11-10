@@ -305,9 +305,9 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
     const { rows } = await app.query(
       `SELECT CASE WHEN schemaname = 'public' THEN '' ELSE schemaname || '.' END || tablename || ':' || array_to_string(roles::text[], ',') AS policy
        FROM pg_catalog.pg_policies
-       WHERE qual = 'true' OR with_check = 'true' ORDER BY 1`,
+       WHERE qual = 'true' OR with_check = 'true'`,
     );
-    // Tri des deux côtés par le même ordre (celui de JavaScript) : l'ordre de la base dépend de sa collation.
+    // Tri des deux côtés par le même ordre (celui de JavaScript) : l'ordre de la base dépendrait de sa collation.
     expect(rows.map((r) => r.policy as string).sort()).toEqual(
       [
         "accounts:vadrouille_auth",

@@ -5168,7 +5168,7 @@
         },
         "prevente_reponses_destination_check": {
           "name": "prevente_reponses_destination_check",
-          "value": "\"prevente_reponses\".\"destination\" IS NULL OR (char_length(\"prevente_reponses\".\"destination\") BETWEEN 1 AND 80 AND btrim(\"prevente_reponses\".\"destination\") <> '' AND \"prevente_reponses\".\"destination\" !~ '[\\x01-\\x1F\\x7F]')"
+          "value": "\"prevente_reponses\".\"destination\" IS NULL OR (char_length(\"prevente_reponses\".\"destination\") BETWEEN 1 AND 80 AND btrim(\"prevente_reponses\".\"destination\") <> '' AND \"prevente_reponses\".\"destination\" !~ '[\\x01-\\x1F\\x7F\\u0080-\\u009F\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF]')"
         },
         "prevente_reponses_periode_check": {
           "name": "prevente_reponses_periode_check",

@@ -11,7 +11,7 @@ Aucun mot de passe ni chaîne de connexion n'apparaît dans ce dépôt, dans une
 
 | Chemin | Rôle |
 | --- | --- |
-| `db/bootstrap/roles.sql` | Amorçage idempotent des 23 rôles des décisions 0007, 0046 et 0060 (§ 3.2 : `vadrouille_coords_purge`), de B7c (`vadrouille_fn_usage`, migration `0010_usage_forfait`), de B3d (`vadrouille_mail_counter`, décision 0138 § 11, migration `0020_plafond_emails`) de M1f-D (`vadrouille_autocomplete_counter`, migration `0021_compteurs_autocompletion`) et de C2a (`vadrouille_fn_prevente`, `vadrouille_fn_prevente_releve`, `vadrouille_prevente_releve`, migration `0029_prevente_mesure`, section 5), une fois par base, avant les migrations. Aucun mot de passe. |
+| `db/bootstrap/roles.sql` | Amorçage idempotent des 23 rôles des décisions 0007, 0046 et 0060 (§ 3.2 : `vadrouille_coords_purge`), de B7c (`vadrouille_fn_usage`, migration `0010_usage_forfait`), de B3d (`vadrouille_mail_counter`, décision 0138 § 11, migration `0020_plafond_emails`), de M1f-D (`vadrouille_autocomplete_counter`, migration `0021_compteurs_autocompletion`) et de C2a (`vadrouille_fn_prevente`, `vadrouille_fn_prevente_releve`, `vadrouille_prevente_releve`, migration `0029_prevente_mesure`, section 5), une fois par base, avant les migrations. Aucun mot de passe. |
 | `db/maintenance/coords-purge-repli.sql` | Repli manuel de la purge du MVP (0060 § 3.5), exécuté par Samuel seul dans la console Neon quand `coords-purge.yml` ne peut pas réussir ; jamais par le studio (section 4). |
 | `db/schema/` | Schéma Drizzle (`auth.ts` : utilisateurs, organisations, appartenances, limiteur d'actions ; `business.ts` : tables métier ; `prevente.ts` : mesure de la prévente, hors organisation, section 5). |
 | `db/jsonb-keys.ts` | Listes de clés des colonnes JSONB, partagées par le schéma (contraintes `CHECK`) et les tests. |
@@ -200,8 +200,8 @@ Console Neon, projet de staging, branche principale, **SQL Editor**, base de l'a
 `db/bootstrap/roles.sql` et l'exécuter. Il peut être rejoué sans effet.
 
 Contrôle (23 lignes ; `super` et `bypassrls` à `false` partout ; `login` à `true` seulement pour
-`vadrouille_migrator`, `vadrouille_app`, `vadrouille_auth`, `vadrouille_prototype`, `vadrouille_prototype_purge`,
-`vadrouille_coords_purge` et `vadrouille_prevente_releve`) :
+`vadrouille_migrator`, `vadrouille_app`, `vadrouille_auth`, `vadrouille_prototype`, `vadrouille_prototype_purge` et
+`vadrouille_coords_purge`) :
 
 ```sql
 SELECT rolname, rolsuper AS super, rolbypassrls AS bypassrls, rolcanlogin AS login
@@ -374,9 +374,13 @@ Fonctions, toutes `SECURITY DEFINER`, `search_path` figé, `PUBLIC` exclu :
   bornes : `22023`) ; un appelant ne peut que l'abaisser (tests). Au plafond, la fonction n'incrémente ni n'insère rien
   et rend `plafond_atteint`. L'application ne compte jamais elle-même les réponses du jour.
 - **Refus** : une valeur hors liste, `interne`, une `destination` vide, faite d'espaces, de plus de 80 caractères ou
-  portant un caractère de contrôle (U+0001 à U+001F, U+007F), des motifs de l'autre parcours ou une réponse entièrement
+  portant un caractère de contrôle (U+0001 à U+001F, U+007F, U+0080 à U+009F), de sens d'écriture ou de largeur nulle
+  (U+200B à U+200F, U+202A à U+202E, U+2060 à U+2064, U+2066 à U+2069, U+FEFF) ou un séparateur de ligne (U+2028,
+  U+2029), des motifs de l'autre parcours ou une réponse entièrement
   vide font échouer l'appel (`23514`, nom de la contrainte dans l'erreur ; `23502` pour une provenance ou un parcours
-  absents), sans rien écrire ni consommer le plafond. L'erreur ne cite jamais la ligne refusée. La validation par le
+  absents), sans rien écrire ni consommer le plafond. L'erreur ne cite jamais la ligne refusée ni la valeur reçue
+  (test) ; par prudence, ne jamais journaliser le message ni le détail d'une erreur de ces deux fonctions, le code et le
+  nom de la contrainte suffisent. La validation par le
   schéma strict de `src/contracts` reste le premier verrou : ces refus ne doivent pas se produire en fonctionnement
   normal.
 - **Listes de codes** (`preparation`, `motifs`) : une liste absente vaut une liste vide ; les doublons sont retirés
@@ -386,10 +390,13 @@ Fonctions, toutes `SECURITY DEFINER`, `search_path` figé, `PUBLIC` exclu :
 
 Relevé : les fonctions de relevé ne rendent que des `bigint`, des `date` et des valeurs du domaine
 `public.prevente_code` (les codes des listes fermées et les rubriques ci-dessus) ; aucune ne rend `destination`, `id`
-ni le jour d'une réponse, et `vadrouille_prevente_releve` n'a aucun droit sur une table. Ce rôle de connexion (deux
-connexions au plus, aucune appartenance) n'a **aucun mot de passe** tant que le workflow du relevé n'existe pas : son
-mot de passe, l'environnement GitHub et les secrets viennent avec la tâche C2e et sont posés par Samuel (spécification
-§ 5 et « Questions ouvertes », 2). La lecture des destinations pour D3 (requête de `db/maintenance/`, exécutée par
+ni le jour d'une réponse, et `vadrouille_prevente_releve` n'a aucun droit sur une table. Ce rôle est créé **sans
+connexion** (`NOLOGIN`) et sans appartenance : personne ne peut le prendre tant que le workflow du relevé n'existe pas.
+**À faire par C2e** : le passer en rôle de connexion dans `db/bootstrap/roles.sql` (attribut, limite de deux
+connexions, `CONNECT` sur la base) ; l'amorçage refusant de changer l'attribut d'un rôle existant, une base où il a
+déjà été joué demande un `ALTER ROLE vadrouille_prevente_releve LOGIN CONNECTION LIMIT 2` par un propriétaire avant le
+rejeu. Son mot de passe, l'environnement GitHub et les secrets sont posés par Samuel (spécification § 5 et « Questions
+ouvertes », 2). La lecture des destinations pour D3 (requête de `db/maintenance/`, exécutée par
 Samuel) vient aussi avec C2e.
 
 Application à une base réelle : comme toute migration, par `db-migrate.yml` après l'ajout de la ligne

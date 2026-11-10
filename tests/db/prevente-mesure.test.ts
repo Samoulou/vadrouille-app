@@ -21,9 +21,8 @@ import { creerBase, supprimerBases } from "./workflows-harnais";
  * Mesure de la prévente dans la base (spécification `specs/C2-prevente-mesure.md`, § 4 et § 5 ; tâche C2a, ticket 1117 ;
  * migration `0029_prevente_mesure`). Critères B1 à B7.
  *
- * Chaque rôle est éprouvé sous sa propre identité : `vadrouille_app` par sa connexion ; le rôle de connexion du relevé,
- * qui n'a pas encore de mot de passe ni de variable (workflow de C2e), par une connexion du rôle de test passée sous
- * son identité (`SET SESSION AUTHORIZATION vadrouille_prevente_releve` : `session_user` et `current_user` deviennent ce
+ * Chaque rôle est éprouvé sous sa propre identité : `vadrouille_app` par sa connexion ; le rôle du relevé, créé sans
+ * connexion tant que le workflow de C2e n'existe pas, par une connexion du rôle de test passée sous son identité (`SET SESSION AUTHORIZATION vadrouille_prevente_releve` : `session_user` et `current_user` deviennent ce
  * rôle, sans superutilisateur). Le rôle de test (`admin`, superutilisateur du conteneur, hors de l'application) ne sert
  * qu'à lire et vider les trois tables, à reculer le jour par SQL (jamais par l'horloge du processus), à poser un jeu
  * connu et à prouver un refus de contrainte.
@@ -167,7 +166,11 @@ describe("prévente: compter une visite (B2, B3)", () => {
   });
 
   it.each(["interne", "inconnu-123", "FORUM", "", " forum"])("B3 : la provenance « %s » est refusée par la base (23514), rien n'est écrit", async (src) => {
-    expect(await erreur(app, COMPTER, [src])).toMatchObject({ code: "23514", constraint: "prevente_visites_src_check" });
+    const refus = await erreur(app, COMPTER, [src]);
+    expect(refus).toMatchObject({ code: "23514", constraint: "prevente_visites_src_check" });
+    // L'erreur ne cite ni la ligne refusée ni la valeur reçue (RLS activée : PostgreSQL retient le détail).
+    expect(refus?.detail).toBeUndefined();
+    expect(refus?.message).toBe('new row for relation "prevente_visites" violates check constraint "prevente_visites_src_check"');
     expect(await compte("prevente_visites")).toBe(0);
   });
 
@@ -261,6 +264,15 @@ describe("prévente: enregistrer une réponse (B3)", () => {
     ["destination faite d'espaces", { destination: "   " }, "prevente_reponses_destination_check"],
     ["destination avec un saut de ligne", { destination: "Lisbonne\n::warning::x" }, "prevente_reponses_destination_check"],
     ["destination avec une tabulation", { destination: "Lis\tbonne" }, "prevente_reponses_destination_check"],
+    ["destination avec DEL (U+007F)", { destination: "Lis\u007Fbonne" }, "prevente_reponses_destination_check"],
+    ["destination avec un contrôle C1 (U+0085)", { destination: "Lis\u0085bonne" }, "prevente_reponses_destination_check"],
+    ["destination avec un contrôle C1 (U+009B)", { destination: "Lis\u009Bbonne" }, "prevente_reponses_destination_check"],
+    ["destination avec une inversion du sens d'écriture (U+202E)", { destination: "Lis\u202Ebonne" }, "prevente_reponses_destination_check"],
+    ["destination avec un isolat de sens d'écriture (U+2066)", { destination: "\u2066Lisbonne" }, "prevente_reponses_destination_check"],
+    ["destination avec une espace de largeur nulle (U+200B)", { destination: "Lis\u200Bbonne" }, "prevente_reponses_destination_check"],
+    ["destination avec un liant de largeur nulle (U+200D)", { destination: "Lis\u200Dbonne" }, "prevente_reponses_destination_check"],
+    ["destination avec un séparateur de ligne (U+2028)", { destination: "Lis\u2028bonne" }, "prevente_reponses_destination_check"],
+    ["destination avec une marque d'ordre des octets (U+FEFF)", { destination: "\uFEFFLisbonne" }, "prevente_reponses_destination_check"],
     ["réponse entièrement vide", {}, "prevente_reponses_non_vide_check"],
     ["réponse vide aux listes vides", { preparation: [], motifs: [] }, "prevente_reponses_non_vide_check"],
   ];
@@ -280,8 +292,11 @@ describe("prévente: enregistrer une réponse (B3)", () => {
     expect(await compte("prevente_reponses_jour")).toBe(0);
   });
 
-  it("une destination de 80 caractères est admise ; un refus ne cite jamais le texte saisi", async () => {
+  it("une destination de 80 caractères est admise, comme les lettres accentuées, l'espace insécable, l'apostrophe et les écritures non latines ; un refus ne cite jamais le texte saisi", async () => {
     expect(await enregistrer(app, { destination: "é".repeat(80) })).toBe("admise");
+    for (const destination of ["São Tomé", "L\u2019Île\u00A0d\u2019Yeu", "Zürich – Genève", "東京", "Αθήνα", "القاهرة", "Saint-Jean-de-Luz (64)"]) {
+      expect(await enregistrer(app, { destination }), destination).toBe("admise");
+    }
     const texte = "Texte-saisi-a-ne-jamais-citer";
     const refus = await erreur(app, ENREGISTRER, parametres({ src: "interne", destination: texte }));
     expect(refus?.code).toBe("23514");
@@ -431,7 +446,7 @@ describe("prévente: droits des rôles (B4)", () => {
     expect(rows.map((r) => r.proname)).toEqual(["prevente_releve_destinations", "prevente_releve_reponses", "prevente_releve_visites"]);
   });
 
-  it("vadrouille_prevente_releve : aucun droit sur aucune table ni vue (public et prototype), aucune appartenance, deux connexions au plus", async () => {
+  it("vadrouille_prevente_releve : aucun droit sur aucune table ni vue (public et prototype), aucune appartenance, sans connexion, aucun rôle de connexion ne peut le prendre", async () => {
     const droits = await admin.query(
       `SELECT n.nspname || '.' || c.relname AS rel FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
        WHERE c.relkind IN ('r', 'p', 'v', 'm', 'S') AND n.nspname IN ('public', 'prototype', 'vadrouille_migrations')
@@ -448,7 +463,11 @@ describe("prévente: droits des rôles (B4)", () => {
     const attributs = await admin.query(
       "SELECT rolcanlogin, rolconnlimit, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb FROM pg_catalog.pg_roles WHERE rolname = 'vadrouille_prevente_releve'",
     );
-    expect(attributs.rows).toEqual([{ rolcanlogin: true, rolconnlimit: 2, rolsuper: false, rolbypassrls: false, rolcreaterole: false, rolcreatedb: false }]);
+    expect(attributs.rows).toEqual([{ rolcanlogin: false, rolconnlimit: -1, rolsuper: false, rolbypassrls: false, rolcreaterole: false, rolcreatedb: false }]);
+    for (const login of ["app", "auth", "migrator", "p0", "p0_purge", "coords_purge"] as const) {
+      const client = await connect(login);
+      expect(await erreur(client, "SET ROLE vadrouille_prevente_releve"), login).toMatchObject({ code: "42501" });
+    }
     for (const role of ["vadrouille_app", "vadrouille_owner", "vadrouille_fn_prevente", "vadrouille_fn_prevente_releve"]) {
       expect(await erreur(releve, `SET ROLE ${role}`), role).toMatchObject({ code: "42501" });
     }

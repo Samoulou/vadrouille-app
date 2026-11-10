@@ -42,10 +42,11 @@ const ROLES = {
   // B7c (migration 0010_usage_forfait) : propriétaire de la fonction des sommes de consommation.
   vadrouille_fn_usage: false,
   // C2a (migration 0029_prevente_mesure ; forme à confirmer par le Tech Lead, T1, et la Sécurité, S1) : propriétaires
-  // des fonctions d'écriture et de relevé de la mesure de la prévente ; connexion du relevé (workflow de C2e).
+  // des fonctions d'écriture et de relevé de la mesure de la prévente ; rôle du relevé, sans connexion tant que le
+  // workflow de C2e n'existe pas.
   vadrouille_fn_prevente: false,
   vadrouille_fn_prevente_releve: false,
-  vadrouille_prevente_releve: true,
+  vadrouille_prevente_releve: false,
 } as const;
 /** Attribut LOGIN attendu par rôle, lu par `Map` (clé venue de la base : aucun accès calculé, spécification P0c, 2.6). */
 const LOGIN_BY_ROLE = new Map<string, boolean>(Object.entries(ROLES));
@@ -164,8 +165,8 @@ const EXPECTED_TABLE_PRIVILEGES: Record<string, Record<string, string[]>> = {
   // B7c : lecture par colonnes seulement (droits par colonne ci-dessous), aucun droit de table.
   vadrouille_fn_usage: {},
   // C2a (migration 0029_prevente_mesure) : seuls rôles qui touchent les trois tables de la mesure de la prévente ;
-  // `UPDATE` par colonne seulement (droits par colonne ci-dessous) ; ni DELETE ni TRUNCATE. Le rôle de connexion du
-  // relevé n'a aucun droit de table.
+  // `UPDATE` par colonne seulement (droits par colonne ci-dessous) ; ni DELETE ni TRUNCATE. Le rôle du relevé n'a
+  // aucun droit de table.
   vadrouille_fn_prevente: {
     prevente_visites: ["SELECT", "INSERT"],
     prevente_reponses_jour: ["SELECT", "INSERT"],
@@ -606,7 +607,7 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
     // B7c (0010_usage_forfait) : sommes de consommation, à vadrouille_app seul.
     usage_forfait_totals: { owner: "vadrouille_fn_usage", execute: ["vadrouille_app"] },
     // C2a (0029_prevente_mesure ; spécification C2, § 4 et § 5, critère B4) : écriture de la mesure de la prévente à
-    // vadrouille_app seul ; relevé au rôle de connexion du relevé seul.
+    // vadrouille_app seul ; relevé au rôle du relevé seul.
     prevente_compter_visite: { owner: "vadrouille_fn_prevente", execute: ["vadrouille_app"] },
     prevente_enregistrer_reponse: { owner: "vadrouille_fn_prevente", execute: ["vadrouille_app"] },
     prevente_releve_visites: { owner: "vadrouille_fn_prevente_releve", execute: ["vadrouille_prevente_releve"] },
@@ -657,17 +658,21 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
       "SELECT proname, prosrc FROM pg_catalog.pg_proc WHERE prosecdef AND pronamespace IN ('public'::regnamespace, 'prototype'::regnamespace)",
     );
     expect(rows.length).toBe(13);
-    // C2a (0029) : `ON CONFLICT … DO UPDATE SET` ne nomme aucun objet (sa cible est la table de l'`INSERT INTO`, déjà
-    // contrôlée) : seul ce `UPDATE`, précédé de `DO`, sort du contrôle ; tout autre `UPDATE` y reste soumis.
-    const CONTROLE = /\b(FROM|(?<!\bDO\s+)UPDATE|INTO|JOIN)\s+(?!(public|prototype)\.)[a-z_]+\b(?!\s*\()/i;
+    // Contrôle d'origine, inchangé. C2a (0029) : la seule suite exacte `DO UPDATE SET` (clause d'`ON CONFLICT`, qui ne
+    // nomme aucun objet : sa cible est la table de l'`INSERT INTO`, déjà contrôlée) est retirée du texte avant le
+    // contrôle ; tout autre `UPDATE`, même précédé de `DO`, y reste soumis.
+    const CONTROLE = /\b(FROM|UPDATE|INTO|JOIN)\s+(?!(public|prototype)\.)[a-z_]+\b(?!\s*\()/i;
+    const sansClauseDeConflit = (texte: string) => texte.replace(/\bDO\s+UPDATE\s+SET\b/gi, "DO_UPDATE_SET");
     for (const row of rows) {
       expect(row.prosrc, row.proname).not.toMatch(/\bEXECUTE\b/i);
-      expect(row.prosrc, row.proname).not.toMatch(CONTROLE);
+      expect(sansClauseDeConflit(row.prosrc), row.proname).not.toMatch(CONTROLE);
     }
-    // Le contrôle reste vif après l'amendement : un `UPDATE` sans schéma est vu, un `DO UPDATE SET` ne l'est pas.
-    expect("UPDATE prevente_visites SET visites = 1").toMatch(CONTROLE);
-    expect("DO NOTHING; UPDATE prevente_visites SET visites = 1").toMatch(CONTROLE);
-    expect("ON CONFLICT (jour) DO UPDATE SET visites = 1").not.toMatch(CONTROLE);
+    // Le contrôle reste vif après l'amendement : un `UPDATE` sans schéma est vu, seul `DO UPDATE SET` ne l'est pas.
+    expect(sansClauseDeConflit("UPDATE prevente_visites SET visites = 1")).toMatch(CONTROLE);
+    expect(sansClauseDeConflit("DO NOTHING; UPDATE prevente_visites SET visites = 1")).toMatch(CONTROLE);
+    expect(sansClauseDeConflit("DO UPDATE prevente_visites SET visites = 1")).toMatch(CONTROLE);
+    expect(sansClauseDeConflit("DO UPDATE SETS SET visites = 1")).toMatch(CONTROLE);
+    expect(sansClauseDeConflit("ON CONFLICT (jour) DO UPDATE SET visites = 1")).not.toMatch(CONTROLE);
   });
 });
 

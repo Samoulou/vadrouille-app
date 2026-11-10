@@ -81,11 +81,13 @@ export const preventeReponses = pgTable(
   (t) => [
     check("prevente_reponses_src_check", dansListe(t.src, PREVENTE_PROVENANCES)),
     check("prevente_reponses_parcours_check", dansListe(t.parcours, PREVENTE_PARCOURS)),
-    // 1 à 80 caractères, pas seulement des espaces, aucun caractère de contrôle (C0 et DEL) : le nettoyage est fait par
-    // l'application (§ 3.3 point 3) ; la base refuse ce qui lui aurait échappé.
+    // 1 à 80 caractères, pas seulement des espaces, aucun caractère de contrôle (C0, DEL, C1 : U+0080 à U+009F), de
+    // sens d'écriture ou de largeur nulle (U+200B à U+200F, U+202A à U+202E, U+2060 à U+2064, U+2066 à U+2069, U+FEFF)
+    // ni séparateur de ligne (U+2028, U+2029) : le texte est lu en console par Samuel (§ 5 point 5). Le nettoyage est
+    // fait par l'application (§ 3.3 point 3) ; la base refuse ce qui lui aurait échappé.
     check(
       "prevente_reponses_destination_check",
-      sql`${t.destination} IS NULL OR (char_length(${t.destination}) BETWEEN 1 AND ${sql.raw(String(PREVENTE_DESTINATION_MAX))} AND btrim(${t.destination}) <> '' AND ${t.destination} !~ '[\\x01-\\x1F\\x7F]')`,
+      sql`${t.destination} IS NULL OR (char_length(${t.destination}) BETWEEN 1 AND ${sql.raw(String(PREVENTE_DESTINATION_MAX))} AND btrim(${t.destination}) <> '' AND ${t.destination} !~ '[\\x01-\\x1F\\x7F\\u0080-\\u009F\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF]')`,
     ),
     check("prevente_reponses_periode_check", sql`${t.periode} IS NULL OR ${dansListe(t.periode, PREVENTE_PERIODES)}`),
     check("prevente_reponses_preparation_check", tableauDansListe(t.preparation, PREVENTE_PREPARATIONS)),

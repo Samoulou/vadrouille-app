@@ -3,18 +3,16 @@
 -- § 3.2, B8c), le propriétaire de la fonction des sommes de consommation (B7c, migration 0010_usage_forfait), le
 -- rôle du plafond global des e-mails (B3d, décision 0138 § 11, migration 0020_plafond_emails) et celui des compteurs
 -- de la ville par autocomplétion (M1f-D, migration 0021_compteurs_autocompletion), et les trois de la mesure de la
--- prévente (C2a, migration 0029_prevente_mesure : deux propriétaires de fonctions et la connexion du relevé).
+-- prévente (C2a, migration 0029_prevente_mesure : deux propriétaires de fonctions et le rôle du relevé).
 --
 -- À exécuter UNE FOIS PAR BASE, avant les migrations, par un utilisateur qui peut créer des rôles :
 --   - en CI : le superutilisateur du conteneur postgres:17.11 (job `db`) ;
 --   - sur la base Neon de staging : l'utilisateur propriétaire de l'intégration, par Samuel, dans l'éditeur SQL
 --     de la console Neon (procédure de `db/README.md`, « Passage aux rôles à moindre privilège »).
--- Idempotent : une seconde exécution ne change rien. Il ne contient AUCUN mot de passe : les sept rôles de
+-- Idempotent : une seconde exécution ne change rien. Il ne contient AUCUN mot de passe : les six rôles de
 -- connexion (vadrouille_migrator, vadrouille_app, vadrouille_auth, vadrouille_prototype,
--- vadrouille_prototype_purge, vadrouille_coords_purge, vadrouille_prevente_releve) reçoivent le leur hors du dépôt
--- (pour les trois du prototype et de la purge : procédure S5 de 0046 ; pour vadrouille_coords_purge, décision 0060
--- § 3.3 ; pour vadrouille_prevente_releve : posé par Samuel avec le workflow du relevé, tâche C2e, et sans mot de passe
--- d'ici là, donc sans connexion possible sur une base à authentification par mot de passe).
+-- vadrouille_prototype_purge, vadrouille_coords_purge) reçoivent le leur hors du dépôt (pour les trois derniers :
+-- procédure S5 de 0046 ; pour vadrouille_coords_purge, décision 0060 § 3.3).
 -- Aucun rôle n'a SUPERUSER ni BYPASSRLS ; si un rôle existe déjà avec un attribut inattendu (limite de connexions
 -- comprise), le script s'arrête au lieu de le corriger en silence.
 
@@ -56,11 +54,12 @@ DECLARE
     -- Mesure de la prévente (C2a, migration 0029_prevente_mesure ; forme à confirmer par le Tech Lead, T1, et la
     -- Sécurité, S1) : propriétaire des deux fonctions d'écriture (seul rôle qui écrit prevente_visites,
     -- prevente_reponses_jour et prevente_reponses) ; propriétaire des trois fonctions de relevé (lecture seule) ;
-    -- connexion du relevé (workflow de C2e), deux connexions au plus, aucune appartenance, EXECUTE sur les seules
-    -- fonctions de relevé.
+    -- rôle du relevé, qui n'a que EXECUTE sur les fonctions de relevé : SANS connexion et sans appartenance tant que
+    -- le workflow du relevé (tâche C2e) n'existe pas. C2e le passe en rôle de connexion (attribut, limite de
+    -- connexions, CONNECT sur la base, mot de passe posé par Samuel) : personne ne peut le prendre d'ici là.
     ['vadrouille_fn_prevente', 'false', '-1'],
     ['vadrouille_fn_prevente_releve', 'false', '-1'],
-    ['vadrouille_prevente_releve', 'true', '2']
+    ['vadrouille_prevente_releve', 'false', '-1']
   ];
   i int;
   v_name text;
@@ -111,12 +110,12 @@ CREATE SCHEMA IF NOT EXISTS vadrouille_migrations;
 REVOKE ALL ON SCHEMA vadrouille_migrations FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA vadrouille_migrations TO vadrouille_migrator;
 
--- Connexion à la base pour les sept rôles de connexion. CREATE sur la base pour vadrouille_owner seul : la migration
+-- Connexion à la base pour les six rôles de connexion. CREATE sur la base pour vadrouille_owner seul : la migration
 -- 0003_prototype crée le schéma prototype sous ce rôle (décision 0046, D15 point 3 : le schéma lui appartient).
 DO $$
 BEGIN
   EXECUTE pg_catalog.format(
-    'GRANT CONNECT ON DATABASE %I TO vadrouille_migrator, vadrouille_app, vadrouille_auth, vadrouille_prototype, vadrouille_prototype_purge, vadrouille_coords_purge, vadrouille_prevente_releve',
+    'GRANT CONNECT ON DATABASE %I TO vadrouille_migrator, vadrouille_app, vadrouille_auth, vadrouille_prototype, vadrouille_prototype_purge, vadrouille_coords_purge',
     pg_catalog.current_database());
   EXECUTE pg_catalog.format('GRANT CREATE ON DATABASE %I TO vadrouille_owner', pg_catalog.current_database());
 END
