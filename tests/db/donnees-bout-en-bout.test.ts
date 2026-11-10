@@ -9,6 +9,7 @@ import {
   ADRESSE_DEBLOQUER,
   ADRESSE_DEBLOQUER_REFUS,
   ADRESSE_GOUTS,
+  ADRESSE_GOUTS_CREATION,
   ADRESSE_PARTAGE,
   ADRESSE_PARTAGE_CREATION,
   ADRESSE_RAPPELS,
@@ -247,8 +248,9 @@ describe("données de bout en bout de la création d'un lien sur api (M6a)", () 
     expect(await nombreDeVoyages(id)).toBe(1);
   });
 
-  it(`${ADRESSE_GOUTS} : un voyage débloqué terminé depuis 2 jours, deux réponses « éviter » actives (M8c-1)`, async () => {
-    const id = await identite(ADRESSE_GOUTS);
+  // `ADRESSE_GOUTS_CREATION` (M8c-2, ticket 1131) : mêmes données, dans sa propre organisation.
+  it.each([ADRESSE_GOUTS, ADRESSE_GOUTS_CREATION])("%s : un voyage débloqué terminé depuis 2 jours, deux réponses « éviter » actives (M8c-1)", async (adresse) => {
+    const id = await identite(adresse);
     if ((await nombreDeVoyages(id)) === 0) {
       const converti = convertirVoyagesSimules().find((v) => v.mockId === EDIMBOURG_DEBLOQUE_TRIP_ID);
       expect(converti).toBeDefined();

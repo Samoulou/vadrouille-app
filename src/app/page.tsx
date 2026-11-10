@@ -16,6 +16,8 @@ import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
 import { Landing } from "@/features/accueil/Landing";
 import { LandingPrevente } from "@/features/accueil/LandingPrevente";
 import { preventeRoutes } from "@/features/accueil/routes";
+import { DeletedNotice } from "@/features/compte/DeletedNotice";
+import { annonceCompteSupprime } from "@/features/compte/routes";
 import { creationRoutes } from "@/features/creation/routes";
 import { formatPrice } from "@/features/presentation/price";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
@@ -54,12 +56,15 @@ function demoLinks(): DemoLink[] {
  * P0-PO-11 est retirée et ses voyages se lisent dans « Mes voyages », lien secondaire sous « Créer un voyage ». Hors
  * liste blanche de l'adaptateur `prototype`, la page lève (erreur 500), comme avant.
  */
-export default async function HomePage({ searchParams }: { searchParams?: Promise<{ src?: string | string[] }> } = {}) {
+export default async function HomePage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
+  const lus = (await searchParams) ?? {};
   // Précommande (`PREVENTE=1`) : la provenance `?src=` suit le bouton jusqu'au paiement (`docs/commercial/suivi.md`).
   const prevente = getPrevente();
-  const src = prevente ? sourcePrevente((await searchParams)?.src) : null;
+  const src = prevente ? sourcePrevente(lus.src) : null;
   // Mesure (spécification C2, C2b) : un affichage compté, écrit après la réponse ; ne lève ni n'attend jamais l'écriture.
   if (prevente) await compterVisitePrevente(src);
+  // M9c (spécification M9 § 6.4, critère 4 ; M9-PO-7) : arrivée après la suppression du compte (accueil ordinaire).
+  const compteSupprime = annonceCompteSupprime(lus);
   let demo: { destination?: string } | null = null;
   if (isMockAdapter()) {
     const trip = await getTripAdapter().getTrip(MOCK_DEMO_TRIP.ctx, MOCK_DEMO_TRIP.tripId);
@@ -74,6 +79,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   return (
     <Landing
       createHref={creationRoutes.nouveau({ essai })}
+      notice={compteSupprime ? <DeletedNotice /> : null}
       secondary={
         essai ? (
           <Button asChild variant="secondary" className="w-full">

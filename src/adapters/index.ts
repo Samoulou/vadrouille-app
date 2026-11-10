@@ -2,6 +2,7 @@ import type { PlacePhoto } from "@/contracts/photo";
 import {
   APP_TRIAL_TRIP_ID_PATTERN,
   TripReviewSchema,
+  type RetainedPreference,
   type RevisionFixtures,
   type Trip,
   type TrialRevisionRequest,
@@ -98,6 +99,11 @@ export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
  * comme `MOCK_DEMO_TRIP`. Jamais lu par une route produit.
  */
 export { MOCK_DEMO_TRIP_DRAFT as MOCK_DEMO_DRAFT } from "@/mocks/creation-edimbourg";
+/**
+ * Adresse du compte du jeu simulé (M9c, ticket 1122) : affichée par « Ton compte » et écrite dans l'export simulé avec la
+ * connexion simulée, qui ne garde aucune adresse en clair (0017 § 3.5). Jamais lue avec la connexion réelle.
+ */
+export { MOCK_KNOWN_EMAIL as ADRESSE_COMPTE_SIMULE } from "@/mocks/auth-simule";
 export { authAdapterChoice, betterAuthAllowed, mockAuthAllowed } from "./auth-guard";
 export { assertApiAdapter } from "./api-guard";
 export { getRequestContext, SessionRequiseError } from "./context";
@@ -585,6 +591,17 @@ export function avisEnregistres(value: string | undefined = process.env.DATA_ADA
  */
 export function goutsEnregistres(value: string | undefined = process.env.DATA_ADAPTER): TasteAdapter | null {
   return adapterChoice(value) === "api" ? (getTripAdapter(value).tastes ?? null) : null;
+}
+
+/**
+ * Goûts proposés à l'écran 2 « Vérification » (M8c-2, ticket 1131 ; décision 0160 § 1.6 point 1) : ceux de **la personne
+ * de la session** dans **l'organisation de la session**, relus à chaque affichage, au format `RetainedPreference`
+ * (codes maison seulement : ni voyage d'origine, ni instant). Aucun hors de `api` (`mock` garde ses goûts dans la mémoire
+ * de l'onglet de `/voyages`, que la création ne monte pas ; le site d'essai n'en a pas).
+ */
+export async function goutsRetenus(ctx: AdapterContext, value: string | undefined = process.env.DATA_ADAPTER): Promise<RetainedPreference[]> {
+  const gouts = (await goutsEnregistres(value)?.listRetainedTastes(ctx)) ?? [];
+  return gouts.map(({ id, origin, subject }) => ({ id, origin, subject }));
 }
 
 /** Recherches par voyage et par 24 heures sur `mock` : la règle `trip` de `lieu-recherche` (décision 0147 § 6.4 point 1). */
