@@ -18,7 +18,7 @@ import {
  * Mesure de la prévente (spécification `specs/C2-prevente-mesure.md`, § 4 ; tâche C2a, ticket 1117) : visites par jour
  * et par provenance, compteur du jour des réponses, réponses au questionnaire.
  *
- * **Exception à `organization_id`** (à confirmer par le Tech Lead, T1) : ces trois tables n'appartiennent à aucune
+ * **Exception à `organization_id`** (confirmée par le Tech Lead, décision 0172 § 1) : ces trois tables n'appartiennent à aucune
  * organisation (visiteurs anonymes, avant tout compte), comme le compteur global `email_daily_counts` (0020).
  * Aucune colonne ne peut recevoir une adresse IP, un agent utilisateur, une heure ni un identifiant de paiement ou de
  * session (critère B5). RLS, politiques, droits, fonctions `SECURITY DEFINER` et domaine `prevente_code` :

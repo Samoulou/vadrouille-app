@@ -51,8 +51,8 @@ DECLARE
     -- Consommation du MVP (B7c, migration 0010_usage_forfait) : propriétaire de public.usage_forfait_totals(), seul
     -- lecteur des sommes globales de usage_ledger ; aucune connexion, aucune appartenance hors ADMIN de vadrouille_migrator.
     ['vadrouille_fn_usage', 'false', '-1'],
-    -- Mesure de la prévente (C2a, migration 0029_prevente_mesure ; forme à confirmer par le Tech Lead, T1, et la
-    -- Sécurité, S1) : propriétaire des deux fonctions d'écriture (seul rôle qui écrit prevente_visites,
+    -- Mesure de la prévente (C2a, migration 0029_prevente_mesure ; forme confirmée par le Tech Lead, décision 0172
+    -- § 1 ; avis de la Sécurité, S1 : 0172 § 6) : propriétaire des deux fonctions d'écriture (seul rôle qui écrit prevente_visites,
     -- prevente_reponses_jour et prevente_reponses) ; propriétaire des trois fonctions de relevé (lecture seule) ;
     -- rôle du relevé, qui n'a que EXECUTE sur les fonctions de relevé : SANS connexion et sans appartenance tant que
     -- le workflow du relevé (tâche C2e) n'existe pas. C2e le passe en rôle de connexion (attribut, limite de

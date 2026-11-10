@@ -319,7 +319,7 @@ describe("vues partagées: lecture seulement avec un jeton valide", () => {
         "email_daily_counts:vadrouille_mail_counter",
         "memberships:vadrouille_auth",
         "organizations:vadrouille_auth",
-        // C2a (migration 0029_prevente_mesure ; forme à confirmer, T1 et S1) : tables globales anonymes ; une politique
+        // C2a (migration 0029_prevente_mesure ; décision 0172 § 2, qui amende 0007) : tables globales anonymes ; une politique
         // par commande pour la fonction d'écriture, une lecture pour le relevé (tests/db/prevente-mesure.test.ts).
         "prevente_reponses:vadrouille_fn_prevente",
         "prevente_reponses:vadrouille_fn_prevente_releve",

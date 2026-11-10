@@ -41,7 +41,7 @@ const ROLES = {
   vadrouille_coords_purge: true,
   // B7c (migration 0010_usage_forfait) : propriétaire de la fonction des sommes de consommation.
   vadrouille_fn_usage: false,
-  // C2a (migration 0029_prevente_mesure ; forme à confirmer par le Tech Lead, T1, et la Sécurité, S1) : propriétaires
+  // C2a (migration 0029_prevente_mesure ; décision 0172 § 1 point 6 et § 2 point 2) : propriétaires
   // des fonctions d'écriture et de relevé de la mesure de la prévente ; rôle du relevé, sans connexion tant que le
   // workflow de C2e n'existe pas.
   vadrouille_fn_prevente: false,
@@ -658,7 +658,8 @@ describe("fonctions: SECURITY DEFINER durcies", () => {
       "SELECT proname, prosrc FROM pg_catalog.pg_proc WHERE prosecdef AND pronamespace IN ('public'::regnamespace, 'prototype'::regnamespace)",
     );
     expect(rows.length).toBe(13);
-    // Contrôle d'origine, inchangé. C2a (0029) : la seule suite exacte `DO UPDATE SET` (clause d'`ON CONFLICT`, qui ne
+    // Contrôle d'origine, inchangé. C2a (0029 ; amendement autorisé par la décision 0172 § 2 point 3) : la seule suite
+    // exacte `DO UPDATE SET` (clause d'`ON CONFLICT`, qui ne
     // nomme aucun objet : sa cible est la table de l'`INSERT INTO`, déjà contrôlée) est retirée du texte avant le
     // contrôle ; tout autre `UPDATE`, même précédé de `DO`, y reste soumis.
     const CONTROLE = /\b(FROM|UPDATE|INTO|JOIN)\s+(?!(public|prototype)\.)[a-z_]+\b(?!\s*\()/i;

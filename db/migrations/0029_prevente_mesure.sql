@@ -1,7 +1,8 @@
 -- 0029_prevente_mesure — mesure de la prévente : visites par jour et par provenance, réponses au questionnaire,
 -- compteur du jour (spécification `specs/C2-prevente-mesure.md`, § 4 et § 5, critères B1 à B7 ; tâche C2a, ticket 1117).
--- Forme des tables, rôles et droits : **proposition de la spécification, à confirmer par le Tech Lead (T1) et par la
--- Sécurité (S1)**. Générée par `pnpm db:generate --name prevente_mesure` depuis `db/schema/prevente.ts`, puis complétée
+-- Forme des tables, rôles et droits : proposition de la spécification, **confirmée par le Tech Lead (T1 : décision
+-- 0172, § 1)** ; Sécurité (S1) : approuvé, aucun bloquant, revue consolidée du head `4049ec4` de la PR #1123 (0172,
+-- § 6). Générée par `pnpm db:generate --name prevente_mesure` depuis `db/schema/prevente.ts`, puis complétée
 -- à la main (RLS, politiques, droits, domaine, fonctions). Exécutée par `vadrouille_migrator` dans une transaction,
 -- après 0028_purge_place_coordinates. Sur une base réelle : seulement par le workflow `db-migrate`, après l'ajout de
 -- sa ligne à MIGRATIONS_APPROUVEES par une PR de workflow à part (tâche C2a-2 ; 0035, 0056 § 3).
@@ -10,7 +11,7 @@
 -- Migration **additive** : trois tables, un domaine et cinq fonctions nouveaux ; aucune ligne existante lue, modifiée
 -- ni supprimée ; aucun code de `main` ne les nomme (le code applicatif arrive avec C2b et C2c).
 --
--- Exception à `organization_id` (T1) : ces tables n'appartiennent à aucune organisation (visiteurs anonymes, avant
+-- Exception à `organization_id` (0172) : ces tables n'appartiennent à aucune organisation (visiteurs anonymes, avant
 -- tout compte), comme `email_daily_counts` (0020). Aucune colonne ne peut recevoir une adresse IP, un agent
 -- utilisateur, une heure ni un identifiant de paiement ou de session ; le jour est posé par la base, en UTC.
 --
