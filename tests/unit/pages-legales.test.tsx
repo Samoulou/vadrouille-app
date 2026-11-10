@@ -5,6 +5,7 @@ import { getPagesLegales, pagesLegalesDisponibles } from "@/adapters";
 import ConditionsDeVentePage from "@/app/precommande/conditions-de-vente/page";
 import DonneesPage from "@/app/precommande/donnees/page";
 import MentionsLegalesPage from "@/app/precommande/mentions-legales/page";
+import { LIENS_LEGAUX, veilleDe } from "@/features/accueil/PageLegale";
 import { pagesLegalesRoutes } from "@/features/accueil/routes";
 import * as messages from "@/i18n/messages";
 
@@ -165,26 +166,31 @@ describe("pages légales : rendu", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Qui vend Vadrouille" })).toBeInTheDocument();
     expect(screen.getByText("Vadrouille est vendu par Vendeur d'essai, statut d'essai.")).toBeInTheDocument();
     expect(screen.getByText("Adresse : Rue de l'Essai 1, 0000 Ville d'essai")).toBeInTheDocument();
-    expect(screen.getByText("Contact : contact@vendeur-essai.example")).toBeInTheDocument();
+    const contact = screen.getByRole("link", { name: "contact@vendeur-essai.example" });
+    expect(contact).toHaveAttribute("href", "mailto:contact@vendeur-essai.example");
+    expect(contact.parentElement).toHaveTextContent(/^Contact : contact@vendeur-essai\.example$/);
     expect(screen.getByRole("link", { name: "Conditions de vente de la précommande" })).toHaveAttribute("href", "/precommande/conditions-de-vente");
     expect(screen.getByRole("link", { name: "Tes données et la précommande" })).toHaveAttribute("href", "/precommande/donnees");
     expect(screen.getByRole("link", { name: "Revenir à l'accueil" })).toHaveAttribute("href", "/");
     expect(screen.queryByText(/^Version du/)).not.toBeInTheDocument();
   });
 
-  it("« Conditions de vente » : onze articles, prix de l'offre, date d'ouverture et liste de la page de prévente, vendeur et contact", () => {
+  it("« Conditions de vente » : dix articles, sans « Droit applicable » (non publié avant V12), prix de l'offre, date d'ouverture et liste de la page de prévente, vendeur et contact", () => {
     ouvrir();
     render(ConditionsDeVentePage());
     expect(screen.getByRole("heading", { level: 1, name: "Conditions de vente de la précommande" })).toBeInTheDocument();
     expect(screen.getByText("Version du 10 novembre 2026.")).toBeInTheDocument();
     const articles = screen.getAllByRole("heading", { level: 2 }).map((titre) => titre.textContent);
-    expect(articles).toHaveLength(11);
+    expect(articles).toHaveLength(10);
+    expect(articles.at(-1)).toBe("10. Contact");
+    expect(document.body.textContent).not.toMatch(/Droit applicable|droit suisse|tribunal/);
     articles.forEach((titre, rang) => expect(titre).toMatch(new RegExp(`^${rang + 1}\\. `)));
     expect(screen.getByText("Le vendeur est Vendeur d'essai, statut d'essai. Ses coordonnées sont dans « Qui vend Vadrouille ».")).toBeInTheDocument();
     expect(screen.getByText(/^Le prix est de 29\sCHF, en francs suisses/)).toBeInTheDocument();
     expect(screen.getByText(/utilisable dès le 1er février 2027\./)).toBeInTheDocument();
     expect(screen.getByText(/tu es remboursé intégralement : 29\sCHF\./)).toBeInTheDocument();
-    expect(screen.getByText(/^Jusqu'au 31 janvier 2027 inclus.* Écris à contact@vendeur-essai\.example,/)).toBeInTheDocument();
+    expect(screen.getByText(/^Jusqu'au 31 janvier 2027 inclus/)).toHaveTextContent(/ Écris à contact@vendeur-essai\.example, depuis l'adresse e-mail/);
+    for (const lien of screen.getAllByRole("link", { name: "contact@vendeur-essai.example" })) expect(lien).toHaveAttribute("href", "mailto:contact@vendeur-essai.example");
     expect(screen.getByText(/domiciliées en Suisse/)).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").map((ligne) => ligne.textContent)).toEqual(messages.prevente.prix.inclus);
     expect(screen.getByRole("link", { name: "Qui vend Vadrouille" })).toHaveAttribute("href", "/precommande/mentions-legales");
@@ -204,7 +210,7 @@ describe("pages légales : rendu", () => {
       "Combien de temps",
       "Tes droits",
     ]);
-    expect(screen.getByText("Vendeur d'essai, Rue de l'Essai 1, 0000 Ville d'essai. Contact : contact@vendeur-essai.example.")).toBeInTheDocument();
+    expect(screen.getByText(/^Vendeur d'essai, Rue de l'Essai 1, 0000 Ville d'essai\. Contact :/)).toHaveTextContent(/Contact : contact@vendeur-essai\.example\.$/);
     expect(screen.getByText(/pendant la durée exigée par la loi : durée d'essai\./)).toBeInTheDocument();
     for (const nom of ["Stripe", "Vercel"]) {
       const lien = screen.getByRole("link", { name: new RegExp(`^Politique de confidentialité de ${nom}\\s*\\(s'ouvre dans un nouvel onglet\\)$`) });
@@ -212,6 +218,10 @@ describe("pages légales : rendu", () => {
       expect(lien).toHaveAttribute("rel", "noopener noreferrer");
       expect(lien.getAttribute("href")).toMatch(/^https:\/\//);
     }
+    for (const adresse of Object.values(LIENS_LEGAUX)) expect(adresse).toMatch(/^https:\/\/[a-z.]+\/[a-z/-]+$/);
+    expect(Object.keys(LIENS_LEGAUX)).toEqual(["stripe", "vercel"]);
+    // « Aucun cookie » : phrase non publiée tant que le contrôle V8 de la source n'est pas fait sur le déploiement réel.
+    expect(document.body.textContent).not.toMatch(/cookie/i);
     // Paragraphe « Les visites » : seulement quand le compteur est en service (note d'intégration de la source).
     expect(document.body.textContent).not.toMatch(/nombre d'affichages/);
   });
@@ -225,8 +235,11 @@ describe("pages légales : rendu", () => {
     }
   });
 
-  it("la veille de l'ouverture écrite dans les conditions suit la date d'ouverture de la page de prévente", () => {
-    // « Jusqu'au 31 janvier 2027 inclus » : si la date d'ouverture change (`prevente.json`), `legal.json` change avec elle.
-    expect([messages.prevente.ouverture, messages.legal.veille]).toEqual(["1er février 2027", "31 janvier 2027"]);
+  it("la veille de l'ouverture se calcule depuis la date d'ouverture de la page de prévente", () => {
+    expect(veilleDe(messages.prevente.ouverture)).toBe("31 janvier 2027");
+    expect(veilleDe("1er janvier 2028")).toBe("31 décembre 2027");
+    expect(veilleDe("1er mars 2028")).toBe("29 février 2028");
+    expect(veilleDe("2 février 2027")).toBe("1er février 2027");
+    for (const illisible of ["", "février 2027", "2027-02-01", "1er fevrier 2027"]) expect(() => veilleDe(illisible)).toThrow();
   });
 });

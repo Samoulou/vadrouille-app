@@ -106,8 +106,8 @@ export const LECTURES_ENV = [
   // Pages légales de la précommande (ticket 1125 ; décision 0168, « Conditions d'activation ») : six noms non secrets
   // lus par propriété littérale (identité du vendeur, durée de conservation, date de publication des textes), validés
   // (longueur bornée, aucun caractère de contrôle, e-mail et date de forme stricte) puis affichés sur trois pages
-  // publiques ; une valeur absente ou invalide : 404. Aucune clé, aucun appel sortant. Verdict Sécurité à rendre à la
-  // revue de la PR.
+  // publiques ; une valeur absente ou invalide : 404. Aucune clé, aucun appel sortant. Verdict Sécurité :
+  // approuvé (revue de la PR #1129, 708aba5).
   {
     fichier: "src/adapters/pages-legales.ts",
     noms: ["VENDEUR_NOM", "VENDEUR_STATUT", "VENDEUR_ADRESSE", "VENDEUR_CONTACT", "VENDEUR_CONSERVATION", "TEXTES_LEGAUX_DATE"],

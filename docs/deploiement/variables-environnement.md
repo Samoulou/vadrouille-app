@@ -37,6 +37,10 @@ Aucune n'est un secret : chaque valeur est **affichée telle quelle sur une page
 
 Refusés dans toute valeur : caractères de contrôle (retour à la ligne et tabulation compris), caractères invisibles de formatage, et `[`, `]`, `{`, `}`, `<`, `>` (un emplacement « [NOM DU VENDEUR] » recopié de la source ne passe pas). Le code ne peut pas reconnaître une valeur d'exemple bien formée : relire les trois pages après avoir posé les variables.
 
+Avant de poser `VENDEUR_CONTACT` : « Qui vend … » affirme « La même adresse figure sur ton reçu de paiement ». Ce n'est vrai que si la même adresse est réglée comme adresse de contact dans le compte Stripe (`docs/commercial/textes-legaux-prevente.md`, S3) ; sinon, retirer la phrase de `src/i18n/fr/legal.json` avant de poser les variables.
+
+Deux passages de la source ne sont pas dans les pages : l'article « Droit applicable » des conditions (non publié avant V12) et la phrase « Les pages de la précommande ne déposent aucun cookie… » (non publiée avant le contrôle V8 sur le déploiement réel). Ils reviennent par une PR, après la réponse de Samuel.
+
 Ces variables ne suffisent pas à activer la précommande : les autres conditions de la décision 0168 restent requises, et les textes eux-mêmes attendent la validation de Samuel (`docs/commercial/textes-legaux-prevente.md`, « À faire vérifier »).
 
 ## Envoi du code de connexion par e-mail (B3b-envoi ; décision 0098, amendée par 0138)

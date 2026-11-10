@@ -1,7 +1,6 @@
 {
   "titreDocument": "{titre} · {produit}",
   "version": "Version du {publication}.",
-  "veille": "31 janvier 2027",
   "autresPages": "Autres pages",
   "retour": "Revenir à l'accueil",
   "nouvelOnglet": " (s'ouvre dans un nouvel onglet)",
@@ -75,11 +74,7 @@
         ]
       },
       {
-        "titre": "10. Droit applicable",
-        "blocs": [{ "p": "Ces conditions sont soumises au droit suisse. Le tribunal compétent est celui que la loi désigne." }]
-      },
-      {
-        "titre": "11. Contact",
+        "titre": "10. Contact",
         "blocs": [{ "p": "Une question, un problème, une demande de remboursement : {contact}." }]
       }
     ]
@@ -94,8 +89,7 @@
       {
         "titre": "Sur ce site",
         "blocs": [
-          { "p": "À ce stade, {produit} ne te demande aucune donnée personnelle sur ce site. Il n'y a ni compte, ni formulaire, ni inscription. L'application n'enregistre ni ton nom, ni ton adresse e-mail, ni ton paiement." },
-          { "p": "Les pages de la précommande ne déposent aucun cookie et n'utilisent aucun traceur publicitaire." }
+          { "p": "À ce stade, {produit} ne te demande aucune donnée personnelle sur ce site. Il n'y a ni compte, ni formulaire, ni inscription. L'application n'enregistre ni ton nom, ni ton adresse e-mail, ni ton paiement." }
         ]
       },
       {
