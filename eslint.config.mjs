@@ -152,13 +152,15 @@ const F11C_FILES = [
  * (chargé à la demande) et dont l'écran 1 appelle la détection du départ saisi ; il n'importe à l'exécution que des modules
  * purs de `src/domain` et `@/contracts/values`, ni `zod` ni `src/server` (`configuration` en type seulement). M8a (décision
  * 0160 § 1.5 point 4, ticket 1062) : `@/domain/apres-voyage`, étapes à évaluer et accès de l'écran 16, une seule
- * implémentation pour l'écran, le serveur et `mock` (types de @/contracts seulement).
+ * implémentation pour l'écran, le serveur et `mock` (types de @/contracts seulement). M8b (décision 0160 § 1.4 point 2,
+ * ticket 1111) : `@/domain/lieu-a-soi`, prédicat unique `estLieuASoi` (lieu à soi et adresse découverte) sans copie côté
+ * navigateur (types de @/contracts et de @/contracts/values seulement).
  */
 const CLIENT_DOMAIN_PATTERN = {
   regex:
-    "^(@/domain/(?!(preferences|villes-du-voyage|changement-de-ville|apres-voyage)$)|(\\.{1,2}/)+(.*/)?domain/(?!(preferences|villes-du-voyage|changement-de-ville|apres-voyage)$))",
+    "^(@/domain/(?!(preferences|villes-du-voyage|changement-de-ville|apres-voyage|lieu-a-soi)$)|(\\.{1,2}/)+(.*/)?domain/(?!(preferences|villes-du-voyage|changement-de-ville|apres-voyage|lieu-a-soi)$))",
   message:
-    "Depuis le code chargé par le navigateur, seuls @/domain/preferences, @/domain/villes-du-voyage, @/domain/changement-de-ville et @/domain/apres-voyage s'importent de src/domain (décisions 0112 § 2 point 2, 0148 § 6 point 3, 0151 § 6 et 0160 § 1.5 point 4).",
+    "Depuis le code chargé par le navigateur, seuls @/domain/preferences, @/domain/villes-du-voyage, @/domain/changement-de-ville, @/domain/apres-voyage et @/domain/lieu-a-soi s'importent de src/domain (décisions 0112 § 2 point 2, 0148 § 6 point 3, 0151 § 6 et 0160 § 1.4 point 2 et § 1.5 point 4).",
 };
 
 /** Imports interdits : en configuration plate, le dernier bloc remplace les précédents, d'où une seule fonction. */
@@ -992,6 +994,30 @@ export default defineConfig([
         "error",
         {
           paths: [{ ...CONTRACTS_PATH, message: "src/domain/apres-voyage.ts : types seulement depuis @/contracts (décision 0160 § 1.5 point 4)." }],
+        },
+      ],
+    },
+  },
+  {
+    // M8b (décision 0160 § 1.4 point 2) : `src/domain/lieu-a-soi.ts`, chargé par le navigateur, n'importe que des types de
+    // @/contracts et de @/contracts/values (même règle que `src/domain/preferences.ts`).
+    files: ["src/domain/lieu-a-soi.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^(?!@/contracts(/values)?$)",
+              message: "src/domain/lieu-a-soi.ts : types de @/contracts et de @/contracts/values seulement (décision 0160 § 1.4 point 2).",
+            },
+          ],
+        },
+      ],
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [{ ...CONTRACTS_PATH, message: "src/domain/lieu-a-soi.ts : types seulement depuis @/contracts (décision 0160 § 1.4 point 2)." }],
         },
       ],
     },

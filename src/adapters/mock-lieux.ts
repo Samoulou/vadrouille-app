@@ -16,8 +16,9 @@ import {
   type Stop,
   type Trip,
 } from "@/contracts";
-
+import type { AddedBy } from "@/contracts/values";
 import { poserEtapeDansJour, versHeure, versMinutes } from "@/lib/pose-ajout";
+import { marqueAuMoment } from "@/server/lieux/marque";
 
 import type { AdapterContext, PlaceAdapter, TripAdapter } from "./types";
 
@@ -32,7 +33,8 @@ import type { AdapterContext, PlaceAdapter, TripAdapter } from "./types";
  *   « aucun » (texte « Aucun lieu trouvé. »). Le débit par adresse IP et le plafond global n'existent que sur `api`.
  * - `previewAddPlace` et `applyAddPlace` : version simulée **1** (le jeu simulé n'a pas d'historique) ; l'étape `ajout-<id>`
  *   est posée dans un temps libre qui la contient (durée prévue de son type, `durees`) ou à la place d'un repas pas encore
- *   choisi à la même heure, verrouillée, `addedBy: "person"`, avec le nom saisi et le `placeId` choisi ; sinon `no_option` avec `cause: "no_room"` (décision 0155 § 1.2 : le seul refus de `mock` est le manque de place).
+ *   choisi à la même heure, verrouillée, marquée `addedBy` par la même règle que `api` (`marqueAuMoment`, horloge de la portée :
+ *   `discovered` pendant le voyage pour aujourd'hui ou un jour passé, sinon `person` ; M8b, décision 0160 § 1.4), avec le nom saisi et le `placeId` choisi ; sinon `no_option` avec `cause: "no_room"` (décision 0155 § 1.2 : le seul refus de `mock` est le manque de place).
  *   L'application rend la version 2 **sans modifier le jeu simulé** (comme le verrou de `mock`, l'écran garde l'ajout en
  *   mémoire) ; rien d'autre n'est gardé que le compteur des recherches.
  * - `undoAddPlace` (M5d-6, ticket 994 ; décision 0155 § 4.1) : même signature et mêmes contrôles d'entrée que `api`
@@ -83,7 +85,7 @@ function resultatsSimules(query: string): PlaceSearchResult[] {
 type Pose = { readonly day: Day; readonly stop: Stop };
 
 /** Pose l'étape ajoutée dans la journée simulée, ou `null` (`no_option`). */
-export function poserAjoutSimule(day: Day, stopId: string, demande: AddPlaceRequest, durees: DureesAjout): Pose | null {
+export function poserAjoutSimule(day: Day, stopId: string, demande: AddPlaceRequest, durees: DureesAjout, marque: AddedBy = "person"): Pose | null {
   const debut = versMinutes(demande.time);
   const repas = day.items.find((item) => item.type === "openMeal" && item.time === demande.time);
   const duree =
@@ -100,7 +102,8 @@ export function poserAjoutSimule(day: Day, stopId: string, demande: AddPlaceRequ
     facts: {},
     exceptions: [],
     locked: true,
-    addedBy: "person",
+    // M8b (décision 0160 § 1.4 point 4) : même règle que `api` (`marqueAuMoment`), à l'horloge de la portée.
+    addedBy: marque,
   };
   // Pose partagée avec l'écran (`apercuSurJourAffiche`) : une seule règle (revue de la PR 973, bloquant 1).
   const pose = poserEtapeDansJour(day, stop);
@@ -135,7 +138,7 @@ export function createMockPlaces(options: OptionsLieuxSimules): PlaceAdapter {
     if (day === undefined) return { erreur: fail("not_found") };
     const lu2 = AddPlaceApplySchema.safeParse(input);
     const requestId = id ?? (lu2.success ? lu2.data.requestId : crypto.randomUUID());
-    const pose = poserAjoutSimule(day, `ajout-${requestId}`, demande, durees);
+    const pose = poserAjoutSimule(day, `ajout-${requestId}`, demande, durees, marqueAuMoment(lu.trip, demande.day, now()));
     // Seul refus du calcul simulé : le manque de place (décision 0155 § 1.2), cause posée comme sur `api`.
     if (pose === null) return { erreur: { ok: false, error: { code: "no_option", cause: "no_room" } } as Result<never> };
     return { pose, demande, requestId };

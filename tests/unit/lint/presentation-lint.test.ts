@@ -123,6 +123,20 @@ describe("lint: règles du tri partagées sans zod (B10a)", () => {
     expect(await messagesFor(code, "src/domain/apres-voyage.ts", IMPORTS)).not.toHaveLength(0);
   });
 
+  it("M8b : depuis src/features, @/domain/lieu-a-soi s'importe (prédicat unique, décision 0160 § 1.4 point 2) ; les autres modules restent refusés", async () => {
+    expect(await messagesFor('import { estLieuASoi } from "@/domain/lieu-a-soi";\nexport const x = estLieuASoi;\n', ECRAN, IMPORTS)).toHaveLength(0);
+    expect(await messagesFor('import { x } from "@/domain/lieu-a-soi-bis";\nexport const y = x;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
+    expect(await messagesFor('import { etapeSignalable } from "@/domain/signalement";\nexport const x = etapeSignalable;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
+  });
+
+  it.each([
+    'import { z } from "zod";\nexport const x = z;\n',
+    'import { StopSchema } from "@/contracts";\nexport const x = StopSchema;\n',
+    'import { x } from "./calculs";\nexport const y = x;\n',
+  ])("refusé dans src/domain/lieu-a-soi.ts : %s", async (code) => {
+    expect(await messagesFor(code, "src/domain/lieu-a-soi.ts", IMPORTS)).not.toHaveLength(0);
+  });
+
   it("depuis src/features/presentation, @/server/actions/presentation s'importe ; un autre module de src/server est refusé (0112 § 2 point 4, 0020 § 11)", async () => {
     const ACTIONS = "src/features/presentation/server-actions.ts";
     expect(await messagesFor('import { decideCard } from "@/server/actions/presentation";\nexport const x = decideCard;\n', ACTIONS, IMPORTS)).toHaveLength(0);

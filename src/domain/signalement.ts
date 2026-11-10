@@ -1,5 +1,7 @@
 import type { Stop } from "@/contracts";
 
+import { estLieuASoi } from "./lieu-a-soi";
+
 /**
  * Règles pures du signalement d'une erreur sur une étape (tâche M5c, ticket 904 ; décision 0147 § 1 point 4 ;
  * spécification M5, § 5) : quelles étapes se signalent, et où se trouve l'étape visée. Aucune donnée
@@ -18,11 +20,12 @@ type LigneDeJour = { readonly type: string; readonly stop?: EtapeSignalable };
 export type JourSignalable = { readonly items: readonly LigneDeJour[]; readonly events: readonly { readonly id: string }[] };
 
 /**
- * Une étape du programme se signale, sauf un engagement (`commitment`) et un lieu à soi (`addedBy: "person"`) : la personne
+ * Une étape du programme se signale, sauf un engagement (`commitment`) et un lieu à soi (`estLieuASoi` : lieu à soi
+ * ou adresse découverte, M8b) : la personne
  * les a saisis (spécification § 5, « Où »). Un événement de `Day.events` ne se signale jamais (il n'est pas une étape).
  */
 export function etapeSignalable(stop: EtapeSignalable): boolean {
-  return stop.commitment === undefined && stop.addedBy !== "person";
+  return stop.commitment === undefined && !estLieuASoi(stop);
 }
 
 /** Situation de l'étape visée dans les jours lisibles du voyage. */

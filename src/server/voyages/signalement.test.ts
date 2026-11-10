@@ -136,11 +136,12 @@ describe("signalement: ordre des refus (0147 § 1 point 4)", () => {
     }
   });
 
-  it("événement, engagement, lieu à soi d'une journée servie : validation_failed sur stopId, aucun doublon cherché", async () => {
+  // M8b (ticket 1111 ; critère M8b-5) : une adresse découverte (`discovered`) est refusée comme un lieu à soi (`person`).
+  it.each(["person", "discovered"] as const)("événement, engagement, lieu à soi (addedBy: %s) d'une journée servie : validation_failed sur stopId, aucun doublon cherché", async (addedBy) => {
     const avecAjout = JOURS.map((jour) =>
       jour.index !== 3
         ? jour
-        : { ...jour, items: jour.items.map((ligne) => (ligne.type === "stop" && ligne === jour.items.find((l) => l.type === "stop") ? { ...ligne, stop: { ...ligne.stop, id: "ajout-x", addedBy: "person" as const } } : ligne)) },
+        : { ...jour, items: jour.items.map((ligne) => (ligne.type === "stop" && ligne === jour.items.find((l) => l.type === "stop") ? { ...ligne, stop: { ...ligne.stop, id: "ajout-x", addedBy } } : ligne)) },
     );
     for (const stopId of ["j1-tattoo", "j2-concert-orgue", "ajout-x"]) {
       const b = banc({}, { jours: avecAjout });
