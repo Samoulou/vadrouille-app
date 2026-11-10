@@ -20,6 +20,25 @@ Note de sécurité (revue de F9a, PR #86). Elle ne crée aucune règle : elle ra
 
 Ni l'une ni l'autre n'ouvre quoi que ce soit à elle seule : l'ouverture dépend des variables du tableau précédent.
 
+## Précommande : pages légales (ticket 1125 ; décision 0168, « Conditions d'activation »)
+
+Trois pages publiques : `/precommande/mentions-legales`, `/precommande/conditions-de-vente`, `/precommande/donnees`. Elles n'existent que si la précommande est ouverte (`PREVENTE=1`, décision 0168) **et** si les six variables ci-dessous sont toutes posées et valides. Sinon, les trois répondent 404 : jamais un texte à trous, jamais une valeur par défaut. Lecture : `src/adapters/pages-legales.ts` (`getPagesLegales`, `pagesLegalesDisponibles`), côté serveur, à chaque requête.
+
+Aucune n'est un secret : chaque valeur est **affichée telle quelle sur une page publique**. Elles sont posées par Samuel seulement (nom, adresse, juridique : décisions réservées), dans l'environnement du déploiement, jamais dans le dépôt, qui est public (`docs/commercial/textes-legaux-prevente.md`, S1).
+
+| Variable | Forme admise (après `trim()`) | Où elle s'affiche | Source |
+|---|---|---|---|
+| `VENDEUR_NOM` | 2 à 80 caractères | « Qui vend … », conditions (article 3), « Tes données » (responsable) | S1 |
+| `VENDEUR_STATUT` | 2 à 120 caractères ; s'écrit après le nom et une virgule (« …, particulier établi en … ») | « Qui vend … », conditions (article 3) | S7 |
+| `VENDEUR_ADRESSE` | 5 à 200 caractères, sur une seule ligne (adresse postale ou de domiciliation, parties séparées par des virgules) | « Qui vend … », « Tes données » | S1 |
+| `VENDEUR_CONTACT` | adresse e-mail de forme simple (`nom@domaine.tld`), 254 caractères au plus, sans nom affiché ni `mailto:` | les trois pages | S1 |
+| `VENDEUR_CONSERVATION` | 2 à 60 caractères ; termine la phrase « … pendant la durée exigée par la loi : » | « Tes données » (« Combien de temps ») | S9 |
+| `TEXTES_LEGAUX_DATE` | `AAAA-MM-JJ`, date qui existe au calendrier | « Version du … » des conditions et de « Tes données » | S2 |
+
+Refusés dans toute valeur : caractères de contrôle (retour à la ligne et tabulation compris), caractères invisibles de formatage, et `[`, `]`, `{`, `}`, `<`, `>` (un emplacement « [NOM DU VENDEUR] » recopié de la source ne passe pas). Le code ne peut pas reconnaître une valeur d'exemple bien formée : relire les trois pages après avoir posé les variables.
+
+Ces variables ne suffisent pas à activer la précommande : les autres conditions de la décision 0168 restent requises, et les textes eux-mêmes attendent la validation de Samuel (`docs/commercial/textes-legaux-prevente.md`, « À faire vérifier »).
+
 ## Envoi du code de connexion par e-mail (B3b-envoi ; décision 0098, amendée par 0138)
 
 Deux transports, choisis par `EMAIL_TRANSPORT` : **`smtp`**, vers Mailpit seulement, en local et en CI ; **`resend`**, envoi réel par l'API de Resend, dans le seul cas admis de la préversion de Vercel (spécification B3d, décision 0138, section suivante). Il faut `AUTH_ADAPTER=better-auth`. Sans `EMAIL_TRANSPORT`, le port d'envoi reste désactivé : rien ne part, aucun repli vers Mailpit ni vers Resend.

@@ -1,0 +1,142 @@
+{
+  "titreDocument": "{titre} · {produit}",
+  "version": "Version du {publication}.",
+  "veille": "31 janvier 2027",
+  "autresPages": "Autres pages",
+  "retour": "Revenir à l'accueil",
+  "nouvelOnglet": " (s'ouvre dans un nouvel onglet)",
+  "liens": {
+    "stripe": "Politique de confidentialité de Stripe",
+    "vercel": "Politique de confidentialité de Vercel"
+  },
+  "mentions": {
+    "titre": "Qui vend {produit}",
+    "sections": [
+      {
+        "blocs": [
+          { "p": "{produit} est vendu par {vendeur}, {statut}." },
+          { "p": "Adresse : {adresse}" },
+          { "p": "Contact : {contact}" },
+          { "p": "Pour toute question sur ta précommande ou pour un remboursement, écris à cette adresse. La même adresse figure sur ton reçu de paiement." },
+          { "p": "Le paiement est encaissé par Stripe, pour le compte du vendeur." }
+        ]
+      }
+    ]
+  },
+  "conditions": {
+    "titre": "Conditions de vente de la précommande",
+    "sections": [
+      {
+        "titre": "1. Ce que tu achètes",
+        "blocs": [
+          { "p": "Tu précommandes un « voyage complet » {produit}, pour un voyage. C'est un service entièrement numérique. Il comprend :" },
+          { "inclus": true },
+          { "p": "Tout se fait dans l'application. Il n'y a ni rendez-vous, ni appel, ni relecture de ton programme par une personne." },
+          { "p": "{produit} ne réserve rien à ta place. Tu réserves toi-même ce qui est marqué « À réserver »." },
+          { "p": "Un programme peut contenir des erreurs. Vérifie les horaires, les prix et les réservations avant de partir, surtout ce qui est marqué « À confirmer » ou « Non confirmé »." }
+        ]
+      },
+      {
+        "titre": "2. À qui s'adresse l'offre",
+        "blocs": [{ "p": "La précommande s'adresse aux personnes domiciliées en Suisse. Si tu habites dans un autre pays, ne précommande pas pour l'instant." }]
+      },
+      {
+        "titre": "3. Le vendeur",
+        "blocs": [{ "p": "Le vendeur est {vendeur}, {statut}. Ses coordonnées sont dans « Qui vend {produit} »." }]
+      },
+      {
+        "titre": "4. Le prix",
+        "blocs": [{ "p": "Le prix est de {prix}, en francs suisses, pour un voyage. C'est un paiement unique, sans abonnement. Aucun frais n'est ajouté par le vendeur." }]
+      },
+      {
+        "titre": "5. Le paiement",
+        "blocs": [
+          { "p": "Tu paies avec TWINT ou par carte, sur une page de paiement hébergée par Stripe. Le prix est débité au moment de la précommande. Stripe t'envoie un reçu par e-mail." },
+          { "p": "La précommande est conclue quand ton paiement est accepté." }
+        ]
+      },
+      {
+        "titre": "6. La date d'ouverture",
+        "blocs": [{ "p": "Ton voyage complet est utilisable dès le {date}. Tu prépares alors ton voyage dans l'application, au moment qui te convient." }]
+      },
+      {
+        "titre": "7. Si le voyage complet n'est pas prêt",
+        "blocs": [{ "p": "Si le voyage complet n'est pas utilisable le {date}, tu es remboursé intégralement : {prix}. Tu n'as aucune démarche à faire." }]
+      },
+      {
+        "titre": "8. Si tu changes d'avis",
+        "blocs": [{ "p": "Jusqu'au {veille} inclus, tu peux demander le remboursement intégral de ta précommande, sans donner de raison. Écris à {contact}, depuis l'adresse e-mail utilisée pour le paiement ou en joignant ton reçu." }]
+      },
+      {
+        "titre": "9. Comment tu es remboursé",
+        "blocs": [
+          { "p": "Le remboursement est fait sur le moyen de paiement utilisé pour la précommande, par Stripe. Il est lancé dans les 14 jours : après ta demande si tu changes d'avis, après le {date} si le voyage complet n'est pas prêt. Ta banque ou TWINT peut ensuite mettre quelques jours à l'afficher." },
+          { "p": "Le remboursement est toujours de {prix}. Aucun frais n'est retenu." }
+        ]
+      },
+      {
+        "titre": "10. Droit applicable",
+        "blocs": [{ "p": "Ces conditions sont soumises au droit suisse. Le tribunal compétent est celui que la loi désigne." }]
+      },
+      {
+        "titre": "11. Contact",
+        "blocs": [{ "p": "Une question, un problème, une demande de remboursement : {contact}." }]
+      }
+    ]
+  },
+  "donnees": {
+    "titre": "Tes données et la précommande",
+    "sections": [
+      {
+        "titre": "Qui est responsable",
+        "blocs": [{ "p": "{vendeur}, {adresse}. Contact : {contact}." }]
+      },
+      {
+        "titre": "Sur ce site",
+        "blocs": [
+          { "p": "À ce stade, {produit} ne te demande aucune donnée personnelle sur ce site. Il n'y a ni compte, ni formulaire, ni inscription. L'application n'enregistre ni ton nom, ni ton adresse e-mail, ni ton paiement." },
+          { "p": "Les pages de la précommande ne déposent aucun cookie et n'utilisent aucun traceur publicitaire." }
+        ]
+      },
+      {
+        "titre": "L'hébergement",
+        "blocs": [
+          { "p": "Le site est hébergé par Vercel (Vercel Inc., États-Unis). Pour afficher les pages et protéger le site, Vercel traite des données techniques : ton adresse IP, la date et l'heure, la page demandée, ton navigateur. Ces données peuvent être traitées hors de Suisse, notamment aux États-Unis." },
+          { "lien": "vercel" }
+        ]
+      },
+      {
+        "titre": "Le paiement",
+        "blocs": [
+          { "p": "Le paiement se fait sur une page de Stripe, pas sur ce site. Stripe reçoit les données que tu y saisis : ton adresse e-mail, les données de ta carte ou de ton paiement TWINT, et les données techniques nécessaires à la sécurité du paiement. Stripe les traite selon sa propre politique de confidentialité, y compris hors de Suisse." },
+          { "lien": "stripe" },
+          { "p": "Le vendeur ne voit jamais le numéro complet de ta carte. Dans son compte Stripe, il voit ton adresse e-mail, le montant, la date, le moyen de paiement et, si tu es venu par un lien de diffusion, le nom de ce lien (par exemple « forum »)." }
+        ]
+      },
+      {
+        "titre": "À quoi sert ton adresse e-mail",
+        "blocs": [
+          { "p": "Elle sert à trois choses, et à rien d'autre :" },
+          { "liste": ["t'envoyer ton reçu (par Stripe) ;", "te contacter au sujet de ta précommande : son ouverture, un remboursement ;", "répondre à tes messages."] },
+          { "p": "Hors Stripe, qui la reçoit au moment du paiement, ton adresse e-mail n'est partagée avec personne. Elle n'est ni vendue, ni utilisée pour de la publicité." }
+        ]
+      },
+      {
+        "titre": "Si tu écris au vendeur",
+        "blocs": [{ "p": "Ton message et ton adresse e-mail sont gardés le temps de te répondre et de traiter ta demande." }]
+      },
+      {
+        "titre": "Combien de temps",
+        "blocs": [{ "p": "Les données de paiement sont conservées chez Stripe. Le vendeur garde les justificatifs de vente pendant la durée exigée par la loi : {conservation}." }]
+      },
+      {
+        "titre": "Tes droits",
+        "blocs": [
+          { "p": "Tu peux demander à voir tes données, à les faire corriger ou à les faire supprimer, et tu peux t'opposer à leur utilisation. Écris à {contact}. La réponse est gratuite." },
+          { "p": "Certaines données de paiement doivent être gardées pour des raisons légales, même après une demande de suppression." },
+          { "p": "Si tu estimes que tes droits ne sont pas respectés, tu peux t'adresser au Préposé fédéral à la protection des données et à la transparence (PFPDT)." }
+        ]
+      }
+    ]
+  }
+}
