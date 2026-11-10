@@ -3,15 +3,20 @@ import Link from "next/link";
 import {
   MOCK_DEMO_TRIP,
   MOCK_DEMO_UNLOCKED_TRIP,
+  getPrevente,
   getTripAdapter,
   isMockAdapter,
   paymentAvailable,
   siteEssaiAutorise,
+  sourcePrevente,
 } from "@/adapters";
 import { Button } from "@/components/ligne/Button";
 import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
 import { Landing } from "@/features/accueil/Landing";
+import { LandingPrevente } from "@/features/accueil/LandingPrevente";
+import { preventeRoutes } from "@/features/accueil/routes";
 import { creationRoutes } from "@/features/creation/routes";
+import { formatPrice } from "@/features/presentation/price";
 import { presentationRoute, unlockRoutes } from "@/features/presentation/routes";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
 import * as messages from "@/i18n/messages";
@@ -48,7 +53,10 @@ function demoLinks(): DemoLink[] {
  * P0-PO-11 est retirée et ses voyages se lisent dans « Mes voyages », lien secondaire sous « Créer un voyage ». Hors
  * liste blanche de l'adaptateur `prototype`, la page lève (erreur 500), comme avant.
  */
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams?: Promise<{ src?: string | string[] }> } = {}) {
+  // Précommande (`PREVENTE=1`) : la provenance `?src=` suit le bouton jusqu'au paiement (`docs/commercial/suivi.md`).
+  const prevente = getPrevente();
+  const src = prevente ? sourcePrevente((await searchParams)?.src) : null;
   let demo: { destination?: string } | null = null;
   if (isMockAdapter()) {
     const trip = await getTripAdapter().getTrip(MOCK_DEMO_TRIP.ctx, MOCK_DEMO_TRIP.tripId);
@@ -56,6 +64,10 @@ export default async function HomePage() {
   }
   // Site d'essai : garde explicite de la liste blanche (décision 0032 § A4.2), qui lève hors de la préversion sans rien lire.
   const essai = siteEssaiAutorise();
+  const footer = demo ? <DemoSection destination={demo.destination} links={demoLinks()} /> : null;
+  if (prevente) {
+    return <LandingPrevente href={preventeRoutes.precommander(src)} prix={formatPrice(prevente.amount, prevente.currency)} demo={footer} />;
+  }
   return (
     <Landing
       createHref={creationRoutes.nouveau({ essai })}
@@ -66,7 +78,7 @@ export default async function HomePage() {
           </Button>
         ) : null
       }
-      footer={demo ? <DemoSection destination={demo.destination} links={demoLinks()} /> : null}
+      footer={footer}
     />
   );
 }

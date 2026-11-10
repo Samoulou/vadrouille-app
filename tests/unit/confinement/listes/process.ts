@@ -99,6 +99,10 @@ export const LECTURES_ENV = [
   { fichier: "src/adapters/context.ts", noms: ["DATA_ADAPTER"] },
   { fichier: "src/adapters/index.ts", noms: ["DATA_ADAPTER", "PAYMENT_ADAPTER"] },
   { fichier: "src/adapters/payment-guard.ts", noms: ["VADROUILLE_DEMO_PAYMENT", "PAYMENT_ADAPTER", "DATA_ADAPTER"] },
+  // Précommande (décision 0168, `docs/commercial/page-prevente.md`) : deux noms non secrets lus par propriété
+  // littérale ; `PREVENTE` comparé à « 1 », `PREVENTE_LIEN_PAIEMENT` admis seulement comme lien HTTPS de l'hôte de paiement
+  // de Stripe, sinon ignoré ; aucune clé, aucun appel sortant. Verdict Sécurité à rendre à la revue de la PR.
+  { fichier: "src/adapters/prevente.ts", noms: ["PREVENTE", "PREVENTE_LIEN_PAIEMENT"] },
   // B4b (ticket 831 ; spécification B4, B4b point 5 ; amendement B4-TL-14 de 0020 § 2.3) : garde élargie à `simulated`,
   // noms non secrets lus par propriété littérale et comparés à une valeur exacte, jamais rendus (jamais
   // `SIMULATED_WEBHOOK_SECRET`). Verdict Sécurité : approuvé (revue de la PR #836, a1a61d7).

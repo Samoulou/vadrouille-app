@@ -1103,6 +1103,41 @@
         }
       ],
       "ecart": "B4e partie back (décision 0144 § 5.4) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "src/adapters/prevente.ts",
+      "portee": "application",
+      "usage": "seul hôte admis pour le lien de paiement de la précommande (PREVENTE_LIEN_PAIEMENT), comparé à l'hôte de l'adresse avant toute redirection ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:buy.stripe.com",
+          "formes": [
+            "buy.stripe.com"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "précommande (décision 0168) : lien de paiement hébergé, sans clé ni appel sortant ; verdict Sécurité à rendre à la revue de la PR"
+    },
+    {
+      "fichier": "tests/unit/prevente.test.tsx",
+      "portee": "test",
+      "usage": "liens de paiement de test admis et refusés par getPrevente ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:buy.stripe.com",
+          "formes": [
+            "https://buy.stripe.com/test_abc123",
+            "http://buy.stripe.com/x",
+            "https://buy.stripe.com.evil.example/x",
+            "https://u@buy.stripe.com/x",
+            "https://buy.stripe.com",
+            "https://buy.stripe.com/"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "précommande (décision 0168) : lien de paiement hébergé, sans clé ni appel sortant ; verdict Sécurité à rendre à la revue de la PR"
     }
   ]
 }

@@ -38,3 +38,14 @@ describe("en-têtes du reçu R9-recu (B4e)", () => {
   });
 });
 
+
+// Précommande (décision 0168) : redirection vers le paiement hébergé et page de retour.
+describe("en-têtes de `/precommande`", () => {
+  it("ni cache ni indexation, seule l'origine en référent", () => {
+    expect(RESPONSE_HEADERS.find((entry) => entry.source === "/precommande/:path*")?.headers).toEqual([
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ]);
+  });
+});
