@@ -31,10 +31,10 @@ const ETIQUETTES = new Map<string, TagKind>(
 
 /** Titrage : grotesque étroite, graisse maximale (décision 0170). Une seule voix pour tous les titres de la page. */
 const TITRE =
-  "font-(family-name:--font-titrage) font-extrabold font-stretch-85%";
+  "font-(family-name:--font-titrage) font-semibold font-stretch-85%";
 const TITRE_SECTION = cn(
   TITRE,
-  "relative text-[clamp(2.25rem,6vw,4rem)] leading-none",
+  "relative text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.05] tracking-[-0.01em]",
 );
 const LARGEUR = "mx-auto w-full max-w-6xl px-5 sm:px-8";
 /** Deux colonnes : le rail de la page, puis le contenu. Les repères ci-dessous en reprennent les mesures. */
@@ -74,7 +74,7 @@ function Precommander({
     <a
       href={href}
       className={cn(
-        "inline-flex min-h-14 items-center justify-center rounded-control bg-quai px-6 py-2 text-center text-arret font-extrabold text-ink sm:px-8",
+        "inline-flex min-h-12 items-center justify-center rounded-control bg-quai px-5 py-2 text-center text-arret font-semibold text-ink",
         className,
       )}
     >
@@ -144,7 +144,7 @@ const GESTES: readonly ReactNode[] = [
     className="flex flex-col gap-4 rounded-plate border border-outline bg-raised p-4"
   >
     <div className="flex flex-col gap-1">
-      <span className="text-arret font-bold text-ink">
+      <span className="text-arret font-semibold text-ink">
         {exemple.etapes.diner.nom}
       </span>
       <span className="text-corps-s text-ink-soft">
@@ -152,10 +152,10 @@ const GESTES: readonly ReactNode[] = [
       </span>
     </div>
     <div className="grid grid-cols-2 gap-2">
-      <span className="flex min-h-11 items-center justify-center rounded-control border-(length:--ligne-trait-controle) border-ink text-corps font-bold text-ink">
+      <span className="flex min-h-11 items-center justify-center rounded-control border-(length:--ligne-trait-controle) border-ink text-corps font-semibold text-ink">
         {messages.presentation.actions.dislike}
       </span>
-      <span className="flex min-h-11 items-center justify-center rounded-control bg-line text-corps font-bold text-on-line">
+      <span className="flex min-h-11 items-center justify-center rounded-control bg-line text-corps font-semibold text-on-line">
         {messages.presentation.actions.like}
       </span>
     </div>
@@ -164,10 +164,10 @@ const GESTES: readonly ReactNode[] = [
     key="depart"
     className="flex items-center gap-3 rounded-plate border border-outline bg-raised p-4"
   >
-    <span className="text-corps font-bold text-ink tabular-nums">
+    <span className="text-corps font-semibold text-ink tabular-nums">
       {t.etapes.exemple.heure}
     </span>
-    <span className="min-w-0 flex-1 text-arret font-bold text-ink">
+    <span className="min-w-0 flex-1 text-arret font-semibold text-ink">
       {exemple.etapes.diner.nom}
     </span>
     <Tag kind="toReserve" />
@@ -195,22 +195,22 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
           <div className="flex flex-col gap-12 pt-6 lg:gap-16">
             <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <p className={cn(TITRE, "text-titre-jour")}>{produit}</p>
-              <p className="rounded-tag bg-quai px-2 text-etiquette font-bold text-ink">
+              <p className="text-corps-s font-semibold text-outline-strong">
                 {t.bandeau}
               </p>
             </div>
             <div className="grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-16">
-              <div className="flex flex-col gap-7 lg:pb-24">
+              <div className="flex flex-col gap-6 lg:self-center lg:pb-24">
                 <h1
                   className={cn(
                     TITRE,
-                    "text-[clamp(3.25rem,9.5vw,7rem)] leading-[0.92]",
+                    "text-[clamp(2.75rem,7vw,5rem)] leading-[1.04] tracking-[-0.01em]",
                   )}
                 >
                   <span className="block">{t.titre.avant} </span>
                   {t.titre.accent}
                 </h1>
-                <p className="max-w-xl text-arret font-normal">
+                <p className="max-w-xl text-arret font-normal text-outline-strong">
                   {format(t.sousTitre, { produit })}
                 </p>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -223,7 +223,7 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
                     <a
                       href="#demonstration"
                       className={cn(
-                        "inline-flex min-h-14 items-center justify-center rounded-control border-(length:--ligne-trait-controle) border-on-line px-6 py-2 text-center text-arret font-bold sm:px-8",
+                        "inline-flex min-h-12 items-center justify-center rounded-control border-(length:--ligne-trait-controle) border-outline-strong px-5 py-2 text-center text-arret font-semibold",
                         FOCUS_SUR_INK,
                       )}
                     >
@@ -231,19 +231,6 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
                     </a>
                   ) : null}
                 </div>
-                <ul
-                  role="list"
-                  className="flex flex-col gap-1 text-corps-s font-semibold sm:flex-row sm:gap-0"
-                >
-                  {t.atouts.map((atout) => (
-                    <li
-                      key={atout}
-                      className="sm:border-l sm:border-on-line sm:px-3 sm:first:border-l-0 sm:first:pl-0"
-                    >
-                      {atout}
-                    </li>
-                  ))}
-                </ul>
               </div>
               <figure className="flex w-full max-w-md flex-col gap-4 self-end rounded-t-sheet bg-page px-5 pt-3 pb-8 text-ink">
                 <span
@@ -257,7 +244,7 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
                   <span className="text-corps-s font-semibold">
                     {t.telephone.jour}
                   </span>
-                  <span className="text-titre-jour font-extrabold tracking-tight">
+                  <span className="text-titre-jour font-semibold">
                     {exemple.ville}
                   </span>
                 </div>
@@ -284,14 +271,14 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
             {t.destinations.legende}
           </caption>
           <thead>
-            <tr className="border-y-2 border-ink text-corps-s text-ink">
-              <th scope="col" className="py-2 pr-3 font-bold">
+            <tr className="border-y border-outline-strong text-corps-s text-ink">
+              <th scope="col" className="py-2 pr-3 font-semibold">
                 {t.destinations.colonnes.quand}
               </th>
-              <th scope="col" className="py-2 pr-3 font-bold">
+              <th scope="col" className="py-2 pr-3 font-semibold">
                 {t.destinations.colonnes.ou}
               </th>
-              <th scope="col" className="py-2 text-right font-bold">
+              <th scope="col" className="py-2 text-right font-semibold">
                 {t.destinations.colonnes.duree}
               </th>
             </tr>
@@ -313,7 +300,7 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
                     {destination.nom}
                   </span>
                 </th>
-                <td className="py-4 text-right text-corps font-bold whitespace-nowrap text-ink tabular-nums sm:text-arret">
+                <td className="py-4 text-right text-corps font-semibold whitespace-nowrap text-ink tabular-nums sm:text-arret">
                   {destination.duree}
                 </td>
               </tr>
@@ -360,7 +347,7 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
           <Arret />
           {format(t.vise.titre, { produit })}
         </h2>
-        <dl className="border-t-2 border-ink">
+        <dl className="border-t border-outline-strong">
           {t.vise.liste.map((point) => (
             <div
               key={point.titre}
@@ -379,10 +366,10 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
 
       {/* 5. Le billet */}
       <Troncon titreId="prix-titre" className="bg-muted">
-        <div className="grid overflow-hidden rounded-plate border-2 border-ink bg-raised lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <div className="grid overflow-hidden rounded-plate border border-outline-strong bg-raised lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
           <div className="flex flex-col justify-between gap-10 bg-ink p-6 text-on-line lg:p-10">
             <div className="flex flex-col gap-3">
-              <p className="text-corps font-bold">{t.prix.surtitre}</p>
+              <p className="text-corps font-semibold">{t.prix.surtitre}</p>
               <h2 id="prix-titre" className="relative flex flex-col gap-1">
                 <span
                   className={cn(
@@ -396,13 +383,13 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
               </h2>
             </div>
             <div className="flex flex-col gap-3 text-corps">
-              <p className="font-bold">{t.prix.paiementUnique}</p>
+              <p className="font-semibold">{t.prix.paiementUnique}</p>
               <p>{format(t.prix.utilisable, { date })}</p>
               <p>{format(t.prix.rembourse, { date })}</p>
             </div>
           </div>
-          <div className="flex flex-col gap-6 border-t-2 border-dashed border-ink p-6 lg:border-t-0 lg:border-l-2 lg:p-10">
-            <h3 className="text-section font-extrabold text-ink">
+          <div className="flex flex-col gap-6 border-t border-dashed border-outline-strong p-6 lg:border-t-0 lg:border-l lg:p-10">
+            <h3 className="text-section font-semibold text-ink">
               {t.prix.inclusTitre}
             </h3>
             <ul role="list" className="border-t border-hairline">
@@ -435,13 +422,13 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
             <Arret />
             {t.faq.titre}
           </h2>
-          <div className="border-t-2 border-ink">
+          <div className="border-t border-outline-strong">
             {t.faq.liste.map((entree) => (
               <details
                 key={entree.question}
                 className="group border-b border-hairline"
               >
-                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 text-arret font-bold text-ink [&::-webkit-details-marker]:hidden">
+                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 text-arret font-semibold text-ink [&::-webkit-details-marker]:hidden">
                   {format(entree.question, { produit })}
                   <IconPlus
                     aria-hidden="true"
@@ -469,7 +456,7 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
               id="final-titre"
               className={cn(
                 TITRE,
-                "relative max-w-4xl text-[clamp(2.75rem,8vw,6rem)] leading-[0.9]",
+                "relative max-w-4xl text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.04] tracking-[-0.01em]",
               )}
             >
               <span

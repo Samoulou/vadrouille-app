@@ -31,9 +31,9 @@ Exemple : un tag « À réserver » est un aplat `quai` avec du texte `ink` en s
 
 ## Typographie
 
-Deux voix (décision 0171). **Hanken Grotesk** (400, 600, 700, 800) pour tout ce qui se lit : nette, lisible en petit et dehors. **Bricolage Grotesque**, étroite (largeur 85 %) et en 800, pour les titres d'écran et de section et pour les styles `destination`, `titre-fiche`, `titre-jour` : c'est elle qui donne le caractère. Les chiffres restent alignés.
+Deux voix (décision 0171). **Hanken Grotesk** (400, 600, 700, 800) pour tout ce qui se lit : nette, lisible en petit et dehors. **Bricolage Grotesque**, étroite (largeur 85 %) et en 600 (décision 0173 : la hiérarchie vient de la taille), pour les titres d'écran et de section et pour les styles `destination`, `titre-fiche`, `titre-jour` : c'est elle qui donne le caractère. Les chiffres restent alignés.
 
-- Titres : `destination`, `titre-fiche`, `titre-jour` en 800, police de titrage ; `section`, `arret`, `bloc` pour structurer un écran.
+- Titres : `destination`, `titre-fiche`, `titre-jour` en 600, police de titrage ; `section`, `arret`, `bloc` pour structurer un écran.
 - Texte : `corps` pour expliquer, `corps-s` pour les métadonnées, `legende` pour les trajets et les aides.
 - Données : `heure`, `heure-l`, `montant`, `pastille`, `etiquette`, toujours en chiffres tabulaires.
 - Ni capitales pour les libellés, ni italique, ni mot isolé mis en couleur dans un titre.

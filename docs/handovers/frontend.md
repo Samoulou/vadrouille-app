@@ -62,7 +62,7 @@ Ces liens sont privés : Samuel exporte les maquettes en PNG dans `docs/ux/maque
 | PWA | Manifest + service worker | Hors-ligne du § 13 |
 | Hébergement | Vercel ; portabilité préservée : `output: "standalone"`, `Dockerfile` construit en CI, aucun stockage propre à Vercel (KV, Edge Config) | Décision 0002 |
 
-*Note (2026-11-10), ligne « Police » et § 4.1 : depuis la décision 0171 (choix de Samuel), les titres d'écran et de section et les styles `destination`, `titre-fiche`, `titre-jour` sont en Bricolage Grotesque étroite (tailles 44/44, 34/36, 34/36 ; `section` 22/26), et le bouton principal est un aplat `ink`. Hanken Grotesk reste la police de tout le reste. `docs/design-system/` et `src/styles/globals.css` font foi.*
+*Note (2026-11-10), ligne « Police » et § 4.1 : depuis la décision 0171 (choix de Samuel), les titres d'écran et de section et les styles `destination`, `titre-fiche`, `titre-jour` sont en Bricolage Grotesque étroite (tailles 44/44, 34/36, 34/36 ; `section` 22/26), et le bouton principal est un aplat `ink` ; titres et boutons en graisse 600 (décision 0173). Hanken Grotesk reste la police de tout le reste. `docs/design-system/` et `src/styles/globals.css` font foi.*
 
 *Note (2026-10-11), ligne « PWA » : au MVP, le manifeste et un service worker qui ne sert que la page de repli hors ligne et ses ressources statiques, sans donnée du voyage ; le hors-ligne complet du § 13 est reporté « Après le MVP » (Q137, Q139) : `specs/F10-pendant-le-voyage.md`, « Écarts avec le handover ».*
 

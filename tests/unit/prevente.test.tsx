@@ -62,7 +62,7 @@ describe("accueil : précommande", () => {
     expect(boutons).toHaveLength(3);
     for (const bouton of boutons) expect(bouton).toHaveAttribute("href", "/precommande?src=forum");
     expect(screen.queryByRole("link", { name: "Créer un voyage" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: /^Ton voyage,\s*de l'hôtel à la soirée\.$/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: /^Ton voyage,\s*de l'hôtel à la soirée$/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: /^29\sCHF\s*pour un voyage$/ })).toBeInTheDocument();
     expect(screen.getByText(/1er février 2027, tu es remboursé intégralement/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Questions fréquentes" })).toBeInTheDocument();

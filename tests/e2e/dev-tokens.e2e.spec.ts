@@ -21,12 +21,12 @@ test.describe("/dev/tokens", () => {
     }
   });
 
-  test("applique la police de titrage et les tailles des tokens (décision 0171)", async ({ page }) => {
+  test("applique la police de titrage et les tailles des tokens (décisions 0171 et 0173)", async ({ page }) => {
     await page.goto("/dev/tokens");
     const sample = page.locator('[data-text-style="destination"] span').nth(1);
     await expect(sample).toHaveCSS("font-size", "44px");
     await expect(sample).toHaveCSS("line-height", "44px");
-    await expect(sample).toHaveCSS("font-weight", "800");
+    await expect(sample).toHaveCSS("font-weight", "600");
     const family = await sample.evaluate((el) => getComputedStyle(el).fontFamily);
     expect(family).toMatch(/Bricolage.*Hanken/);
   });
