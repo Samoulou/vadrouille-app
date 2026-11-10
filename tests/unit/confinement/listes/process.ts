@@ -82,6 +82,11 @@ export const PROPRIETES_PROCESS = [
   // rien n'y est écrit par le test. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
   { fichier: "tests/db/auth.test.ts", propriete: "stdout" },
   { fichier: "tests/db/auth.test.ts", propriete: "stderr" },
+  // M9a (ticket 1097 ; spécification M9 § 6.2) : même forme que `tests/db/auth.test.ts`, sortie standard et sortie
+  // d'erreur espionnées (`vi.spyOn(…, "write")`) pendant la réauthentification et l'export, pour prouver qu'aucune
+  // adresse, aucun code ni aucun contenu de voyage n'y est écrit ; rien n'y est écrit par le test. Verdict Sécurité à rendre.
+  { fichier: "tests/db/export-compte.test.ts", propriete: "stdout" },
+  { fichier: "tests/db/export-compte.test.ts", propriete: "stderr" },
 ] as const satisfies readonly LigneProcess[];
 
 export const LECTURES_ENV = [

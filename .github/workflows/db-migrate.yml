@@ -118,6 +118,8 @@ jobs:
             "0022_feedback_signalements 44ea9ca8672b6870114f39eab838ce3c88a2f3c2adcc1f63a1753588bb966590"
             "0023_lien_prive_partage 1e5ba834a4cb3da1c1927c83b468150adbcea6e62b9d4d672754f2b55103b3e1"
             "0024_rappels 5218eb24815f22d36ef8f9e27dfc2fcbc2a6199381cead93c8a20964be349248"
+            "0025_recu_stripe c1bc97d25a64497784d4e139f6d00070f04825166c23e87893b6ef7cb532930d"
+            "0026_apres_voyage 1ac33b5646674d981e26abaef7bb4461c0f74b0f73e2e6a44c71615e19988902"
           )
 
           # 1. Contrôles, sans connexion (§ 2.6.1). Un échec n'affiche que le nom du contrôle, jamais une valeur.
