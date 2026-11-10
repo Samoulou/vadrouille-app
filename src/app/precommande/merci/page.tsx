@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getPrevente } from "@/adapters";
+import { getPrevente, pagesLegalesDisponibles } from "@/adapters";
 import { Button } from "@/components/ligne/Button";
 import { PRODUCT_NAME } from "@/config/site";
+import { LiensLegaux } from "@/features/accueil/LiensLegaux";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
@@ -30,6 +31,7 @@ export default function PrecommandeMerciPage() {
       <p className="text-corps text-ink">{t.texte}</p>
       <p className="text-corps text-ink-soft">{format(t.suite, { date })}</p>
       <p className="text-corps text-ink-soft">{t.remboursement}</p>
+      {pagesLegalesDisponibles() ? <LiensLegaux /> : null}
       <Button asChild variant="secondary" className="mt-2 w-full">
         <Link href="/">{t.retour}</Link>
       </Button>

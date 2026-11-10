@@ -296,8 +296,6 @@ export default defineConfig([
     "coverage/**",
     // Routes générées par le Workflow SDK au build (`withWorkflow`, décision 0063) ; ignorées par git.
     "src/app/.well-known/workflow/**",
-    // Outil de design tiers installé tel quel (décision 0173) : ses scripts ne font pas partie du code de l'app.
-    ".claude/skills/**",
   ]),
   {
     plugins: { ligne },

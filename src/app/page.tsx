@@ -6,6 +6,7 @@ import {
   getPrevente,
   getTripAdapter,
   isMockAdapter,
+  pagesLegalesDisponibles,
   paymentAvailable,
   siteEssaiAutorise,
   sourcePrevente,
@@ -66,7 +67,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const essai = siteEssaiAutorise();
   const footer = demo ? <DemoSection destination={demo.destination} links={demoLinks()} /> : null;
   if (prevente) {
-    return <LandingPrevente href={preventeRoutes.precommander(src)} prix={formatPrice(prevente.amount, prevente.currency)} demo={footer} />;
+    return <LandingPrevente href={preventeRoutes.precommander(src)} prix={formatPrice(prevente.amount, prevente.currency)} demo={footer} legal={pagesLegalesDisponibles()} />;
   }
   return (
     <Landing

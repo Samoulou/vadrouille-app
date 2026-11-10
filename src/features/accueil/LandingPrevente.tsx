@@ -9,6 +9,7 @@ import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
 import { EXEMPLE } from "./Landing";
+import { LiensLegaux } from "./LiensLegaux";
 
 const t = messages.prevente;
 const exemple = messages.accueil.exemple;
@@ -54,6 +55,8 @@ export interface LandingPreventeProps {
   prix: string;
   /** Section « Démonstration » (données simulées), quand elle existe. */
   demo?: ReactNode;
+  /** Vrai quand les pages légales répondent (`pagesLegalesDisponibles()`) : affiche les liens vers elles. */
+  legal?: boolean;
 }
 
 /**
@@ -180,7 +183,12 @@ const GESTES: readonly ReactNode[] = [
  * arrêt à chaque section et finit au terminus du dernier appel. Pas de halo, pas d'ombre, pas d'inclinaison : la
  * profondeur vient des aplats, comme dans Ligne.
  */
-export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
+export function LandingPrevente({
+  href,
+  prix,
+  demo,
+  legal = false,
+}: LandingPreventeProps) {
   const date = t.ouverture;
   const produit = PRODUCT_NAME;
   return (
@@ -411,6 +419,7 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
               <p className="text-corps-s text-ink-soft">{t.prix.moyens}</p>
               <p className="text-corps-s text-ink-soft">{t.prix.sansAide}</p>
             </div>
+            {legal ? <LiensLegaux /> : null}
           </div>
         </div>
       </Troncon>
@@ -479,6 +488,14 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
             <Precommander href={href} prix={prix} className={FOCUS_SUR_INK} />
           </div>
         </div>
+        {legal ? (
+          <footer className="border-t border-outline-strong">
+            <div className={cn(LARGEUR, VOIE)}>
+              <div aria-hidden="true" />
+              <LiensLegaux surInk className="py-4" />
+            </div>
+          </footer>
+        ) : null}
       </section>
 
       {demo ? (

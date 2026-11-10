@@ -10,7 +10,7 @@ Samuel, fil du projet « Retirer le look IA du design », 2026-11-10 10:30 UTC (
 
 ## Installation
 
-La skill est copiée telle quelle dans `.claude/skills/unslop/` (révision `97daa3e` du dépôt `heydamir/unslop`, licence CC BY 4.0, auteur Damir Sokolovsky, crédit et licence conservés). Contenu tiers lu avant installation : des consignes de design, deux scripts Node facultatifs (`snapshot.mjs`, capture d'une page ; `story.mjs`, vidéo) qui ne sont appelés par rien dans le dépôt, la CI ni le build. Aucune dépendance ajoutée. Verdict de la Sécurité attendu à la revue.
+La skill est copiée telle quelle dans `.claude/skills/unslop/` (révision `97daa3e` du dépôt `heydamir/unslop`, licence CC BY 4.0, auteur Damir Sokolovsky, crédit et licence conservés). Contenu tiers lu avant installation : des consignes de design et des images de référence. Seule différence avec la source : ses deux scripts Node facultatifs (`scripts/snapshot.mjs`, capture d'une page en ligne ; `scripts/story.mjs`, vidéo) ne sont **pas** copiés dans le dépôt, parce que le contrôle de confinement (`tests/unit/confinement`) refuse leurs accès (processus, fichiers) et qu'aucun des deux ne sert ici : les deux passages de `SKILL.md` qui les citent ne s'appliquent donc pas. Aucun code exécutable ajouté. Aucune dépendance ajoutée. Verdict de la Sécurité attendu à la revue.
 
 ## Direction (les cinq lignes de la skill)
 

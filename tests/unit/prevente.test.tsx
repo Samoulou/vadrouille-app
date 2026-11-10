@@ -13,6 +13,22 @@ function ouvrir(lien?: string) {
   return getPrevente();
 }
 
+/** Les six valeurs qui rendent les pages légales disponibles (`src/adapters/pages-legales.ts`). */
+function vendeur() {
+  vi.stubEnv("VENDEUR_NOM", "Vendeur d'essai");
+  vi.stubEnv("VENDEUR_STATUT", "statut d'essai");
+  vi.stubEnv("VENDEUR_ADRESSE", "Rue de l'Essai 1, 0000 Ville d'essai");
+  vi.stubEnv("VENDEUR_CONTACT", "contact@vendeur-essai.example");
+  vi.stubEnv("VENDEUR_CONSERVATION", "durée d'essai");
+  vi.stubEnv("TEXTES_LEGAUX_DATE", "2026-11-10");
+}
+/** Adresse de chaque page légale, et nombre de liens attendus vers elle sur la page d'accueil. */
+const LIENS_LEGAUX = {
+  "/precommande/mentions-legales": 2,
+  "/precommande/conditions-de-vente": 2,
+  "/precommande/donnees": 2,
+} as const;
+
 afterEach(() => {
   vi.unstubAllEnvs();
 });
@@ -70,6 +86,24 @@ describe("accueil : précommande", () => {
     expect(screen.queryByText("Aucun lieu inventé")).not.toBeInTheDocument();
   });
 
+  it("ouverte, pages légales non configurées : aucun lien vers elles", async () => {
+    vi.stubEnv("PREVENTE", "1");
+    render(await HomePage({ searchParams: Promise.resolve({}) }));
+    expect(screen.queryByRole("navigation", { name: "Informations légales" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Mentions légales" })).not.toBeInTheDocument();
+  });
+
+  it("ouverte, pages légales configurées : liens près du bouton du prix et au pied de la page", async () => {
+    vi.stubEnv("PREVENTE", "1");
+    vendeur();
+    render(await HomePage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getAllByRole("navigation", { name: "Informations légales" })).toHaveLength(2);
+    for (const [href, attendus] of Object.entries(LIENS_LEGAUX)) {
+      const liens = screen.getAllByRole("link").filter((lien) => lien.getAttribute("href") === href);
+      expect(liens, href).toHaveLength(attendus);
+    }
+  });
+
   it("ouverte, provenance invalide : bouton sans provenance", async () => {
     vi.stubEnv("PREVENTE", "1");
     render(await HomePage({ searchParams: Promise.resolve({ src: "a b" }) }));
@@ -115,5 +149,17 @@ describe("précommande : pages", () => {
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     expect(screen.getByText(/Si ton paiement a abouti/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/sans démarche|e-mail d'accès|réponds à l'e-mail/);
+  });
+
+  it("merci : liens vers les pages légales seulement quand elles sont configurées", () => {
+    ouvrir(LIEN);
+    const { unmount } = render(PrecommandeMerciPage());
+    expect(screen.queryByRole("navigation", { name: "Informations légales" })).not.toBeInTheDocument();
+    unmount();
+    vendeur();
+    render(PrecommandeMerciPage());
+    for (const href of Object.keys(LIENS_LEGAUX)) {
+      expect(screen.getAllByRole("link").filter((lien) => lien.getAttribute("href") === href)).toHaveLength(1);
+    }
   });
 });
