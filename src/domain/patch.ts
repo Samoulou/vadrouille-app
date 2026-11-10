@@ -12,6 +12,7 @@ import {
   type TransferItem,
   type TripSnapshot,
 } from "@/contracts";
+import type { AddedBy } from "@/contracts/values";
 
 import { budgetParPersonne, changementDeBudget } from "@/domain/calculs";
 import { creneauOccupe } from "@/domain/changement-de-ville";
@@ -23,6 +24,7 @@ import type { Trajet } from "@/domain/planification";
 import { INCONNU, logementsDuJour, trajetLePlusRapide, type Point } from "@/domain/relectures";
 import { finOccupee, repasDeLHeure, squelette, type JourSquelette } from "@/domain/squelette";
 import { element, lire } from "@/domain/tables";
+import { estLieuASoi } from "@/domain/lieu-a-soi";
 import { arrondi5, versHeure, versMinutes } from "@/domain/temps";
 import {
   estBloquante,
@@ -72,10 +74,16 @@ export type EntreePatch = {
   /**
    * Identifiants des étapes ajoutées par la personne dans les versions précédentes (R1 selon B5-PO-4, R7 selon
    * B5-PO-8). Depuis la décision 0147 § 6.1, le moteur y ajoute lui-même les étapes de la base marquées
-   * `addedBy: "person"` (le serveur n'a plus à relire l'historique) ; le paramètre reste pour `mock` et les tests. Ceux
-   * du patch courant s'y ajoutent.
+   * `addedBy` (lieu à soi ou adresse découverte, `estLieuASoi` ; le serveur n'a plus à relire l'historique) ; le paramètre
+   * reste pour `mock` et les tests. Ceux du patch courant s'y ajoutent.
    */
   ajouts?: ReadonlySet<string>;
+  /**
+   * Marque posée sur l'étape créée par une opération `add` (M8b, décision 0160 § 1.4 point 4) : `person` par défaut,
+   * `discovered` pour une adresse découverte sur place. Calculée par le serveur (`marqueDAjout`, horloge du serveur et fuseau
+   * du voyage) ; ni `TripPatch` ni `AddPlaceRequest` n'ont de champ pour elle : aucune valeur du client ne la choisit (S6).
+   */
+  marqueAjout?: AddedBy;
 };
 
 export type ResultatPatch =
@@ -624,8 +632,9 @@ export function appliquerPatch(entree: EntreePatch): ResultatPatch {
   const choix = new Map<string, EtatChoix>(moteur.choix);
   const ajouts = new Set([
     ...(entree.ajouts ?? []),
-    // Lieux à soi de la base (décision 0147 § 6.1) : marqués dans l'instantané, rétablis par un `revert`.
-    ...base.days.flatMap((jour) => etapesDuJour(jour).flatMap((stop) => (stop.addedBy === "person" ? [stop.id] : []))),
+    // Lieux à soi et adresses découvertes de la base (décisions 0147 § 6.1 et 0160 § 1.4) : marqués dans l'instantané,
+    // rétablis par un `revert`.
+    ...base.days.flatMap((jour) => etapesDuJour(jour).flatMap((stop) => (estLieuASoi(stop) ? [stop.id] : []))),
   ]);
   const deverrouillees = new Set<string>();
   const candidats = new Map(moteur.candidats.map((candidat) => [candidat.id, candidat]));
@@ -702,8 +711,9 @@ export function appliquerPatch(entree: EntreePatch): ResultatPatch {
           facts: {},
           exceptions: [],
           locked: false,
-          // Lieu à soi (décision 0147 § 6.1) : marque stockée dans l'instantané ; « Ajouté par toi. » sur la fiche.
-          addedBy: "person",
+          // Lieu à soi (décision 0147 § 6.1) : marque stockée dans l'instantané ; « Ajouté par toi. » sur la fiche, ou
+          // « Découvert sur place. » si le serveur a calculé `discovered` (M8b, décision 0160 § 1.4 point 4).
+          addedBy: entree.marqueAjout ?? "person",
         };
         retirerRepasOuvert(jour, stop, configuration);
         jour.lignes.push({ genre: "etape", stop, fixe: true });

@@ -223,6 +223,13 @@ describe("Recherche d'un lieu à soi et demande d'ajout (décision 0147 § 3)", 
     for (const extra of [{ displayName: "Nom Google" }, { address: "Adresse" }, { query: "café" }, { placeId: PLACE }, { requestId: REQUETE }]) {
       expect(AddPlaceRequestSchema.safeParse({ ...demande, ...extra }).success, Object.keys(extra)[0]).toBe(false);
     }
+    // M8b (ticket 1111 ; spécification M8 § 6.4, critère M8b-2 ; décision 0160 § 2.6) : la marque « découvert » est calculée
+    // par le serveur ; ni la demande ni son application n'ont de champ pour elle.
+    for (const extra of [{ addedBy: "discovered" }, { addedBy: "person" }, { discovered: true }, { marqueAjout: "discovered" }]) {
+      expect(AddPlaceRequestSchema.safeParse({ ...demande, ...extra }).success, JSON.stringify(extra)).toBe(false);
+      expect(AddPlaceApplySchema.safeParse({ ...demande, requestId: REQUETE, ...extra }).success, JSON.stringify(extra)).toBe(false);
+    }
+    expect(AddPlaceApplySchema.safeParse({ ...demande, requestId: REQUETE }).success).toBe(true);
     expect(AddPlaceRequestSchema.safeParse({ ...demande, name: "<script>" }).success).toBe(false);
     expect(AddPlaceRequestSchema.safeParse({ ...demande, name: "" }).success).toBe(false);
     expect(AddPlaceRequestSchema.safeParse({ ...demande, kind: "event" }).success).toBe(false);

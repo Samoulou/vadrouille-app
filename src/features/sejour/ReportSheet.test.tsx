@@ -208,6 +208,8 @@ describe("signalement: fiche", () => {
   it.each([
     ["engagement", 1, "j1-tattoo", {}],
     ["lieu à soi", 2, "j2-dean-village", { addedBy: "person" as const }],
+    // M8b (ticket 1111 ; critère M8b-5) : une adresse découverte ne se signale pas sur la fiche.
+    ["lieu découvert sur place", 2, "j2-dean-village", { addedBy: "discovered" as const }],
     ["événement", 2, "j2-concert-orgue", {}],
   ])("pas de bouton pour un %s", (_nom, n, stopId, overrides) => {
     renderFiche(n, stopId, { overrides });

@@ -26,5 +26,11 @@
   "horsLigne": "Tu es hors ligne. Tu pourras donner ton avis dès que le réseau revient.",
   "erreur": "Impossible d'enregistrer ton avis pour le moment.",
   "reessayer": "Réessayer",
-  "reessayerEtape": "Réessayer : {name}"
+  "reessayerEtape": "Réessayer : {name}",
+  "decouvertes": {
+    "titre": "Adresses découvertes",
+    "sousTitre": "Les lieux que tu as ajoutés pendant ton voyage.",
+    "aucune": "Aucune adresse découverte pendant ce voyage.",
+    "ligne": "{name} · Jour {n}"
+  }
 }
