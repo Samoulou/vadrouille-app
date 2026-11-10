@@ -1,5 +1,14 @@
 {
   "export": {
     "notice": "Ce fichier contient les données que {produit} garde sur toi et tes voyages, à la date indiquée. Les lieux y sont désignés par leur identifiant Google, sans autre information Google. Les codes (catégories, avis, statuts) sont ceux de l'application."
+  },
+  "suppression": {
+    "titre": "Supprimer ton compte",
+    "supprime": "Seront supprimés : ton adresse e-mail, tes voyages et leurs programmes, tes briefs, ton tri, tes avis, tes goûts retenus, tes accords aux rappels et tes liens privés.",
+    "garde": "Nous gardons la trace de tes paiements le temps exigé par la loi, sans ton adresse ni tes voyages.",
+    "irreversible": "Rien ne pourra être rétabli. Pense à exporter tes données avant.",
+    "fin": "Ton compte est supprimé.",
+    "paiementEnAttente": "Un paiement est en cours. Réessaie quand il sera terminé.",
+    "erreur": "Impossible de supprimer ton compte pour le moment."
   }
 }

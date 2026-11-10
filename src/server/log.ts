@@ -190,6 +190,11 @@ export const LOG_EVENTS = [
   // instantané illisible, taille au-delà de la borne) ; réponse 500 sans fichier ; niveau `error`. **`errorName` seul**
   // (`CHAMPS_ADMIS_PAR_EVENEMENT`) : jamais l'adresse, un identifiant, une destination, un récit ni un nom d'étape.
   "compte.export_failed",
+  // M9b (ticket 1106 ; spécification M9 § 4.3 et § 6.1) : « Supprimer mon compte » n'a pas pu finir (base, limiteur), après
+  // la relance interne de l'action ou pendant la reprise de `verifyCode` ; l'organisation reste en « suppression en
+  // cours » et une prochaine vérification de code reprend ; niveau `error`. **`errorName` seul** : jamais l'adresse ni un
+  // identifiant.
+  "compte.suppression_failed",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -933,6 +938,8 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   ["calendrier.version_unavailable", new Set<string>()],
   // M9a (ticket 1097) : nom de l'erreur seulement ; tout autre champ est retiré.
   ["compte.export_failed", new Set(["errorName"])],
+  // M9b (ticket 1106) : nom de l'erreur seulement ; tout autre champ est retiré.
+  ["compte.suppression_failed", new Set(["errorName"])],
   [
     "generation.programme_written",
     new Set([

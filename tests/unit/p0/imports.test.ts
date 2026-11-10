@@ -2158,6 +2158,12 @@ const FRONTIERE_P0R3B = {
     // Rappels par e-mail de api (M6c, ticket 1021 ; décision 0157 § 1.7 point 5) : `setTripReminders`, `getTripReminders`.
     // Entrée relevée par `pnpm test`, au-delà de 0157 : verdict Sécurité à rendre à la revue de M6c.
     { fichier: "src/server/actions/rappels.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Compte de api (M9b, ticket 1106 ; spécification M9 § 6.3, qui place `deleteAccount` dans ce fichier ; régime des
+    // entrées : décision 0055, section 1 point 2 ; suppression : décisions 0007 et 0167) : `deleteAccount` lit le limiteur
+    // et la base (`src/server/account/delete.ts`), à côté de `requestCode`, `verifyCode`, `signOut` et `hasSession`. Même
+    // propriété que les autres actions : `"use server"`, ses exports ne sont que des références vues du navigateur.
+    // Entrée relevée par `pnpm test`. Verdict Sécurité et Tech Lead : acceptée, revue consolidée du head b601197 (PR 1108).
+    { fichier: "src/server/actions/compte.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
     // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
@@ -2446,6 +2452,7 @@ describe("p0: clé côté serveur seulement", () => {
       "src/server/actions/retouches.ts",
       "src/server/actions/lieux.ts",
       "src/server/actions/rappels.ts",
+      "src/server/actions/compte.ts",
       "src/server/routes/simulated-webhook.ts",
       "src/server/routes/stripe-webhook.ts",
       "src/server/routes/calendrier.ts",

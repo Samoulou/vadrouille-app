@@ -598,6 +598,8 @@ describe("module de journal", () => {
       "calendrier.version_unavailable",
       // M9a (ticket 1097) : export du compte en échec, nom de l'erreur seulement.
       "compte.export_failed",
+      // M9b (ticket 1106) : suppression du compte en échec, nom de l'erreur seulement.
+      "compte.suppression_failed",
       "log.unknown_event",
     ]);
   });
