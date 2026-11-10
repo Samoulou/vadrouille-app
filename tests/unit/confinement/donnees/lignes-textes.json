@@ -1138,6 +1138,21 @@
         }
       ],
       "ecart": "précommande (décision 0168) : lien de paiement hébergé, sans clé ni appel sortant ; verdict Sécurité à rendre à la revue de la PR"
+    },
+    {
+      "fichier": "src/features/accueil/PageLegale.tsx",
+      "portee": "application",
+      "usage": "lien sortant vers la politique de confidentialité de Stripe, sur la page « Tes données et la précommande » (nouvel onglet, noopener noreferrer) ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:stripe.com",
+          "formes": [
+            "https://stripe.com/fr-ch/privacy"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "pages légales de la précommande (décision 0168, « Conditions d'activation » ; ticket 1125 ; note d'intégration de docs/commercial/textes-legaux-prevente.md) : lien affiché, sans clé ni appel sortant ; verdict Sécurité à rendre à la revue de la PR"
     }
   ]
 }

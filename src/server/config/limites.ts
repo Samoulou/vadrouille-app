@@ -95,6 +95,12 @@ export const RATE_LIMITS: RateLimitConfig = {
   // personne propriétaire, du déblocage et de l'accès `open`, avant le contrôle de l'étape et toute écriture ; `api`
   // seulement (sur `mock`, les avis vivent dans la mémoire de l'onglet).
   avis: [{ kind: "ip", windowSeconds: 3600, threshold: 120 }],
+  // M8c-1 (ticket 1121 ; décision 0160 § 2.3, S3, confirmé par la Sécurité en revue de la PR 1124) : goûts retenus, 20 gestes
+  // par heure et par adresse IP. « Retenir ces goûts » et « Annuler » un retrait sont refusés au-delà ; « Retirer » et
+  // « Retirer tous mes goûts » sont comptés (verdict ignoré, panne comprise) et **jamais refusés** (RGPD art. 7 (3), comme
+  // 0157 § 1.7 point 5). Vérifié après le contrôle du voyage, de la personne et de l'accès, avant toute écriture ; `api`
+  // seulement (sur `mock`, les goûts vivent dans la mémoire de l'onglet).
+  gouts: [{ kind: "ip", windowSeconds: 3600, threshold: 20 }],
   // M9a (ticket 1097 ; spécification M9 § 5 point 7, S7 à confirmer par la Sécurité) : « Exporter mes données », 5 par heure
   // et par personne (proposition). Espèce `user` : identifiant de la personne de la session, sans dépendre de l'en-tête
   // d'adresse. Vérifié après la session, le rôle, l'organisation personnelle et la connexion récente (refus gratuits), avant
