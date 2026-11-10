@@ -2,9 +2,14 @@ import type { PlacePhoto } from "@/contracts/photo";
 import { APP_TRIAL_TRIP_ID_PATTERN, type RevisionFixtures, type Trip, type TrialRevisionRequest, type TrialRevisionResult } from "@/contracts";
 import { unlockRoutes } from "@/features/presentation/routes";
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
+import { SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR } from "@/server/config/lieux";
+import { RATE_LIMITS } from "@/server/config/limites";
+import { CONFIGURATION_MOTEUR } from "@/server/config/moteur";
 import { OFFER_CONFIG } from "@/server/config/offer";
+import { VERSIONS_MAX_PAR_VOYAGE } from "@/server/config/retouches";
 
 import { apiCreationAdapter } from "./api-creation-instance";
+import { photosApi, type PhotosApiBranchees } from "./api-photos-instance";
 import { apiTripAdapter } from "./api-instance";
 import { assertAuthAdapter } from "./auth-guard";
 import { betterAuthServerAdapter } from "./better-auth";
@@ -12,6 +17,9 @@ import { counterpartOf, getMockRevisionFixtures, mockTripAdapter } from "./mock"
 import { createMockAuthAdapter } from "./mock-auth";
 import { createMockCreationAdapter } from "./mock-creation";
 import { createMockPaymentAdapter } from "./mock-payment";
+import { createMockPlaces, VERSION_SIMULEE, type DureesAjout } from "./mock-lieux";
+import { createMockStopReports } from "./mock-reports";
+import { createMockTripVersions } from "./mock-versions";
 import { createMockShareAdapter, shareEnded } from "./mock-share";
 import {
   assertPrototypeAllowedOnProcess,
@@ -26,13 +34,39 @@ import {
 } from "./prototype-instance";
 import { withSimulatedUnlock } from "./mock-unlock";
 import { adapterChoice, isPrototypeAdapter, paymentAvailable } from "./payment-guard";
-import { realShareAvailable, shareAvailable } from "./share-guard";
+import { apiShareAdapter } from "./api-share-instance";
+import { apiShareAvailable, realShareAvailable, shareAvailable } from "./share-guard";
 import { createSignedShareAdapter } from "./signed-share";
 import { paiementSimule } from "./simulated-payment-instance";
-import { authHmacKey, defaultScope, getSimulationScope, MAX_AUTH_ADDRESSES_PER_SCOPE, MAX_LAUNCHES_PER_SCOPE, type SimulationScope } from "./simulation";
-import type { AdapterContext, AuthAdapter, CreationAdapter, PaymentAdapter, PaymentSimulator, ShareAdapter, TripAdapter } from "./types";
+import { paiementStripe } from "./stripe-payment-instance";
+import {
+  authHmacKey,
+  defaultScope,
+  getSimulationScope,
+  MAX_AUTH_ADDRESSES_PER_SCOPE,
+  MAX_LAUNCHES_PER_SCOPE,
+  MAX_PLACE_SEARCHES_PER_SCOPE,
+  MAX_STOP_REPORTS_PER_SCOPE,
+  emptyVersionsStore,
+  type SimulationScope,
+} from "./simulation";
+import type {
+  AddPlaceAdapter,
+  AdapterContext,
+  AuthAdapter,
+  CreationAdapter,
+  PaymentAdapter,
+  PaymentSimulator,
+  PlaceAdapter,
+  RevisionAdapter,
+  ShareAdapter,
+  StopReportAdapter,
+  TripAdapter,
+  TripVersionsAdapter,
+} from "./types";
 
 export type {
+  AddPlaceAdapter,
   AdapterContext,
   AuthAdapter,
   AuthConfig,
@@ -40,8 +74,11 @@ export type {
   MemberRole,
   PaymentAdapter,
   PaymentSimulator,
+  PlaceAdapter,
+  RevisionAdapter,
   ShareAdapter,
   TripAdapter,
+  TripVersionsAdapter,
 } from "./types";
 export { MOCK_DEMO_TRIP, MOCK_DEMO_UNLOCKED_TRIP } from "./mock";
 /**
@@ -52,8 +89,10 @@ export { MOCK_DEMO_TRIP_DRAFT as MOCK_DEMO_DRAFT } from "@/mocks/creation-edimbo
 export { authAdapterChoice, betterAuthAllowed, mockAuthAllowed } from "./auth-guard";
 export { assertApiAdapter } from "./api-guard";
 export { getRequestContext, SessionRequiseError } from "./context";
+// M9a (ticket 1097) : session et création de session lues par les opérations branchées (route de l'export du compte).
+export { creationDeSessionBranchee, sessionBranchee } from "./better-auth";
 export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
-export { realShareAvailable, shareAvailable, shareDemoAvailable } from "./share-guard";
+export { apiShareAvailable, realShareAvailable, shareAvailable, shareDemoAvailable } from "./share-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";
 export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype-instance";
 
@@ -64,6 +103,15 @@ export { brancherLectureProgrammesReels, prototypeRelectures } from "./prototype
  */
 export function isMockAdapter(value: string | undefined = process.env.DATA_ADAPTER): boolean {
   return adapterChoice(value) === "mock";
+}
+
+/**
+ * Vrai quand l'adaptateur de données est exactement `api` (`DATA_ADAPTER`, après `trim()`), faux pour toute autre valeur,
+ * sans lever d'erreur ni rien construire (décision 0141 § 6.4) : l'écran 1 n'y monte la recherche de ville de `api` que si
+ * `rechercheVilleApiOuverte()` rend aussi vrai.
+ */
+export function isApiAdapter(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  return adapterChoice(value) === "api";
 }
 
 /**
@@ -156,7 +204,7 @@ export function getAuthAdapter(options: { scope?: SimulationScope; env?: NodeJS.
 export const CHECKOUT_TTL_MS = 30 * 60_000;
 export const DEMO_UNLOCK_TTL_MS = 30 * 60_000;
 
-function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_ADAPTER): "mock" | "simulated" {
+function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_ADAPTER): "mock" | "simulated" | "stripe" {
   const choice = adapterChoice(value);
   switch (choice) {
     case "mock":
@@ -165,7 +213,9 @@ function paymentAdapterChoice(value: string | undefined = process.env.PAYMENT_AD
       // B4b (spécification B4, B4b point 1) : paiement simulé en base, branché au démarrage (`./simulated-payment-instance.ts`).
       return "simulated";
     case "stripe":
-      throw new Error("adaptateur de paiement stripe non implémenté (tâche de paiement réel, après G0 et Q26)");
+      // B4c (spécification B4, B4c point 2 ; décision 0140 § 5 point 1) : Stripe en mode test, branché au démarrage
+      // (`./stripe-payment-instance.ts`) ; sans simulateur.
+      return "stripe";
     default:
       throw new Error(`PAYMENT_ADAPTER inconnu : « ${choice} » (valeurs : mock, simulated, stripe)`);
   }
@@ -185,28 +235,37 @@ function mockPaymentFor(scope: SimulationScope): PaymentAdapter & PaymentSimulat
   });
 }
 
-/** Adaptateur du choix courant : `mock` dans la portée, `simulated` branché au démarrage (la portée ne sert pas). */
-function paymentFor(scope: SimulationScope | undefined): PaymentAdapter & PaymentSimulator {
-  return paymentAdapterChoice() === "simulated" ? paiementSimule() : mockPaymentFor(scope ?? defaultScope());
+/**
+ * Adaptateur du choix courant : `mock` dans la portée, `simulated` ou `stripe` branchés au démarrage (la portée ne sert
+ * pas) ; `stripe` n'a pas de simulateur.
+ */
+function paymentFor(scope: SimulationScope | undefined): { adapter: PaymentAdapter; simulator: PaymentSimulator | null } {
+  const choice = paymentAdapterChoice();
+  if (choice === "stripe") return { adapter: paiementStripe(), simulator: null };
+  const adapter = choice === "simulated" ? paiementSimule() : mockPaymentFor(scope ?? defaultScope());
+  return { adapter, simulator: adapter };
 }
 
 /**
- * Adaptateur de paiement (variable serveur `PAYMENT_ADAPTER`, `mock` par défaut ; `simulated` depuis B4b, l'état vit
- * alors en base et la portée de simulation ne sert pas). **Filet de sécurité** : lève une erreur si `paymentAvailable()`
- * est faux ; les pages et les actions consultent la garde avant et ne l'atteignent jamais dans ce cas. `stripe` lève
- * toujours « non implémenté » (B4c).
+ * Adaptateur de paiement (variable serveur `PAYMENT_ADAPTER`, `mock` par défaut ; `simulated` depuis B4b et `stripe` en
+ * mode test depuis B4c : l'état vit alors en base et la portée de simulation ne sert pas). **Filet de sécurité** : lève
+ * une erreur si `paymentAvailable()` est faux ; les pages et les actions consultent la garde avant et ne l'atteignent
+ * jamais dans ce cas.
  */
 export function getPaymentAdapter(options: { scope?: SimulationScope } = {}): PaymentAdapter {
   if (!paymentAvailable()) {
     throw new Error("paiement indisponible : paymentAvailable() est faux (décision 0020 § 2.3)");
   }
-  return paymentFor(options.scope);
+  return paymentFor(options.scope).adapter;
 }
 
-/** Simulation des issues : `null` hors adaptateur simulé autorisé (décision 0020 § 2.3, amendée par B4b). */
+/**
+ * Simulation des issues : `null` hors adaptateur simulé autorisé (décision 0020 § 2.3, amendée par B4b), et toujours
+ * `null` pour `stripe` (B4c, décision 0140 § 5 point 1 : seul le webhook Stripe accorde le droit).
+ */
 export function getPaymentSimulator(options: { scope?: SimulationScope } = {}): PaymentSimulator | null {
   if (!paymentAvailable()) return null;
-  return paymentFor(options.scope);
+  return paymentFor(options.scope).simulator;
 }
 
 /**
@@ -318,6 +377,21 @@ async function lieuDeLaProposition(lecteur: TripAdapter, ctx: AdapterContext, tr
 }
 
 /**
+ * Étape commune aux photos du site d'essai et de `api` (décisions 0128 et 0143) : lecture différée du lieu de la carte,
+ * appelée par le service des photos après sa barrière seulement ; lieu absent ou mal formé : `null`.
+ */
+function lieuDeLaCarte(
+  lecteur: () => TripAdapter,
+  ctx: AdapterContext,
+  demande: { readonly tripId: string; readonly proposalId: string },
+): () => Promise<string | null> {
+  return async () => {
+    const placeId = await lieuDeLaProposition(lecteur(), ctx, demande.tripId, demande.proposalId);
+    return placeId !== null && PLACE_ID_PHOTO.test(placeId) ? placeId : null;
+  };
+}
+
+/**
  * Photo d'une carte du tri d'un voyage d'essai (décision 0128, demande de Samuel du 2026-10-23 15:23 UTC), chargée à la
  * demande par les photos branchées sur l'adaptateur `prototype` (`src/server/p0/photos.ts` : garde du mode réel, cookie
  * d'accès, cadence et forfait réservé). **Le lieu n'est jamais pris de l'entrée** : il est lu sur la proposition
@@ -336,13 +410,60 @@ export async function photoLieuEssai(
     const photos = photosEssai();
     if (photos === null) return null;
     // Le voyage n'est lu qu'après la garde et le cookie d'accès (`src/server/p0/photos.ts`) : sans code d'accès, aucune lecture.
-    const lieu = async () => {
-      const placeId = await lieuDeLaProposition(lecteur(), ctx, demande.tripId, demande.proposalId);
-      return placeId !== null && PLACE_ID_PHOTO.test(placeId) ? placeId : null;
-    };
+    const lieu = lieuDeLaCarte(lecteur, ctx, demande);
     return (await photos.photo(lieu)) ?? null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Chemin des photos du tri selon l'adaptateur de données (décision 0128, ticket 879) : `prototype` (site d'essai),
+ * `api` (vraie app), `null` pour `mock` et toute autre valeur (aucune photo, rien n'est lu). Sans lever d'erreur.
+ */
+export function cheminPhotosDuTri(value: string | undefined = process.env.DATA_ADAPTER): "prototype" | "api" | null {
+  const choix = adapterChoice(value);
+  return choix === "prototype" || choix === "api" ? choix : null;
+}
+
+/**
+ * Photo d'une carte du tri sur l'adaptateur `api` (décision 0143, qui généralise 0128 ; ticket 879, M1e) : barrière
+ * B9-TL-8, client branché, lieu, cadence et client de `src/server/photos/api.ts`, branchés au démarrage
+ * (`api-photos-instance.ts`). **Le lieu n'est jamais pris de l'entrée** : il est lu en base sur la proposition
+ * `proposalId` du voyage `tripId`, par `getTripReader()` dans le contexte d'organisation de la requête (mêmes cartes que
+ * l'écran, `lieuDeLaProposition`), et seulement barrière ouverte et client branché. Hors adaptateur `api`,
+ * voyage inconnu ou d'une autre organisation, proposition d'un autre voyage ou sans lieu, identifiant mal formé : `null`,
+ * photos non branchées, aucun appel. Ne lève jamais ; rien n'est stocké.
+ */
+export async function photoLieuApi(
+  ctx: AdapterContext,
+  demande: { readonly tripId: string; readonly proposalId: string },
+  lecteur: () => TripAdapter = getTripReader,
+): Promise<PlacePhoto | null> {
+  if (cheminPhotosDuTri() !== "api") return null;
+  try {
+    const photos = photosApi();
+    if (photos === null) return null;
+    const lieu = lieuDeLaCarte(lecteur, ctx, demande);
+    return (await photos.photo(lieu)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Vrai si l'écran du tri demande la photo de la carte affichée : site d'essai (`prototype`, sa garde est celle de
+ * l'action), ou `api` barrière ouverte et client branché (`photosApiOuvertes`) ; faux sinon (`mock`, `api` sous la
+ * barrière fermée ou photos non branchées : l'emplacement « Photo du lieu » reste, sans appel à l'action).
+ */
+export async function photosDuTriActives(photos: () => PhotosApiBranchees | null = photosApi): Promise<boolean> {
+  const chemin = cheminPhotosDuTri();
+  if (chemin === "prototype") return true;
+  if (chemin !== "api") return false;
+  try {
+    return (await photos()?.ouvertes()) === true;
+  } catch {
+    return false;
   }
 }
 
@@ -362,11 +483,149 @@ export async function getRevisionFixtures(
 }
 
 /**
+ * Révision enregistrée (écran 14 ; tâche M1g, ticket 869) : celle de l'adaptateur `api` (`TripAdapter.revision`),
+ * `null` pour `mock` et `prototype` (l'écran garde alors son implémentation en mémoire et le jeu simulé de révision).
+ * Lue par les actions serveur de `src/server/actions/remplacement.ts` et par la mise en page du voyage.
+ */
+export function revisionEnregistree(value: string | undefined = process.env.DATA_ADAPTER): RevisionAdapter | null {
+  if (adapterChoice(value) !== "api") return null;
+  return getTripAdapter(value).revision ?? null;
+}
+
+/**
+ * Signalement d'une erreur sur une étape (tâche M5c, ticket 904 ; décision 0147 § 1) : `mock`, dans la portée de simulation
+ * (`options.scope`, sinon celle de la requête), voyages lus par `getTripReader()` de la même portée ; `api`, la table
+ * `feedback` (`TripAdapter.reports`) ; `null` pour `prototype` (le site d'essai n'a pas de signalement : la fiche ne montre
+ * pas le bouton, `signalementDisponible`). Lu par l'action serveur `reportStop` (`src/server/actions/retouches.ts`).
+ */
+export async function signalementsDuVoyage(
+  value: string | undefined = process.env.DATA_ADAPTER,
+  options: { scope?: SimulationScope } = {},
+): Promise<StopReportAdapter | null> {
+  const choice = adapterChoice(value);
+  if (choice === "api") return getTripAdapter(value).reports ?? null;
+  if (choice !== "mock") return null;
+  const scope = options.scope ?? (await getSimulationScope());
+  const store = (scope.reports ??= { records: [] });
+  return createMockStopReports({
+    trips: getTripReader({ scope }),
+    store,
+    now: () => scope.clock.now(),
+    plafond: SIGNALEMENTS_PAR_VOYAGE_ET_PAR_JOUR,
+    max: MAX_STOP_REPORTS_PER_SCOPE,
+  });
+}
+
+/** Recherches par voyage et par 24 heures sur `mock` : la règle `trip` de `lieu-recherche` (décision 0147 § 6.4 point 1). */
+function plafondRechercheParVoyage(): number {
+  return RATE_LIMITS["lieu-recherche"]?.find((regle) => regle.kind === "trip")?.threshold ?? 0;
+}
+
+/**
+ * Lieu à soi (tâche M5d-1, ticket 939 ; décision 0147 § 3) : `mock`, recherche et ajout simulés dans la portée de
+ * simulation (`options.scope`, sinon celle de la requête), voyages lus par `getTripReader()` de la même portée ; `null`
+ * pour `api` (recherche par le terminal de la composition, ajout par `ajoutDeLieu`) et pour `prototype` (le site d'essai
+ * n'a pas d'ajout). Lu par les actions serveur de `src/server/actions/lieux.ts`.
+ */
+export async function lieuxSimules(
+  value: string | undefined = process.env.DATA_ADAPTER,
+  options: { scope?: SimulationScope } = {},
+): Promise<PlaceAdapter | null> {
+  if (adapterChoice(value) !== "mock") return null;
+  const scope = options.scope ?? (await getSimulationScope());
+  const store = (scope.placeSearches ??= { records: [] });
+  const { activity, lunch, dinner } = CONFIGURATION_MOTEUR.dureesParDefaut;
+  return createMockPlaces({
+    trips: getTripReader({ scope }),
+    store,
+    now: () => scope.clock.now(),
+    plafond: plafondRechercheParVoyage(),
+    durees: { activity, lunch, dinner },
+    max: MAX_PLACE_SEARCHES_PER_SCOPE,
+  });
+}
+
+/**
+ * Aperçu et application d'un ajout (M5d-1) : `api`, cas d'usage de `src/server/lieux/ajout.ts` (`TripAdapter.places`) ;
+ * `mock`, l'ajout simulé de `lieuxSimules` ; `null` pour `prototype`.
+ */
+export async function ajoutDeLieu(value: string | undefined = process.env.DATA_ADAPTER, options: { scope?: SimulationScope } = {}): Promise<AddPlaceAdapter | null> {
+  const choice = adapterChoice(value);
+  if (choice === "api") return getTripAdapter(value).places ?? null;
+  return lieuxSimules(value, options);
+}
+
+/** Paramètres de l'écran « Ajouter un lieu » (M5d-2), lus côté serveur par la page. */
+export type ParametresAjoutDeLieu = {
+  /** Durées prévues par type (`dureesParDefaut` du moteur) : heure proposée, premier temps libre assez long (M5-PO-12). */
+  readonly durees: DureesAjout;
+  /** `mock` : version fixe du jeu simulé, base de chaque demande ; `api` : `null`, la version courante du voyage sert. */
+  readonly versionSimulee: number | null;
+  /** `api` : noms et adresses des résultats rendus par Google (mention « Données de lieux : Google »). */
+  readonly resultatsGoogle: boolean;
+};
+
+/**
+ * Écran « Ajouter un lieu » (tâche M5d-2, ticket 961 ; décision 0147 § 3 et § 14) : adaptateurs `mock` et `api`
+ * seulement, `null` pour `prototype` (le site d'essai n'a pas d'ajout : la page répond 404). Aucune lecture, aucun appel.
+ */
+export function parametresAjoutDeLieu(value: string | undefined = process.env.DATA_ADAPTER): ParametresAjoutDeLieu | null {
+  const choice = adapterChoice(value);
+  if (choice !== "mock" && choice !== "api") return null;
+  const { activity, lunch, dinner } = CONFIGURATION_MOTEUR.dureesParDefaut;
+  return { durees: { activity, lunch, dinner }, versionSimulee: choice === "mock" ? VERSION_SIMULEE : null, resultatsGoogle: choice === "api" };
+}
+
+/**
+ * Versions du programme (tâche M5b, ticket 934 ; décision 0147 § 5.3) : `mock`, historique simulé dans la portée de
+ * simulation (`options.scope`, sinon celle de la requête), voyages lus par `getTripReader()` de la même portée ; `api`,
+ * `trip_versions` (`TripAdapter.versions`) ; `null` pour `prototype` (le site d'essai n'a pas de versions : ni lien, ni
+ * page). Lu par les actions serveur de `src/server/actions/retouches.ts` et par l'écran « Versions du programme ».
+ */
+export async function versionsDuVoyage(
+  value: string | undefined = process.env.DATA_ADAPTER,
+  options: { scope?: SimulationScope } = {},
+): Promise<TripVersionsAdapter | null> {
+  const choice = adapterChoice(value);
+  if (choice === "api") return getTripAdapter(value).versions ?? null;
+  if (choice !== "mock") return null;
+  const scope = options.scope ?? (await getSimulationScope());
+  const store = (scope.versions ??= emptyVersionsStore());
+  return createMockTripVersions({ trips: getTripReader({ scope }), store, now: () => scope.clock.now(), max: VERSIONS_MAX_PAR_VOYAGE });
+}
+
+/** Lien « Versions du programme » et écran des versions (M5b) : adaptateurs `mock` et `api` seulement, décidé côté serveur. */
+export function versionsDisponibles(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  const choice = adapterChoice(value);
+  return choice === "mock" || choice === "api";
+}
+
+/** Bouton « Signaler une erreur » de la fiche (M5c) : adaptateurs `mock` et `api` seulement, décidé côté serveur. */
+export function signalementDisponible(value: string | undefined = process.env.DATA_ADAPTER): boolean {
+  const choice = adapterChoice(value);
+  return choice === "mock" || choice === "api";
+}
+
+/**
+ * Version courante d'un voyage pour la révision enregistrée (M1g) : base de la première demande d'aperçu, transmise par
+ * la mise en page du voyage à `TripShell`. `null` hors adaptateur `api`, pour un voyage inconnu ou d'une autre
+ * organisation, ou si la lecture échoue (l'écran garde alors son implémentation en mémoire).
+ */
+export async function getRevisionVersion(ctx: AdapterContext, tripId: string, value: string | undefined = process.env.DATA_ADAPTER): Promise<number | null> {
+  const revision = revisionEnregistree(value);
+  if (revision === null) return null;
+  const version = await revision.currentVersion(ctx, { tripId });
+  return version.ok ? version.value : null;
+}
+
+/**
  * Adaptateur de partage (spécification F10, F10-TL-7 ; décision 0039), simulé dans la portée de la requête : liens en
  * mémoire de la portée, voyages lus par `getTripReader()` de la même portée, durée du partage lue dans la
  * configuration serveur. **Partage réel du site d'essai** (`realShareAvailable`, décision 0135) : jeton signé sans
  * stockage, lien créé depuis la session vérifiée (`getTripReader()` de la requête), vue partagée lue par un lecteur du
- * seul voyage du lien, dans l'organisation du jeton. **Filet de sécurité** : lève une erreur si `shareAvailable()` est
+ * seul voyage du lien, dans l'organisation du jeton. **Partage sur `api`** (`apiShareAvailable`, décision 0157 § 1.2 ;
+ * ticket 1013, M6a) : garde `assertApiAdapter`, puis les cas d'usage branchés au démarrage (`api-share-instance.ts` :
+ * `share_links`, vue lue par les vues de la base), sans repli vers `mock`. **Filet de sécurité** : lève une erreur si `shareAvailable()` est
  * faux ; les pages et les actions consultent la garde avant et ne l'atteignent jamais dans ce cas.
  */
 export function getShareAdapter(options: { scope?: SimulationScope } = {}): ShareAdapter {
@@ -374,6 +633,9 @@ export function getShareAdapter(options: { scope?: SimulationScope } = {}): Shar
     throw new Error("partage indisponible : shareAvailable() est faux (spécification F10, F10-TL-7)");
   }
   const scope = options.scope ?? defaultScope();
+  if (apiShareAvailable()) {
+    return apiShareAdapter(() => scope.clock.now());
+  }
   if (realShareAvailable()) {
     return createSignedShareAdapter({
       creatorTrips: getTripReader({ scope }),

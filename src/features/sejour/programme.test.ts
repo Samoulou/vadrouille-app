@@ -131,3 +131,17 @@ describe("programme: cocher et décocher la liste « À faire avant de partir »
     expect(events).toEqual([{ type: "setChecklistItemDone", itemId: "check-chateau", done: true, base: false }]);
   });
 });
+
+describe("programmeReducer : « reset » (M5b, retour à une version enregistré)", () => {
+  it("retire verrous, jours affichés et modification annulable ; garde la liste locale ; état vide inchangé", () => {
+    expect(programmeReducer(INITIAL_PROGRAMME, { type: "reset" })).toBe(INITIAL_PROGRAMME);
+    const etat = {
+      ...INITIAL_PROGRAMME,
+      locks: { "j1-chateau": true },
+      days: { 1: edimbourg.days[0]! },
+      previous: { locks: {}, days: {} },
+      checklist: { "check-assurance": true },
+    };
+    expect(programmeReducer(etat, { type: "reset" })).toEqual({ locks: {}, days: {}, previous: null, checklist: { "check-assurance": true } });
+  });
+});

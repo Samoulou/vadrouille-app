@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ErreurAncrage, STATUTS_GOOGLE, type ClientPlacesMvp } from "@/grounding/interfaces";
+import { ErreurAncrage, STATUTS_GOOGLE, type ClientLieux, type ClientPlacesMvp } from "@/grounding/interfaces";
 
 /**
  * Double de Places à **valeurs sentinelles** (contrainte 8 : aucune réponse réelle de Google enregistrée). Les
@@ -64,6 +64,38 @@ export function creerPlacesSimule(fixtures: FixturesPlaces): ClientPlacesMvp {
       if (nouveau !== undefined) return { placeId: nouveau };
       if (!parPlaceId.has(placeId)) throw new ErreurAncrage("place_not_found");
       return { placeId };
+    },
+  };
+}
+
+/**
+ * Valeurs sentinelles du double de la recherche d'un lieu à soi (décision 0147 § 12 S3) : nom et adresse Google simulés,
+ * cherchés par les tests dans la base, le journal, les réponses de l'ajout, l'adresse, le stockage du navigateur et les
+ * requêtes de modèle (ils ne doivent y apparaître nulle part).
+ */
+export const SENTINELLE_NOM_LIEU = "SENTINELLE-NOM-LIEU-M5D";
+export const SENTINELLE_ADRESSE_LIEU = "SENTINELLE-ADRESSE-LIEU-M5D";
+
+/**
+ * Double de la recherche d'un lieu à soi (M5d-1, décision 0147 § 3 point 1 et § 12 S3) : aucun appel, aucune réponse réelle
+ * de Google. Rend `resultats` résultats (5 au plus, 3 par défaut ; 0 pour « Aucun lieu trouvé. »), chacun au `placeId`
+ * sentinelle `ChIJ-M5D-<rang>`, au nom `SENTINELLE-NOM-LIEU-M5D` et à l'adresse `SENTINELLE-ADRESSE-LIEU-M5D` (suivis du
+ * rang). Les requêtes reçues sont gardées dans `requetes` (texte et ville), pour les tests seulement.
+ */
+export function creerRechercheLieuxSimulee(options: { readonly resultats?: number } = {}): ClientLieux & {
+  readonly requetes: { readonly texte: string; readonly ville: string | null }[];
+} {
+  const nombre = Math.max(0, Math.min(5, options.resultats ?? 3));
+  const requetes: { texte: string; ville: string | null }[] = [];
+  return {
+    requetes,
+    async rechercherLieux(texte, ville) {
+      requetes.push({ texte, ville });
+      return Array.from({ length: nombre }, (_, rang) => ({
+        placeId: `ChIJ-M5D-${String(rang + 1)}`,
+        nom: `${SENTINELLE_NOM_LIEU} ${String(rang + 1)}`,
+        adresse: rang === nombre - 1 && nombre > 1 ? null : `${SENTINELLE_ADRESSE_LIEU} ${String(rang + 1)}`,
+      }));
     },
   };
 }

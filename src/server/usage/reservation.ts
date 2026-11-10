@@ -70,7 +70,7 @@ export const CLE_VERROU_USAGE = 0x5e1f0003;
  * Profils d'un forfait de génération (B7-PO-5) et de relecture (B8-TL-4, décision 0100 § 1.3) : `relecture` (un jour, une
  * présentation) et `relectureVoyage` (le voyage), choisis par la **portée** de la lecture, jamais par un contenu.
  */
-export const PROFILS_FORFAIT = ["apercu", "complet", "mini", "lot", "programme", "relecture", "relectureVoyage"] as const;
+export const PROFILS_FORFAIT = ["apercu", "complet", "mini", "lot", "programme", "revision", "verification", "relecture", "relectureVoyage"] as const;
 export type ProfilForfait = (typeof PROFILS_FORFAIT)[number];
 
 /** Actions sans compte (écrans 2 et 3 ; B7-TL-10). */
@@ -117,6 +117,12 @@ function skusDe(plafonds: PlafondsUsage): SkusForfait {
 export function forfaitDuProfil(plafonds: PlafondsUsage, table: TablePrixGoogle, profil: ProfilForfait): Forfait {
   if (profil === "relecture") return forfaitRelecture(table, skusDe(plafonds), plafonds.relecture.jour);
   if (profil === "relectureVoyage") return forfaitRelecture(table, skusDe(plafonds), plafonds.relecture.voyage);
+  if (profil === "verification") {
+    // Vérification des lieux restants (M1c) : ni modèle (`coutModelesMicros: null`, le registre refuse toute requête de modèle)
+    // ni Routes ; seules les requêtes Text Search et les fiches du profil.
+    const v = plafonds.generations.verification;
+    return { ...forfaitExecution(table, skusDe(plafonds), { ...v, routesRequetes: 0, routesElements: 0 }, 0), coutModelesMicros: null };
+  }
   const p = plafonds.generations[profil];
   return forfaitExecution(table, skusDe(plafonds), p, p.coutModelesMicros);
 }
@@ -298,7 +304,7 @@ async function reserver(transaction: TransactionOrganisation, ecriture: Ecriture
 }
 
 /**
- * Réserve le forfait d'une génération (`apercu`, `complet`, `mini`, `lot`) ou d'une relecture (`relecture`, `relectureVoyage`), dans la transaction de
+ * Réserve le forfait d'une génération (`apercu`, `complet`, `mini`, `lot`, `programme`, `revision`, `verification`) ou d'une relecture (`relecture`, `relectureVoyage`), dans la transaction de
  * `withOrg` de la génération (0083 § 2), contre le plafond par organisation et par jour et les limites globales. Une
  * demande mal formée (identifiant qui n'est pas un uuid, relecture avec génération, génération sans identifiant,
  * organisation technique) est une erreur de composition : `usage_unavailable`, sans requête. Une même

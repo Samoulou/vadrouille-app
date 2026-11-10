@@ -82,6 +82,11 @@ export const PROPRIETES_PROCESS = [
   // rien n'y est écrit par le test. Verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446).
   { fichier: "tests/db/auth.test.ts", propriete: "stdout" },
   { fichier: "tests/db/auth.test.ts", propriete: "stderr" },
+  // M9a (ticket 1097 ; spécification M9 § 6.2) : même forme que `tests/db/auth.test.ts`, sortie standard et sortie
+  // d'erreur espionnées (`vi.spyOn(…, "write")`) pendant la réauthentification et l'export, pour prouver qu'aucune
+  // adresse, aucun code ni aucun contenu de voyage n'y est écrit ; rien n'y est écrit par le test. Verdict Sécurité à rendre.
+  { fichier: "tests/db/export-compte.test.ts", propriete: "stdout" },
+  { fichier: "tests/db/export-compte.test.ts", propriete: "stderr" },
 ] as const satisfies readonly LigneProcess[];
 
 export const LECTURES_ENV = [
@@ -100,6 +105,10 @@ export const LECTURES_ENV = [
   { fichier: "src/adapters/payment-guard.ts", noms: ["AUTH_ADAPTER", "SIMULATED_WEBHOOK_ENABLED"] },
   // F10c (décision 0039, F10-TL-7) : garde du partage simulé, alignée sur `payment-guard.ts`. Verdict Sécurité : approuvé (PR #236, a1463f6).
   { fichier: "src/adapters/share-guard.ts", noms: ["VADROUILLE_DEMO_SHARE", "DATA_ADAPTER"] },
+  // M6a (ticket 1013 ; décision 0157 § 1.2 et § 2.1 point 3) : partage `api`, environnement déclaré comparé à une liste
+  // fermée et en-tête de confiance comparé à sa seule valeur admise ; valeurs jamais rendues. Verdict Sécurité :
+  // approuvé (revue de la PR #1018).
+  { fichier: "src/adapters/share-guard.ts", noms: ["VADROUILLE_ENV", "VERCEL_ENV", "TRUSTED_IP_HEADER"] },
   // F8b (décision 0017 § 11.2, F8-TL-10) : garde de la connexion simulée, même forme que `share-guard.ts`. Verdict Sécurité : à venir (PR F8b, ticket 259).
   { fichier: "src/adapters/auth-guard.ts", noms: ["AUTH_ADAPTER", "VADROUILLE_DEMO_AUTH"] },
   // B3c (ticket 447 ; décision 0077 § 5.1, B3-TL-2) : environnement déclaré, comparé à une liste fermée (`local`,
@@ -107,7 +116,8 @@ export const LECTURES_ENV = [
   // (test d'équivalence dans `tests/unit/server/env.test.ts`). Verdict Sécurité à rendre.
   { fichier: "src/adapters/auth-guard.ts", noms: ["VADROUILLE_ENV", "VERCEL_ENV"] },
   // Relevé de la base de P0c1 (P0b1) : `VADROUILLE_PROTOTYPE`, `CI` dans `flags.ts`, `prototype-instance.ts`.
-  { fichier: "src/dev/flags.ts", noms: ["VADROUILLE_DEV_PAGES", "VADROUILLE_ENV", "VERCEL_ENV", "VADROUILLE_PROTOTYPE", "CI"] },
+  // B4c, décision 0140 § 3 point 6 (§ 6 ligne 12) : prédicat de production partagé `isProductionTarget` ; lecture non secrète.
+  { fichier: "src/dev/flags.ts", noms: ["VADROUILLE_DEV_PAGES", "VADROUILLE_ENV", "VERCEL_ENV", "VADROUILLE_PROTOTYPE", "CI", "VERCEL_TARGET_ENV"] },
   { fichier: "src/adapters/prototype-instance.ts", noms: ["VADROUILLE_PROTOTYPE_DIR"] },
   // B1 (PR 188, après P0c1 ; spécification P0c, sections 5 et 9 ; décision 0036). Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   // Noms secrets de la base : `LECTURES_ENV_SECRETES` ci-dessous (module de connexion et outil de migration seulement).
@@ -234,6 +244,10 @@ export const LECTURES_ENV = [
   // B4a (ticket 531 ; spécification B4, B4a point 6 ; décision 0097 B4-TL-3) : choix des adaptateurs de paiement et de
   // données, lus par propriété littérale, valeur contrôlée contre une liste fermée et jamais journalisée. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
   { fichier: "src/server/env/index.ts", noms: ["PAYMENT_ADAPTER", "DATA_ADAPTER"] },
+  // M6c, correction 1 (ticket 1021 ; revue de la PR 1024, bloquant 2) : facteur d'accélération de l'horloge des rappels,
+  // lu par propriété littérale au démarrage, refusé hors `local` et `ci`, entier 1 à 86 400 sinon refusé ; jamais
+  // journalisé. Verdict Sécurité demandé dans la PR.
+  { fichier: "src/server/env/index.ts", noms: ["RAPPELS_ACCELERATION"] },
 ] as const satisfies readonly LigneLectureEnv[];
 
 export const ENV_ENTIER = [
@@ -254,6 +268,11 @@ export const ENV_ENTIER = [
       "argument:betterAuthAllowed",
       // B4b : choix `simulated` lu par `src/instrumentation.ts` pour brancher la composition du paiement simulé.
       "defaut:simulatedPaymentChosen",
+      // B4c (décision 0140 § 3 point 6) : branche `stripe` fermée sur cible de production (prédicat partagé), et choix
+      // `stripe` lu par `src/instrumentation.ts`. Formes au-delà de 0140 § 6 (relevées par `pnpm test`) : verdict
+      // Sécurité à rendre à la revue de B4c.
+      "argument:isProductionTarget",
+      "defaut:stripePaymentChosen",
     ],
   },
   // F10c (décision 0039, F10-TL-7) : même forme que `payment-guard.ts`. Verdict Sécurité : approuvé (PR #236, a1463f6).
@@ -269,6 +288,15 @@ export const ENV_ENTIER = [
       "defaut:realShareAvailable",
       "argument:realShareAvailable",
       "argument:prototypeAdapterAllowed",
+      // M6a (ticket 1013 ; décision 0157 § 1.2) : partage `api`, même forme (garde de `api` et de `better-auth`, jamais
+      // en production, liste fermée d'environnements). Verdict Sécurité : approuvé (revue de la PR #1018).
+      "defaut:environnementLocalOuCi",
+      "argument:betterAuthAllowed",
+      "defaut:apiShareAvailable",
+      "argument:isProductionTarget",
+      "argument:authAdapterChoice",
+      "argument:environnementLocalOuCi",
+      "argument:apiShareAvailable",
     ],
   },
   // F8b (décision 0017 § 11.2, F8-TL-10) : même forme que `share-guard.ts`. Verdict Sécurité : à venir (PR F8b, ticket 259).
@@ -291,7 +319,11 @@ export const ENV_ENTIER = [
     formes: ["defaut:betterAuthAllowed", "argument:betterAuthAllowed"],
   },
   { fichier: "src/adapters/simulation.ts", formes: ["defaut:simulationEnabled", "argument:devPagesEnabled", "argument:isProductionDeployment"] },
-  { fichier: "src/dev/flags.ts", formes: ["defaut:devPagesEnabled", "defaut:isProductionDeployment", "defaut:prototypeAdapterAllowed", "argument:isProductionDeployment"] },
+  // B4c, décision 0140 § 3 point 6 (§ 6 ligne 12) : prédicat de production partagé `isProductionTarget` ; lecture non secrète.
+  {
+    fichier: "src/dev/flags.ts",
+    formes: ["defaut:devPagesEnabled", "defaut:isProductionDeployment", "defaut:prototypeAdapterAllowed", "argument:isProductionDeployment", "defaut:isProductionTarget"],
+  },
   { fichier: "tests/unit/ci/visual-update.test.ts", formes: ["etalement"] },
   // Relevé de la base de P0c1 (P0b1, après `40b6738`).
   { fichier: "src/adapters/context.ts", formes: ["defaut:getRequestContext", "argument:assertPrototypeAllowed"] },
@@ -326,6 +358,12 @@ export const ENV_ENTIER = [
   // (jamais à l'import), passé entier à la seule barrière de sortie. Verdict Sécurité à rendre.
   { fichier: "src/server/env/egress.ts", formes: ["defaut:verifierSortie"] },
   { fichier: "src/server/env/ai.ts", formes: ["defaut:lireCleOpenRouter", "argument:verifierSortie"] },
+  // B4c, décision 0140 § 3 : environnement lu à l'appel, passé entier à la barrière de sortie (§ 6 lignes 6 et 13 ;
+  // `productionPaiement(env, processEnv = process.env)` appelle `isProductionTarget(processEnv)`).
+  {
+    fichier: "src/server/env/payment.ts",
+    formes: ["defaut:cleStripe", "defaut:secretWebhookStripe", "defaut:productionPaiement", "argument:verifierSortie", "argument:isProductionTarget"],
+  },
   { fichier: "src/server/env/grounding.ts", formes: ["defaut:lireCleGoogle", "argument:verifierSortie"] },
   { fichier: "src/server/env/garde-cles.ts", formes: ["defaut:clesDeServicePosees"] },
   // B3d (M2a), décision 0138 § 4 : environnement lu à l'appel, passé entier à la barrière de sortie et au prédicat du cas
@@ -351,6 +389,10 @@ export const ENV_ENTIER = [
   // B3d (M2a ; décision 0138 § 3, T2) : `parseServerEnv` passe l'objet reçu entier au prédicat du cas admis de
   // `EMAIL_TRANSPORT=resend`. Ligne au-delà de 0138 § 9 (relevée par `pnpm test`) : verdict : approuvé par la Sécurité sur le head 68d6e69.
   { fichier: "src/server/env/index.ts", formes: ["argument:resendAdmis"] },
+  // B4c (décision 0140 § 3 points 3 et 6) : `parseServerEnv` passe l'objet reçu entier au prédicat de production partagé
+  // pour refuser `PAYMENT_ADAPTER=stripe` en production. Ligne au-delà de 0140 § 6 (relevée par `pnpm test`) : verdict
+  // Sécurité à rendre à la revue de B4c.
+  { fichier: "src/server/env/index.ts", formes: ["argument:isProductionTarget"] },
   { fichier: "db/connection.ts", formes: ["argument:resolveServerEnvironment"] },
   // B3a (ticket 293 ; spécification B3, B3a point 3) : copie de l'environnement du lanceur, dont sont retirées
   // `VADROUILLE_DATABASE_URL_MIGRATOR` et `VADROUILLE_DB_ADMIN_URL`, passée au serveur autonome. Ligne au-delà du plafond

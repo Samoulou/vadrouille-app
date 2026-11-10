@@ -124,4 +124,29 @@ describe("SegmentedControl vertical (raisons de l'écran 14, F7a)", () => {
     expect(radios[2]).toHaveFocus();
     for (const radio of radios) expect(radio.className).not.toMatch(/(^|\s)(focus(-visible)?:)?(outline-none|outline-hidden|ring-0)/);
   });
+  it("M4-suite-carte: variante wrap : rail flex-wrap, options flex-auto d'au moins une cible tactile, libellé en overflow-wrap anywhere", async () => {
+    const villes = [
+      { value: "toutes", label: "Toutes les villes" },
+      { value: "rome", label: "Rome" },
+      { value: "compostelle", label: "Saint-Jacques-de-Compostelle" },
+      { value: "florence", label: "Florence" },
+    ];
+    const { container } = render(<SegmentedControl label="Afficher sur la carte" options={villes} value="toutes" onChange={() => {}} wrap />);
+    const group = screen.getByRole("radiogroup", { name: "Afficher sur la carte" });
+    expect(group).toHaveClass("flex", "flex-wrap");
+    for (const radio of screen.getAllByRole("radio")) {
+      expect(radio).toHaveClass("flex-auto", "min-w-(--touch-target)", "min-h-(--touch-target)", "wrap-anywhere");
+      expect(radio).not.toHaveClass("flex-1");
+    }
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("M4-suite-carte: sans wrap (ou en vertical), classes inchangées", () => {
+    const { rerender } = render(<SegmentedControl label="Rythme" options={OPTIONS} value={null} onChange={() => {}} />);
+    expect(screen.getByRole("radiogroup")).not.toHaveClass("flex-wrap");
+    for (const radio of screen.getAllByRole("radio")) expect(radio).toHaveClass("flex-1");
+    rerender(<SegmentedControl label="Rythme" options={OPTIONS} value={null} onChange={() => {}} orientation="vertical" wrap />);
+    expect(screen.getByRole("radiogroup")).not.toHaveClass("flex-wrap");
+    for (const radio of screen.getAllByRole("radio")) expect(radio).toHaveClass("w-full");
+  });
 });

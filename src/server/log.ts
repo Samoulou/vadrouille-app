@@ -1,7 +1,7 @@
 import "server-only";
 
 import { CODE_CLE_ABSENTE } from "@/ai/erreurs";
-import { API_ERROR_CODES } from "@/contracts/values";
+import { API_ERROR_CODES, STOP_REPORT_REASONS } from "@/contracts/values";
 import { CODES_ARRET_JOURNAL_SANS_CLE } from "@/server/log-codes-arret";
 
 /**
@@ -73,6 +73,19 @@ export const LOG_EVENTS = [
   // B3d (revue de la PR 850, mineur 1) : purge des jours échus du plafond global en échec, après le transport ; `errorName`
   // seulement, comme `rate_limit.purge_failed`. La réservation reste acceptée.
   "email.purge_failed",
+  // M7a : e-mail « propositions prêtes » non envoyé à la fin de `generateProgramme` (base indisponible, composition refusée,
+  // panne du transport) ; `errorName` seulement, `warn`. Jamais bloquant pour le workflow ; aucune valeur (ni adresse, ni
+  // lien, ni identifiant). Les refus déjà journalisés (adresse, enveloppe, plafond, Resend) ne l'écrivent pas une seconde fois.
+  "email.notification_failed",
+  // M6c (ticket 1021 ; revue de la PR 1024, bloquant 1 et mineur 3 du Tech Lead) : workflow 7 des rappels. Relais vers une
+  // exécution successeur en échec (l'exécution continue et réessaie au réveil suivant) ; fin de l'exécution sur pannes
+  // répétées (réveils ou relais). Nom seul, `warn` : ni voyage, ni accord, ni adresse, ni message d'erreur.
+  "rappels.relay_failed",
+  "rappels.abandoned",
+  // R-B (ticket 1075 ; décision 0162 § 3 point 3) : la réclamation du relais trouve la génération suivante tenue par une
+  // autre exécution (doublon d'une même génération) ; l'exécution se termine sans relayer. Nom seul, `info` : ni voyage, ni
+  // accord, ni identifiant d'exécution. Une réclamation en panne écrit `rappels.relay_failed`.
+  "rappels.relay_duplicate",
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",
@@ -107,6 +120,14 @@ export const LOG_EVENTS = [
   // (`suggestions` ou `choix`), `guard` (garde fermée), `googleCode` (`LOG_GOOGLE_CODES`), `httpStatus` (code HTTP d'une
   // réponse de Google autre que 200), `errorName`. Jamais le texte tapé, un `placeId`, un texte Google, le cookie ni une clé.
   "p0.ville_refusee",
+  // M1f (décision 0141 § 6.3 point 4) : refus d'une action de la recherche de ville de l'écran 1 de `api`
+  // (`suggererVillesApi`, `choisirVilleApi`). Champs : `reason` (`LOG_VILLE_API_REASONS`), `action` (`suggestions` ou
+  // `choix`), `errorName`, `googleCode` (`LOG_GOOGLE_CODES`) et `httpStatus`, en liste fermée par événement. Niveau `info`
+  // pour ce qu'un visiteur anonyme peut provoquer en rafale, `warn` pour une panne. Jamais la saisie, un `placeId`, un
+  // texte Google, une adresse IP, une clé HMAC ni une clé. `ville.purge_failed` : purge des compteurs du jour en échec,
+  // après l'appel Google, `errorName` seul (`warn`), comme `email.purge_failed`.
+  "ville.refusee",
+  "ville.purge_failed",
   // B4a (spécification B4, B4-PO-12 ; décision 0097 B4-TL-13 et B4-TL-11 point 1.1) : alerte de paiement (niveau `error`,
   // champs `eventId`, `eventType`, `alertCode`, `checkoutId` seulement), échec de la suite après un droit validé (`warn`,
   // `errorName` seulement), configuration invalide sur le webhook simulé (`warn`, `rule` et `variable` seulement). Ni
@@ -114,6 +135,14 @@ export const LOG_EVENTS = [
   "payment.alert",
   "payment.followup_failed",
   "payment.webhook_config_invalid",
+  // B4c (décision 0140 § 1.2) : échec d'un appel au prestataire Stripe (création ou lecture d'une session), niveau `warn`,
+  // champ unique `errorClass` (`LOG_PROVIDER_ERROR_CLASSES`) ; ni message, ni en-tête, ni paramètre, ni identifiant de
+  // requête de Stripe, ni clé.
+  "payment.provider_failed",
+  // B4e (décision 0144 § 5.3 point 4) : lien du reçu de Stripe non conservé après un droit accordé (prestataire, lien
+  // refusé, base ou durée totale dépassée), niveau `warn`, champs `eventId` et `reason` seulement (`LOG_RECEIPT_REASONS`) ;
+  // jamais le lien, ni l'identifiant de session, ni un message d'erreur. Ajout soumis au verdict de la Sécurité.
+  "payment.receipt_unavailable",
   // B9d (spécification B9, B9-PO-17 points 3 et 4 ; décision 0087 § 1.4) : un voyage complet entre en état bloqué (reprise par
   // le studio), une fois par passage, par l'écrivain dont l'écriture a passé la ligne en `failed`. Niveau `warn` ; champs
   // `tripId`, `organizationId`, `generationRunId` (identifiants internes) et `stopReason` (code fermé) ; aucune donnée de lieu.
@@ -135,6 +164,32 @@ export const LOG_EVENTS = [
   "recalcul.not_created",
   "recalcul.start_failed",
   "recalcul.unlock_failed",
+  // M5c (décision 0147 § 12 S1 point 4) : signalement d'une erreur sur une étape **nouvellement enregistré** dans `feedback`
+  // (ni rejeu, ni doublon, ni refus), une fois, par `reportStop` seul ; niveau `info`. **Champ unique `reason`** (motif fermé
+  // `STOP_REPORT_REASONS`, `CHAMPS_ADMIS_PAR_EVENEMENT`) : ni texte, ni `placeId`, ni identifiant de voyage, d'étape,
+  // d'organisation ou de personne. L'enregistrement est en base ; le journal ne sert qu'à compter.
+  "voyages.stop_reported",
+  // M5d-1 (décision 0147 § 12 S1 point 5) : une fois par action de recherche d'un lieu à soi (`searchPlaces` de `api`),
+  // aboutie ou refusée, par le terminal `src/server/composition/lieux-api.ts` seul. **Compteurs et codes fermés seulement**
+  // (`CHAMPS_ADMIS_PAR_EVENEMENT`) : `places` (résultats rendus, 0 à 5), `reason` (`LOG_LIEU_REASONS`), `googleCode` et
+  // `httpStatus` (sur `google_erreur`), `errorName`. Jamais la requête saisie, la ville, un `placeId`, un nom ou une adresse
+  // Google, `tripId`, `organizationId`, une adresse IP ni une clé. Niveau `info`, `warn` pour une panne.
+  "lieu.recherche",
+  // M5d-4 (décision 0155 § 2.4) : lieux à soi réinjectés par la révision M1b (étape `e`, `ecritureRevision` seule), une fois
+  // par passage qui en réinjecte au moins un, après R3 ; niveau `info`. **Compteurs seulement** (`CHAMPS_ADMIS_PAR_EVENEMENT`) :
+  // `places` (lieux à soi réinjectés) et `stopsRemoved` (étapes de l'IA retirées parce qu'elles les chevauchaient). Jamais
+  // `tripId`, `organizationId`, `generationRunId`, un nom, un `placeId` ni une heure. Le compte peut inclure un passage dont
+  // la publication n'écrit rien (R3, jour incohérent, version de base dépassée), et un rejeu du lot peut compter deux fois le
+  // même lieu (biais de mesure seulement).
+  "recalcul.lieux_a_soi",
+  // M6b (ticket 1005, spécification M6 § 4) : le fichier de calendrier d'un voyage débloqué n'a pas trouvé sa version
+  // courante (incohérence de la base) ; réponse 500 sans corps ; niveau `error`. **Aucun champ** (`CHAMPS_ADMIS_PAR_EVENEMENT`) :
+  // jamais `tripId`, `organizationId`, un nom ni une heure.
+  "calendrier.version_unavailable",
+  // M9a (ticket 1097 ; spécification M9 § 3.5 et § 6.1) : « Exporter mes données » n'a pas pu construire le fichier (base,
+  // instantané illisible, taille au-delà de la borne) ; réponse 500 sans fichier ; niveau `error`. **`errorName` seul**
+  // (`CHAMPS_ADMIS_PAR_EVENEMENT`) : jamais l'adresse, un identifiant, une destination, un récit ni un nom d'étape.
+  "compte.export_failed",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -174,6 +229,8 @@ export type LogFields = {
   readonly candidates?: number;
   /** Candidats retenus hors événements (lieux) : 0 donne le niveau `warn` et l'arrêt `research_empty` (mineur 2). */
   readonly places?: number;
+  /** Étapes de l'IA retirées par la réinjection des lieux à soi (`recalcul.lieux_a_soi`, 0155 § 2.4) : entier positif ou nul. */
+  readonly stopsRemoved?: number;
   readonly candidatesRefused?: number;
   readonly planRefused?: number;
   readonly planUnreadable?: number;
@@ -245,6 +302,11 @@ export type LogFields = {
    * (`p0.read_unavailable`, décision 0137 § 2) : `LOG_STEP_FAILURE_CODES`, jamais un message ; retiré sur tout autre événement.
    */
   readonly failureCode?: string;
+  /**
+   * Classe d'une erreur du prestataire Stripe (`payment.provider_failed`, décision 0140 § 1.2) :
+   * `LOG_PROVIDER_ERROR_CLASSES`, jamais un message ; retiré sur tout autre événement (modèle `failureCode`).
+   */
+  readonly errorClass?: string;
   /** Identifiant d'un événement de paiement (`payment.alert`, B4-TL-13) : forme simulée ou `evt_…` de Stripe. */
   readonly eventId?: string;
   /** Type normalisé d'un événement de paiement (`PaymentEvent.type`, liste fermée). */
@@ -259,9 +321,9 @@ export type LogFields = {
   readonly generationRunId?: string;
   /** Code fermé d'arrêt d'une génération (`generation_runs.stop_reason`, liste fermée de la décision 0114), jamais un message. */
   readonly stopReason?: string;
-  /** Code fermé d'une erreur d'un client Google (`p0.ville_refusee`) : `LOG_GOOGLE_CODES`, jamais un message. */
+  /** Code fermé d'une erreur d'un client Google (`p0.ville_refusee`, `ville.refusee`) : `LOG_GOOGLE_CODES`, jamais un message. */
   readonly googleCode?: string;
-  /** Code HTTP d'une réponse de Google autre que 200 (`p0.ville_refusee`) : entier de 100 à 599, jamais le corps. */
+  /** Code HTTP d'une réponse de Google autre que 200 (`p0.ville_refusee`, `ville.refusee`) : entier de 100 à 599, jamais le corps. */
   readonly httpStatus?: number;
   /**
    * Usage d'un envoi d'e-mail (`email.sent`, `email.cap_reached`, B3d point 6) : `LOG_EMAIL_USAGES`, copie d'`EMAIL_USAGES`
@@ -307,12 +369,14 @@ const VARIABLES_ADMISES: ReadonlySet<string> = new Set(
     VADROUILLE_DB_ADMIN_URL: 0,
     STRIPE_SECRET_KEY: 0,
     STRIPE_PUBLISHABLE_KEY: 0,
+    STRIPE_WEBHOOK_SECRET: 0,
     "STRIPE_*": 0,
     P0_REAL_RUNS: 0,
     P0_RUN_TOKEN: 0,
     "P0_*": 0,
     RESEND_API_KEY: 0,
     "NEXT_PUBLIC_*RESEND*": 0,
+    RAPPELS_ACCELERATION: 0,
   }),
 );
 
@@ -493,6 +557,48 @@ export const LOG_VILLE_REASONS = [
 export type LogVilleReason = (typeof LOG_VILLE_REASONS)[number];
 const RAISONS_VILLE: ReadonlySet<string> = new Set<string>(LOG_VILLE_REASONS);
 /**
+ * Motifs de `ville.refusee` (recherche de ville de `api`, décision 0141 § 6.3 point 4) : entrée refusée, seuils non
+ * validés, barrière fermée, client Places non construit, débit du limiteur, plafond du jour, compteur indisponible,
+ * erreur de Google, pays hors table maison, ville hors des 62 villes du MVP, exception attrapée par l'action serveur.
+ */
+export const LOG_VILLE_API_REASONS = [
+  "entree_invalide",
+  "seuils_non_valides",
+  "barriere",
+  "client",
+  "limite",
+  "limite_jour",
+  "compteur_indisponible",
+  "google_erreur",
+  "pays_inconnu",
+  "hors_table",
+  "exception",
+] as const;
+export type LogVilleApiReason = (typeof LOG_VILLE_API_REASONS)[number];
+const RAISONS_VILLE_API: ReadonlySet<string> = new Set<string>(LOG_VILLE_API_REASONS);
+/**
+ * Issues de `lieu.recherche` (recherche d'un lieu à soi, décision 0147 § 12 S1 point 5) : aboutie (`ok`, `aucun_resultat`),
+ * entrée refusée par le cœur, voyage non débloqué, seuils non validés, barrière fermée, client Places non construit, refus
+ * du limiteur par adresse IP (`limite`) ou par voyage (`limite_voyage`), compteur global du jour (`limite_jour`), compteur
+ * indisponible, erreur de Google, exception attrapée par l'action serveur.
+ */
+export const LOG_LIEU_REASONS = [
+  "ok",
+  "aucun_resultat",
+  "entree_invalide",
+  "non_debloque",
+  "seuils_non_valides",
+  "barriere",
+  "client",
+  "limite",
+  "limite_voyage",
+  "limite_jour",
+  "compteur_indisponible",
+  "google_erreur",
+  "exception",
+] as const;
+export type LogLieuReason = (typeof LOG_LIEU_REASONS)[number];
+/**
  * Codes admis dans `googleCode` : copie de `CODES_ERREUR_GOOGLE` (`src/grounding/enveloppe-google.ts`, que ce module
  * n'importe pas) et `place_not_found` (`ErreurAncrage` d'une fiche introuvable) ; égalité vérifiée par le test du journal.
  */
@@ -540,6 +646,11 @@ export const LOG_EMAIL_TRANSPORT_REASONS: readonly string[] = ["egress_refused",
 export const LOG_EMAIL_USAGES: readonly string[] = ["connexion", "notification"];
 const USAGES_EMAIL: ReadonlySet<string> = new Set(LOG_EMAIL_USAGES);
 /**
+ * Raisons de `payment.receipt_unavailable` (B4e, décision 0144 § 5.3 point 4) : copie de `RAISONS_RECU` de
+ * `src/server/payment/recu-stripe.ts` (ce module n'importe pas `src/server/payment`), égalité vérifiée par le test.
+ */
+export const LOG_RECEIPT_REASONS: readonly string[] = ["provider_error", "refused", "db_error", "timeout"];
+/**
  * Liste de `reason` admise **par événement** (mineur 3 de la revue du head 244b81a) : une raison d'un autre événement est
  * retirée. Un événement absent de la table n'admet aucune `reason`.
  */
@@ -549,8 +660,13 @@ const RAISONS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map(
   ["voyages.fiches_non_relues", RAISONS_FICHES],
   ["voyages.positions_non_ecrites", RAISONS_POSITIONS],
   ["p0.ville_refusee", RAISONS_VILLE],
+  ["ville.refusee", RAISONS_VILLE_API],
   ["email.provider_refused", new Set(LOG_EMAIL_PROVIDER_REASONS)],
   ["email.transport_refused", new Set(LOG_EMAIL_TRANSPORT_REASONS)],
+  // M5c (0147 § 12 S1 point 4) : liste fermée importée de sa définition unique, aucune copie.
+  ["voyages.stop_reported", new Set<string>(STOP_REPORT_REASONS)],
+  ["lieu.recherche", new Set<string>(LOG_LIEU_REASONS)],
+  ["payment.receipt_unavailable", new Set(LOG_RECEIPT_REASONS)],
 ]);
 /**
  * Phases admises dans `phase` (`p0.step_failed`, ticket 493, décision 0090 § 3 point 4) : celles de
@@ -647,6 +763,24 @@ export const LOG_ALERT_CODES: readonly string[] = [
   "dispute",
 ];
 const CODES_ALERTE: ReadonlySet<string> = new Set(LOG_ALERT_CODES);
+/**
+ * Valeurs du champ `errorClass` (`payment.provider_failed`, décision 0140 § 1.2) : les sept classes d'erreur du SDK
+ * nommées par `src/server/payment/stripe.ts` (égalité vérifiée par le test du journal), `invalid_response` (réponse
+ * inexploitable), `egress_refused` (barrière de sortie fermée) et `other` (toute autre erreur).
+ */
+export const LOG_PROVIDER_ERROR_CLASSES: readonly string[] = [
+  "StripeConnectionError",
+  "StripeRateLimitError",
+  "StripeAPIError",
+  "StripeIdempotencyError",
+  "StripeAuthenticationError",
+  "StripePermissionError",
+  "StripeInvalidRequestError",
+  "invalid_response",
+  "egress_refused",
+  "other",
+];
+const CLASSES_ERREUR_PRESTATAIRE: ReadonlySet<string> = new Set(LOG_PROVIDER_ERROR_CLASSES);
 /** Raisons de fin d'une génération (copie de `FINS_MODELE` de `@/ai/client`, égalité vérifiée par le test du journal ; 0130 § 2). */
 export const LOG_FINISH_REASONS: readonly string[] = ["stop", "length", "content-filter", "tool-calls", "error", "other"];
 const RAISONS_FIN: ReadonlySet<string> = new Set(LOG_FINISH_REASONS);
@@ -719,6 +853,7 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
   ["pagesRead", entierPositif],
   ["candidates", entierPositif],
   ["places", entierPositif],
+  ["stopsRemoved", entierPositif],
   ["candidatesRefused", entierPositif],
   ["planRefused", entierPositif],
   ["planUnreadable", entierPositif],
@@ -762,16 +897,19 @@ const CONTROLES: ReadonlyMap<string, (valeur: unknown) => boolean> = new Map<key
 ]);
 
 /**
- * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee`
- * seulement (constat du 2026-10-25 ; verdict 0122 § 2.1 point 4 : aucun statut sur la ligne des sites) ; `failureCode`
+ * Champs propres à certains événements, retirés sur tout autre : `googleCode` et `httpStatus` sur `p0.ville_refusee`,
+ * `ville.refusee` et `lieu.recherche` seulement (constat du 2026-10-25 ; décisions 0141 § 6.3 point 4 et 0147 § 12 S1
+ * point 5 ; verdict 0122 § 2.1 point 4 : aucun statut sur la ligne des sites) ; `failureCode`
  * sur `p0.step_failed` (ticket 493) et `p0.read_unavailable` (décision 0137 § 2) seulement ; `usage` sur `email.sent` et
- * `email.cap_reached` seulement (B3d point 6).
+ * `email.cap_reached` seulement (B3d point 6) ; `errorClass` sur `payment.provider_failed` seulement (B4c, décision 0140
+ * § 1.2 ; revue de la PR 848, mineur : règle dans cette table, valeur de `LOG_PROVIDER_ERROR_CLASSES`).
  */
 const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlySet<string>; readonly controle: (valeur: unknown) => boolean }> = new Map([
-  ["googleCode", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
-  ["httpStatus", { evenements: new Set(["p0.ville_refusee"]), controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
+  ["googleCode", { evenements: new Set(["p0.ville_refusee", "ville.refusee", "lieu.recherche"]), controle: (v: unknown) => chaine(v) && CODES_GOOGLE.has(v) }],
+  ["httpStatus", { evenements: new Set(["p0.ville_refusee", "ville.refusee", "lieu.recherche"]), controle: (v: unknown) => entierPositif(v) && v >= 100 && v <= 599 }],
   ["failureCode", { evenements: new Set(["p0.step_failed", "p0.read_unavailable"]), controle: (v: unknown) => chaine(v) && CODES_ETAPE.has(v) }],
   ["usage", { evenements: new Set(["email.sent", "email.cap_reached"]), controle: (v: unknown) => chaine(v) && USAGES_EMAIL.has(v) }],
+  ["errorClass", { evenements: new Set(["payment.provider_failed"]), controle: (v: unknown) => chaine(v) && CLASSES_ERREUR_PRESTATAIRE.has(v) }],
 ]);
 
 /**
@@ -780,6 +918,21 @@ const CHAMPS_PAR_EVENEMENT: ReadonlyMap<string, { readonly evenements: ReadonlyS
  * événement que les contrôles globaux (`CONTROLES`) ne donnent pas ; les événements absents de la table ne changent pas.
  */
 export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  // Décision 0141 § 6.3 point 4 (Sécurité, mineur 6) : recherche de ville de `api`, champs fermés seulement.
+  ["ville.refusee", new Set(["reason", "action", "errorName", "googleCode", "httpStatus"])],
+  ["ville.purge_failed", new Set(["errorName"])],
+  // Décision 0147 § 12 S1 point 4 : motif seul ; `tripId`, `organizationId`, `placeId`, `stopId` ou un texte sont retirés.
+  ["voyages.stop_reported", new Set(["reason"])],
+  // Décision 0147 § 12 S1 point 5 : compteur et codes fermés ; requête, ville, `placeId`, textes Google et identifiants retirés.
+  ["lieu.recherche", new Set(["places", "reason", "googleCode", "httpStatus", "errorName"])],
+  // Décision 0155 § 2.4 : deux compteurs ; identifiants, noms, `placeId` et heures retirés.
+  ["recalcul.lieux_a_soi", new Set(["places", "stopsRemoved"])],
+  // Décision 0144 § 5.3 point 4 : identifiant d'événement et raison fermée ; lien, session, message et code retirés.
+  ["payment.receipt_unavailable", new Set(["eventId", "reason"])],
+  // M6b (ticket 1005) : aucun champ ; tout champ passé est retiré.
+  ["calendrier.version_unavailable", new Set<string>()],
+  // M9a (ticket 1097) : nom de l'erreur seulement ; tout autre champ est retiré.
+  ["compte.export_failed", new Set(["errorName"])],
   [
     "generation.programme_written",
     new Set([
@@ -817,7 +970,34 @@ export function errorNameOf(error: unknown): string | undefined {
   }
 }
 
-/** Ligne écrite pour un événement : champs filtrés, `dropped` si des champs ont été retirés. */
+/**
+ * Motif du contrôle global (décision 0144 § 5.3 point 5) : tout lien de Stripe, quelle qu'en soit la casse, forme encodée
+ * `%2e` comprise (`pay.`, `checkout.`, `api.stripe.com`…). Hôte écrit d'un seul tenant dans chaque branche, pour que
+ * l'analyseur de confinement le relève. **Limite assumée** : ni les doubles encodages (`stripe%252ecom`) ni d'autres
+ * obfuscations (Unicode, espaces insérés) ne sont reconnus ; c'est un filet, la garantie première restant qu'aucun champ
+ * de `LogFields` ne porte le lien et que le lien ne quitte jamais la conservation du reçu ni le rendu de `R9-recu`.
+ */
+const MOTIF_LIEN_STRIPE = /stripe\.com|stripe%2ecom/i;
+
+/** Vrai si la valeur (chaîne, ou chaîne d'un tableau ou d'un objet imbriqué) correspond au motif d'un lien de Stripe. */
+export function contientLienStripe(valeur: unknown, profondeur = 0): boolean {
+  if (typeof valeur === "string") return MOTIF_LIEN_STRIPE.test(valeur);
+  if (typeof valeur !== "object" || valeur === null) return false;
+  // Au-delà de cette profondeur, la valeur est tenue pour suspecte (retirée) : aucun champ admis n'en approche.
+  if (profondeur >= 8) return true;
+  return Object.values(valeur).some((element) => contientLienStripe(element, profondeur + 1));
+}
+
+/** Dernier filet (0144 § 5.3 point 5) : ligne sérialisée, clés comprises, remplacée si elle répond encore au motif. */
+export function ligneSansLienStripe(ligne: string, level: LogLevel): string {
+  return MOTIF_LIEN_STRIPE.test(ligne) ? JSON.stringify({ level, event: "log.unknown_event", dropped: 1 }) : ligne;
+}
+
+/**
+ * Ligne écrite pour un événement : champs filtrés, `dropped` si des champs ont été retirés. Après le filtrage par champ,
+ * **contrôle global** (0144 § 5.3 point 5) : toute valeur retenue qui porte un lien de Stripe est retirée et comptée, puis
+ * la ligne sérialisée passe par `ligneSansLienStripe`.
+ */
 export function formatLogLine(event: string, fields: object = {}, level: LogLevel = "info"): string {
   const ligne: Record<string, unknown> = { level, event: EVENEMENTS.has(event) ? event : "log.unknown_event" };
   let retires = 0;
@@ -834,11 +1014,11 @@ export function formatLogLine(event: string, fields: object = {}, level: LogLeve
         : propre !== undefined
           ? (v: unknown) => propre.evenements.has(event) && propre.controle(v)
           : CONTROLES.get(cle);
-    if (controle !== undefined && controle(valeur)) ligne[cle] = valeur;
+    if (controle !== undefined && controle(valeur) && !contientLienStripe(valeur)) ligne[cle] = valeur;
     else retires += 1;
   }
   if (retires > 0) ligne.dropped = retires;
-  return JSON.stringify(ligne);
+  return ligneSansLienStripe(JSON.stringify(ligne), level);
 }
 
 /** Écrit un événement. Ne lève jamais : une entrée inattendue est retirée, pas écrite. */

@@ -25,6 +25,11 @@ export interface TripsScreenProps {
    * « Créer un voyage » (aucun lien ne mène à une page 404).
    */
   createHref?: string;
+  /**
+   * Reçus de la personne (B4d) : identifiant du voyage → adresse de son reçu (`R9-recu`), lue par la page ; un voyage
+   * absent de la liste n'a pas de lien « Voir le reçu ».
+   */
+  receiptHrefs?: Readonly<Record<string, string>>;
   /** Horloge injectable (tests) ; `Date.now` par défaut. Fonction stable. */
   now?: () => number;
   /**
@@ -59,7 +64,19 @@ function Title({ embedded }: { embedded: boolean }) {
   );
 }
 
-function TripRow({ summary, section, href, dates }: { summary: TripSummary; section: SectionKey; href: string; dates: string }) {
+function TripRow({
+  summary,
+  section,
+  href,
+  dates,
+  receiptHref,
+}: {
+  summary: TripSummary;
+  section: SectionKey;
+  href: string;
+  dates: string;
+  receiptHref: string | undefined;
+}) {
   const mention =
     section === "locked" ? t.mentions.premieresPropositions : section === "past" && !summary.unlocked ? t.mentions.nonDebloque : null;
   // Réservations restantes : seulement « En cours » et « À venir » (F11-PO-2) ; rien à 0.
@@ -90,6 +107,14 @@ function TripRow({ summary, section, href, dates }: { summary: TripSummary; sect
           </>
         ) : null}
       </Link>
+      {/* Lien à part, jamais dans le lien du voyage (pas de lien imbriqué) ; nom accessible avec la destination. */}
+      {receiptHref ? (
+        <Button asChild variant="text" size="sm" className="mb-2 px-0">
+          <Link href={receiptHref} aria-label={format(t.recuNom, { destination: summary.destination })} data-part="recu">
+            {t.recu}
+          </Link>
+        </Button>
+      ) : null}
     </li>
   );
 }
@@ -110,7 +135,17 @@ function Loading() {
   );
 }
 
-function Sections({ sections, now, targetOf }: { sections: TripSections; now: number; targetOf: (summary: TripSummary) => string }) {
+function Sections({
+  sections,
+  now,
+  targetOf,
+  receiptHrefs,
+}: {
+  sections: TripSections;
+  now: number;
+  targetOf: (summary: TripSummary) => string;
+  receiptHrefs: Readonly<Record<string, string>>;
+}) {
   return (
     <>
       {sections.featured ? (
@@ -133,7 +168,14 @@ function Sections({ sections, now, targetOf }: { sections: TripSections; now: nu
             </h2>
             <ul className="flex flex-col">
               {trips.map((summary) => (
-                <TripRow key={summary.id} summary={summary} section={key} href={targetOf(summary)} dates={tripDates(summary, now)} />
+                <TripRow
+                  key={summary.id}
+                  summary={summary}
+                  section={key}
+                  href={targetOf(summary)}
+                  dates={tripDates(summary, now)}
+                  receiptHref={Object.hasOwn(receiptHrefs, summary.id) ? receiptHrefs[summary.id] : undefined}
+                />
               ))}
             </ul>
           </section>
@@ -150,7 +192,9 @@ function Sections({ sections, now, targetOf }: { sections: TripSections; now: nu
  * liste classée puis reclassée). Le lien de chaque voyage rouvre au dernier onglet consulté dans l'onglet du
  * navigateur (mémoire du fournisseur, perdue au rechargement). Rendus et textes provisoires (UX/UI, Q154).
  */
-export function TripsScreen({ trips, createHref, now: clock, embedded = false }: TripsScreenProps) {
+const AUCUN_RECU: Readonly<Record<string, string>> = {};
+
+export function TripsScreen({ trips, createHref, receiptHrefs = AUCUN_RECU, now: clock, embedded = false }: TripsScreenProps) {
   const now = useClientNow(clock ? { now: clock } : undefined);
   const memory = useOptionalTripSession();
 
@@ -180,7 +224,7 @@ export function TripsScreen({ trips, createHref, now: clock, embedded = false }:
             </Button>
           </div>
         ) : null}
-        <Sections sections={classifyTrips(trips, now)} now={now} targetOf={targetOf} />
+        <Sections sections={classifyTrips(trips, now)} now={now} targetOf={targetOf} receiptHrefs={receiptHrefs} />
       </>
     );
   }

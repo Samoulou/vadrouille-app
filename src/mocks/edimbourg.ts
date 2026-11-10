@@ -553,8 +553,13 @@ export const edimbourg: Trip = {
   checklist: [
     // Moments (évolution E4) : « Déjà réservé » et « Avant le départ » → `beforeDeparture` ; « Au plus tôt » →
     // `beforeDeparture` (Q42, B2-PO-1) ; « Une semaine avant » → date limite au début du voyage moins 7 jours.
+    // Sortes (décision 0147 § 6.2 et § 6.3) : engagement déjà pris → `ticket` ; chose à réserver, avec son lien
+    // « Réserver » → `reservation` (l'assurance comprise : le compteur du jeu simulé reste à 4). Les libellés des
+    // réservations d'étape passeront au seul nom de l'étape avec le préfixe « Réserver : » composé à l'écran (M5e), pour
+    // ne jamais montrer une ligne sans verbe.
     {
       id: "check-tattoo",
+      kind: "ticket",
       label: "[Billets du Tattoo]",
       when: { type: "beforeDeparture" },
       done: true,
@@ -563,6 +568,7 @@ export const edimbourg: Trip = {
     },
     {
       id: "check-excursion",
+      kind: "reservation",
       label: "[Excursion dans les Highlands]",
       when: { type: "beforeDeparture" },
       done: false,
@@ -572,6 +578,7 @@ export const edimbourg: Trip = {
     },
     {
       id: "check-chateau",
+      kind: "reservation",
       label: "[Château d'Édimbourg]",
       when: { type: "deadline", date: "2026-08-22" },
       done: false,
@@ -581,6 +588,7 @@ export const edimbourg: Trip = {
     },
     {
       id: "check-distillerie",
+      kind: "reservation",
       label: "[Visite de la distillerie]",
       when: { type: "deadline", date: "2026-08-22" },
       done: false,
@@ -590,6 +598,7 @@ export const edimbourg: Trip = {
     },
     {
       id: "check-assurance",
+      kind: "reservation",
       label: "[Assurance voyage]",
       when: { type: "beforeDeparture" },
       done: false,

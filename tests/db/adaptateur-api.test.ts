@@ -30,7 +30,7 @@ import {
   enregistrementConverti,
   type DonneesVoyage,
 } from "../support/voyages-en-base";
-import { closeAll, connect, createOrg, type DbClient, type Org } from "./helpers";
+import { closeAll, connect, createOrg, type DbClient, inTx, type Org, token } from "./helpers";
 
 /**
  * Lecture des voyages et adaptateur `api` sur la base réelle (spécification B6, critères de B6a ; décision 0086,
@@ -752,6 +752,46 @@ describe("lecture: logements, trajets, toConfirm, jour en préparation", () => {
     expect(exceptions).toEqual({ zero: ["toConfirm"], une: ["toReserve", "toConfirm"], deux: ["toReserve", "unconfirmed"] });
   });
 
+  // Ticket 1019 (décision 0159) : « À confirmer » n'est pas une valeur stockée. Tirée des horaires Google (décision
+  // 0011, point 5), elle est recalculée à chaque lecture ; la base ne garde que `toReserve` et `unconfirmed`.
+  const etapeAConfirmer = [term("start", "09:00"), seg("walk"), etape("a-confirmer", "10:00", "11:00", P[0], ["unconfirmed"]), seg("walk"), term("end", "18:00")];
+
+  it("lecture: une étape « À confirmer » créée sur api est stockée sans toConfirm et ressort toConfirm à chaque lecture", async () => {
+    const id = await ecrire(a, voyage([jour(1, "2027-12-02", etapeAConfirmer)], { destination: "À confirmer" }));
+    const stocke = await admin.query("SELECT snapshot -> 'days' -> 0 -> 'items' -> 2 -> 'stop' -> 'exceptions' AS exceptions FROM public.trip_versions WHERE trip_id = $1", [id]);
+    expect(stocke.rows).toEqual([{ exceptions: ["unconfirmed"] }]);
+    // Horaires du lieu inconnus pour la date : « À confirmer » recalculée, après les exceptions stockées.
+    const durees = { [`${L1}|${P[0]}|walk`]: 5, [`${P[0]}|${L1}|walk`]: 5 };
+    const lire = () => banc({ table: table(durees, [], [P[0] ?? ""]) }).adapter.getDay(ctxA, id, 1);
+    const day = await lire();
+    expect((day?.items ?? []).flatMap((i) => (i.type === "stop" ? [i.stop.exceptions] : []))).toEqual([["unconfirmed", "toConfirm"]]);
+    // Seconde lecture identique ; rien n'a été écrit entre-temps.
+    expect(await lire()).toEqual(day);
+    const ecrites = await admin.query("SELECT count(*)::int AS n FROM public.trip_versions WHERE trip_id = $1 AND snapshot::text LIKE '%toConfirm%'", [id]);
+    expect(ecrites.rows[0].n).toBe(0);
+  });
+
+  it("vue partagée: la même étape lue par shared_trip_version du voyage créé porte [\"unconfirmed\"], jamais toConfirm", async () => {
+    const id = await ecrire(a, voyage([jour(1, "2027-12-03", etapeAConfirmer)], { destination: "À confirmer partagé", entitlements: ["tripUnlocked"] }));
+    const jeton = token();
+    await inTx(app, { org: a.org, user: a.owner }, (c) =>
+      c.query("INSERT INTO share_links (organization_id, trip_id, token_hash, created_by, expires_at) VALUES ($1, $2, $3, $4, now() + interval '30 days')", [a.org, id, jeton, a.owner]),
+    );
+    const versions = await inTx(
+      app,
+      {},
+      async (c) => {
+        await c.query("SELECT set_config('app.share_token_hash', $1, true)", [jeton.toString("hex")]);
+        return (await c.query("SELECT snapshot FROM shared_trip_version")).rows as { snapshot: TripSnapshot }[];
+      },
+      "vadrouille_share",
+    );
+    expect(versions).toHaveLength(1);
+    const etapes = (versions[0]?.snapshot.days ?? []).flatMap((d) => d.items.flatMap((i) => (i.type === "stop" ? [i.stop] : [])));
+    expect(etapes.map((e) => e.exceptions)).toEqual([["unconfirmed"]]);
+    expect(JSON.stringify(versions)).not.toContain("toConfirm");
+  });
+
   it("lecture: jour en préparation (exécution batch non terminée), puis aucun après finished_at", async () => {
     const days = [
       jour(1, "2028-01-01", [term("start", "09:00"), seg("walk"), etape("p", "10:00", "11:00", P[0]), seg("walk"), term("end", "18:00")]),
@@ -886,10 +926,20 @@ describe("lecture: identifiants, données incohérentes, voyages sans version", 
 
 const P0 = "test_place_incoherent";
 
+/**
+ * Écarts nommés entre les fabriques `api` et `mock` (seules clés tolérées). `places` (M5d-1, ticket 939) : l'ajout d'un lieu
+ * à soi est propre à `api` dans `TripAdapter` ; `mock` le tient hors de l'adaptateur, dans la portée de simulation
+ * (`lieuxSimules` et `ajoutDeLieu` de `@/adapters`), comme la recherche. Arbitrage du CEO, correction 2 de la PR 943.
+ */
+const PROPRES_A_API = ["places"] as const;
+
 describe("adaptateur mock inchangé", () => {
-  it("la fabrique de mock reste celle de la suite (aucun cas propre à un adaptateur dans la suite)", () => {
+  it("la fabrique de mock reste celle de la suite (aucun cas propre à un adaptateur dans la suite, sauf les écarts nommés)", () => {
     const adapter: TripAdapter = createMockTripAdapter();
-    expect(Object.keys(adapter).sort()).toEqual(Object.keys(banc().adapter).sort());
+    const api = Object.keys(banc().adapter);
+    for (const cle of PROPRES_A_API) expect(api).toContain(cle);
+    expect(Object.keys(adapter)).not.toContain("places");
+    expect(Object.keys(adapter).sort()).toEqual(api.filter((cle) => !(PROPRES_A_API as readonly string[]).includes(cle)).sort());
     void creerLectureVoyages;
   });
 });

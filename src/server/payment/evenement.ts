@@ -30,7 +30,8 @@ const STATUTS: ReadonlyMap<string, PaymentEventStatus> = new Map([
   ["no_payment_required", "noPaymentRequired"],
 ]);
 
-const objet = (valeur: unknown): valeur is Record<string, unknown> => typeof valeur === "object" && valeur !== null && !Array.isArray(valeur);
+/** Objet JSON (ni `null` ni tableau) : seul garde de ce nom du paiement, partagé avec `./stripe.ts` (revue de la PR 867, mineur 3). */
+export const objet = (valeur: unknown): valeur is Record<string, unknown> => typeof valeur === "object" && valeur !== null && !Array.isArray(valeur);
 const texte = (valeur: unknown): string | undefined => (typeof valeur === "string" && valeur.length > 0 && valeur.length <= 255 ? valeur : undefined);
 const entier = (valeur: unknown): number | undefined => (typeof valeur === "number" && Number.isSafeInteger(valeur) && valeur >= 0 ? valeur : undefined);
 

@@ -23,7 +23,8 @@ import { DeckCard } from "@/components/ligne/DeckCard";
 import { DeckProgress } from "@/components/ligne/DeckProgress";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
-import type { DeckSession, PreferenceAnswer, PreferencePrompt, Proposal, TrialRevisionResult } from "@/contracts";
+import type { DeckSession, PreferenceAnswer, PreferencePrompt, Proposal, TrialRevisionResult, TripCity } from "@/contracts";
+import { aPlusieursVilles, dateDuJour, texteDeVille, villeDeLaDate } from "@/features/voyage/villes";
 import { weekdayOf } from "@/contracts/values";
 import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
 import { format } from "@/i18n";
@@ -66,6 +67,16 @@ function preloadDeferred() {
 
 const t = messages.presentation;
 
+/**
+ * Ville d'une carte (spécification M4 § 7.3 et § 8) : « Jour 2 · Rome », ou « Jour 3 · De Rome à Florence » pour toutes les
+ * cartes d'une journée de changement de ville ; `null` pour un voyage à une seule ville.
+ */
+export function villeDeLaCarte(cities: readonly TripCity[] | undefined, day: number): string | null {
+  if (!aPlusieursVilles(cities)) return null;
+  const ville = villeDeLaDate(cities, dateDuJour(cities, day));
+  return ville === undefined ? null : format(t.carte.jourVille, { n: day, ville: texteDeVille(ville, t.carte.changement) });
+}
+
 export interface PresentationScreenProps {
   tripId: string;
   /** Écran 6 (faux) ou 6b « Suite du tri » (vrai). */
@@ -82,8 +93,17 @@ export interface PresentationScreenProps {
    * lien ne mène à une page 404 quand le paiement simulé n'est pas disponible.
    */
   canUnlock?: boolean;
-  /** Mention « Données de lieux : Google » (adaptateur `prototype`, spécification P0) ; absente par défaut. */
+  /**
+   * Mention « Données de lieux : Google » (adaptateur `prototype`, spécification P0 ; sur `api`, dès que les photos du tri
+   * sont demandées, décision 0143 § 5) ; absente par défaut.
+   */
   placesFromGoogle?: boolean;
+  /**
+   * Photo de la carte affichée demandée à l'action (décisions 0128 et 0143) : la page passe
+   * `photosDuTriActives()` (site d'essai, ou `api` barrière ouverte). Absent : `placesFromGoogle`. Faux : aucune demande,
+   * l'emplacement « Photo du lieu » reste.
+   */
+  photos?: boolean;
   /**
    * Voyage d'essai (adaptateur `prototype`, spécification E2E-essai, lot 1 ; D4) : le tri reste en mémoire, sans question
    * de préférence (le programme n'écrit pas de catégorie), et la fin du tri dit que les choix ne changent pas encore le
@@ -116,6 +136,11 @@ export interface PresentationScreenProps {
    * ouvert (F6-PO-16). `null` ou absent : session en mémoire de F6 (`mock`, `prototype`).
    */
   deck?: DeckSession | null;
+  /**
+   * Villes du voyage (`Trip.cities`, spécification M4 § 7.3) : dès 2 villes, chaque carte affiche « Jour {n} · {ville} »,
+   * ou « Jour {n} · De {ville} à {ville} » le jour d'un changement de ville. Absent : cartes inchangées.
+   */
+  cities?: readonly TripCity[];
 }
 
 /**
@@ -163,12 +188,14 @@ function Deck({
   noOptionSlots = [],
   canUnlock = true,
   placesFromGoogle = false,
+  photos = placesFromGoogle,
   essai = false,
   revisable = false,
   demanderRevision = demanderRevisionServeur,
   demanderPhoto,
   actions: injected,
   deck = null,
+  cities,
   track,
 }: DeckProps) {
   const [state, dispatch] = useReducer(deckReducer, proposals, (initial) => ({ ...initDeck(initial), prompt: deck?.openPrompt ?? null }));
@@ -205,10 +232,15 @@ function Deck({
   const revisionDemandeeRef = useRef(false);
 
   const card = currentCard(state);
-  // Décision 0128 : photo de la carte affichée seulement (voyage d'essai, données de lieux Google ; jamais la carte
+  // Décision 0143 § 5 (0128 § 3) : dès que les photos Google sont demandées, la mention « Données de lieux : Google »
+  // accompagne le paquet et le détail, quel que soit l'adaptateur.
+  const donneesGoogle = placesFromGoogle || photos;
+  // Décision 0128 : photo de la carte affichée seulement (voyage d'essai, ou `api` barrière ouverte ; jamais la carte
   // suivante en avance), puis celle du détail ouvert, servie par la même demande de la page.
-  const photoCarte = usePhotoCarte(tripId, card ? { proposalId: card.id, avecLieu: card.stop.placeId !== undefined } : null, placesFromGoogle, demanderPhoto);
-  const photoDetail = usePhotoCarte(tripId, detail ? { proposalId: detail.id, avecLieu: detail.stop.placeId !== undefined } : null, placesFromGoogle, demanderPhoto);
+  const carteDemandee = card ? { proposalId: card.id, avecLieu: card.stop.placeId !== undefined } : null;
+  const detailDemande = detail ? { proposalId: detail.id, avecLieu: detail.stop.placeId !== undefined } : null;
+  const photoCarte = usePhotoCarte(tripId, carteDemandee, photos, demanderPhoto);
+  const photoDetail = usePhotoCarte(tripId, detailDemande, photos, demanderPhoto);
   const position = offset + state.index + 1;
   const total = offset + state.cards.length;
   const programme = `/voyages/${encodeURIComponent(tripId)}`;
@@ -465,6 +497,7 @@ function Deck({
             photo={photoCarte.photo}
             photoEnAttente={photoCarte.attente}
             context={formatContexte(card.neighbours, dayOf(card.day)?.stops ?? [])}
+            ville={villeDeLaCarte(cities, card.day)}
             isLastOption={isLastOption(state)}
             cardRef={cardRef}
             onLike={(gesture) => decide("like", gesture, gesture === "button" ? "keep" : "card")}
@@ -508,7 +541,7 @@ function Deck({
         />
       )}
       <UndoToastRegion className="mt-1 shrink-0">{toast}</UndoToastRegion>
-      <PlacesAttribution placesFromGoogle={placesFromGoogle} className="shrink-0" />
+      <PlacesAttribution placesFromGoogle={donneesGoogle} className="shrink-0" />
       {/* Montées seulement à l'ouverture : la fermeture les démonte, et Radix rend le focus (`onReturnFocus`). */}
       {state.prompt ? (
         <Suspense fallback={null}>
@@ -535,7 +568,7 @@ function Deck({
             weekday={weekdayOf(dayOf(detail.day)?.date ?? "")}
             onClose={() => setDetail(null)}
             onReturnFocus={returnFocus}
-            placesFromGoogle={placesFromGoogle}
+            placesFromGoogle={donneesGoogle}
             photo={photoDetail.photo}
             photoEnAttente={photoDetail.attente}
           />

@@ -58,6 +58,10 @@ export const SPECIFICATEURS = [
   { specificateur: "next/navigation", zones: ["src/**", "next.config.ts"], sousChemins: "exacts" },
   { specificateur: "next/cache", zones: ["src/**", "next.config.ts"], sousChemins: "exacts" },
   { specificateur: "next/headers", zones: ["src/**", "next.config.ts"], sousChemins: "exacts" },
+  // M6a (ticket 1013 ; décision 0157 § 2.1) : proxy de Next.js (`NextResponse`, `NextRequest`), et son test (matcher par
+  // l'outil de test de Next.js). Sans capacité. Verdict Sécurité à rendre.
+  { specificateur: "next/server", zones: ["src/proxy.ts", "tests/unit/server/partage/proxy.test.ts"], sousChemins: "exacts" },
+  { specificateur: "next/experimental/testing/server", zones: ["tests/unit/server/partage/proxy.test.ts"], sousChemins: "exacts" },
   // `scripts/p0/**` : section 9 (P0a1, `scripts/p0/rapport.ts`).
   { specificateur: "zod", zones: ["src/**", "scripts/p0/**"] },
   { specificateur: "clsx", zones: ["src/lib/**"] },
@@ -160,6 +164,21 @@ const COMPOSITION_VILLES =
   "Places des villes, de la barrière d'accès du lancement (0055 section 2 point 5), des tables maison des pays et des villes (aucune donnée " +
   "Google conservée hors du `placeId`, 0011 et 0027), d'un port en mémoire et du plafond persistant (ligne `ville` de `prototype.forfaits`, " +
   "empreinte du cookie, table de prix ; 0129 § 3) ; verdict Sécurité : 0129 § 9, dans la revue de la PR 732";
+const COMPOSITION_VILLES_API =
+  "recherche de ville de l'écran 1 de `api` (décision 0141 ; plan du MVP, ligne M1f) : terminal mince sur le cœur commun " +
+  "`src/server/villes/recherche.ts`, garde des seuils non validés (§ 2.3), barrière B9-TL-8 et crochet `accesReelApi` fermé (§ 6.2), " +
+  "limiteur `ville-recherche` (§ 4), compteurs du jour `autocomplete_daily_counts` (§ 5), table des 62 villes du MVP (§ 8.2), " +
+  "fiche sans position (§ 6.3) ; aucune donnée Google conservée hors du `placeId` (0011, 0027) ; verdict Sécurité : attendu (S-859-3)";
+const COMPOSITION_LIEUX_API =
+  "recherche d'un lieu à soi de `api` (décision 0147 § 3, § 6.4 et § 12 S1 à S3 ; plan du MVP, ligne M5d-1, ticket 939) : terminal mince " +
+  "sur le cœur `src/server/lieux/recherche.ts`, sur le modèle de M1f (0141) : garde `SEUILS_LIEUX_VALIDES` non validée, barrière B9-TL-8 " +
+  "et crochet `accesReelApi` fermé, limiteur `lieu-recherche` (espèces `ip` et `trip`), compteur du jour `lieux` de " +
+  "`autocomplete_daily_counts` ; aucune donnée Google conservée hors du `placeId` (0011, 0027) ; verdict Sécurité : attendu";
+const COMPOSITION_RAPPELS =
+  "rappels par e-mail de `api` (décision 0157 § 1.7 ; plan du MVP, ligne M6c, ticket 1021) : terminal mince sur le cœur " +
+  "`src/server/rappels/accord.ts`, sur le modèle de M5d-1 : composition des notifications (`rappelsDuServeur`, garde " +
+  "`RAPPELS_ENVOI_REEL`), limiteur `rappels-accord` (espèces `ip` et `trip`), démarrage du workflow 7 ; aucune donnée " +
+  "Google ; verdict Sécurité : attendu";
 const SERVER_ONLY_P0R3C4 =
   "marqueur `server-only` (sans capacité) d'un nouveau module serveur de `p0Run`, exigé par `ligne/require-server-only` ; " +
   "P0r3c-4 (ticket 316), décisions 0009 et 0063 ; verdict Sécurité à rendre";
@@ -206,7 +225,6 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "(module non chargé par `pnpm p0`, hors de la liste fermée d'exceptions) ; B8a (ticket 462), décision 0085 § 1 ; verdict Sécurité à rendre",
   })),
   { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
-  { fichier: "src/grounding/ancrage-zone.ts", specificateur: "@/prototype/brief", noms: ["type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/ancrage-zone.test.ts", specificateur: "@/prototype/brief", noms: ["BriefSchema", "type:Brief"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/budget-routes.ts", specificateur: "@/prototype/ancrage", noms: ["type:Trajets"], motif: PROTOTYPE_PUR },
   { fichier: "src/grounding/fiches-finales.ts", specificateur: "@/prototype/ancrage", noms: ["type:AncrageResolu"], motif: PROTOTYPE_PUR },
@@ -378,6 +396,25 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
       "marqueur `server-only` (sans capacité) du module étroit du webhook simulé (B4a, ticket 531 ; décision 0097 B4-TL-3), zone " +
       "sensible, exigé par `ligne/require-server-only` ; verdict Sécurité : approuvé, revue du head d50acfa (PR 582)",
   },
+  // B4c (décision 0140 § 3 point 6) : prédicat de production partagé, importé par les deux modules d'environnement qui
+  // ferment le paiement Stripe en production. Lignes au-delà de 0140 § 6, relevées par `pnpm test` : verdict Sécurité à
+  // rendre à la revue de B4c.
+  {
+    fichier: "src/server/env/index.ts",
+    specificateur: "@/dev/flags",
+    noms: ["isProductionTarget"],
+    motif:
+      "prédicat de production partagé `isProductionTarget` (B4c, décision 0140 § 3 points 3 et 6) : `PAYMENT_ADAPTER=stripe` refusé sur cible de production ; " +
+      "module pur, sans capacité (lecture non secrète de l'objet reçu) ; verdict Sécurité à rendre à la revue de B4c",
+  },
+  {
+    fichier: "src/server/env/payment.ts",
+    specificateur: "@/dev/flags",
+    noms: ["isProductionTarget"],
+    motif:
+      "prédicat de production partagé `isProductionTarget` (B4c, décision 0140 § 3 point 6, § 6 ligne 13) : `productionPaiement` ferme le webhook et la " +
+      "composition Stripe en production ; module pur, sans capacité ; verdict Sécurité à rendre à la revue de B4c",
+  },
   // B3d (M2a ; décision 0138 § 2.4) : ligne au-delà de 0138 § 9, relevée par `pnpm test` ; verdict : approuvé par la Sécurité sur le head 68d6e69.
   {
     fichier: "src/server/env/cle-resend.ts",
@@ -480,15 +517,48 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   { fichier: "src/server/env/generation.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_B9C },
   // Recherche de ville du site d'essai : les lignes que l'analyseur relève pour `villes.ts`, et rien d'autre.
   { fichier: "src/server/composition/villes.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_VILLES },
-  { fichier: "src/server/composition/villes.ts", specificateur: "@/lib/fuseaux", noms: ["fuseauParPosition", "paysParCode", "villeDuPays"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/lib/fuseaux", noms: ["villeDuPays"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/log", noms: ["errorNameOf", "logEvent", "type:LogFields", "type:LogVilleReason"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/p0/acces", noms: ["cookieAccesValide", "empreinteCookieAcces", "ouvertureP0", "type:DependancesAcces"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/p0/base", noms: ["poolPrototype"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/cout-google", noms: ["TablePrixGoogleSchema"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/neon", noms: ["reserverVille", "type:DemandeVille", "type:LimitesVille", "type:ResultatVille"], motif: COMPOSITION_VILLES },
   { fichier: "src/server/composition/villes.ts", specificateur: "../../../prototype/config/prix-google.json", noms: ["default"], motif: COMPOSITION_VILLES },
-  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/periodes", noms: ["periodesDe"], motif: COMPOSITION_VILLES },
-  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/usage/port", noms: ["horlogeSysteme", "type:PortConsommation"], motif: COMPOSITION_VILLES },
+  { fichier: "src/server/composition/villes.ts", specificateur: "@/server/villes/recherche", noms: ["choisirVille", "suggererVilles", "type:ClientVilles", "type:PortsRecherche"], motif: COMPOSITION_VILLES },
+  // Recherche de ville de `api` (décision 0141 § 11 ligne 4, PR 885) : les lignes que l'analyseur relève pour `villes-api.ts`.
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/lib/fuseaux", noms: ["villeMvpDuPays"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/config/usage", noms: ["PLAFONDS_USAGE"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/config/villes", noms: ["SEUILS_AUTOCOMPLETION_VALIDES"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/generation/acces-reel", noms: ["accesReelApi"], motif: COMPOSITION_VILLES_API },
+  {
+    fichier: "src/server/composition/villes-api.ts",
+    specificateur: "@/server/generation/barriere",
+    noms: ["evaluerBarriere", "plafondsDeGenerationPoses", "type:EtatBarriere"],
+    motif: COMPOSITION_VILLES_API,
+  },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/log", noms: ["errorNameOf", "logEvent"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/rate-limit", noms: ["checkRateLimit"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/villes/compteurs", noms: ["purgerAutocompletion", "reserverAutocompletion"], motif: COMPOSITION_VILLES_API },
+  { fichier: "src/server/composition/villes-api.ts", specificateur: "@/server/villes/recherche", noms: ["choisirVille", "suggererVilles", "type:PortsRecherche"], motif: COMPOSITION_VILLES_API },
+  // Recherche d'un lieu à soi de `api` (décision 0147 § 3 et § 14 ligne M5d-1, ticket 939) : les lignes que l'analyseur relève pour `lieux-api.ts`.
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/config/lieux", noms: ["SEUILS_LIEUX_VALIDES"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/config/usage", noms: ["PLAFONDS_USAGE"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/generation/acces-reel", noms: ["accesReelApi"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/generation/barriere", noms: ["evaluerBarriere", "plafondsDeGenerationPoses", "type:EtatBarriere"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/log", noms: ["errorNameOf", "logEvent", "type:LogLieuReason"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/rate-limit", noms: ["verdictRateLimit"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/villes/compteurs", noms: ["purgerAutocompletion", "reserverAutocompletion"], motif: COMPOSITION_LIEUX_API },
+  { fichier: "src/server/composition/lieux-api.ts", specificateur: "@/server/lieux/recherche", noms: ["rechercherLieux", "type:DependancesRechercheLieux", "type:PortsRechercheLieux"], motif: COMPOSITION_LIEUX_API },
+  // Rappels par e-mail de `api` (M6c, ticket 1021) : les lignes que l'analyseur relève pour `composition/rappels.ts`.
+  { fichier: "src/server/composition/rappels.ts", specificateur: "server-only", noms: ["effet"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/auth", noms: ["rappelsDuServeur"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/mail/disabled", noms: ["disabledNotificationMailer"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/rate-limit", noms: ["verdictRateLimit"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/rappels/accord", noms: ["type:DependancesRappels"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/rappels/demarrage", noms: ["demarrerRappelsReel"], motif: COMPOSITION_RAPPELS },
+  { fichier: "src/server/composition/rappels.ts", specificateur: "@/server/rappels/limiteurs", noms: ["compterEspeceRappels"], motif: COMPOSITION_RAPPELS },
   // P0r3c-4 (ticket 316) : workflow `p0Run`, son interface stable, l'adaptateur de la table de travail et les plafonds de
   // l'agent (décisions 0009 et 0063). Verdict Sécurité à rendre dans la PR.
   ...["src/workflows/index.ts", "src/workflows/p0-run.ts", "src/workflows/apercu.ts", "src/adapters/prototype-travail.ts", "src/research/plafonds-agent.ts"].map((fichier) => ({
@@ -516,6 +586,20 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
     specificateur: "server-only",
     noms: ["effet"],
     motif: "marqueur `server-only` (sans capacité) du workflow `generateProgramme` (chaîne inversée), exigé par `ligne/require-server-only` ; M1a-2, ticket 851, décision 0136 § 2.1 ; admis par le verdict Sécurité de la revue du head 3536d13 de la PR 854 (amende 0139 § 6 point 1 d'une ligne, précédent 0120 S9 point 1)",
+  },
+  {
+    fichier: "src/workflows/rappels.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du workflow 7 `rappelsVeille`, exigé par `ligne/require-server-only` ; M6c, ticket 1021, décision 0157 § 1.7 ; verdict Sécurité demandé dans la PR (précédent 0120 S9 point 1)",
+  },
+  {
+    fichier: "src/workflows/region.ts",
+    specificateur: "server-only",
+    noms: ["effet"],
+    motif:
+      "marqueur `server-only` (sans capacité) du module feuille de la région des workflows, exigé par `ligne/require-server-only` ; M6c, ticket 1021, revue de la PR 1024 (mineur 1 du Tech Lead) ; verdict Sécurité demandé dans la PR (précédent 0120 S9 point 1)",
   },
   // P0r3d (ticket 354) : lecture du suivi des exécutions (page de lancement) et interrupteur de démarrage de `p0Run`,
   // marqueurs `server-only` sans capacité.

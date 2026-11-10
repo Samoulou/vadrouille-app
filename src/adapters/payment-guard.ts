@@ -1,4 +1,4 @@
-import { isProductionDeployment, prototypeAdapterAllowed } from "@/dev/flags";
+import { isProductionDeployment, isProductionTarget, prototypeAdapterAllowed } from "@/dev/flags";
 
 import { betterAuthAllowed } from "./auth-guard";
 
@@ -41,7 +41,12 @@ export function paymentDemoAllowed(env: NodeJS.ProcessEnv = process.env): boolea
  *   (spécification E2E-essai, lot 1), sans prestataire, sans e-mail, sans écriture en base ;
  * - `PAYMENT_ADAPTER=simulated` (spécification B4, B4b point 1 ; amendement B4-TL-14 de 0020 § 2.3) : paiement simulé
  *   autorisé (`paymentDemoAllowed`), `DATA_ADAPTER=api`, `AUTH_ADAPTER=better-auth` et webhook simulé ouvert
- *   (`local` ou `ci` seulement) : paiement simulé en base, droit accordé par le webhook simulé.
+ *   (`local` ou `ci` seulement) : paiement simulé en base, droit accordé par le webhook simulé ;
+ * - `PAYMENT_ADAPTER=stripe` (spécification B4, B4c ; amendement de 0020 § 2.3 par la décision 0140 § 5 point 1) :
+ *   jamais sur une cible de production (`isProductionTarget`, prédicat partagé de 0140 § 3 point 6, appelé ici
+ *   directement : ce module ne peut pas importer `src/server/env/payment`), `DATA_ADAPTER=api` et
+ *   `AUTH_ADAPTER=better-auth` admis (`betterAuthAllowed`) : session Stripe en mode test, droit accordé par le webhook
+ *   Stripe. La clé n'est jamais lue ici.
  * Toute autre combinaison ferme (sans quoi `getRequestContext()` lèverait et la page répondrait 500).
  */
 export function paymentAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -55,6 +60,10 @@ export function paymentAvailable(env: NodeJS.ProcessEnv = process.env): boolean 
     const webhookOuvert = env.SIMULATED_WEBHOOK_ENABLED === "true" && betterAuthAllowed(env);
     return paymentDemoAllowed(env) && donnees === "api" && adapterChoice(env.AUTH_ADAPTER) === "better-auth" && webhookOuvert;
   }
+  if (paiement === "stripe") {
+    if (isProductionTarget(env)) return false;
+    return donnees === "api" && adapterChoice(env.AUTH_ADAPTER) === "better-auth" && betterAuthAllowed(env);
+  }
   if (paiement !== "mock") return false;
   if (donnees === "mock") return paymentDemoAllowed(env);
   return donnees === "prototype" && prototypeAdapterAllowed(env);
@@ -67,4 +76,13 @@ export function paymentAvailable(env: NodeJS.ProcessEnv = process.env): boolean 
  */
 export function simulatedPaymentChosen(env: NodeJS.ProcessEnv = process.env): boolean {
   return adapterChoice(env.PAYMENT_ADAPTER) === "simulated";
+}
+
+/**
+ * Vrai quand `PAYMENT_ADAPTER` vaut `stripe` (spécification B4, B4c ; décision 0140 § 5 point 1), sans lever d'erreur
+ * ni consulter la garde : `src/instrumentation.ts` y branche la composition du paiement Stripe ; `parseServerEnv` a
+ * déjà refusé de démarrer en production ou sans ses variables, et `paymentAvailable()` reste vérifiée à chaque appel.
+ */
+export function stripePaymentChosen(env: NodeJS.ProcessEnv = process.env): boolean {
+  return adapterChoice(env.PAYMENT_ADAPTER) === "stripe";
 }

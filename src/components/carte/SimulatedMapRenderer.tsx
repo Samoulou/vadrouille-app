@@ -1,15 +1,17 @@
 "use client";
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import { StopMarker } from "@/components/ligne/StopMarker";
 import { useElementSize } from "@/lib/use-element-size";
 
+import { CityMark, DECALAGES_JOURNEE, DECALAGES_SEJOUR, mesurerEtiquettes, nomRepere, nomTerminus, texteEtiquette } from "./CityLabel";
 import { defaultFitPadding } from "./css";
+import { useLabelPlaces } from "./label-places";
 import { MarkerButton } from "./MarkerButton";
-import { areaRadiusDegrees, type LatLng } from "./route";
-import { drag, fitCamera, offsetCamera, project, scaleAt, type Camera } from "./simulated-model";
-import type { MapView } from "./types";
+import { anneauVisible, areaRadiusDegrees, boundsOf, ZOOM_POSITION_SEULE, type LatLng } from "./route";
+import { drag, fitCamera, offsetCamera, project, scaleAt, type Camera, type Size } from "./simulated-model";
+import { fitTargetOf, type FitPadding, type MapView } from "./types";
 
 /** Au-delà de ce déplacement (en pixels CSS), le geste est un glisser et non un toucher. */
 const DRAG_THRESHOLD = 4;
@@ -37,6 +39,26 @@ function areaBox(center: LatLng, radiusM: number): LatLng[] {
   ];
 }
 
+/**
+ * Cadrage d'une vue : boîte des positions, ou, pour une vue d'une ville ou la journée d'un changement de ville réduite à
+ * une seule position (décision 0150 § 3 bis), cette position au milieu de la zone non couverte par le panneau, au zoom 15.
+ */
+function frame(view: MapView, size: Size, insets: FitPadding | undefined): Camera | null {
+  const target = fitTargetOf(view);
+  const positions: LatLng[] = target
+    ? target.positions
+    : view.mode === "day"
+      ? view.route.positions
+      : view.mode === "area"
+        ? areaBox(view.center, view.radiusM)
+        : view.rings;
+  const box = boundsOf(positions);
+  if (target?.single && box && box.north === box.south && box.east === box.west) {
+    return { zoom: ZOOM_POSITION_SEULE, center: offsetCamera({ lat: box.north, lng: box.east }, insets, ZOOM_POSITION_SEULE) };
+  }
+  return fitCamera(positions, size, view.fitPadding ?? defaultFitPadding());
+}
+
 export function SimulatedMapRenderer({ view }: { view: MapView }) {
   // Taille du conteneur, par le crochet commun (décision 0022 § 6) : la zone de la carte, pas la fenêtre.
   const [containerRef, size] = useElementSize<HTMLDivElement>();
@@ -46,20 +68,20 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
   const dragState = useRef<DragState | null>(null);
   const suppressClick = useRef(false);
 
-  // Cadrage au premier affichage et à chaque changement de jour seulement ; recentrage quand la
+  // Cadrage au premier affichage et à chaque changement de jour (ou de vue, décision 0150) seulement ; recentrage quand la
   // sélection change (zoom inchangé, sans transition). Ajusté pendant le rendu, sans effet.
-  const positions: LatLng[] = view.mode === "day" ? view.route.positions : view.mode === "area" ? areaBox(view.center, view.radiusM) : view.rings;
+  const insets = view.mode === "day" || view.mode === "overview" ? view.visibleInsets : undefined;
   let next = camera;
   if (size && (next === null || next.key !== view.fitKey)) {
-    const fitted = fitCamera(positions, size, view.fitPadding ?? defaultFitPadding());
+    const fitted = frame(view, size, insets);
     next = fitted ? { ...fitted, key: view.fitKey } : null;
   }
   if (selectedStopId !== previousSelection) {
     setPreviousSelection(selectedStopId);
     const target = view.mode === "day" ? view.route.stops.find((stop) => stop.stopId === selectedStopId) : undefined;
     if (next && target) {
-      // Étape au milieu de la zone non couverte par le panneau, dans la projection simulée (décision 0016 § 2).
-      const insets = view.mode === "day" ? view.visibleInsets : undefined;
+      // Étape au milieu de la zone non couverte par le panneau, dans la projection simulée (décision 0016 § 2) ; après un
+      // recadrage du même rendu (autre moitié, décision 0150 § 3 point 5), au zoom de ce cadrage.
       next = { ...next, center: offsetCamera(target.position, insets, next.zoom) };
     }
   }
@@ -106,9 +128,26 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
   };
   const ready = camera !== null && size !== null;
 
+  // Étiquettes de ville : côté et décalage recalculés à chaque rendu (décision 0150 § 4).
+  const labels = useLabelPlaces(mesurerEtiquettes);
+  const measureLabels = labels.measure;
+  const containerElement = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    measureLabels(containerElement.current);
+  });
+  const setContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      containerElement.current = element;
+      return containerRef(element);
+    },
+    [containerRef],
+  );
+  const cities = view.mode === "overview" ? view.cities : undefined;
+  const transfer = view.mode === "day" ? view.transferCities : undefined;
+
   return (
     <div
-      ref={containerRef}
+      ref={setContainer}
       data-renderer="simulated"
       data-center-lat={camera?.center.lat}
       data-center-lng={camera?.center.lng}
@@ -152,7 +191,7 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
         </svg>
       ) : null}
 
-      {ready && view.mode === "day"
+      {ready && view.mode === "day" && !transfer
         ? view.route.termini.map((terminus) => (
             <span
               key={terminus.roles.join("-")}
@@ -164,6 +203,25 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
               <StopMarker kind="terminus" />
             </span>
           ))
+        : null}
+
+      {ready && view.mode === "day" && transfer
+        ? view.route.termini.map((terminus) => {
+            const nom = nomTerminus(terminus, transfer);
+            const key = terminus.roles.join("-");
+            return (
+              <span key={key} className="absolute flex -translate-x-1/2 -translate-y-1/2" style={at(terminus.position)}>
+                <CityMark
+                  name={nom?.name}
+                  label={
+                    nom
+                      ? { placeKey: key, text: nom.city, place: labels.places[key], decalagesMax: DECALAGES_JOURNEE }
+                      : undefined
+                  }
+                />
+              </span>
+            );
+          })
         : null}
 
       {ready && view.mode === "day"
@@ -194,6 +252,37 @@ export function SimulatedMapRenderer({ view }: { view: MapView }) {
           />
         </svg>
       ) : null}
+
+      {ready && cities
+        ? cities.rings.map((ring, index) =>
+            anneauVisible(camera.zoom, ring.city, view.mode === "overview" ? view.cityView : undefined) ? (
+              <span
+                key={index}
+                aria-hidden="true"
+                data-part="anneau"
+                className="absolute flex -translate-x-1/2 -translate-y-1/2"
+                style={at(ring.position)}
+              >
+                <StopMarker kind="overview" />
+              </span>
+            ) : null,
+          )
+        : null}
+
+      {ready && cities
+        ? cities.markers.map((marker) => (
+            <span key={marker.key} className="absolute flex -translate-x-1/2 -translate-y-1/2" style={at(marker.position)}>
+              <CityMark
+                name={marker.primary ? nomRepere(marker) : undefined}
+                label={
+                  marker.primary
+                    ? { placeKey: marker.key, text: texteEtiquette(marker), place: labels.places[marker.key], decalagesMax: DECALAGES_SEJOUR }
+                    : undefined
+                }
+              />
+            </span>
+          ))
+        : null}
 
       {ready && view.mode === "overview"
         ? view.rings.map((ring, index) => (

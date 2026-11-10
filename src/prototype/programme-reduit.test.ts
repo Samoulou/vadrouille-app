@@ -306,6 +306,21 @@ describe("p0: schéma strict de la forme réduite", () => {
     const clesContrat = Object.keys(ProposalSchema.shape);
     for (const cle of Object.keys(PropositionReduiteSchema.shape)) expect(clesContrat, cle).toContain(cle);
     for (const cle of Object.keys(StopReduitSchema.shape)) expect(Object.keys(StopSchema.shape), cle).toContain(cle);
-    expect(Object.keys(ProgrammeReduitSchema.shape.trip.shape).sort()).toEqual(Object.keys(TripSchema.shape).sort());
+    // `cities` (décision 0148 § 6) : omis, le site d'essai n'a qu'une ville (test suivant).
+    expect(Object.keys(ProgrammeReduitSchema.shape.trip.shape).sort()).toEqual(
+      Object.keys(TripSchema.shape)
+        .filter((cle) => cle !== "cities")
+        .sort(),
+    );
+  });
+
+  it("plusieurs-villes: le voyage réduit refuse Trip.cities (une seule ville au site d'essai, décision 0148 § 4)", () => {
+    const programme = exemple();
+    const cities = [
+      { name: "Rome", start: programme.trip.start, end: programme.trip.end },
+      { name: "Florence", start: programme.trip.end, end: programme.trip.end },
+    ];
+    expect(ProgrammeReduitSchema.safeParse({ ...programme, trip: { ...programme.trip, cities } }).success).toBe(false);
+    expect(ProgrammeReduitSchema.shape.trip.shape).not.toHaveProperty("cities");
   });
 });

@@ -549,6 +549,12 @@ export function replanifierJour(entree: EntreeMoteur, base: TripSnapshot, index:
     (jour) => jour.index === index,
   );
   if (jourBase === undefined || squeletteDuJour === undefined) throw new RangeError("moteur : jour hors du séjour");
+  // Jour d'un changement de ville (`transfer`, décision 0151 § 4) : la ligne « Vers {ville} » est un bloc fixe que ce
+  // planificateur (ancienne chaîne, qui n'en écrit jamais) ne sait pas poser ; le jour entier est donc **recopié tel quel**,
+  // `transfer` compris, plutôt que replanifié sans lui. Sur la chaîne inversée, le recalcul est la révision (M1b).
+  if (jourBase.items.some((item) => item.type === "transfer")) {
+    return { ok: true, jour: TripSnapshotSchema.parse({ days: [jourBase] }).days.at(0) ?? jourBase, rapport: [] };
+  }
 
   // Étape gardée telle quelle : verrouillée, engagement, ou conservée par l'appelant (0119 § 2.1) sur un jour planifié.
   const conservees = nonPlanifie ? undefined : entree.conservees;

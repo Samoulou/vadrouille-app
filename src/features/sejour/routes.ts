@@ -1,4 +1,4 @@
-import type { Stop } from "@/contracts";
+import type { Meal, Stop } from "@/contracts";
 
 /**
  * Adresses des écrans du voyage (décision 0015 § 1) : seul endroit qui connaît le schéma des routes.
@@ -7,7 +7,11 @@ import type { Stop } from "@/contracts";
  * quels pour que `:` ne devienne pas `%3A`. Aucun paramètre n'est un identifiant de lieu Google.
  */
 
-export type TripRoutesBase = "/voyages" | "/dev/voyages";
+/**
+ * `/dev/carte/villes` : voyages simulés à plusieurs villes avec positions, carte simulée (décision 0150, page de
+ * développement de M4-suite-carte) ; comme `/dev/voyages`, ni « Pendant le voyage » ni versions.
+ */
+export type TripRoutesBase = "/voyages" | "/dev/voyages" | "/dev/carte/villes";
 
 /**
  * Numéro de jour d'une adresse `/jour/{n}` : entier écrit sans zéro initial, trois chiffres au plus. Seule forme admise
@@ -25,8 +29,11 @@ export interface TripRoutes {
   etape(n: number, stopId: Stop["id"]): string;
   /** Écran 14 « Remplacer une étape » (F7). */
   remplacer(n: number, stopId: Stop["id"]): string;
-  /** « Ajouter un lieu » du jour (F7), avec la plage de temps libre proposée. */
-  ajouter(n: number, free?: { from: string; to: string }): string;
+  /**
+   * « Ajouter un lieu » du jour (F7, F7-PO-8) : avec la plage d'un temps libre (lien « Idées », `?de=&a=`) ou le repas pas
+   * encore choisi (« Choisir », `?de=&repas=`, M5d-3). Heures « HH:MM » et repas écrits tels quels, comme pour « Idées ».
+   */
+  ajouter(n: number, moment?: { from: string; to: string } | { time: string; meal: Meal }): string;
   /**
    * Niveau supérieur du Séjour : « Mes voyages » (`R17`). Toujours `/voyages`, quelle que soit la base : `R17`
    * n'a pas de pendant de développement (décision 0021 § 6, qui renomme `retour()`).
@@ -37,11 +44,24 @@ export interface TripRoutes {
    * `R15` (F10-PO-7) : aucun lien ne mène alors à une 404.
    */
   aujourdhui(): string | null;
+  /**
+   * « Versions du programme » (M5b, spécification M5 § 4 ; décision 0147 § 5.3 point 3) ; `null` avec la base
+   * `/dev/voyages`, qui n'a pas de page des versions : aucun lien ne mène alors à une 404.
+   */
+  versions(): string | null;
 }
 
 /** `R17` « Mes voyages » : seul endroit qui écrit cette adresse (décision 0021 § 6). */
 export function mesVoyagesRoute(): string {
   return "/voyages";
+}
+
+/**
+ * Fichier `.ics` du programme (M6b, ticket 1005 ; décision 0157 § 1.6 point 1) : route `GET /api/v1/voyages/[id]/calendrier`,
+ * seul endroit qui écrit cette adresse (bouton « Ajouter au calendrier » du Séjour, tests).
+ */
+export function calendrierRoute(tripId: string): string {
+  return `/api/v1/voyages/${encodeURIComponent(tripId)}/calendrier`;
 }
 
 export function tripRoutes(base: TripRoutesBase, tripId: string): TripRoutes {
@@ -52,8 +72,14 @@ export function tripRoutes(base: TripRoutesBase, tripId: string): TripRoutes {
     jour,
     etape: (n, stopId) => `${jour(n)}?etape=${encodeURIComponent(stopId)}`,
     remplacer: (n, stopId) => `${jour(n)}/remplacer/${encodeURIComponent(stopId)}`,
-    ajouter: (n, free) => (free ? `${jour(n)}/ajouter?de=${free.from}&a=${free.to}` : `${jour(n)}/ajouter`),
+    ajouter: (n, moment) =>
+      moment === undefined
+        ? `${jour(n)}/ajouter`
+        : "meal" in moment
+          ? `${jour(n)}/ajouter?de=${moment.time}&repas=${moment.meal}`
+          : `${jour(n)}/ajouter?de=${moment.from}&a=${moment.to}`,
     mesVoyages: mesVoyagesRoute,
     aujourdhui: () => (base === "/voyages" ? `${trip}/aujourdhui` : null),
+    versions: () => (base === "/voyages" ? `${trip}/versions` : null),
   };
 }

@@ -9,10 +9,12 @@ import type { MemberRole } from "@/adapters/types";
 import { type CanonicalEmail, isCanonicalEmail } from "@/server/email";
 import { serverEnv } from "@/server/env";
 import { errorNameOf, logEvent } from "@/server/log";
-import { disabledCodeMailer } from "@/server/mail/disabled";
+import { RAPPELS_ENVOI_REEL } from "@/server/config/rappels";
+import type { CompositionNotifications } from "@/server/mail/apercu-pret";
+import { disabledCodeMailer, disabledNotificationMailer } from "@/server/mail/disabled";
 import type { CodeMailer } from "@/server/mail/port";
-import { createResendCodeMailer } from "@/server/mail/resend";
-import { createSmtpCodeMailer } from "@/server/mail/smtp";
+import { createResendCodeMailer, createResendNotificationMailer } from "@/server/mail/resend";
+import { createSmtpCodeMailer, createSmtpNotificationMailer } from "@/server/mail/smtp";
 import { creerAuth, type InstanceAuth, OrganisationEnSuppressionError } from "@/tenancy/auth";
 import { avecAdresse } from "@/tenancy/code-otp";
 import { hacherJeton } from "@/tenancy/jetons-haches";
@@ -64,6 +66,14 @@ export type AuthOperations = {
   readonly readSession: (headers: Headers) => Promise<AuthSession | null>;
   /** Ferme la session du cookie (idempotente). */
   readonly signOut: (headers: Headers) => Promise<{ readonly ok: true } | AuthFailure>;
+  /**
+   * Instant de création d'une session non expirée (M9a, réauthentification récente ; spécification M9 § 1.3, T1), `null`
+   * si elle est inconnue, expirée ou illisible. Lu dans `sessions.created_at`, que Better Auth 1.7.7 écrit à la création
+   * (`createSession` : `createdAt: new Date()`) et **ne change pas à la prolongation** (`getSession` → `updateSession` avec
+   * `expiresAt` et `updatedAt` seulement ; c'est aussi la mesure de son propre `freshSessionMiddleware`). Une session
+   * n'est créée que par une vérification de code réussie : l'instant mesure donc le dernier code juste de cette session.
+   */
+  readonly readSessionCreatedAt: (sessionId: string) => Promise<Date | null>;
 };
 
 /**
@@ -100,6 +110,8 @@ const POOL_VERROUS = { max: 5, connectionTimeoutMillis: 5_000, query_timeout: 10
 const DUREE_SOUS_VERROU_MS = 20_000;
 /** Forme d'un code de connexion : 6 chiffres ASCII (B3-PO-4). */
 const FORME_CODE = /^[0-9]{6}$/;
+/** Identifiant de session (`sessions.id`, `uuid`), contrôlé avant toute requête. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Le délai d'une opération tenue sous verrou est dépassé ; ne porte aucune valeur. */
 class DelaiDepasseError extends Error {
@@ -338,7 +350,21 @@ export function createAuthOperations(config: AuthOperationsConfig): AuthOperatio
     }
   }
 
-  return Object.freeze({ requestCode, verifyCode, readSession, signOut });
+  async function readSessionCreatedAt(sessionId: string): Promise<Date | null> {
+    if (secret === null || typeof sessionId !== "string" || !UUID.test(sessionId)) return null;
+    try {
+      const lu = await database.execute<{ cree_ms: unknown }>(
+        sql`SELECT (extract(epoch FROM created_at) * 1000)::float8 AS cree_ms FROM sessions WHERE id = ${sessionId} AND expires_at > now() LIMIT 1`,
+      );
+      const ms = Number(lu.rows[0]?.cree_ms);
+      return lu.rows.length === 1 && Number.isFinite(ms) ? new Date(ms) : null;
+    } catch (erreur) {
+      journaliserEchec("session-created-at", erreur);
+      return null;
+    }
+  }
+
+  return Object.freeze({ requestCode, verifyCode, readSession, signOut, readSessionCreatedAt });
 }
 
 let parDefaut: AuthOperations | undefined;
@@ -371,6 +397,40 @@ export function authOperations(): AuthOperations {
           : disabledCodeMailer,
   });
   return parDefaut;
+}
+
+/**
+ * Composition du port des notifications (M7a, e-mail « propositions prêtes »), dans ce module parce qu'il est le seul, hors
+ * des tests, à lire `serverEnv()` pour l'e-mail et à construire l'implémentation Resend (0138 § 9, ligne 7b) : **mêmes règles
+ * que le port du code** de `authOperations()`. `EMAIL_TRANSPORT=resend` (cas admis de 0138 § 3 seulement) → Resend ;
+ * `EMAIL_TRANSPORT=smtp` (Mailpit, `local` et `ci`) → SMTP ; sinon, ou sans connexion réelle (`AUTH_ADAPTER` autre que
+ * `better-auth` : aucune adresse de compte, aucune `APP_URL`), port désactivé et origine nulle. Lue à chaque appel (aucun
+ * cache) ; lève une `ServerEnvError` (sans valeur) si la configuration est refusée.
+ */
+export function notificationsDuServeur(): CompositionNotifications {
+  const env = serverEnv();
+  if (env.authAdapter !== "better-auth" || env.betterAuth === null) return { mailer: disabledNotificationMailer, origine: null };
+  const mailer =
+    env.emailTransport === "resend"
+      ? createResendNotificationMailer()
+      : env.emailTransport === "smtp" && env.smtp !== null
+        ? createSmtpNotificationMailer(env.smtp)
+        : disabledNotificationMailer;
+  return { mailer, origine: env.betterAuth.appUrl };
+}
+
+/**
+ * Composition des rappels par e-mail (M6c, ticket 1021 ; décision 0157 § 1.7 point 10 et § 2.6, S6) : celle des
+ * notifications (`notificationsDuServeur`, même port, même origine), **sauf** Resend tant que `RAPPELS_ENVOI_REEL` est faux :
+ * port désactivé et origine nulle, donc ni interrupteur, ni workflow, ni appel de `resend.ts` pour un rappel. Mailpit
+ * (`EMAIL_TRANSPORT=smtp`, `local` et `ci`) reste branché. Lue à chaque appel ; lève une `ServerEnvError` (sans valeur) si la
+ * configuration est refusée.
+ */
+export function rappelsDuServeur(): CompositionNotifications & { readonly acceleration: number } {
+  const env = serverEnv();
+  // Accélération des durées (`RAPPELS_ACCELERATION`, `local` et `ci` seulement, contrôlée par `serverEnv`) : 1 ailleurs.
+  if (!RAPPELS_ENVOI_REEL && env.emailTransport === "resend") return { mailer: disabledNotificationMailer, origine: null, acceleration: 1 };
+  return { ...notificationsDuServeur(), acceleration: env.rappelsAcceleration };
 }
 
 /** Le rappel d'envoi n'a pas été appelé ; ne porte aucune valeur. */

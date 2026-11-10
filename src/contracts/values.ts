@@ -9,6 +9,7 @@
  * Seuls des `import type` sont permis ici : ils disparaissent à la compilation.
  */
 import type { MapPointRef } from "./map";
+import type { PreferenceSubject } from "./preference";
 
 /**
  * Catégories d'une proposition et vocabulaire des envies du brief (décision 0013 § 3.1 ; codes provisoires de
@@ -50,12 +51,126 @@ export const STOP_KINDS = ["activity", "meal", "event"] as const;
 export type StopKind = (typeof STOP_KINDS)[number];
 
 /**
- * Nombre de lignes « À faire » non faites (décision 0021 § 1.1) : seul calcul des « réservations à faire »,
- * pour le résumé de voyage (`TripSummary.toReserveCount`) et, avec F9b, le programme ajusté.
+ * Marque d'une étape ajoutée par la personne (`Stop.addedBy`, décision 0147 § 6.1, étendue par 0160 § 1.4) : lieu à soi
+ * (`person`) ou adresse découverte sur place (`discovered`, M8b). Source de `StopSchema.addedBy`. La marque est calculée
+ * par le serveur, jamais choisie par le client (0160 § 1.4 point 4).
  */
-export function countToReserve(checklist: readonly { done: boolean }[]): number {
-  return checklist.filter((item) => !item.done).length;
+export const ADDED_BY = ["person", "discovered"] as const;
+export type AddedBy = (typeof ADDED_BY)[number];
+
+/**
+ * Avis rapide sur une étape après le voyage (« J'ai aimé », « Pas pour moi », « Pas fait » ; F11-PO-10). Décision 0160
+ * § 1.2 point 1 : `notDone` en camelCase (amende 0021 § 1.1, `not_done`). Source de `StopReviewSchema.rating`, de la
+ * propriété `rating` de l'événement `stop_reviewed` et du `CHECK` de `stop_reviews.rating` (M8-D).
+ */
+export const STOP_RATINGS = ["liked", "disliked", "notDone"] as const;
+export type StopRating = (typeof STOP_RATINGS)[number];
+
+/**
+ * Sens d'une préférence de catégorie (décision 0021 § 1.1 et § 1.3) : `more` (« Tu aimes… »), `less` (« Tu préfères
+ * éviter… »). Source de `PreferenceSubjectSchema`.
+ */
+export const PREFERENCE_DIRECTIONS = ["more", "less"] as const;
+export type PreferenceDirection = (typeof PREFERENCE_DIRECTIONS)[number];
+
+/** Origine d'une préférence retenue (décision 0021 § 1.1) : confirmée par la personne, ou déduite de ses gestes. */
+export const PREFERENCE_ORIGINS = ["confirmed", "inferred"] as const;
+export type PreferenceOrigin = (typeof PREFERENCE_ORIGINS)[number];
+
+/**
+ * Clé stable d'un sujet de préférence (décision 0021 § 1.1) : `category:museum:less`, `distance`. Identifiant de
+ * `RetainedPreference` et de `RetainedTaste` ; décide « même sujet, même sens » (F11-PO-12). L'ordre des colonnes de la
+ * liste des goûts retenus suit l'ordre de ces clés en texte (décision 0160 § 1.3 point 7).
+ */
+export function preferenceKey(subject: PreferenceSubject): string {
+  return subject.kind === "distance" ? "distance" : `category:${subject.category}:${subject.direction}`;
 }
+
+/** Nombre de sujets possibles : chaque catégorie dans chaque sens, plus la distance (17 au MVP ; décision 0160 § 1.2). */
+export const PREFERENCE_SUBJECTS_MAX = CATEGORIES.length * PREFERENCE_DIRECTIONS.length + 1;
+
+const PREFERENCE_KEYS: ReadonlySet<string> = new Set([
+  ...CATEGORIES.flatMap((category) =>
+    PREFERENCE_DIRECTIONS.map((direction) => preferenceKey({ kind: "category", category, direction })),
+  ),
+  preferenceKey({ kind: "distance" }),
+]);
+
+/** Vrai pour la clé d'un sujet possible (`preferenceKey`), faux pour tout autre texte. */
+export function isPreferenceKey(value: string): boolean {
+  return PREFERENCE_KEYS.has(value);
+}
+
+/**
+ * Accès à l'écran 16 « Après le voyage », calculé par le serveur une seule fois (décision 0160 § 1.2 point 3 et § 1.5
+ * point 3) : avant le dernier jour (`notEnded`), du dernier jour à la fin de l'accès (`open`), au-delà (`readOnly`).
+ * Source de `TripReviewSchema.access`.
+ */
+export const REVIEW_ACCESS = ["notEnded", "open", "readOnly"] as const;
+export type ReviewAccess = (typeof REVIEW_ACCESS)[number];
+
+/**
+ * Sortes d'une ligne « À faire » (décision 0147 § 6.2, T8) : réservation à faire (« Réserver : {nom} », comptée),
+ * billet ou engagement déjà pris (`ticket`), bon plan ou autre (`other`). Égale, dans cet ordre, au `CHECK` de
+ * `checklist_items.kind` (`db/schema/business.ts`), égalité testée. Source de `ChecklistItemSchema.kind`.
+ */
+export const CHECKLIST_KINDS = ["reservation", "ticket", "other"] as const;
+export type ChecklistKind = (typeof CHECKLIST_KINDS)[number];
+
+/**
+ * Nombre de réservations à faire (décision 0021 § 1.1, amendée par 0147 § 6.2) : lignes « À faire » de sorte
+ * `reservation` non faites, et elles seules (ni bons plans, ni engagements). Seul calcul des « réservations à faire »,
+ * pour le résumé de voyage (`TripSummary.toReserveCount`) et le programme ajusté.
+ */
+export function countToReserve(checklist: readonly { done: boolean; kind: ChecklistKind }[]): number {
+  return checklist.filter((item) => item.kind === "reservation" && !item.done).length;
+}
+
+/**
+ * Motifs d'un signalement d'erreur sur une étape (décision 0147 § 1, M5-PO-8), dans l'ordre de la feuille : fermé ou
+ * n'existe plus, horaires faux, mauvais lieu ou mauvaise adresse, prix faux, autre erreur. Liste fermée, sans texte
+ * libre (M5-PO-9) ; égale au `CHECK` de `feedback.reason` posé par la migration M5-D. Source de
+ * `StopReportSchema.reason` et du champ `reason` de l'événement de journal `voyages.stop_reported`.
+ */
+export const STOP_REPORT_REASONS = ["closed", "hours", "wrongPlace", "price", "other"] as const;
+export type StopReportReason = (typeof STOP_REPORT_REASONS)[number];
+
+/**
+ * Sortes d'une version dans la liste « Versions du programme » (décision 0147 § 5.3 point 1) : version écrite par
+ * l'exécution `preview` (`prepared`), révision après le tri (`adjusted`, M1b), voyage complet (`complete`, M1c), puis
+ * les retouches de la personne, lues sur la première opération de `trip_versions.patch` (`[add, lock]` donne `added`).
+ * Source de `TripVersionSummarySchema.kind` ; le libellé est composé par l'écran, jamais stocké.
+ */
+export const TRIP_VERSION_KINDS = [
+  "prepared",
+  "adjusted",
+  "complete",
+  "replaced",
+  "added",
+  "moved",
+  "locked",
+  "unlocked",
+  "reverted",
+] as const;
+export type TripVersionKind = (typeof TRIP_VERSION_KINDS)[number];
+
+/** Versions par page de la liste « Versions du programme » (décision 0147 § 5.3 point 2). */
+export const TRIP_VERSIONS_PAGE_SIZE = 20;
+
+/**
+ * Texte saisi de la recherche d'un lieu à soi (« Lieu à ajouter », décision 0147 § 3 point 3 ; F7-PO-9) : 2 à 80
+ * caractères après retrait des espaces aux extrémités, aucune recherche à la frappe.
+ */
+export const PLACE_SEARCH_QUERY_LENGTH = { min: 2, max: 80 } as const;
+/**
+ * Longueur maximale du nom saisi par la personne pour un ajout (M5-PO-10). Ici, module sans Zod que le code client lit
+ * (décision 0155 § 5.1) ; `src/contracts/patch.ts` l'importe et la réexporte.
+ */
+export const ADDED_STOP_NAME_MAX = 80;
+/** Résultats d'une recherche de lieu à soi, au plus (décision 0147 § 3 point 1 : `pageSize: 5`). */
+export const PLACE_SEARCH_MAX_RESULTS = 5;
+/** Longueur maximale d'un nom ou d'une adresse Google affichés dans un résultat de recherche (décision 0147 § 3 point 3). */
+export const GOOGLE_PLACE_LABEL_MAX = 200;
 
 /** Jours de la semaine abrégés, du lundi au dimanche (handover § 9). Source de `WeekdaySchema`. */
 export const WEEKDAYS = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."] as const;
@@ -173,6 +288,8 @@ export const APP_TRIAL_TRIP_ID_PATTERN = /^proto_([a-z0-9-]{1,24})_([0-9a-f]{32}
 /**
  * Exceptions montrées par la vue partagée (spécification F10, F10-PO-14 ; décision 0039, F10-TL-1) : « À réserver »
  * est une action de la personne qui voyage, jamais montrée au visiteur. Sous-ensemble de `ExceptionSchema` (test).
+ * Valeurs admises, pas garanties : `toConfirm` n'est jamais stockée (horaires Google, décision 0011 point 5) ; elle
+ * vient d'une lecture qui la recalcule, ou d'une donnée de démonstration (décision 0159).
  */
 export const SHARED_EXCEPTIONS = ["toConfirm", "unconfirmed"] as const;
 export type SharedException = (typeof SHARED_EXCEPTIONS)[number];
@@ -220,8 +337,28 @@ export const API_ERROR_CODES = [
   // B3d (spécification B3d, point 4 ; décision 0138 T4) : plafond global des e-mails du jour atteint, ou quota du
   // fournisseur ; `retryable` faux (la personne réessaie demain). Ajouté à la fin, sans renommer ni réordonner.
   "email_cap_reached",
+  // M5 (décision 0147 § 8) : retouche refusée sur un voyage non débloqué (M5-PO-1) ; `retryable` faux. Symétrique
+  // d'`already_unlocked`. Ajouté à la fin, sans renommer ni réordonner.
+  "not_unlocked",
+  // M9a (spécification M9 § 6.1 ; ticket 1097) : export ou suppression du compte refusés faute de connexion récente (code
+  // vérifié depuis moins de 10 minutes, handover § 12), puis export refusé à un conseiller ou dans une organisation à
+  // plusieurs membres (`forbidden`, sous réserve de T9 : le Tech Lead peut retenir `not_found`). Ajoutés à la fin, sans
+  // renommer ni réordonner.
+  "reauthentication_required",
+  "forbidden",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
+
+/**
+ * Cause d'un refus `no_option` d'ajout d'un lieu à soi (décision 0155 § 1.1, évolution E16) : `ApiError.cause`, présent
+ * **seulement** avec `no_option`. `no_room` : toute cause de la famille « manque de place » (heure hors de la journée, trajet
+ * non relu, chevauchement d'une étape fixe, fin de journée, R5, R8, changement de ville) ; `place_not_found` : fiche du lieu
+ * ajouté `introuvable` ; `place_closed` : fiche `ferme_definitivement` (un lieu fermé temporairement a une fiche `valide`).
+ * Un `no_option` sans `cause` (remplacement, déplacement, verrou, écran 3, `mock` d'autres gestes) se lit comme `no_room`.
+ * Code fermé, dérivé du statut relu : aucun nom, adresse ni `placeId`.
+ */
+export const NO_OPTION_CAUSES = ["no_room", "place_not_found", "place_closed"] as const;
+export type NoOptionCause = (typeof NO_OPTION_CAUSES)[number];
 
 export function isCheckoutFailure(status: string): status is CheckoutFailure {
   return (CHECKOUT_FAILURES as readonly string[]).includes(status);
@@ -276,8 +413,18 @@ export const STORY_LENGTH = { min: 20, max: 1000 } as const;
  * au-delà, et l'écran 1 du site d'essai le refuse au champ (spécification E2E-essai, lot 2, D1).
  */
 export const PROTOTYPE_STAY_DAYS_MAX = 15;
-/** Villes en tout, destination comprise (provisoire, F8-PO-3). */
-export const MAX_CITIES = 4;
+/**
+ * Villes en tout, destination comprise : 3 (M4-PO-2, décision 0148 § 4 point 1 ; remplace le « 4, provisoire » de
+ * F8-PO-3). Un seul plafond pour `mock`, l'ancienne chaîne et la chaîne inversée ; borne aussi `Trip.cities`.
+ */
+export const MAX_CITIES = 3;
+/**
+ * Borne haute de `transfer.estimatedMinutes` (durée estimée d'un changement de ville par le modèle), inclusive :
+ * 600 minutes (décision 0148 § 2 ; décision 0149 § 2 ; décision 0151). Aucune borne basse dans le contrat : le
+ * minimum (20) reste réglable dans `moteur.json` (`changementDeVille.dureeEstimeeMinutes`, M4b), dont le maximum ne
+ * dépasse jamais cette constante (test de M4b).
+ */
+export const TRANSFER_ESTIMATED_MINUTES_MAX = 600;
 /** Engagements déjà pris (provisoire, F8-PO-3). */
 export const MAX_COMMITMENTS = 10;
 export const ADULTS = { min: 1, max: 9 } as const;
@@ -370,4 +517,41 @@ export function isEmailShape(value: string): boolean {
   if (local.length === 0) return false;
   const dot = domain.indexOf(".");
   return dot > 0 && !domain.startsWith(".") && !domain.endsWith(".");
+}
+
+/**
+ * Origine du reçu de Stripe (décision 0144 § 5.3 point 3) : **liste fermée**, seul littéral de cette origine dans ce
+ * fichier ; ajouter une origine demande une nouvelle décision (Tech Lead, avec la Sécurité).
+ */
+export const ORIGINES_RECU: readonly string[] = ["https://pay.stripe.com"];
+/** Plafond de longueur du lien du reçu (0144 § 2 point 3 ; `CHECK` de la migration 0025_recu_stripe). */
+export const LONGUEUR_MAX_RECU = 2048;
+/**
+ * Motif de la Sécurité (0144 § 5.2), recopié du `CHECK` `checkouts_stripe_receipt_url_check` de la migration
+ * 0025_recu_stripe, sensible à la casse : l'hôte en majuscules est refusé.
+ */
+const MOTIF_RECU = /^https:\/\/pay\.stripe\.com\/receipts\/[A-Za-z0-9_%./~-]+(\?[A-Za-z0-9_%=&.~-]*)?$/;
+/** Second motif du `CHECK` (0144 § 5.3 point 1) : `..` et ses formes encodées (`%2e`), sans égard à la casse. */
+const REMONTEE_RECU = /(\.|%2e)(\.|%2e)/i;
+
+/**
+ * Seule fonction qui admet un lien de reçu de Stripe (0144 § 5.3 point 3), dans le module de sa liste fermée (lu par
+ * l'interface sans `zod`, décision 0016 § 3.1), employée avant l'écriture en base (webhook Stripe), par le raffinement
+ * de `ReceiptSchema` (forme `stripe`, `billing.ts`) et avant tout `href` (`R9-recu`), y compris sur une valeur relue de
+ * la base. Vraie **seulement** si : (1) chaîne d'au plus 2048 caractères ; (2) **la chaîne brute** passe
+ * les deux motifs du `CHECK` (motif de la Sécurité, sensible à la casse ; refus de `..` et de `%2e%2e` sans égard à la
+ * casse), **avant** toute analyse, pour que la normalisation de `new URL` (hôte en minuscules, `..` résolu) ne fasse
+ * rien admettre que la base refuserait ; (3) `new URL` réussit sans base ; (4) protocole `https:`, ni identifiants ni
+ * port ; (5) origine dans `ORIGINES_RECU`. La valeur n'est jamais décodée ni réécrite : elle est rendue telle quelle.
+ */
+export function recuStripeAdmis(valeur: unknown): valeur is string {
+  if (typeof valeur !== "string" || valeur.length > LONGUEUR_MAX_RECU) return false;
+  if (!MOTIF_RECU.test(valeur) || REMONTEE_RECU.test(valeur)) return false;
+  let url: URL;
+  try {
+    url = new URL(valeur);
+  } catch {
+    return false;
+  }
+  return url.protocol === "https:" && url.username === "" && url.password === "" && url.port === "" && ORIGINES_RECU.includes(url.origin);
 }

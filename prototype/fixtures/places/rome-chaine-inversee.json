@@ -402,6 +402,19 @@
       "adresse": "SENTINELLE-ADRESSE-GOOGLE",
       "note": 1.234,
       "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
+    },
+    "Rome": {
+      "placeId": "SENTINELLE_PLACE_ID_VILLE",
+      "statut": "OPERATIONAL",
+      "position": {
+        "lat": 41.9,
+        "lng": 12.5
+      },
+      "horaires": null,
+      "nom": "SENTINELLE-NOM-GOOGLE",
+      "adresse": "SENTINELLE-ADRESSE-GOOGLE",
+      "note": 1.234,
+      "niveauPrix": "SENTINELLE_NIVEAU_PRIX"
     }
   }
 }

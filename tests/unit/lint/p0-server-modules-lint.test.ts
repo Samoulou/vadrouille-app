@@ -227,8 +227,16 @@ const EXEMPTED = [
 /** Adaptateurs de P0 de `src/server/p0` exemptés (P0r3c-5a, puis B7a : `vers-couche-ia.ts`, décision 0077 § 1 point 5). */
 const EXEMPTED_SERVEUR_P0 = ["src/server/p0/assemblage.ts", "src/server/p0/vers-moteur.ts", "src/server/p0/vers-couche-ia.ts"];
 
-/** Code partagé de `src/server/programme` chargé par `pnpm p0`, exempté (décision 0136 § 1.5, M1a-1). */
-const EXEMPTED_SERVEUR_PROGRAMME = ["src/server/programme/forme.ts", "src/server/programme/entree.ts", "src/server/programme/assemblage.ts"];
+/**
+ * Code partagé de `src/server/programme` chargé par `pnpm p0`, exempté (décision 0136 § 1.5, M1a-1 ; `cadrage.ts` par M4b,
+ * décision 0149 § 6 : importé par `assemblage.ts`).
+ */
+const EXEMPTED_SERVEUR_PROGRAMME = [
+  "src/server/programme/forme.ts",
+  "src/server/programme/entree.ts",
+  "src/server/programme/assemblage.ts",
+  "src/server/programme/cadrage.ts",
+];
 
 function sourceFiles(dir: string, extensions = /\.(js|jsx|ts|tsx)$/): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -270,7 +278,7 @@ describe("exception de server-only : liste fermée de 28 fichiers (20 de B1, pui
     }
   });
 
-  it("src/server/programme : seuls forme, entree et assemblage sont exemptés, et tous sont présents", async () => {
+  it("src/server/programme : seuls forme, entree, assemblage et cadrage sont exemptés, et tous sont présents", async () => {
     const present = sourceFiles("src/server/programme");
     for (const filePath of EXEMPTED_SERVEUR_PROGRAMME) expect(present, filePath).toContain(filePath);
     for (const filePath of present) {

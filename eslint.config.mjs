@@ -73,6 +73,26 @@ const SERVER_PATTERN_PAGE_P0 = {
 };
 
 /**
+ * M1f (décision 0141 § 6.4) : exception nominative à F9a pour la seule page de l'écran 1
+ * (`src/app/(creation)/voyages/nouveau/page.tsx`, composant serveur), qui lit `rechercheVilleApiOuverte` par
+ * `@/server/composition/villes-api` (module `server-only` ordinaire : exporté d'une action, ce prédicat serait appelable
+ * par n'importe quel client). Ni la barrière, ni le crochet, ni la configuration : `ligne/creation-imports` refuse
+ * toujours `@/server/generation/*` dans cette page (T23). Tout autre module de `src/server` hors actions reste refusé.
+ */
+const SERVER_PATTERN_PAGE_VILLES = {
+  regex: "^(@/server/(?!actions/[^/]+$|composition/villes-api$)|(\\.{1,2}/)+(.*/)?server/(?!actions/[^/]+$))",
+  message:
+    "Hors de src/server, seul @/server/actions/* s'importe (décision 0020 § 11) ; la page de l'écran 1 admet en plus @/server/composition/villes-api (rechercheVilleApiOuverte, décision 0141 § 6.4).",
+};
+
+/** Noms admis de `@/server/composition/villes-api` dans la page de l'écran 1 : le seul prédicat de 0141 § 6.4. */
+const VILLES_API_PAGE_PATH = {
+  name: "@/server/composition/villes-api",
+  allowImportNames: ["rechercheVilleApiOuverte"],
+  message: "La page de l'écran 1 n'importe de @/server/composition/villes-api que rechercheVilleApiOuverte (décision 0141 § 6.4).",
+};
+
+/**
  * F10c (décision 0039, F10-TL-5) : depuis la feuille « Partager » et la vue partagée, seul le module d'actions du
  * partage s'importe de `src/server` ; ni la configuration, ni parse-input, ni les actions d'un autre écran.
  */
@@ -125,11 +145,18 @@ const F11C_FILES = [
 
 /**
  * B10a (décision 0112 § 2 point 2, amendement de 0016 § 3.1 règle 4) : depuis le code chargé par le navigateur, seul
- * `@/domain/preferences` (règles du tri, sans `zod`) s'importe de `src/domain`.
+ * `@/domain/preferences` (règles du tri, sans `zod`) s'importe de `src/domain`. M4c (décision 0148 § 6 point 3 : la ville
+ * d'un jour est une fonction pure **unique**, « appelée par le serveur et par les écrans ») : `@/domain/villes-du-voyage`
+ * aussi, module pur qui n'importe que des types de @/contracts. M4-suite-front (T-M4S-1 et T-M4S-2 de la spécification
+ * M4-suite, § 12 ; décision 0151 § 6) : `@/domain/changement-de-ville`, dont la Journée lit le chevauchement à l'affichage
+ * (chargé à la demande) et dont l'écran 1 appelle la détection du départ saisi ; il n'importe à l'exécution que des modules
+ * purs de `src/domain` et `@/contracts/values`, ni `zod` ni `src/server` (`configuration` en type seulement).
  */
 const CLIENT_DOMAIN_PATTERN = {
-  regex: "^(@/domain/(?!preferences$)|(\\.{1,2}/)+(.*/)?domain/(?!preferences$))",
-  message: "Depuis le code chargé par le navigateur, seul @/domain/preferences s'importe de src/domain (décision 0112 § 2 point 2).",
+  regex:
+    "^(@/domain/(?!(preferences|villes-du-voyage|changement-de-ville)$)|(\\.{1,2}/)+(.*/)?domain/(?!(preferences|villes-du-voyage|changement-de-ville)$))",
+  message:
+    "Depuis le code chargé par le navigateur, seuls @/domain/preferences, @/domain/villes-du-voyage et @/domain/changement-de-ville s'importent de src/domain (décisions 0112 § 2 point 2, 0148 § 6 point 3 et 0151 § 6).",
 };
 
 /** Imports interdits : en configuration plate, le dernier bloc remplace les précédents, d'où une seule fonction. */
@@ -419,6 +446,11 @@ export default defineConfig([
       "src/adapters/share-signed-token.ts",
       "src/adapters/share-views.ts",
       "src/server/essai/partage.ts",
+      // M6a (ticket 1013) : partage sur `api` (jeton, empreinte, chemin et en-tête « compté » jamais journalisés).
+      "src/adapters/api-share.ts",
+      "src/adapters/api-share-instance.ts",
+      "src/server/partage/**/*.ts",
+      "src/server/voyages/carte-partagee.ts",
     ],
     rules: { "no-console": "error" },
   },
@@ -427,7 +459,8 @@ export default defineConfig([
     // F10c : de même dans l'adaptateur de partage simulé (F10-TL-5) ; F8b : de même dans la connexion simulée
     // et la création simulée (0017 § 10.1).
     // Décision 0135 : de même dans l'adaptateur de partage réel (horloge de la portée).
-    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts", "src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts", "src/adapters/signed-share.ts"],
+    // M6a (ticket 1013) : de même dans l'adaptateur de partage `api`.
+    files: ["src/adapters/mock-payment.ts", "src/adapters/mock-share.ts", "src/adapters/mock-auth.ts", "src/adapters/mock-creation.ts", "src/adapters/signed-share.ts", "src/adapters/api-share.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -671,6 +704,9 @@ export default defineConfig([
       "src/server/programme/forme.ts",
       "src/server/programme/entree.ts",
       "src/server/programme/assemblage.ts",
+      // M4b (décision 0148 § 5.1 point 3 (b), 0149 § 6) : cadrage de la sortie rédigée, importé par `assemblage.ts` pour son
+      // second contrôle, donc chargé par `pnpm p0` ; même régime (pur : `@/contracts`, `src/domain` et ces fichiers).
+      "src/server/programme/cadrage.ts",
     ],
     rules: { "ligne/require-server-only": "error" },
   },
@@ -782,6 +818,18 @@ export default defineConfig([
     rules: restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
   },
   {
+    // M1f (décision 0141 § 6.4) : la page de l'écran 1 lit `rechercheVilleApiOuverte` par `@/server/composition/villes-api`
+    // (SERVER_PATTERN_PAGE_VILLES) ; les autres interdits du bloc précédent tiennent.
+    files: ["src/app/(creation)/voyages/nouveau/page.tsx"],
+    // Le seul nom admis de `villes-api` est le prédicat `rechercheVilleApiOuverte` (revue du head `bc43913`, mineur 1).
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { paths: [VILLES_API_PAGE_PATH], patterns: [MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN_PAGE_VILLES, SIMULATION_PATTERN] },
+      ],
+    },
+  },
+  {
     // E2E-essai, lot 2 (D3) : `R-lancer` lit l'état de la garde du site d'essai par `@/server/p0/page-acces`, comme
     // `/prototype/executions` (SERVER_PATTERN_PAGE_P0) ; les autres interdits du bloc précédent tiennent.
     files: ["src/app/(creation)/voyages/nouveau/lancer/page.tsx"],
@@ -863,6 +911,28 @@ export default defineConfig([
       "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
       ...noClientStorage("Vue partagée", "spécification F10, F10c, décision 0039 F10-TL-5", "aucun service worker"),
       ...restrictedImports(MOCKS_PATTERN, SIMULATED_MAP_PATTERN, SERVER_PATTERN, SIMULATION_PATTERN),
+    },
+  },
+  {
+    // M6a (ticket 1013 ; spécification M6 § 3.3 point 1 et § 3.4 ; décision 0157 § 2.1) : proxy de Next.js, limité à
+    // `/p/…`. Liste blanche d'imports : `next/server`, la garde `@/adapters/share-guard` (seul module de src/adapters) et
+    // le limiteur `@/server/partage/limite-vue` (seul module de src/server) ; toute autre source, alias, relative ou
+    // paquet, est refusée. Aucun journal : ni jeton, ni chemin, ni adresse (tests/unit/lint/proxy-lint.test.ts).
+    files: ["src/proxy.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^(?!(next/server|@/adapters/share-guard|@/server/partage/limite-vue)$)",
+              message:
+                "src/proxy.ts n'importe que next/server, @/adapters/share-guard et @/server/partage/limite-vue (décision 0157 § 2.1 ; ticket 1013, M6a).",
+            },
+          ],
+        },
+      ],
+      "no-console": "error",
     },
   },
   {

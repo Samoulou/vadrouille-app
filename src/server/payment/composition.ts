@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createSimulatedPaymentAdapter } from "@/adapters/simulated-payment";
+import { cheminSimulationParDefaut, createSimulatedPaymentAdapter } from "@/adapters/simulated-payment";
 import type { PaymentAdapter, PaymentSimulator } from "@/adapters/types";
 import { serverEnv } from "@/server/env";
 import { cleWebhookSimule } from "@/server/env/payment";
@@ -28,7 +28,7 @@ export function composerPaiementSimule(): PaymentAdapter & PaymentSimulator {
     database: createDatabase("vadrouille_app"),
     withOrg,
     maintenant,
-    prestataire: creerPrestataireSimule({ cle, transport: transportHttp(env.betterAuth.appUrl), maintenant }),
+    prestataire: creerPrestataireSimule({ cle, transport: transportHttp(env.betterAuth.appUrl), maintenant, cheminSimulation: cheminSimulationParDefaut }),
     // Limiteur des actions (B4-TL-6 point 2) : en-têtes de la requête de l'action, lus par l'en-tête de confiance seul.
     limiteur: async (action) => checkRateLimit({ action, headers: new Headers(await (await import("next/headers")).headers()) }),
   });

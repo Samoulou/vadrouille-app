@@ -1,8 +1,16 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  coutDesCompteurs,
+  createAutocompleteCounter,
+  type AutocompleteCounterOptions,
+  type AutocompleteCounterPool,
+} from "@/server/villes/compteurs";
+
+import { createDatabase } from "../../db/index";
 import { runMigrations } from "../../db/migrate";
 import { urlBaseJetable } from "./env";
 import { closeAll, connect, connectBaseJetable, type DbClient } from "./helpers";
@@ -12,9 +20,10 @@ import { creerBase, supprimerBases } from "./workflows-harnais";
  * Compteurs quotidiens de la ville par autocomplétion sur la vraie app (plan du MVP, M1f-D ; migration
  * 0021_compteurs_autocompletion ; décision 0129 § 3, modèle de 0020_plafond_emails, 0138 § 11, T1).
  *
- * Aucun code applicatif n'existe encore (M1f) : ces tests éprouvent la table, ses droits et sa politique par SQL, sous
- * `vadrouille_app` puis `SET LOCAL ROLE vadrouille_autocomplete_counter`, avec la forme de réservation que M1f reprendra
- * (ligne du jour par `INSERT (day) … ON CONFLICT DO NOTHING`, puis un seul `UPDATE` conditionnel par action). Seul le
+ * Les premiers `describe` éprouvent la table, ses droits et sa politique par SQL, sous `vadrouille_app` puis `SET LOCAL
+ * ROLE vadrouille_autocomplete_counter`, avec la forme de réservation que M1f reprend (ligne du jour par `INSERT (day) …
+ * ON CONFLICT DO NOTHING`, puis un seul `UPDATE` conditionnel par action). Le `describe` « module de réservation (M1f) »
+ * éprouve le module `src/server/villes/compteurs.ts` lui-même (décision 0141 § 5, T5 à T10 ; PR 885). Seul le
  * rôle de test (`admin`, superutilisateur du conteneur, hors de l'application : aucune migration ne le crée) vide la
  * table et pose des jours passés.
  *
@@ -37,6 +46,18 @@ const INCREMENT: Record<Action, string> = {
 
 let admin: DbClient;
 let app: DbClient;
+const pools: { end(): Promise<void> }[] = [];
+
+/** Pool de `vadrouille_app` (fabrique gardée de `db/connection.ts`) pour le module ; `max` plus grand pour une vraie concurrence. */
+function pool(max = 2): AutocompleteCounterPool {
+  const p = createDatabase("vadrouille_app", undefined, { max, connectionTimeoutMillis: 10_000, query_timeout: 10_000 }).$client;
+  pools.push(p);
+  return p;
+}
+
+/** Module de réservation sur la base, seuils de test 3 suggestions et 2 choix sauf mention contraire. */
+const compteurSur = (options: Omit<AutocompleteCounterOptions, "pool"> & { pool?: AutocompleteCounterPool } = {}) =>
+  createAutocompleteCounter({ pool: options.pool ?? pool(), seuils: { suggestions: 3, choix: 2 }, ...options });
 
 /** Une transaction de `vadrouille_app` sous le rôle des compteurs ; annulée si `fn` lève. */
 async function sousRole<T>(client: DbClient, fn: (c: DbClient) => Promise<T>): Promise<T> {
@@ -91,12 +112,13 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await admin.query("DELETE FROM public.autocomplete_daily_counts");
+  await Promise.all(pools.map((p) => p.end()));
   await closeAll();
   await supprimerBases();
 });
 
 describe("autocomplétion: forme de la table (0021)", () => {
-  it("trois colonnes seulement (jour, suggestions, choix) : aucune saisie, donnée Google, empreinte ni organisation", async () => {
+  it("quatre colonnes seulement (jour, suggestions, choix, lieux) : aucune saisie, donnée Google, empreinte ni organisation", async () => {
     const { rows } = await admin.query(
       `SELECT attname, pg_catalog.format_type(atttypid, atttypmod) AS type, attnotnull FROM pg_catalog.pg_attribute
        WHERE attrelid = 'public.autocomplete_daily_counts'::regclass AND attnum > 0 AND NOT attisdropped ORDER BY attnum`,
@@ -105,6 +127,8 @@ describe("autocomplétion: forme de la table (0021)", () => {
       { attname: "day", type: "date", attnotnull: true },
       { attname: "suggestions", type: "integer", attnotnull: true },
       { attname: "choix", type: "integer", attnotnull: true },
+      // M5-D (migration 0022, décision 0147 § 6.4 point 3) : recherches d'un lieu à soi.
+      { attname: "lieux", type: "integer", attnotnull: true },
     ]);
   });
 
@@ -239,8 +263,13 @@ describe("autocomplétion: droits minimaux et isolation des rôles", () => {
 });
 
 const DOWN_0021 = readFileSync(path.join(process.cwd(), "db/migrations/0021_compteurs_autocompletion.down.sql"), "utf8");
+/**
+ * Descente de 0022 (M5-D), jouée d'abord : les descentes se jouent dans l'ordre inverse des migrations, et celle de 0021
+ * ne connaît pas l'`UPDATE (lieux)` accordé par 0022.
+ */
+const DOWN_0022 = readFileSync(path.join(process.cwd(), "db/migrations/0022_feedback_signalements.down.sql"), "utf8");
 
-describe("autocomplétion: retour arrière de 0021 (base jetable)", () => {
+describe("autocomplétion: retour arrière de 0021, après celui de 0022 (base jetable)", () => {
   it("la descente retire droits et politique, garde la table et ses compteurs ; la réservation est refusée (42501)", async () => {
     const nom = await creerBase("autocompl_retour");
     await runMigrations({ VADROUILLE_DATABASE_URL_MIGRATOR: urlBaseJetable("migrator", nom) });
@@ -248,6 +277,7 @@ describe("autocomplétion: retour arrière de 0021 (base jetable)", () => {
     expect(await reserver(appJ, "suggestions", 150)).toBe(1);
 
     await migrateur.query("BEGIN");
+    await migrateur.query(DOWN_0022);
     await migrateur.query(DOWN_0021);
     expect((await migrateur.query("SELECT current_user::text AS u")).rows[0].u).toBe("vadrouille_migrator");
     await migrateur.query("COMMIT");
@@ -269,5 +299,146 @@ describe("autocomplétion: retour arrière de 0021 (base jetable)", () => {
       "SELECT relrowsecurity, relforcerowsecurity FROM pg_catalog.pg_class WHERE oid = 'public.autocomplete_daily_counts'::regclass",
     );
     expect(rls.rows[0]).toEqual({ relrowsecurity: true, relforcerowsecurity: true });
+  });
+});
+
+describe("autocomplétion: module de réservation (M1f)", () => {
+  let journal: string[];
+  beforeEach(() => {
+    journal = [];
+    const capture = (...args: unknown[]) => {
+      journal.push(args.map(String).join(" "));
+    };
+    vi.spyOn(console, "log").mockImplementation(capture);
+    vi.spyOn(console, "warn").mockImplementation(capture);
+    vi.spyOn(console, "error").mockImplementation(capture);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+  const evenements = () => journal.map((ligne) => JSON.parse(ligne) as Record<string, unknown>);
+  const ages = async () =>
+    (await admin.query(`SELECT (${JOUR} - day) AS age FROM public.autocomplete_daily_counts ORDER BY day DESC`)).rows.map((r) => r.age as number);
+
+  it("seuils de test 3 et 2 : la 4e suggestion et le 3e choix sont refusés, rien d'écrit ; colonnes indépendantes", async () => {
+    const compteur = compteurSur();
+    for (const n of [1, 2, 3]) expect(await compteur.reserve("suggestions")).toEqual({ ok: true, compte: n });
+    expect(await compteur.reserve("suggestions")).toEqual({ ok: false, raison: "plafond" });
+    expect(await ligneDuJour()).toEqual({ suggestions: 3, choix: 0 });
+    // Le plafond des suggestions atteint ne bloque pas les choix.
+    for (const n of [1, 2]) expect(await compteur.reserve("choix")).toEqual({ ok: true, compte: n });
+    expect(await compteur.reserve("choix")).toEqual({ ok: false, raison: "plafond" });
+    expect(await ligneDuJour()).toEqual({ suggestions: 3, choix: 2 });
+    expect(evenements()).toEqual([]);
+  });
+
+  it("sans dépassement sous la concurrence : 60 réservations parallèles sous un seuil de 40, exactement 40 acceptées", async () => {
+    const compteur = compteurSur({ pool: pool(12), seuils: { suggestions: 150, choix: 40 } });
+    const issues = await Promise.all(Array.from({ length: 60 }, () => compteur.reserve("choix")));
+    const acceptees = issues.flatMap((r) => (r.ok ? [r.compte] : []));
+    expect(acceptees).toHaveLength(40);
+    expect(new Set(acceptees).size).toBe(40);
+    expect(issues.filter((r) => !r.ok)).toEqual(Array.from({ length: 20 }, () => ({ ok: false, raison: "plafond" })));
+    expect(await ligneDuJour()).toEqual({ suggestions: 0, choix: 40 });
+  });
+
+  it("purge après un jour nouveau : jours de plus de 40 jours retirés, 40e jour et jour courant gardés ; aucune purge sans jour nouveau", async () => {
+    const echus = `INSERT INTO public.autocomplete_daily_counts (day, suggestions, choix) SELECT ${JOUR} - n, 5, 1 FROM unnest(ARRAY[1, 39, 40, 41, 90]) AS n`;
+    await admin.query(echus);
+    const compteur = compteurSur();
+    // La réservation ne purge pas.
+    expect(await compteur.reserve("suggestions")).toEqual({ ok: true, compte: 1 });
+    expect(await ages()).toEqual([0, 1, 39, 40, 41, 90]);
+    await compteur.purge();
+    expect(await ages()).toEqual([0, 1, 39, 40]);
+    // Le jour est déjà ouvert : la réservation et la purge suivantes ne retirent pas un jour échu ajouté entre-temps.
+    await admin.query(`INSERT INTO public.autocomplete_daily_counts (day) VALUES (${JOUR} - 41)`);
+    expect(await compteur.reserve("choix")).toEqual({ ok: true, compte: 1 });
+    await compteur.purge();
+    expect(await ages()).toEqual([0, 1, 39, 40, 41]);
+    // Une autre instance qui n'a pas ouvert le jour ne purge pas non plus.
+    await compteurSur().purge();
+    expect(await ages()).toEqual([0, 1, 39, 40, 41]);
+    expect(evenements()).toEqual([]);
+  });
+
+  it("une purge en erreur laisse la réservation acceptée et écrit ville.purge_failed (errorName seul) ; elle reprend à l'ouverture du jour suivant", async () => {
+    let pannes = 1;
+    const compteur = compteurSur({
+      beforePurge: () => {
+        if (pannes-- > 0) throw new TypeError("purge en panne SENTINELLE");
+      },
+    });
+    await admin.query(`INSERT INTO public.autocomplete_daily_counts (day, suggestions) VALUES (${JOUR} - 60, 4)`);
+    expect(await compteur.reserve("suggestions")).toEqual({ ok: true, compte: 1 });
+    await expect(compteur.purge()).resolves.toBeUndefined();
+    expect(await ages()).toEqual([0, 60]);
+    expect(await ligneDuJour()).toEqual({ suggestions: 1, choix: 0 });
+    expect(evenements()).toEqual([{ level: "warn", event: "ville.purge_failed", errorName: "TypeError" }]);
+    expect(journal.join("\n")).not.toMatch(/SENTINELLE/);
+    // Même jour : pas de nouvelle tentative.
+    expect(await compteur.reserve("suggestions")).toEqual({ ok: true, compte: 2 });
+    await compteur.purge();
+    expect(await ages()).toEqual([0, 60]);
+    // Jour suivant (rôle de test : la colonne du jour recule d'un jour) : la réservation ouvre le jour, la purge reprend.
+    await admin.query("UPDATE public.autocomplete_daily_counts SET day = day - 1");
+    expect(await compteur.reserve("suggestions")).toEqual({ ok: true, compte: 1 });
+    await compteur.purge();
+    expect(await ages()).toEqual([0, 1]);
+    expect(evenements()).toHaveLength(1);
+  });
+
+  it("jour futur inséré par le rôle : compteurs à zéro, sans effet sur le seuil du jour ni sur le coût dérivé", async () => {
+    // Le rôle n'insère que `day` : la ligne future porte des compteurs nuls (défaut).
+    await sousRole(app, (c) => c.query(`INSERT INTO public.autocomplete_daily_counts (day) VALUES (${JOUR} + 3)`));
+    const compteur = compteurSur();
+    for (const n of [1, 2, 3]) expect(await compteur.reserve("suggestions")).toEqual({ ok: true, compte: n });
+    expect(await compteur.reserve("suggestions")).toEqual({ ok: false, raison: "plafond" });
+    expect(await compteur.reserve("choix")).toEqual({ ok: true, compte: 1 });
+    const { rows } = await admin.query(`SELECT (day - ${JOUR}) AS ecart, suggestions, choix FROM public.autocomplete_daily_counts ORDER BY day`);
+    expect(rows).toEqual([
+      { ecart: 0, suggestions: 3, choix: 1 },
+      { ecart: 3, suggestions: 0, choix: 0 },
+    ]);
+    // Coût dérivé de toutes les lignes (somme) : celui du seul jour courant.
+    const somme = (await admin.query("SELECT sum(suggestions)::int AS suggestions, sum(choix)::int AS choix FROM public.autocomplete_daily_counts")).rows[0] as {
+      suggestions: number;
+      choix: number;
+    };
+    expect(coutDesCompteurs(somme)).toBe(coutDesCompteurs({ suggestions: 3, choix: 1 }));
+    // La purge (jour nouveau ouvert par cette instance) ne retire pas un jour futur.
+    await compteur.purge();
+    expect(await ages()).toEqual([-3, 0]);
+  });
+
+  it("droits retirés par la descente de 0021 : indisponible (42501), aucune exception", async () => {
+    const nom = await creerBase("autocompl_module");
+    await runMigrations({ VADROUILLE_DATABASE_URL_MIGRATOR: urlBaseJetable("migrator", nom) });
+    const [appJ, migrateur] = await Promise.all([connectBaseJetable("app", nom), connectBaseJetable("migrator", nom)]);
+    const codes: (string | undefined)[] = [];
+    // Une seule connexion de `vadrouille_app` sur la base jetable, prêtée à chaque transaction (appels en série).
+    const poolJetable: AutocompleteCounterPool = {
+      connect: async () => ({
+        query: (texte, valeurs) =>
+          appJ.query(texte, valeurs).catch((erreur: unknown) => {
+            codes.push((erreur as { code?: string }).code);
+            throw erreur;
+          }),
+        release: () => undefined,
+      }),
+    };
+    const compteur = createAutocompleteCounter({ pool: poolJetable });
+    expect(await compteur.reserve("suggestions")).toEqual({ ok: true, compte: 1 });
+    await expect(compteur.purge()).resolves.toBeUndefined();
+
+    await migrateur.query("BEGIN");
+    await migrateur.query(DOWN_0022);
+    await migrateur.query(DOWN_0021);
+    await migrateur.query("COMMIT");
+
+    // Nom de classe de l'erreur seul (revue du head `bcaa346`, mineur 7), jamais son message ni son code SQL.
+    for (const action of ["suggestions", "choix"] as const) expect(await compteur.reserve(action)).toEqual({ ok: false, raison: "indisponible", errorName: "error" });
+    expect(codes).toEqual(["42501", "42501"]);
+    expect(evenements()).toEqual([]);
   });
 });

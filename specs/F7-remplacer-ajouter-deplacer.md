@@ -116,6 +116,15 @@ Propositions détaillées dans « Propositions au Tech Lead ». Le Tech Lead les
 - « Ajouter à ma journée » (`Button` `secondary` `sm`) dans l'idée dévoilée de « Surprends-moi » (F5-PO-5) : `…/ajouter?idee={SurpriseIdea.id}`.
 - Paramètres invalides (heure hors `HH:MM`, `repas` inconnu, `idee` absente du jour) : ignorés, adresse remplacée sans eux, sans erreur. L'écran s'ouvre dans le panneau comme l'écran 14 ; titre de niveau 1 « Ajouter un lieu », focus dessus ; titre du document « Ajouter un lieu · Jour {n} » ; « Retour à la Journée » (`IconButton` à icône « fermer », en haut à droite du panneau, décision 0018) et « Annuler » reviennent à la Journée, focus sur l'élément d'origine (lien « Idées », « Choisir », « Ajouter un lieu » ou « Ajouter à ma journée »).
 
+**Rendu de « Choisir »** (décision de l'UX/UI, M5d-3, ticket #969, PR #973 ; écran non maquetté, dans les règles de Ligne, définitive dès sa fusion, décision 0093)
+- Lien texte, même style que « Idées » d'un temps libre : `corps-s`, gras, `ink`, souligné. Pas de `Button`, et pas de jaune `quai` : un repas pas encore choisi n'est pas une action requise (handover § 0 règle 6).
+- Cible de 44 × 44 px au moins (`--touch-target`), à droite du texte « Déjeuner pas encore choisi » ou « Dîner pas encore choisi » et aligné sur sa ligne de base. Son bord droit est celui de « Idées ». Le texte du repas passe à la ligne avant que la cible ne rétrécisse. L'heure, l'anneau et le rail du repas ne changent pas.
+- Libellé visible « Choisir ». Nom accessible « Choisir le déjeuner » ou « Choisir le dîner » : il commence par le libellé visible (WCAG 2.5.3).
+- Présent seulement sur un voyage débloqué (M5-PO-1), avec la même condition que « Ajouter un lieu ». Absent de l'écran 15, de la vue partagée et d'un voyage non débloqué.
+- Aucun badge sur la ligne du repas.
+- Libellés « Choisir », « Choisir le déjeuner », « Choisir le dîner » validés **définitifs** par l'UX/UI à la revue de la PR #973. Ils remplacent la mention « libellé provisoire » de la ligne « Choisir » de « Accès » ci-dessus.
+- Captures 390 × 844 de référence : `docs/ux/captures/969/`.
+
 **Recherche** (F7-PO-9)
 - Champ « Lieu à ajouter » (`type="search"`, libellé visible) et bouton « Rechercher » (`Button` `primary`) ; Entrée lance la recherche. Pas de recherche à chaque frappe : une recherche réelle coûtera un appel par requête (cadrage § 4, coût unitaire ; F7-Q4).
 - Moins de 2 caractères (espaces retirés) : « Écris au moins 2 lettres. » (`role="alert"`), aucune recherche.

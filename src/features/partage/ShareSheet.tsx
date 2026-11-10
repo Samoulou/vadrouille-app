@@ -118,6 +118,8 @@ function ShareContent({
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [pending, setPending] = useState<Operation | null>(null);
   const [failed, setFailed] = useState<Operation | null>(null);
+  // Spécification M6 § 7 : création refusée par la limite `partage-lien` (`rate_limited`, adaptateur `api`).
+  const [limited, setLimited] = useState(false);
   const [announce, setAnnounce] = useState<string | null>(null);
   // Élément à focaliser après le prochain rendu ; lu et vidé par l'effet ci-dessous.
   const focusTarget = useRef<FocusTarget>(null);
@@ -135,6 +137,11 @@ function ShareContent({
       busy.current = true;
       setPending(operation);
       setAnnounce(null);
+      // Après un refus par la limite (bandeau sans « Réessayer », nouvel essai par le bouton de l'action), le bandeau est
+      // retiré au début de l'essai : un nouveau refus est ré-annoncé (revue du ticket 1013, UX mineur 7). Après une
+      // autre erreur, le bandeau et son « Réessayer », qui a le focus, restent en place pendant l'essai.
+      if (limited) setFailed(null);
+      let refusParLimite = false;
       try {
         if (operation === "read") {
           setView({ kind: "loading" });
@@ -151,7 +158,10 @@ function ShareContent({
           setFocusTarget("creer");
         } else {
           const result = await actions.createShareLink(input());
-          if (!result.ok) throw new Error("création");
+          if (!result.ok) {
+            refusParLimite = result.error.code === "rate_limited";
+            throw new Error("création");
+          }
           const url = `${window.location.origin}${sharedRoutes(result.value.token).sejour()}`;
           // Partage réel du site d'essai (décision 0135 § 7) : jeton signé, le même pour ce voyage, que « Créer un lien »
           // redonne ; « il ne pourra plus s'afficher » ne vaut que pour le jeton aléatoire de l'adaptateur simulé.
@@ -165,13 +175,14 @@ function ShareContent({
         // Résultat `{ ok: false }` ou action qui échoue : bandeau d'erreur, état affiché inchangé ; « Réessayer »
         // relance la même action, une tentative par clic, sans relance automatique.
         setFailed(operation);
+        setLimited(refusParLimite);
         if (operation === "read") setView({ kind: "unread" });
       } finally {
         busy.current = false;
         setPending(null);
       }
     },
-    [actions, input],
+    [actions, input, limited],
   );
 
   // Lecture de l'état du lien à l'ouverture (une feuille neuve à chaque ouverture : `ShareContent` est remonté).
@@ -268,19 +279,23 @@ function ShareContent({
         {failed !== null ? (
           <StatusBanner
             kind="error"
-            message={t.erreur}
+            message={limited ? t.limite : t.erreur}
             action={
-              <Button
-                variant="text"
-                data-part="reessayer"
-                className={ARIA_DISABLED}
-                aria-disabled={pending !== null ? true : undefined}
-                onClick={() => {
-                  if (pending === null) void run(failed);
-                }}
-              >
-                {t.reessayer}
-              </Button>
+              // Limite atteinte : « Réessayer » contredirait « Réessaie plus tard » (revue du ticket 1013, UX mineur 7) ;
+              // le bouton de l'action reste disponible pour un nouvel essai.
+              limited ? undefined : (
+                <Button
+                  variant="text"
+                  data-part="reessayer"
+                  className={ARIA_DISABLED}
+                  aria-disabled={pending !== null ? true : undefined}
+                  onClick={() => {
+                    if (pending === null) void run(failed);
+                  }}
+                >
+                  {t.reessayer}
+                </Button>
+              )
             }
           />
         ) : null}

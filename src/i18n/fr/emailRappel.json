@@ -1,0 +1,4 @@
+{
+  "objet": "Ta journée de demain",
+  "corps": "Ta journée de demain est prête.\n\nPour la voir : {lien}\n\nTu reçois ce message parce que tu as demandé un rappel la veille de chaque journée sur {produit}. Pour l'arrêter, ouvre ton Séjour : {lienSejour}"
+}

@@ -11,6 +11,7 @@ import {
   CODES_REGLE,
   compterParRegle,
   estBloquante,
+  etatDuLieuAjoute,
   validerProgramme,
   type CodeRegle,
   type ContexteValidation,
@@ -38,6 +39,14 @@ const CONFIG: ConfigurationMoteur = {
   dureesParDefaut: { activity: 90, lunch: 75, dinner: 90, evening: 90 },
   margeMinutes: 5,
   seuilTempsLibreMinutes: 30,
+  changementDeVille: {
+    activitesParRythme: { relaxed: 1, balanced: 2, intense: 2 },
+    departEstime: { heureParDefaut: "10:00", limite: "18:00", arrondiMinutes: 15 },
+    creneauSansDureeMinutes: 180,
+    dureeEstimeeMinutes: { min: 20, max: 600 },
+    margesMinutes: { avantDepart: { ticket: 45, flight: 120, estimated: 30 }, apresArrivee: { ticket: 30, flight: 60, estimated: 30 } },
+    long: { seuilMinutes: 240, activitesMax: 1 },
+  },
 };
 
 /** Valeurs sentinelles des doubles : aucune ne doit figurer dans un rapport. */
@@ -280,6 +289,26 @@ describe("validation: R1 lieu ancré et sourcé", () => {
     expect(r1(cas(ajout, { ajouts, porteeR1: { ajouts: "complete" } }))).toEqual([{ regle: "R1", etape: "v1-j2-1" }]);
     expect(r1(cas(avecEtape(ajout, "v1-j2-1", (stop) => ({ ...stop, placeId: P_FERME })), { ajouts, porteeR1: { ajouts: "aucune" } }))).toEqual([]);
   });
+
+  it("etatDuLieuAjoute (0155 § 1.2) : quatre états d'après la fiche relue ; portée `aucune` : valide ; R1 refuse tout état autre que valide", () => {
+    const lu = relectures();
+    expect(etatDuLieuAjoute(lu, PA)).toBe("valide");
+    expect(etatDuLieuAjoute(lu, P_INTROUVABLE)).toBe("introuvable");
+    expect(etatDuLieuAjoute(lu, P_FERME)).toBe("ferme");
+    expect(etatDuLieuAjoute(lu, P_INCONNU)).toBe("inconnu");
+    // Portée par défaut (`lieu`, provisoire, Q332) et `complete` : la fiche décide ; `aucune` : jamais contrôlée.
+    for (const placeId of [PA, P_INTROUVABLE, P_FERME, P_INCONNU]) {
+      expect(etatDuLieuAjoute(lu, placeId, { ajouts: "lieu" })).toBe(etatDuLieuAjoute(lu, placeId));
+      expect(etatDuLieuAjoute(lu, placeId, { ajouts: "complete" })).toBe(etatDuLieuAjoute(lu, placeId));
+      expect(etatDuLieuAjoute(lu, placeId, { ajouts: "aucune" })).toBe("valide");
+    }
+    // Même règle que R1 : l'étape ajoutée est refusée si et seulement si l'état n'est pas `valide`.
+    const ajouts = new Set(["v1-j2-1"]);
+    for (const placeId of [PA, P_INTROUVABLE, P_FERME, P_INCONNU]) {
+      const jour = avecEtape(jourDeReference(), "v1-j2-1", (stop) => ({ ...stop, source: undefined, placeId }));
+      expect(r1(cas(jour, { ajouts })).length > 0, placeId).toBe(etatDuLieuAjoute(lu, placeId) !== "valide");
+    }
+  });
 });
 
 describe("validation: R2 événement dans les dates et date relue", () => {
@@ -456,6 +485,17 @@ describe("validation: R8 rythme et temps libre", () => {
   it("trou de 30 min ou plus non écrit comme temps libre : violation (B5-PO-9)", () => {
     const jour = jourDeReference();
     expect(r8(cas({ ...jour, items: jour.items.filter((item) => item.type !== "free") }))).toEqual([{ regle: "R8", jour: 2 }]);
+  });
+
+  it("plusieurs-villes: un transfer remet le précédent à zéro, aucun trajet d'une ville à l'autre (décision 0151 § 4)", () => {
+    const jour = jourDeReference();
+    const sansLibre = jour.items.filter((item) => item.type !== "free");
+    // Un transfer à la place de chaque temps libre : le trou qu'il couvre n'est plus mesuré d'une étape à la suivante.
+    const items = jour.items.flatMap((item): DayLineItem[] =>
+      item.type === "free" ? [{ type: "transfer", from: "Ville 1", to: "Ville 2", source: "estimated", start: "11:30", estimatedMinutes: 120 }] : [item],
+    );
+    expect(r8(cas({ ...jour, items: sansLibre }))).toEqual([{ regle: "R8", jour: 2 }]);
+    expect(r8(cas({ ...jour, items }))).toEqual([]);
   });
 });
 

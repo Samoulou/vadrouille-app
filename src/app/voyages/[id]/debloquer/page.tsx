@@ -47,7 +47,7 @@ export default async function DebloquerPage({ params, searchParams }: { params: 
   const { paiement } = await searchParams;
   const data = await load(id, paiement);
   if (!data) notFound();
-  const { trip, offer, failure } = data;
+  const { trip, offer, failure, receipt } = data;
   return (
     <OfferScreen
       tripId={trip.id}
@@ -57,6 +57,7 @@ export default async function DebloquerPage({ params, searchParams }: { params: 
       programmeHref={tripRoutes("/voyages", trip.id).sejour()}
       offer={offer ? { ...offer, start: trip.start, end: trip.end } : null}
       failure={failure}
+      receiptHref={receipt ? unlockRoutes(trip.id).recu() : null}
       simulated
       recorderKind={devPagesEnabled() ? "console" : "none"}
     />

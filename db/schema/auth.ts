@@ -161,6 +161,12 @@ export const autocompleteDailyCounts = pgTable(
     day: date("day").primaryKey(),
     suggestions: integer("suggestions").notNull().default(0),
     choix: integer("choix").notNull().default(0),
+    // Décision 0147 § 6.4 point 3 (migration 0022) : recherches d'un lieu à soi (Text Search Pro), même table et même
+    // rôle que la ville ; le nom de la table est désormais un peu large.
+    lieux: integer("lieux").notNull().default(0),
   },
-  (t) => [check("autocomplete_daily_counts_counts_check", sql`${t.suggestions} >= 0 AND ${t.choix} >= 0`)],
+  (t) => [
+    check("autocomplete_daily_counts_counts_check", sql`${t.suggestions} >= 0 AND ${t.choix} >= 0`),
+    check("autocomplete_daily_counts_lieux_check", sql`${t.lieux} >= 0`),
+  ],
 );

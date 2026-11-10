@@ -250,6 +250,16 @@ describe("validateTrip : site d'essai (E2E-essai, lot 2, critère 2 ; D1)", () =
     expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY)).toEqual([]);
   });
 
+  // Décision 0141 § 6.4 (PR 885) : écran 1 de api, recherche montée par la page.
+  it("écran 1 api : recherche disponible, un choix dans les suggestions est exigé ; sans réponse de la recherche, aucun changement", () => {
+    const api = { rechercheApi: true, suggestions: true };
+    expect(validateTrip(ROME, TODAY, api)).toEqual([{ field: "destination", code: "selectCity" }]);
+    expect(validateTrip({ ...ROME, destination: "" }, TODAY, api)).toEqual([{ field: "destination", code: "required" }]);
+    expect(validateTrip({ ...ROME, destination: "Lisbonne", placeId: P, country: "PT", timeZone: "Europe/Lisbon" }, TODAY, api)).toEqual([]);
+    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY, { rechercheApi: true, suggestions: false })).toEqual([]);
+    expect(validateTrip({ ...ROME, destination: "Atlantide" }, TODAY, { rechercheApi: true })).toEqual([]);
+  });
+
   it("recherche indisponible (repli) : une ville de la table suffit ; hors de la table, « cityUnavailable »", () => {
     expect(validateTrip({ ...ROME, destination: "Hoi An" }, TODAY, essai)).toEqual([{ field: "destination", code: "cityUnavailable" }]);
     expect(validateTrip({ ...ROME, destination: "Hoi An" }, TODAY, { essai: true, suggestions: false })).toEqual([{ field: "destination", code: "cityUnavailable" }]);

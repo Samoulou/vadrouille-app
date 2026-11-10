@@ -23,6 +23,7 @@ import { formatDateCourte } from "@/features/voyage/plate";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 
+import { aidesDeChangement } from "./aide-changement";
 import { CreationShell, stepTotal, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { DestinationVille, type ActionsVilles, type MotifIndisponible } from "./DestinationVille";
@@ -66,6 +67,7 @@ function messageFor(field: string, code: FieldError, motif: MotifIndisponible = 
     if (code === "length") return length(DESTINATION_LENGTH);
     if (code === "selectCity") return err.villeChoisir;
     if (code === "cityUnavailable") return VILLE_NON_SERVIE[motif];
+    if (code === "cityNotOffered") return err.horsTable;
     if (code === "cityCharacters") return err.villeCaracteres;
     return err.destination;
   }
@@ -76,7 +78,11 @@ function messageFor(field: string, code: FieldError, motif: MotifIndisponible = 
   }
   if (last === "lodging") return err.logement;
   if (inCity && last === "name") {
-    return code === "length" ? length(CITY_NAME_LENGTH) : code === "singleCity" ? err.uneSeuleVille : err.villeNom;
+    if (code === "length") return length(CITY_NAME_LENGTH);
+    if (code === "singleCity") return err.uneSeuleVille;
+    if (code === "cityUnknown") return err.villeInconnue;
+    if (code === "cityRepeated") return err.villeRepetee;
+    return err.villeNom;
   }
   if (inCity && last === "arrival") {
     return code === "cityOrder" ? err.villeOrdre : code === "cityBeforeEnd" ? err.villeAvantDepart : err.villeArrivee;
@@ -97,9 +103,23 @@ export interface CreateTripFormProps {
    * `creationRoutes.nouveau`), car la page est prérendue et ne lit pas l'adaptateur.
    */
   essai?: boolean;
+  /**
+   * Adaptateur `api` (décision 0141 § 6.4) : la page monte la recherche de ville de `api` (`DestinationVille`, actions de
+   * `src/server/actions/villes.ts`) seulement si les seuils sont validés et la barrière réelle ; ville hors des 62 villes
+   * du MVP : message `err.horsTable` (code `cityNotOffered` à « Continuer »). Les autres champs restent ceux de `api` (plusieurs villes, durée).
+   */
+  recherche?: "api";
   /** Actions de la recherche de ville (doubles des tests et des captures, décision 0129 § 5) ; par défaut les actions serveur. */
   villes?: ActionsVilles;
+  /**
+   * Adaptateur `api` (spécification M4 § 7.1) : chaque autre ville est contrôlée à « Continuer » comme le fera `createTrip`
+   * (ville inconnue, même ville que la précédente, autre décalage horaire), avec l'erreur sous son nom.
+   */
+  controleVilles?: boolean;
 }
+
+/** Identifiant de l'aide du billet de trajet (spécification M4 § 7.1 et § 8), sous « Autres villes ». */
+const AIDE_BILLET_ID = "villes-aide-billet";
 
 const sansAbonnement = () => () => {};
 /**
@@ -126,9 +146,11 @@ function useEssaiDepuisAdresse(): boolean {
  * décision 0129, qui y lève F8-PO-14). Ailleurs, destination, logement, villes et engagements restent saisis en texte
  * libre, sans autocomplétion (aucune donnée Google, F8-PO-14).
  */
-export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps = {}) {
+export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVilles = false }: CreateTripFormProps = {}) {
   const essaiAdresse = useEssaiDepuisAdresse();
   const essai = essaiProp ?? essaiAdresse;
+  // Recherche de ville montée : site d'essai, ou `api` (0141 § 6.4) ; ailleurs, le champ texte d'aujourd'hui.
+  const rechercheVille = essai ? "essai" : recherche === "api" ? "api" : null;
   const router = useRouter();
   const { state, dispatch } = useDraft();
   const { trip } = state;
@@ -137,12 +159,18 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
   // quand elle ne répond pas (repli sur la table maison des villes).
   const [rechercheDisponible, setRechercheDisponible] = useState(false);
   const [motifIndisponible, setMotifIndisponible] = useState<MotifIndisponible>("panne");
+  // `api` (décision 0141 § 8.2) : saisie que la recherche a refusée hors des 62 villes, tant qu'elle n'a pas changé.
+  const [horsTableSaisie, setHorsTableSaisie] = useState<string | null>(null);
   // Cookie d'accès absent ou expiré pendant la recherche : saisie du code, puis relance de la recherche.
   const [accesDemande, setAccesDemande] = useState(false);
   const [relance, setRelance] = useState(0);
   const addCityButton = useRef<HTMLButtonElement>(null);
   const addCommitmentButton = useRef<HTMLButtonElement>(null);
   const focusAfterAdd = useRef<string | null>(null);
+  // Ajout et retrait d'une ville, annoncés dans une région `status` (spécification M4 § 7.1 et § 8) ; le compteur rend
+  // chaque annonce nouvelle, même quand le texte se répète.
+  const [annonceVille, setAnnonceVille] = useState<{ texte: string; n: number } | null>(null);
+  const annoncerVille = (texte: string) => setAnnonceVille((precedente) => ({ texte, n: (precedente?.n ?? 0) + 1 }));
 
   // Brouillon perdu : le texte est écrit après le premier rendu, dans une région déjà présente (0018 § 14).
   useEffect(() => {
@@ -160,6 +188,10 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
     const found = errors.find((error) => error.field === field);
     if (!found) return null;
     // Le message du libellé du logement dépend de la réponse (« Oui » : 2 à 120 caractères ; « Un quartier » : 2 à 80).
+    if (found.code === "cityTimeZone") {
+      const city = trip.otherCities[Number(/^otherCities\.(\d+)\./.exec(field)?.[1])];
+      return format(err.villeDecalage, { ville: city?.name.trim() ?? "", destination: trip.destination.trim() });
+    }
     if (field.endsWith("lodging.label")) {
       const lodging = lodgingAt(field);
       if (found.code === "length") return length(lodging?.answer === "known" ? KNOWN_LODGING_LENGTH : AREA_LENGTH);
@@ -174,7 +206,14 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const found = validateTrip(trip, todayIso(), { essai, suggestions: rechercheDisponible });
+    const found = validateTrip(trip, todayIso(), {
+      essai,
+      suggestions: rechercheDisponible,
+      rechercheApi: rechercheVille === "api",
+      // Comparaison aux espaces près (revue du head `bc43913`, mineur 4) : la saisie exacte n'est pas redemandée à la recherche.
+      horsTable: horsTableSaisie !== null && horsTableSaisie.trim() === trip.destination.trim(),
+      controleVilles,
+    });
     setErrors(found);
     const first = found[0];
     if (first) {
@@ -230,17 +269,29 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
   }
 
   const citiesFull = trip.otherCities.length >= MAX_CITIES - 1;
+  // Aide du billet de trajet : dès qu'une autre ville est ajoutée, reliée au « Type de réservation » de chaque engagement.
+  const aideBillet = trip.otherCities.length > 0;
+  // Aide sous le « Billet » qui deviendra le changement de ville (spécification M4-suite § 4.2, UX-M4S-C).
+  const aidesChangement = aidesDeChangement(trip);
   const commitmentsFull = trip.commitments.length >= MAX_COMMITMENTS;
 
   return (
     <CreationShell backHref={creationRoutes.mesVoyages()} step={{ current: 1, total: stepTotal(trip) }}>
       {/* Bloc `muted` du brouillon perdu : région présente dès le chargement, texte écrit ensuite (0018 § 14). */}
+      {/* Même région, unique sur l'écran : l'ajout et le retrait d'une ville y sont annoncés, pour les lecteurs d'écran
+          seulement (spécification M4 § 7.1) ; le brouillon perdu, visible, passe avant. */}
       <div role="status" className={state.noticeVisible ? "rounded-block bg-muted p-4 text-corps-s text-ink-2" : EMPTY_LIVE_REGION_CLASS}>
-        {state.noticeVisible ? t.brouillonPerdu : null}
+        {state.noticeVisible ? (
+          t.brouillonPerdu
+        ) : annonceVille ? (
+          <span key={annonceVille.n} data-part="annonce-villes" className="sr-only">
+            {annonceVille.texte}
+          </span>
+        ) : null}
       </div>
       <div role="alert" className={EMPTY_LIVE_REGION_CLASS} />
       <h1 className={TITLE_CLASS}>{e1.titre}</h1>
-      {essai ? (
+      {rechercheVille !== null ? (
         // Hors du `<form>` (décision 0129 § 5) : la saisie du code d'accès est son propre formulaire (pas de formulaires
         // imbriqués). Ordre de lecture inchangé : titre, Destination (et la saisie du code sous elle), puis le formulaire.
         // Entrée dans le champ choisit une suggestion et ne soumet rien ; « Continuer » valide la destination comme les
@@ -251,7 +302,11 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
             value={trip.destination}
             choisie={trip.placeId && trip.country && trip.timeZone ? { country: trip.country, timeZone: trip.timeZone } : null}
             error={errorOf("destination")}
-            onSaisie={(destination) => dispatch({ type: "trip", patch: { destination, placeId: "", country: "", timeZone: "" } })}
+            onSaisie={(destination) => {
+              // Comme sur le site d'essai : une erreur de « Continuer » reste jusqu'au choix d'une ville ; l'erreur rendue
+              // par la recherche (ville non proposée) tombe à la frappe, dans le champ.
+              dispatch({ type: "trip", patch: { destination, placeId: "", country: "", timeZone: "" } });
+            }}
             onChoix={(choix) => {
               dispatch({ type: "trip", patch: choix });
               setErrors((precedentes) => precedentes.filter((erreur) => erreur.field !== "destination"));
@@ -261,10 +316,17 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
               if (motif) setMotifIndisponible(motif);
             }}
             onAcces={() => setAccesDemande(true)}
+            onHorsTable={(saisie) => {
+              // `api` (0141 § 8.2) : le champ affiche `err.horsTable` ; une erreur de « Continuer » antérieure s'efface,
+              // pour qu'une seule consigne reste sous le champ.
+              setHorsTableSaisie(saisie);
+              setErrors((precedentes) => precedentes.filter((erreur) => erreur.field !== "destination"));
+            }}
             relance={relance}
+            recherche={rechercheVille}
             {...(villes ? { actions: villes } : {})}
           />
-          {accesDemande ? (
+          {essai && accesDemande ? (
             <SaisieCodeAcces
               ouverte={false}
               parcours={{
@@ -282,7 +344,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
         </>
       ) : null}
       <form noValidate onSubmit={submit} className="flex flex-col gap-6">
-        {essai ? null : (
+        {rechercheVille !== null ? null : (
           <TextField
             field="destination"
             label={e1.destination}
@@ -328,6 +390,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
               {e1.villes.titre}
             </h2>
             <FieldHelp id="villes-aide">{e1.villes.aide}</FieldHelp>
+            {aideBillet ? <FieldHelp id={AIDE_BILLET_ID}>{e1.villes.aideBillet}</FieldHelp> : null}
             {trip.otherCities.map((city, index) => {
               const base = `otherCities.${index}`;
               const title = city.name.trim() || format(e1.villes.ville, { n: index + 2 });
@@ -348,6 +411,8 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
                       onClick={() => {
                         dispatch({ type: "removeCity", index });
                         setErrors([]);
+                        const nom = city.name.trim();
+                        annoncerVille(nom ? format(e1.villes.retiree, { ville: nom }) : format(e1.villes.retireeSansNom, { n: index + 2 }));
                         // Site d'essai : la section disparaît avec la dernière ville ; le focus va alors au champ « Départ ».
                         requestAnimationFrame(() => (addCityButton.current ? addCityButton.current.focus() : focusField("end")));
                       }}
@@ -355,14 +420,38 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
                       {e1.retirer}
                     </Button>
                   </div>
-                  <TextField
-                    field={`${base}.name`}
-                    label={e1.villes.nom}
-                    value={city.name}
-                    maxLength={CITY_NAME_LENGTH.max}
-                    onChange={(name) => dispatch({ type: "city", index, patch: { name } })}
-                    error={errorOf(`${base}.name`)}
-                  />
+                  {rechercheVille === "api" ? (
+                    // Recherche de ville de `api` pour chaque autre ville (verdict 0149 § 3) : mêmes actions et même
+                    // terminal que la destination ; seul le nom maison entre dans le brouillon, sans `placeId`. Un refus
+                    // (`limite`, `indisponible`) laisse ce champ en saisie libre (repli sur les 62 villes).
+                    <DestinationVille
+                      champ={`${base}.name`}
+                      libelle={e1.villes.nom}
+                      maxLength={CITY_NAME_LENGTH.max}
+                      value={city.name}
+                      choisie={null}
+                      error={errorOf(`${base}.name`)}
+                      onSaisie={(name) => dispatch({ type: "city", index, patch: { name } })}
+                      onChoix={(choix) => {
+                        dispatch({ type: "city", index, patch: { name: choix.destination } });
+                        setErrors((precedentes) => precedentes.filter((erreur) => erreur.field !== `${base}.name`));
+                      }}
+                      onDisponibilite={() => {}}
+                      onAcces={() => {}}
+                      relance={0}
+                      recherche="api"
+                      {...(villes ? { actions: villes } : {})}
+                    />
+                  ) : (
+                    <TextField
+                      field={`${base}.name`}
+                      label={e1.villes.nom}
+                      value={city.name}
+                      maxLength={CITY_NAME_LENGTH.max}
+                      onChange={(name) => dispatch({ type: "city", index, patch: { name } })}
+                      error={errorOf(`${base}.name`)}
+                    />
+                  )}
                   <TextField
                     field={`${base}.arrival`}
                     type="date"
@@ -401,6 +490,7 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
                 if (citiesFull) return;
                 focusAfterAdd.current = `otherCities.${trip.otherCities.length}.name`;
                 dispatch({ type: "addCity" });
+                annoncerVille(format(e1.villes.ajoutee, { n: trip.otherCities.length + 2 }));
               }}
             >
               <IconPlus className="size-(--ligne-icone-petite)" />
@@ -423,6 +513,8 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
             const base = `commitments.${index}`;
             const title = commitment.label.trim() || format(e1.engagements.engagement, { n: index + 1 });
             const kindError = errorOf(`${base}.kind`);
+            const villeChangement = aidesChangement.get(index);
+            const aideChangementId = `${fieldId(base)}-aide-changement`;
             return (
               <section
                 key={commitment.key}
@@ -456,9 +548,16 @@ export function CreateTripForm({ essai: essaiProp, villes }: CreateTripFormProps
                     value={commitment.kind}
                     onChange={(kind) => dispatch({ type: "commitment", index, patch: { kind } })}
                     invalid={kindError !== null}
-                    describedBy={kindError ? errorId(fieldId(`${base}.kind`)) : undefined}
+                    describedBy={describedBy(
+                      aideBillet && AIDE_BILLET_ID,
+                      villeChangement !== undefined && aideChangementId,
+                      kindError && errorId(fieldId(`${base}.kind`)),
+                    )}
                     id={fieldId(`${base}.kind`)}
                   />
+                  {villeChangement === undefined ? null : (
+                    <FieldHelp id={aideChangementId}>{format(e1.villes.aideChangement, { ville: villeChangement })}</FieldHelp>
+                  )}
                   <FieldMessage id={errorId(fieldId(`${base}.kind`))} message={kindError} />
                 </div>
                 <TextField

@@ -21,6 +21,15 @@ export const RESPONSE_HEADERS = [
     headers: [{ key: "Cache-Control", value: "private, no-store" }],
   },
   {
+    // B4e (décision 0144 § 5.3 point 7) : reçu `R9-recu`, seul HTML qui porte le lien du reçu de Stripe. Ni cache partagé
+    // ni cache du navigateur, et aucun référent envoyé (ni vers Stripe ni ailleurs), pour ce seul chemin.
+    source: "/voyages/:id/debloquer/recu",
+    headers: [
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "no-referrer" },
+    ],
+  },
+  {
     // Vue partagée (`RP`, `RPJ` ; F10-TL-8) : toutes les réponses sous `/p/`, 200, 404 et 500 comprises. Ni cache
     // partagé (un lien désactivé cesse de fonctionner dès la requête suivante), ni indexation, et seule l'origine
     // part dans `Referer` : le chemin, donc le jeton, n'est jamais envoyé à une autre origine.
@@ -56,6 +65,14 @@ export const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+  // Ticket 1029 (M6a ; décision 0157 § 2.1 point 3 ; décision 0161) : sans ce réglage, Next.js retire les en-têtes « flight »
+  // de la requête (`rsc`, `next-router-prefetch`, `next-router-state-tree`… ; `FLIGHT_HEADERS` de
+  // `next/dist/server/web/adapter.js`) avant `src/proxy.ts`, puis les rend à la page : le proxy ne voyait jamais
+  // `Next-Router-Prefetch: 1` et comptait un préchargement du routeur comme une vue. Avec lui, le proxy (seul de
+  // l'application, matcher `/p/:path*`) reçoit la requête telle qu'envoyée : en-têtes « flight » et adresse non normalisée
+  // (`_rsc` gardé dans la requête). Sans autre effet tant que le projet n'utilise ni `i18n`, ni `basePath`, ni
+  // `trailingSlash`, ni `rewrites` ou `redirects` (condition de maintien de la décision 0161).
+  skipProxyUrlNormalize: true,
   // Décision 0005 : le build vérifie les types sans les tests (absents de l'image Docker).
   // `pnpm typecheck` garde le tsconfig.json complet.
   typescript: { tsconfigPath: "tsconfig.build.json" },

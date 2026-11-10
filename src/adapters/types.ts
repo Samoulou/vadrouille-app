@@ -15,10 +15,21 @@ import type {
   InferredBrief,
   LodgingRequest,
   LodgingSuggestion,
+  MoveDraft,
+  MoveOptions,
   Offer,
+  PatchResult,
+  PlaceSearchResult,
   PreviewSlot,
   Proposal,
+  Receipt,
+  ReplacementOffer,
+  ReplacementWrite,
+  RevisionPreview,
+  ChecklistItem,
   Result,
+  RevertPreview,
+  TripVersionPage,
   RetryGenerationRequest,
   Session,
   ShareStatus,
@@ -81,6 +92,119 @@ export interface TripAdapter {
    * « À débloquer »). Facultatif : absent (`mock`, `api`), il vaut `false` ; lu par `isTrialTrip` de `@/adapters`.
    */
   isTrialTrip?(ctx: AdapterContext, tripId: string): Promise<boolean>;
+  /**
+   * Remplacer une étape (écran 14 ; tâche M1g, ticket 869) par une autre proposition déjà vérifiée du voyage, en une
+   * nouvelle version annulable. Facultatif : présent sur `api` seulement (`mock` sert son jeu simulé de révision,
+   * `getRevisionFixtures` ; `prototype` n'en a pas). Entrées reçues en `unknown`, revalidées par le cas d'usage.
+   */
+  readonly revision?: RevisionAdapter;
+  /**
+   * Signaler une erreur sur une étape (tâche M5c, ticket 904 ; décision 0147 § 1) : présent sur `api` (table `feedback`).
+   * `mock` tient ses signalements dans la portée de simulation (`signalementsDuVoyage` de `@/adapters`) ; `prototype` n'en
+   * a pas. Entrée reçue en `unknown`, revalidée par le cas d'usage.
+   */
+  readonly reports?: StopReportAdapter;
+  /**
+   * Versions du programme et retour à une version (tâche M5b, ticket 934 ; décision 0147 § 5.3) : présent sur `api`
+   * (`trip_versions`). `mock` tient un historique simulé dans la portée de simulation (`versionsDuVoyage` de
+   * `@/adapters`) ; `prototype` n'en a pas. Entrées reçues en `unknown`, revalidées par le cas d'usage.
+   */
+  readonly versions?: TripVersionsAdapter;
+  /**
+   * Lieu à soi, aperçu et application d'un ajout `[add, lock]` (tâche M5d-1, ticket 939 ; décision 0147 § 3, § 4 et § 11) :
+   * présent sur `api` (`src/server/lieux/ajout.ts`, port de relectures de la lecture). La recherche de `api` ne passe pas par
+   * l'adaptateur : l'action serveur appelle le terminal `src/server/composition/lieux-api.ts` (seul chemin vers le client
+   * Places). `mock` tient les trois dans la portée de simulation (`lieuxDuVoyage` de `@/adapters`) ; `prototype` n'en a pas.
+   */
+  readonly places?: AddPlaceAdapter;
+}
+
+/**
+ * Ajout d'un lieu à soi (M5d-1 ; décision 0147 § 3 point 5 et § 11) : `AddPlaceRequest` → `RevisionPreview` (`kind:
+ * "add"`), `AddPlaceApply` → `PatchResult` (version nouvelle, auteur `user`, patch `[add, lock]`), `AddPlaceUndo` → `PatchResult` (annulation). Voyage débloqué seulement
+ * (`not_unlocked`), débit `retouche`, `version_conflict`, `no_option` (« Pas de place ce jour-là »), `provider_error`. Le
+ * contexte est celui **de la session** ; `null` : `unauthenticated`. Aucun nom ni adresse Google dans la demande.
+ */
+export interface AddPlaceAdapter {
+  previewAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<RevisionPreview>>;
+  applyAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+  /**
+   * Annulation d'un ajout (« Annuler » du toast, M5d-6 ; décision 0155 § 4.1) : `AddPlaceUndo` `{ tripId, requestId,
+   * version }` → `PatchResult`. Sur `api`, `[revert]` vers la base de l'ajout tant que `version` est la version courante et
+   * un ajout `[add, lock]` d'une personne (sinon `version_conflict`), même si cette base précède le déblocage ; ni débit
+   * `retouche` ni borne du nombre de versions. `mock` : même signature, sur la version simulée.
+   */
+  undoAddPlace(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+}
+
+/**
+ * Lieu à soi complet (M5d-1) : recherche (`PlaceSearchRequest` → `PlaceSearchResult[]`, 5 au plus ; noms et adresses
+ * affichés avec l'attribution, jamais stockés) et ajout. Implémenté par `mock` ; sur `api`, la recherche est celle du
+ * terminal de la composition.
+ */
+export interface PlaceAdapter extends AddPlaceAdapter {
+  searchPlaces(ctx: AdapterContext | null, input: unknown): Promise<Result<PlaceSearchResult[]>>;
+}
+
+/**
+ * Versions du programme (M5b ; décision 0147 § 5.3 et § 8) : voyage débloqué seulement (`not_unlocked`), débit `retouche`.
+ * Le contexte est celui **de la session** ; `null` : sans session (`unauthenticated`).
+ *
+ * - `listTripVersions` (`TripVersionsRequest` → `TripVersionPage`) : 20 par page, de la plus récente à la plus ancienne ;
+ * - `previewRevert` (`RevertPreviewRequest` → `RevertPreview`) : « Ce qui change », rien n'est écrit ;
+ * - `applyRevert` (`RevertApply` → `PatchResult`) : version nouvelle, copie identique de la version visée, idempotente par
+ *   `requestId` ; refus `validation_failed` (`field: "toVersion"`) d'une version non proposée au retour.
+ */
+export interface TripVersionsAdapter {
+  listTripVersions(ctx: AdapterContext | null, input: unknown): Promise<Result<TripVersionPage>>;
+  previewRevert(ctx: AdapterContext | null, input: unknown): Promise<Result<RevertPreview>>;
+  applyRevert(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+}
+
+/**
+ * Signalement d'une erreur sur une étape (M5c ; décision 0147 § 1, § 2) : motif fermé, aucun texte, idempotent par
+ * `requestId`, dédoublonné, plafonné par voyage et par jour UTC. Le contexte est celui **de la session** ; `null` : sans
+ * session (`unauthenticated`). Réponse `null` : aucune donnée, la feuille sait seule si elle propose « Remplacer ».
+ */
+export interface StopReportAdapter {
+  reportStop(ctx: AdapterContext | null, input: unknown): Promise<Result<null>>;
+}
+
+/**
+ * Révision enregistrée d'un voyage (M1g) : cas d'usage de `src/server/versions/remplacement.ts`, dans le cadre commun des
+ * actions sur un voyage. Le contexte est celui **de la session** (jamais une valeur de l'entrée) ; `null` : sans session.
+ */
+export interface RevisionAdapter {
+  /** Version courante du voyage, base de la première demande d'aperçu ; `not_found` hors organisation. */
+  currentVersion(ctx: AdapterContext | null, input: unknown): Promise<Result<number>>;
+  previewReplacement(ctx: AdapterContext | null, input: unknown): Promise<Result<ReplacementOffer>>;
+  applyReplacement(ctx: AdapterContext | null, input: unknown): Promise<Result<ReplacementWrite>>;
+  undoReplacement(ctx: AdapterContext | null, input: unknown): Promise<Result<ReplacementWrite>>;
+  /**
+   * Coche ou décoche une ligne « À faire » (`ChecklistUpdate` → `ChecklistItem`, B6b ; branchée sur l'écran 11 par M5e,
+   * spécification M5 § 7.3) : état final, idempotent, hors des versions.
+   */
+  toggleChecklistItem(ctx: AdapterContext | null, input: unknown): Promise<Result<ChecklistItem>>;
+  /**
+   * Verrouiller ou déverrouiller une étape (M5a, ticket 919 ; décision 0147 § 8 et § 9) : `{ tripId, requestId, stopId,
+   * baseVersion }` → `PatchResult` (version nouvelle, auteur `user`). Voyage débloqué seulement (`not_unlocked`), jamais un
+   * événement ni un engagement (`validation_failed`, `stopId`), débit `retouche` ; aucun appel du port de relectures.
+   */
+  lockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+  unlockStop(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+  /**
+   * Déplacer une étape (ticket 947 ; feuille « Déplacer » de F7b ; décision 0147 § 4, § 8 et § 11 ; décision 0153, PR
+   * #959) : `getMoveOptions` (`{ tripId, stopId }` → `MoveOptions`, points proposés, sans relecture), `previewMove`
+   * (`{ tripId, stopId, pointId, baseVersion }` → `MoveDraft`) et `applyMove` (`{ tripId, requestId, stopId, pointId,
+   * baseVersion }` → `PatchResult`, version nouvelle, patch `[move]` appliqué par le moteur). Aperçu et application : débit
+   * `retouche`, **un** appel du port de relectures (échec : `provider_error` ou `cost_cap_reached`, rien n'est écrit) ; le
+   * moteur refuse en `no_option` toute entrée bloquante nouvelle. Voyage débloqué seulement (`not_unlocked`) ; jamais une
+   * étape verrouillée, un engagement ni un événement (`validation_failed`, `stopId`) ; point absent de la version courante :
+   * `no_option`.
+   */
+  getMoveOptions(ctx: AdapterContext | null, input: unknown): Promise<Result<MoveOptions>>;
+  previewMove(ctx: AdapterContext | null, input: unknown): Promise<Result<MoveDraft>>;
+  applyMove(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
 }
 
 /**
@@ -96,6 +220,14 @@ export interface PaymentAdapter {
   getCheckoutStatus(ctx: AdapterContext, checkoutId: string): Promise<Result<CheckoutStatus>>;
   /** Droit « voyage débloqué » acquis par paiement, lu par `getTripReader()` (§ 3). */
   getEntitlement(ctx: AdapterContext, tripId: string): Promise<{ unlocked: boolean }>;
+  /**
+   * Reçu du paiement qui a débloqué le voyage, pour la personne qui l'a payé seulement (`created_by`) ; `not_found`
+   * sinon. **Obligatoire** depuis B4e (décision 0144 § 2 point 2) : `simulated` rend le reçu maison (B4d), `stripe` le
+   * reçu dont le lien de Stripe est conservé (`not_found` tant que la colonne est `NULL`), `mock` toujours `not_found`.
+   */
+  getReceipt(ctx: AdapterContext, tripId: string): Promise<Result<Receipt>>;
+  /** Reçus de la personne, pour « Mes voyages » (B4d, B4e) ; même règle que `getReceipt` (`mock` : liste vide). */
+  listReceipts(ctx: AdapterContext): Promise<Result<readonly Receipt[]>>;
 }
 
 /**

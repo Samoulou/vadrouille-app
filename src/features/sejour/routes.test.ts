@@ -27,6 +27,12 @@ describe("tripRoutes (décision 0015 § 1)", () => {
     expect(tripRoutes("/dev/voyages", "mock_trip_edimbourg").aujourdhui()).toBeNull();
   });
 
+  it("« Versions du programme » (M5b) : `/voyages/{id}/versions` ; aucune adresse avec la base `/dev/voyages`", () => {
+    expect(routes.versions()).toBe("/voyages/mock_trip_edimbourg/versions");
+    expect(tripRoutes("/voyages", "a b/c").versions()).toBe("/voyages/a%20b%2Fc/versions");
+    expect(tripRoutes("/dev/voyages", "mock_trip_edimbourg").versions()).toBeNull();
+  });
+
   it("« Mes voyages » : une seule adresse, `/voyages` (décision 0021 § 6)", () => {
     expect(mesVoyagesRoute()).toBe("/voyages");
     expect(tripRoutes("/voyages", "a b").mesVoyages()).toBe(mesVoyagesRoute());
@@ -43,5 +49,10 @@ describe("tripRoutes (décision 0015 § 1)", () => {
       "/voyages/mock_trip_edimbourg/jour/2/ajouter?de=15:00&a=18:30",
     );
     expect(routes.ajouter(2)).toBe("/voyages/mock_trip_edimbourg/jour/2/ajouter");
+  });
+
+  it("« Choisir » d'un repas pas encore choisi : de et repas, tels quels (F7-PO-8, M5d-3)", () => {
+    expect(routes.ajouter(2, { time: "19:30", meal: "dinner" })).toBe("/voyages/mock_trip_edimbourg/jour/2/ajouter?de=19:30&repas=dinner");
+    expect(routes.ajouter(1, { time: "12:30", meal: "lunch" })).toBe("/voyages/mock_trip_edimbourg/jour/1/ajouter?de=12:30&repas=lunch");
   });
 });

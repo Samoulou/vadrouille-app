@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType, type MouseEvent, type ReactNode } from "react";
 
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -8,12 +8,44 @@ import { useOnline } from "@/lib/online";
 import { cn } from "@/lib/utils";
 
 import { isMapConfigComplete, useCarteInjection } from "./config";
-import { GoogleMapRenderer } from "./GoogleMapRenderer";
+import type { GoogleMapRendererProps } from "./GoogleMapRenderer";
 import { MAP_FALLBACK_TEXTS, MapFallback, type MapFallbackCause } from "./MapFallback";
-import { buildDayRoute, buildOverview, type RouteDay, type RouteMap } from "./route";
+import { buildCityOverview, buildDayRoute, buildOverview, type DayRoute, type Moitie, type RouteDay, type RouteMap, type VilleDuJour } from "./route";
 import type { FitPadding, MapView } from "./types";
 
 const t = messages.carte;
+
+/** Props du rendu Google chargé à la demande, plus le rechargement de son bloc (« Réessayer » après un échec du bloc). */
+type RenduGoogleProps = GoogleMapRendererProps & { onReload: () => void };
+
+/**
+ * Bloc du rendu Google qui n'a pas pu être téléchargé (réseau instable, déploiement qui change les blocs) : même état
+ * « erreur de chargement » que l'échec de l'API Google (F4-PO-8), annoncé par la région live, sans texte nouveau ;
+ * « Réessayer » retélécharge le bloc. L'erreur ne remonte jamais à `error.tsx` : la liste reste utilisable.
+ */
+function EchecDuBloc({ placesFromGoogle, onErrorChange, onReload }: RenduGoogleProps) {
+  useEffect(() => {
+    onErrorChange?.(true);
+    return () => onErrorChange?.(false);
+  }, [onErrorChange]);
+  return <MapFallback cause="error" placesFromGoogle={placesFromGoogle} onRetry={onReload} />;
+}
+
+/**
+ * Rendu Google chargé à la demande (décision 0152 § 4, ticket 991) : il n'est monté qu'en ligne, avec des positions et
+ * une configuration complète. Hors ligne, sans position ou sans configuration, l'écran n'en télécharge rien. Repli
+ * `null` pendant le chargement du bloc : la région live reste vide, comme pendant le chargement des scripts Google.
+ * Un échec du téléchargement donne `EchecDuBloc` au lieu d'une exception ; `React.lazy` gardant ce résultat, « Réessayer »
+ * remplace le composant paresseux par un nouveau, qui retente l'import.
+ */
+const chargerRenduGoogle = () =>
+  lazy<ComponentType<RenduGoogleProps>>(() =>
+    import("./GoogleMapRenderer").then(
+      (loaded) => ({ default: loaded.GoogleMapRenderer }),
+      () => ({ default: EchecDuBloc }),
+    ),
+  );
+let RenduGoogle = chargerRenduGoogle();
 
 export type DayMapProps =
   | {
@@ -44,6 +76,18 @@ export type DayMapProps =
       visibleInsets?: FitPadding;
       /** Appelée quand le lien d'évitement est activé, avant que le focus aille sur la liste (F5 : relever le panneau). */
       onSkipToList?: () => void;
+      /**
+       * Journée d'un changement de ville (décision 0150 § 3) : villes quittée et d'arrivée (noms maison de `Trip.cities`).
+       * Avec un `transfer` dans `day.items`, les deux terminus sont nommés et étiquetés, et la carte cadre `moitie`.
+       */
+      transferCities?: { de: string; vers: string };
+      /** Moitié cadrée (« avant » ou « après » le `transfer`) ; absente : toute la journée. */
+      moitie?: Moitie;
+      /**
+       * `buildDayRoute(day, map)` déjà calculée par l'appelant (`TripShell`, qui en lit les moitiés) : la carte ne la
+       * recalcule pas. Absente : calculée ici.
+       */
+      route?: DayRoute;
       /** Contrôles posés sur la carte (« Retour »), après le lien d'évitement dans l'ordre de tabulation. */
       controls?: ReactNode;
       /** F4-PO-9 ; `false` avec l'adaptateur mock. */
@@ -60,6 +104,16 @@ export type DayMapProps =
       fitPadding?: FitPadding;
       /** Voir le mode « day » : son changement recadre la carte. */
       fitScope?: string;
+      /**
+       * Voyage à 2 villes ou plus (décision 0150 § 2) : noms de `Trip.cities` dans l'ordre, et ville de chaque jour de `days`
+       * (`villesDeLaDate`). Absents pour une ville : carte inchangée.
+       */
+      cities?: readonly string[];
+      citiesOfDays?: readonly VilleDuJour[];
+      /** Ville choisie dans « Afficher sur la carte » (nom maison) ; absente : toutes les villes. */
+      cityView?: string;
+      /** Partie de la carte couverte par le panneau : cadrage d'une ville réduite à une position (0150 § 3 bis). */
+      visibleInsets?: FitPadding;
       placesFromGoogle: boolean;
       className?: string;
     };
@@ -75,41 +129,80 @@ export type DayMapProps =
 export function DayMap(props: DayMapProps) {
   const online = useOnline();
   const [loadError, setLoadError] = useState(false);
+  // Nouveau composant paresseux après un échec du bloc (« Réessayer ») : le compteur force le rendu qui le lit.
+  const [, setTentativeDuBloc] = useState(0);
+  const rechargerLeBloc = useCallback(() => {
+    RenduGoogle = chargerRenduGoogle();
+    setTentativeDuBloc((value) => value + 1);
+  }, []);
   const { config, simulated: Simulated } = useCarteInjection();
   const configComplete = isMapConfigComplete(config);
 
   const day = props.mode === "day" ? props.day : null;
   const dayMap = props.mode === "day" ? props.map : null;
   const maps = props.mode === "overview" ? props.maps : null;
-  const route = useMemo(() => (day ? buildDayRoute(day, dayMap) : null), [day, dayMap]);
-  const rings = useMemo(() => (maps ? buildOverview(maps) : null), [maps]);
+  const routeFournie = props.mode === "day" ? props.route : undefined;
+  const route = useMemo(() => routeFournie ?? (day ? buildDayRoute(day, dayMap) : null), [routeFournie, day, dayMap]);
+  const cityNames = props.mode === "overview" ? props.cities : undefined;
+  const citiesOfDays = props.mode === "overview" ? props.citiesOfDays : undefined;
+  const overviewDays = props.mode === "overview" ? props.days : null;
+  const multiCity = cityNames !== undefined && cityNames.length >= 2 && citiesOfDays !== undefined;
+  const rings = useMemo(() => (maps && !multiCity ? buildOverview(maps) : null), [maps, multiCity]);
+  const cityOverview = useMemo(
+    () => (maps && overviewDays && multiCity ? buildCityOverview(overviewDays, maps, citiesOfDays, cityNames) : null),
+    [maps, overviewDays, multiCity, citiesOfDays, cityNames],
+  );
 
   const selectedStopId = props.mode === "day" ? props.selectedStopId : undefined;
   const onMarkerPress = props.mode === "day" ? props.onMarkerPress : undefined;
   const fitPadding = props.fitPadding;
   const scope = props.fitScope ? `:${props.fitScope}` : "";
-  const visibleInsets = props.mode === "day" ? props.visibleInsets : undefined;
+  const visibleInsets = props.visibleInsets;
   const interactive = props.mode === "day" ? (props.interactiveMarkers ?? true) : true;
+  const transferDe = props.mode === "day" ? props.transferCities?.de : undefined;
+  const transferVers = props.mode === "day" ? props.transferCities?.vers : undefined;
+  // Journée d'un changement de ville : seulement avec un `transfer` dans la ligne et les deux villes connues.
+  const transfer = route?.moities && transferDe !== undefined && transferVers !== undefined ? { de: transferDe, vers: transferVers } : undefined;
+  const moitie = transfer && props.mode === "day" ? props.moitie : undefined;
+  const cityView = props.mode === "overview" && cityOverview ? props.cityView : undefined;
   const view = useMemo<MapView | null>(() => {
     if (route && day) {
       return {
         mode: "day",
-        fitKey: `jour-${day.index}${scope}`,
+        fitKey: transfer ? `jour-${day.index}:${moitie ?? "journee"}${scope}` : `jour-${day.index}${scope}`,
         route,
         selectedStopId,
         onMarkerPress,
         fitPadding,
         visibleInsets,
         ...(interactive ? {} : { interactive: false }),
+        ...(transfer ? { transferCities: transfer, ...(moitie ? { moitie } : {}) } : {}),
+      };
+    }
+    if (cityOverview) {
+      return {
+        mode: "overview",
+        fitKey: `sejour:${cityView === undefined ? "toutes" : `ville:${cityView}`}${scope}`,
+        rings: [],
+        cities: cityOverview,
+        ...(cityView === undefined ? {} : { cityView }),
+        fitPadding,
+        visibleInsets,
       };
     }
     if (rings) {
       return { mode: "overview", fitKey: `sejour${scope}`, rings, fitPadding };
     }
     return null;
-  }, [route, day, rings, selectedStopId, onMarkerPress, fitPadding, visibleInsets, scope, interactive]);
+    // `transfer` est recréé à chaque rendu : ses deux noms suffisent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, day, rings, cityOverview, cityView, selectedStopId, onMarkerPress, fitPadding, visibleInsets, scope, interactive, transferDe, transferVers, moitie]);
 
-  const hasPositions = view ? (view.mode === "day" ? view.route.positions.length > 0 : view.mode === "overview" && view.rings.length > 0) : false;
+  const hasPositions = view
+    ? view.mode === "day"
+      ? view.route.positions.length > 0
+      : view.mode === "overview" && (view.rings.length > 0 || (view.cities?.all.length ?? 0) > 0)
+    : false;
   const needsConfig = !Simulated;
 
   useEffect(() => {
@@ -132,12 +225,15 @@ export function DayMap(props: DayMapProps) {
     content = <Simulated view={view} />;
   } else {
     content = (
-      <GoogleMapRenderer
-        view={view}
-        config={{ apiKey: config.apiKey ?? "", mapId: config.mapId ?? "" }}
-        placesFromGoogle={props.placesFromGoogle}
-        onErrorChange={setLoadError}
-      />
+      <Suspense fallback={null}>
+        <RenduGoogle
+          view={view}
+          config={{ apiKey: config.apiKey ?? "", mapId: config.mapId ?? "" }}
+          placesFromGoogle={props.placesFromGoogle}
+          onErrorChange={setLoadError}
+          onReload={rechargerLeBloc}
+        />
+      </Suspense>
     );
     cause = loadError ? "error" : null;
   }

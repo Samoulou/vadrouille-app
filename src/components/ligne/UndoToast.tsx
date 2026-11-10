@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 
 import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,8 @@ export interface UndoToastProps {
   /** « [X] écarté. », fourni par l'appelant depuis fr.json. */
   message: string;
   onUndo: () => void;
+  /** Bouton « Annuler », pour lui rendre le focus (annulation échouée de la révision enregistrée, PR 869). */
+  undoRef?: Ref<HTMLButtonElement>;
   /** Fin du délai : la décision devient définitive. */
   onExpire: () => void;
   /** Délai en ms, 5 000 par défaut (handover § 5). */
@@ -45,7 +47,7 @@ export function UndoToastRegion({ children, className }: UndoToastRegionProps) {
  * 2,75:1 contre l'aplat `ink` (WCAG 1.4.11). Remonter le composant (clé) pour une nouvelle action
  * relance le délai.
  */
-export function UndoToast({ message, onUndo, onExpire, duration = 5000, className }: UndoToastProps) {
+export function UndoToast({ message, onUndo, undoRef, onExpire, duration = 5000, className }: UndoToastProps) {
   const [paused, setPaused] = useState({ focus: false, hover: false });
   const remaining = useRef(duration);
   const onExpireRef = useRef(onExpire);
@@ -81,6 +83,7 @@ export function UndoToast({ message, onUndo, onExpire, duration = 5000, classNam
     >
       <p className="min-w-0 flex-1 py-2">{message}</p>
       <button
+        ref={undoRef}
         type="button"
         onClick={onUndo}
         className="inline-flex min-h-(--touch-target) min-w-(--touch-target) shrink-0 cursor-pointer items-center justify-center rounded-control px-3 font-bold text-page underline underline-offset-2 focus-visible:bg-page focus-visible:text-ink"

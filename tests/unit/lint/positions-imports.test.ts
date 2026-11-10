@@ -222,3 +222,32 @@ describe("coordonnées: écrites par un seul module, en paramètres liés (règl
     expect(noms("src/grounding/zone.ts", "const p = position as  PositionGoogleFraiche;")).toBe(1);
   });
 });
+
+/**
+ * Ticket 1013 (M6a ; décision 0157 § 1.4 point 8) : `src/server/voyages/carte-partagee.ts` n'a qu'un importateur hors
+ * des tests, `src/server/partage/vue.ts`. Tant que Samuel n'a pas répondu à Q814 (S7), la vue partagée est livrée sans
+ * carte : le module n'importe rien de `src/server` (ni `@/server/positions/lecture`, ni `@/server/with-system-org`), et
+ * ne nomme ni `lirePositions` ni `withSystemOrg`.
+ */
+const CARTE_PARTAGEE = "src/server/voyages/carte-partagee.ts";
+const VUE_PARTAGEE = "src/server/partage/vue.ts";
+
+describe("carte de la vue partagée : un seul importateur, aucune position lue (0157 § 1.4 point 8, ticket 1013)", () => {
+  it("seul src/server/partage/vue.ts importe carte-partagee.ts hors des tests", () => {
+    const importateurs = ["src", "scripts", "eslint-rules", "db", "prototype"]
+      .flatMap((d) => fichiers(d))
+      .filter((f) => !estTest(f) && imports(f, lire(f)).some((i) => i.cible === CARTE_PARTAGEE));
+    expect(importateurs).toEqual([VUE_PARTAGEE]);
+  });
+
+  it("carte-partagee.ts n'importe rien de src/server et ne lit aucune position", () => {
+    const texte = lire(CARTE_PARTAGEE);
+    const cibles = imports(CARTE_PARTAGEE, texte).map((i) => i.cible);
+    expect(cibles.filter((c) => c.startsWith("src/server/"))).toEqual([]);
+    expect(cibles).not.toContain(LECTURE);
+    expect(cibles).not.toContain("src/server/with-system-org.ts");
+    // Code sans les commentaires (le commentaire de tête explique ce qui n'est pas fait).
+    const code = ts.createPrinter({ removeComments: true }).printFile(ts.createSourceFile(CARTE_PARTAGEE, texte, ts.ScriptTarget.Latest, true));
+    expect(code).not.toMatch(/place_coordinates|lirePositions|withSystemOrg/);
+  });
+});

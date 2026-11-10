@@ -22,6 +22,18 @@ export function isProductionDeployment(env: NodeJS.ProcessEnv = process.env): bo
 }
 
 /**
+ * Cible de production (décision 0140 § 3 point 6) : prédicat de production **partagé** du paiement Stripe, seule
+ * définition de la règle. Vrai si `isProductionDeployment(env)` l'est, **ou** si `VERCEL_TARGET_ENV` (variable que la
+ * barrière de sortie lit aussi) vaut `production` après la même normalisation (`trim().toLowerCase()`). Comme
+ * `isProductionDeployment`, il ne peut que fermer : il est lu par la garde de `PAYMENT_ADAPTER=stripe` de
+ * `parseServerEnv`, par `productionPaiement` (`src/server/env/payment.ts`, qui lit aussi le vrai `process.env`) et par la
+ * branche `stripe` de `paymentAvailable()` (`src/adapters/payment-guard.ts`). Lecture non secrète.
+ */
+export function isProductionTarget(env: NodeJS.ProcessEnv = process.env): boolean {
+  return isProductionDeployment(env) || env.VERCEL_TARGET_ENV?.trim().toLowerCase() === "production";
+}
+
+/**
  * Liste blanche de l'adaptateur `prototype` (spécification P0, « Comportement de P0b » ; décision 0032 § A4.2),
  * **stricte, sans normalisation** : vraie seulement si toutes les conditions suivantes le sont.
  * 1. `isProductionDeployment(env)` est fausse : évaluée en premier, elle l'emporte toujours.

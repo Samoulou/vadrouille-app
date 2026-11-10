@@ -9,10 +9,12 @@ import {
   type StopSnapshot,
   type TripPatch,
   type TripPatchOperation,
+  type TransferItem,
   type TripSnapshot,
 } from "@/contracts";
 
 import { budgetParPersonne, changementDeBudget } from "@/domain/calculs";
+import { creneauOccupe } from "@/domain/changement-de-ville";
 import type { EntreeMoteur, EtatChoix } from "@/domain/entrees";
 import { modesAdmis, sourceDe } from "@/domain/generation";
 import { etapesDuJour } from "@/domain/programme";
@@ -46,6 +48,9 @@ import { controlerVersion, type Refus } from "@/domain/version";
  *    changent pas (R3) ; l'étape visée par un `add` ou un `move` est posée à l'heure demandée ;
  * 4. validation des jours touchés (R1 à R9, R3 contre la base) : une entrée bloquante **nouvelle** (absente du
  *    rapport des mêmes jours de la base) fait refuser le patch, code `no_option` ;
+ *    **verrou seul** (décision 0147 § 9, M5a) : un patch fait seulement de `lock` et d'`unlock` ne déplace rien ; ni
+ *    replanification ni validation, l'instantané de sortie est la base avec `locked` basculé (R3 tient trivialement,
+ *    R1 à R9 sont inchangés), et « Ce qui change » est calculé sans aucune relecture (aucun trajet ne change) ;
  * 5. sortie : instantané validé par `TripSnapshotSchema` (aucune durée, aucune date de contrôle, aucun `toConfirm`),
  *    `PatchResult` validé par `PatchResultSchema` (les `Change[segment]` n'existent que là, calculés en mémoire à la
  *    réponse) et rapport de validation en mémoire.
@@ -66,7 +71,9 @@ export type EntreePatch = {
   versionsAnterieures?: ReadonlyMap<number, TripSnapshot>;
   /**
    * Identifiants des étapes ajoutées par la personne dans les versions précédentes (R1 selon B5-PO-4, R7 selon
-   * B5-PO-8) ; le serveur les déduit des patches `add` de l'historique. Ceux du patch courant s'y ajoutent.
+   * B5-PO-8). Depuis la décision 0147 § 6.1, le moteur y ajoute lui-même les étapes de la base marquées
+   * `addedBy: "person"` (le serveur n'a plus à relire l'historique) ; le paramètre reste pour `mock` et les tests. Ceux
+   * du patch courant s'y ajoutent.
    */
   ajouts?: ReadonlySet<string>;
 };
@@ -79,8 +86,14 @@ const refus = <C extends Exclude<Refus["code"], "version_conflict">>(code: C) =>
 
 // --- Brouillon -------------------------------------------------------------------------------------------------
 
-/** Ligne déplaçable d'un jour : une étape (fixe si l'opération l'a posée à une heure demandée) ou un repas ouvert. */
-type Ligne = { genre: "etape"; stop: StopSnapshot; fixe: boolean } | { genre: "repas"; time: string; meal: Meal };
+/**
+ * Ligne d'un jour : une étape (fixe si l'opération l'a posée à une heure demandée), un repas ouvert, ou un changement de
+ * ville (`transfer`, toujours fixe, jamais visé par une opération : il n'a pas d'identifiant).
+ */
+type Ligne =
+  | { genre: "etape"; stop: StopSnapshot; fixe: boolean }
+  | { genre: "repas"; time: string; meal: Meal }
+  | { genre: "changement"; item: TransferItem };
 
 type JourBrouillon = { origine: DaySnapshot; lignes: Ligne[] };
 
@@ -90,10 +103,15 @@ type Cible =
   | { type: "added"; id: string }
   | { type: "moved"; id: string; avant: { day: number; time: string } };
 
+/**
+ * Lignes d'un jour. Un changement de ville (`transfer`, décision 0148 § 1) est une ligne **fixe** : sans identifiant, aucun
+ * patch ne le vise, et `replanifierHoraires` le pose à son heure avec son créneau occupé (`creneauOccupe`, 0151 § 5).
+ */
 function lignesDe(jour: DaySnapshot): Ligne[] {
   return jour.items.flatMap((item): Ligne[] => {
     if (item.type === "stop") return [{ genre: "etape", stop: item.stop, fixe: false }];
     if (item.type === "openMeal") return [{ genre: "repas", time: item.time, meal: item.meal }];
+    if (item.type === "transfer") return [{ genre: "changement", item }];
     return [];
   });
 }
@@ -138,14 +156,46 @@ type ContextePatch = {
 };
 
 /**
+ * Jour portant un `transfer` touché **seulement** par `lock` / `unlock` (décision 0151 § 5 point 3) : rien ne bouge, le
+ * jour est recopié tel quel avec les nouveaux verrous, `transfer` compris, sans replanification ; jamais `no_option`.
+ * Toute autre opération sur ce jour (lignes ajoutées, retirées, déplacées ou remplacées) : `undefined`, et le jour est
+ * replanifié par la règle du changement de ville (`replanifierHoraires`).
+ */
+function verrousSeulement(jour: JourBrouillon): DaySnapshot | undefined {
+  const sansVerrou = (lignes: readonly Ligne[]) =>
+    JSON.stringify(lignes.map((ligne) => (ligne.genre === "etape" ? { ...ligne, stop: { ...ligne.stop, locked: false } } : ligne)));
+  if (sansVerrou(jour.lignes) !== sansVerrou(lignesDe(jour.origine))) return undefined;
+  const verrous = new Map(jour.lignes.flatMap((ligne) => (ligne.genre === "etape" ? [[ligne.stop.id, ligne.stop.locked] as const] : [])));
+  return {
+    ...jour.origine,
+    items: jour.origine.items.map((item) => {
+      const locked = item.type === "stop" ? verrous.get(item.stop.id) : undefined;
+      return item.type === "stop" && locked !== undefined ? { ...item, stop: { ...item.stop, locked } } : item;
+    }),
+  };
+}
+
+/**
  * Replanifie les heures d'un jour touché. Les étapes verrouillées et l'étape posée par l'opération (`fixe`) gardent
  * leur heure ; les autres lignes (étapes non verrouillées, repas ouverts) gardent leur ordre et leur heure si elles
  * tiennent, sinon elles sont décalées au plus tôt après la précédente (trajet le plus rapide et marge, grille de
  * 5 min), et passent après une étape fixe avant laquelle elles ne tiennent plus. Le temps libre, les trajets et le
  * terminus de fin sont réécrits comme à la génération. `undefined` : le jour ne peut pas être replanifié (trajet
- * inconnu vers une étape à décaler, chevauchement avec une étape fixe, fin du jour dépassée).
+ * inconnu vers une étape à décaler, chevauchement avec une étape fixe, fin du jour dépassée, changement de ville).
+ *
+ * Changement de ville (`transfer`, décision 0151 § 5, qui remplace la règle provisoire `no_option` de M4-C) : un patch
+ * fait seulement de `lock` / `unlock` recopie le jour (`verrousSeulement`). Sinon le `transfer` est une ligne **fixe**,
+ * jamais réécrite ni déplacée, qui occupe son créneau (`creneauOccupe` de `changement-de-ville.ts`, 0148 § 5.3) : une
+ * ligne qui commence avant son départ doit finir (fin occupée) avant lui, sans quoi le jour n'est pas replanifiable
+ * (`undefined`, refus `no_option`) — une étape ne passe jamais d'une ville à l'autre ; aucune ligne ne commence dans le
+ * créneau ; la première étape après l'arrivée n'a pas de trajet avant elle (spécification M4 § 7.3) et le temps libre
+ * avant le départ suit la règle de tous les jours. Les marges de M4-suite § 3.3 s'y ajouteront.
  */
 function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DaySnapshot | undefined {
+  if (jour.origine.items.some((item) => item.type === "transfer")) {
+    const copie = verrousSeulement(jour);
+    if (copie !== undefined) return copie;
+  }
   const { configuration, nuits } = contexte.moteur;
   const marge = configuration.margeMinutes;
   const origine = jour.origine;
@@ -162,9 +212,9 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
   const finBase = dernier?.type === "terminus" && dernier.role === "end" ? versMinutes(dernier.time) : bornes.fin;
   const labelFin = dernier?.type === "terminus" && dernier.role === "end" ? dernier.label : etiquetteDe(logements.arrivee);
 
-  const debutDe = (ligne: Ligne) => versMinutes(ligne.genre === "etape" ? ligne.stop.start : ligne.time);
+  const debutDe = (ligne: Ligne) => versMinutes(ligne.genre === "etape" ? ligne.stop.start : ligne.genre === "repas" ? ligne.time : ligne.item.start);
   const parDebut = (a: Ligne, b: Ligne) => debutDe(a) - debutDe(b);
-  const estFixe = (ligne: Ligne) => ligne.genre === "etape" && (ligne.stop.locked || ligne.fixe);
+  const estFixe = (ligne: Ligne) => ligne.genre === "changement" || (ligne.genre === "etape" && (ligne.stop.locked || ligne.fixe));
   const fixes = jour.lignes.filter(estFixe).sort(parDebut);
   const mobiles = jour.lignes.filter((ligne) => !estFixe(ligne)).sort(parDebut);
 
@@ -174,6 +224,8 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
   /** L'élément précédent est-il verrouillé ? Le début du jour compte comme tel (un conflit entre verrous ne bloque pas, B5-PO-6). */
   let precedentVerrouille = true;
   let dernierVerrouille = false;
+  /** Juste après un changement de ville : la prochaine étape n'a pas de trajet avant elle (spécification M4 § 7.3). */
+  let apresChangement = false;
 
   /** Temps libre avant un élément (B5-PO-9), même règle que la génération (`journee.ts`). */
   const libreAvant = (debut: number, trajet: number | undefined) => {
@@ -181,8 +233,11 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
     if (libre !== undefined) items.push(libre);
   };
 
-  /** Pose une étape à `debut` ; `false` si une heure dépasse la journée. */
-  const poserEtape = (stop: StopSnapshot, debut: number, trajet: ReturnType<Trajet>): boolean => {
+  /**
+   * Pose une étape à `debut` ; `false` si une heure dépasse la journée. `verrou` : l'étape ouvre-t-elle l'exception des
+   * conflits entre verrous à l'étape fixe suivante (voir `poserFixe`) ?
+   */
+  const poserEtape = (stop: StopSnapshot, debut: number, trajet: ReturnType<Trajet>, verrou = stop.locked): boolean => {
     const decalage = debut - versMinutes(stop.start);
     const finEcrite = stop.end === undefined ? undefined : heureSure(versMinutes(stop.end) + decalage);
     const start = heureSure(debut);
@@ -194,32 +249,62 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
     items.push({ type: "stop", stop: ecrite });
     fin = Math.max(fin, occupee);
     if (stop.placeId !== undefined) position = { lieu: stop.placeId };
-    precedentVerrouille = stop.locked;
+    apresChangement = false;
+    precedentVerrouille = verrou;
     dernierVerrouille = stop.locked;
     return true;
   };
 
-  /** Étape fixe : à son heure ; refusée si elle chevauche la précédente, sauf entre deux étapes verrouillées. */
-  const poserFixe = (ligne: Ligne): boolean => {
-    if (ligne.genre !== "etape") return false;
-    const { stop } = ligne;
-    const debut = versMinutes(stop.start);
-    const trajet = stop.placeId === undefined ? undefined : contexte.trajet(position, { lieu: stop.placeId });
-    const auPlusTot = fin + (trajet === undefined ? 0 : trajet.minutes + marge);
-    if (debut < auPlusTot && !(precedentVerrouille && stop.locked)) return false;
-    return poserEtape(stop, debut, trajet);
+  /**
+   * Changement de ville : à son départ, jamais déplacé ; refusé si la ligne précédente finit après le départ. Après lui, la
+   * position est le logement d'arrivée (aucun trajet d'une ville à l'autre) et l'instant, la fin de son créneau occupé.
+   */
+  const poserChangement = (item: TransferItem): boolean => {
+    const creneau = creneauOccupe(item, configuration);
+    if (creneau.debut < fin) return false;
+    libreAvant(creneau.debut, undefined);
+    items.push(item);
+    fin = creneau.fin;
+    position = arrivee;
+    apresChangement = true;
+    // Le créneau occupé n'est jamais partagé, même avec une étape verrouillée (au contraire de deux verrous, B5-PO-6).
+    precedentVerrouille = false;
+    dernierVerrouille = false;
+    return true;
   };
 
-  /** Fin occupée d'une ligne mobile posée à `debut`, et son lieu. */
+  /**
+   * Étape fixe : à son heure ; refusée si elle chevauche la précédente, sauf entre deux étapes verrouillées (B5-PO-6).
+   * L'exception ne vaut que pour un verrou **de la base** : une étape posée par une opération de ce patch (`fixe`, un `add`
+   * ou un `move`) et verrouillée par lui (`[add, lock]` du lieu à soi, décision 0147 § 11) ne l'ouvre ni pour elle ni pour
+   * l'étape fixe suivante. Sinon le verrou que le patch pose lui-même ferait admettre un ajout qui recouvre une étape
+   * verrouillée (critère 22 de la spécification M5, ticket 954 ; addendum 0147 § 4, A.8 écart 4).
+   */
+  const poserFixe = (ligne: Ligne): boolean => {
+    if (ligne.genre === "changement") return poserChangement(ligne.item);
+    if (ligne.genre !== "etape") return false;
+    const { stop } = ligne;
+    const verrou = stop.locked && !ligne.fixe;
+    const debut = versMinutes(stop.start);
+    const trajet = stop.placeId === undefined || apresChangement ? undefined : contexte.trajet(position, { lieu: stop.placeId });
+    const auPlusTot = fin + (trajet === undefined ? 0 : trajet.minutes + marge);
+    if (debut < auPlusTot && !(precedentVerrouille && verrou)) return false;
+    return poserEtape(stop, debut, trajet, verrou);
+  };
+
+  /** Fin occupée d'une ligne mobile posée à `debut`, et son lieu (un changement de ville n'est jamais mobile). */
   const occupation = (ligne: Ligne, debut: number): { fin: number; lieu?: string } =>
     ligne.genre === "repas"
       ? { fin: debut + lire(configuration.dureesParDefaut, ligne.meal) }
-      : {
-          fin: finOccupee(ligne.stop, configuration) + debut - versMinutes(ligne.stop.start),
-          ...(ligne.stop.placeId === undefined ? {} : { lieu: ligne.stop.placeId }),
-        };
+      : ligne.genre === "changement"
+        ? { fin: creneauOccupe(ligne.item, configuration).fin }
+        : {
+            fin: finOccupee(ligne.stop, configuration) + debut - versMinutes(ligne.stop.start),
+            ...(ligne.stop.placeId === undefined ? {} : { lieu: ligne.stop.placeId }),
+          };
 
   for (const ligne of mobiles) {
+    if (ligne.genre === "changement") return undefined;
     // Les étapes fixes qui commencent avant cette ligne passent d'abord.
     while (fixes.length > 0 && debutDe(fixes.at(0) ?? ligne) <= debutDe(ligne)) {
       const fixe = fixes.shift();
@@ -227,9 +312,10 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
     }
     for (;;) {
       const lieu = ligne.genre === "etape" ? ligne.stop.placeId : undefined;
-      const trajet = lieu === undefined ? undefined : contexte.trajet(position, { lieu });
-      // Trajet sans durée connue vers une étape à planifier : non planifiable (B5-PO-6).
-      if (lieu !== undefined && trajet === undefined) return undefined;
+      const trajet = lieu === undefined || apresChangement ? undefined : contexte.trajet(position, { lieu });
+      // Trajet sans durée connue vers une étape à planifier : non planifiable (B5-PO-6) ; juste après un changement de
+      // ville, aucun trajet n'est compté (spécification M4 § 7.3).
+      if (lieu !== undefined && trajet === undefined && !apresChangement) return undefined;
       const auPlusTot = arrondi5(fin + (trajet === undefined ? 0 : trajet.minutes) + marge);
       const debut = Math.max(debutDe(ligne), auPlusTot);
       const occupee = occupation(ligne, debut);
@@ -249,12 +335,16 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
           fin = Math.max(fin, occupee.fin);
           precedentVerrouille = false;
           dernierVerrouille = false;
+          // `apresChangement` reste vrai (choix voulu, R8) : un repas ouvert n'a pas de lieu, la position reste le logement
+          // d'arrivée et la première **étape** après le changement de ville n'a toujours pas de trajet avant elle (M4 § 7.3).
         } else if (!poserEtape(ligne.stop, debut, trajet)) {
           return undefined;
         }
         break;
       }
-      // La ligne ne tient plus avant la prochaine étape fixe : celle-ci passe d'abord, la ligne est retentée après.
+      // La ligne ne tient plus avant la prochaine étape fixe : celle-ci passe d'abord, la ligne est retentée après. Jamais
+      // à travers un changement de ville : une ligne de la ville quittée ne passe pas dans la ville d'arrivée (0151 § 5).
+      if (prochain.genre === "changement") return undefined;
       fixes.shift();
       if (!poserFixe(prochain)) return undefined;
     }
@@ -281,7 +371,11 @@ function replanifierHoraires(jour: JourBrouillon, contexte: ContextePatch): DayS
 
 // --- Ce qui change (B5-PO-15) ----------------------------------------------------------------------------------
 
-/** Trajets d'un jour : minutes du mode le plus rapide vers chaque étape, et retour au logement, en mémoire. */
+/**
+ * Trajets d'un jour : minutes du mode le plus rapide vers chaque étape, et retour au logement, en mémoire. Un
+ * changement de ville (`transfer`, décision 0148 § 1 point 3) coupe la ligne : aucun trajet vers la première étape
+ * après lui (spécification M4 § 7.3), ni retour au logement s'il n'est suivi d'aucune étape avec lieu.
+ */
 type TrajetsDuJour = { versEtape: Map<string, { minutes: number; estimee: boolean }>; retour?: { minutes: number; estimee: boolean } };
 
 function trajetsDuJour(jour: DaySnapshot, contexte: ContextePatch): TrajetsDuJour {
@@ -289,13 +383,20 @@ function trajetsDuJour(jour: DaySnapshot, contexte: ContextePatch): TrajetsDuJou
   const modes = modesAdmis(contexte.moteur.brief.mobility);
   const logements = logementsDuJour(jour.index - 1, nuits.length);
   const versEtape: TrajetsDuJour["versEtape"] = new Map();
-  let position: Point = { logement: logements.depart };
-  for (const stop of etapesDuJour(jour)) {
-    if (stop.placeId === undefined) continue;
-    const trajet = trajetLePlusRapide(relectures, position, { lieu: stop.placeId }, modes);
-    if (trajet !== INCONNU) versEtape.set(stop.id, { minutes: trajet.minutes, estimee: trajet.estimee });
-    position = { lieu: stop.placeId };
+  let position: Point | undefined = { logement: logements.depart };
+  for (const item of jour.items) {
+    if (item.type === "transfer") {
+      position = undefined;
+      continue;
+    }
+    if (item.type !== "stop") continue;
+    const { id, placeId } = item.stop;
+    if (placeId === undefined) continue;
+    const trajet = position === undefined ? INCONNU : trajetLePlusRapide(relectures, position, { lieu: placeId }, modes);
+    if (trajet !== INCONNU) versEtape.set(id, { minutes: trajet.minutes, estimee: trajet.estimee });
+    position = { lieu: placeId };
   }
+  if (position === undefined) return { versEtape };
   const retour = trajetLePlusRapide(relectures, position, { logement: logements.arrivee }, modes);
   return retour === INCONNU ? { versEtape } : { versEtape, retour: { minutes: retour.minutes, estimee: retour.estimee } };
 }
@@ -305,11 +406,37 @@ function etapesSituees(jours: readonly DaySnapshot[]): Map<string, { jour: numbe
 }
 
 /**
- * Changements d'un patch (B5-PO-15, F7-PO-6) : d'abord ceux des étapes visées (`replaced`, `added`, `moved`, forme
- * de 0016 § 4.5), puis, jour touché par jour touché : `moved` pour une autre étape dont l'heure ou le jour change
- * (décalage de la replanification ; pour `revert`, étape qui revient ailleurs), `added` pour une étape qui apparaît
- * sans être visée (`revert`), `segment` pour chaque trajet dont la durée change, `budget` (B5-PO-10) et `unchanged`
- * pour chaque étape qui garde son lieu et son heure, verrouillées comprises. Noms maison seulement (`Stop.name`).
+ * Identité d'une étape pour « Ce qui change » (décision 0147 § 5.2 point 1) : l'identifiant, le `placeId` et le nom.
+ * Depuis M1b, un identifiant `j<jour>-<rang>` est réutilisé d'une version à l'autre (0142 § 5.1) : une étape de même
+ * `id` mais d'autre lieu ou d'autre nom n'est pas la même étape (`removed` puis `added`, jamais `moved`). Reprise par la
+ * liste « À faire » (`lignesApresVersion`, `src/domain/a-faire.ts`, 0147 § 7.2 point 1).
+ */
+export function identite(stop: Pick<StopSnapshot, "id" | "placeId" | "name">): string {
+  return JSON.stringify([stop.id, stop.placeId ?? null, stop.name]);
+}
+
+function etapesParIdentite(jours: readonly DaySnapshot[]): Map<string, { jour: number; stop: StopSnapshot }> {
+  return new Map(jours.flatMap((jour) => etapesDuJour(jour).map((stop) => [identite(stop), { jour: jour.index, stop }] as const)));
+}
+
+/** Verrou posé ou retiré entre deux états de la même étape (0147 § 5.2 point 3), ou rien. */
+function changementDeVerrou(avant: StopSnapshot, apres: StopSnapshot): Change | undefined {
+  if (avant.locked === apres.locked) return undefined;
+  return { type: apres.locked ? "locked" : "unlocked", label: apres.name, time: apres.start };
+}
+
+/**
+ * Changements d'un patch (B5-PO-15, F7-PO-6 ; complétés par la décision 0147 § 5.2) : d'abord ceux des étapes visées
+ * (`replaced`, `added`, `moved`, forme de 0016 § 4.5, `moved` suivi de `locked` ou `unlocked` si le verrou change
+ * aussi), puis, jour touché par jour touché : `removed` pour une étape de la version de départ dont l'identité
+ * (`identite` : `id`, `placeId`, nom) n'existe dans **aucun** jour de la version d'arrivée, sauf l'ancienne étape d'un
+ * remplacement, déjà nommée par `replaced` (bloquant 1 de la revue de 0147) ; `moved` pour une autre étape dont l'heure
+ * ou le jour change (décalage de la replanification ; pour `revert`, étape qui revient ailleurs), suivi de `locked` ou
+ * `unlocked` si son verrou change aussi ; `added` pour une étape qui apparaît sans être visée (`revert`, ou étape de
+ * même identifiant mais d'autre lieu ou d'autre nom) ; `segment` pour chaque trajet dont la durée change ; `budget`
+ * (B5-PO-10) ; enfin `locked` ou `unlocked` à la place d'`unchanged` pour une étape qui garde son lieu et son heure mais
+ * pas son verrou, et `unchanged` pour les autres, verrouillées comprises. Les lignes `checklist` ne viennent jamais
+ * d'ici (0147 § 5.2 point 4). Noms maison seulement (`Stop.name`).
  */
 function changements(
   base: readonly DaySnapshot[],
@@ -318,10 +445,14 @@ function changements(
   cibles: readonly Cible[],
   contexte: ContextePatch,
 ): Change[] {
-  const avant = etapesSituees(base);
+  const avant = etapesParIdentite(base);
+  const avantParId = etapesSituees(base);
   const ensuite = etapesSituees(apres);
+  const identitesEnsuite = new Set(etapesParIdentite(apres).keys());
   const visees = new Set(cibles.map((cible) => cible.id));
   const remplaceDe = new Map(cibles.flatMap((cible) => (cible.type === "replaced" ? [[cible.id, cible.remplacee] as const] : [])));
+  /** Anciennes étapes des remplacements : jamais `removed`, le `replaced` les nomme déjà (0147 § 5.2 point 2). */
+  const remplacees = new Set(remplaceDe.values());
   const resultat: Change[] = [];
 
   for (const cible of cibles) {
@@ -335,9 +466,13 @@ function changements(
       case "added":
         resultat.push({ type: "added", time: stop.start, label: stop.name });
         break;
-      case "moved":
+      case "moved": {
         resultat.push({ type: "moved", label: stop.name, before: cible.avant, after: { day: jour, time: stop.start } });
+        const precedente = avantParId.get(cible.id);
+        const verrou = precedente === undefined ? undefined : changementDeVerrou(precedente.stop, stop);
+        if (verrou !== undefined) resultat.push(verrou);
         break;
+      }
     }
   }
 
@@ -345,15 +480,26 @@ function changements(
   for (const index of joursTouches) {
     const jourApres = apres.find((jour) => jour.index === index);
     const jourBase = base.find((jour) => jour.index === index);
+    if (jourBase !== undefined) {
+      for (const stop of etapesDuJour(jourBase)) {
+        if (remplacees.has(stop.id) || identitesEnsuite.has(identite(stop))) continue;
+        resultat.push({ type: "removed", label: stop.name, before: { day: index, time: stop.start } });
+      }
+    }
     if (jourApres === undefined) continue;
     const gardees: Change[] = [];
     for (const stop of etapesDuJour(jourApres)) {
       if (visees.has(stop.id)) continue;
-      const precedente = avant.get(stop.id);
+      const precedente = avant.get(identite(stop));
       if (precedente === undefined) {
         resultat.push({ type: "added", time: stop.start, label: stop.name });
-      } else if (precedente.jour === index && precedente.stop.placeId === stop.placeId && precedente.stop.start === stop.start) {
-        gardees.push({ type: "unchanged", label: stop.name, time: stop.start });
+        continue;
+      }
+      const verrou = changementDeVerrou(precedente.stop, stop);
+      if (precedente.jour === index && precedente.stop.start === stop.start) {
+        // Même lieu, même heure : `locked` ou `unlocked` à la place d'`unchanged` si seul le verrou change.
+        if (verrou !== undefined) resultat.push(verrou);
+        else gardees.push({ type: "unchanged", label: stop.name, time: stop.start });
       } else {
         resultat.push({
           type: "moved",
@@ -361,6 +507,7 @@ function changements(
           before: { day: precedente.jour, time: precedente.stop.start },
           after: { day: index, time: stop.start },
         });
+        if (verrou !== undefined) resultat.push(verrou);
       }
     }
     if (jourBase !== undefined) {
@@ -368,7 +515,11 @@ function changements(
       const trajetsApres = trajetsDuJour(jourApres, contexte);
       for (const stop of etapesDuJour(jourApres)) {
         const apresTrajet = trajetsApres.versEtape.get(stop.id);
-        const avantTrajet = trajetsAvant.versEtape.get(remplaceDe.get(stop.id) ?? stop.id);
+        // Trajet comparé à celui de la même étape (même identité) ou de l'étape remplacée, jamais d'une autre étape de
+        // même identifiant (identifiant réutilisé, 0147 § 5.2 point 1).
+        const remplacee = remplaceDe.get(stop.id);
+        const memeEtape = avant.has(identite(stop));
+        const avantTrajet = remplacee !== undefined ? trajetsAvant.versEtape.get(remplacee) : memeEtape ? trajetsAvant.versEtape.get(stop.id) : undefined;
         if (apresTrajet !== undefined && avantTrajet !== undefined && apresTrajet.minutes !== avantTrajet.minutes) {
           resultat.push({ type: "segment", label: stop.name, before: avantTrajet.minutes, after: apresTrajet.minutes, estimated: apresTrajet.estimee });
         }
@@ -471,7 +622,11 @@ export function appliquerPatch(entree: EntreePatch): ResultatPatch {
   const cibles: Cible[] = [];
   const remplacees = new Map<string, string>();
   const choix = new Map<string, EtatChoix>(moteur.choix);
-  const ajouts = new Set(entree.ajouts ?? []);
+  const ajouts = new Set([
+    ...(entree.ajouts ?? []),
+    // Lieux à soi de la base (décision 0147 § 6.1) : marqués dans l'instantané, rétablis par un `revert`.
+    ...base.days.flatMap((jour) => etapesDuJour(jour).flatMap((stop) => (stop.addedBy === "person" ? [stop.id] : []))),
+  ]);
   const deverrouillees = new Set<string>();
   const candidats = new Map(moteur.candidats.map((candidat) => [candidat.id, candidat]));
   const { configuration } = moteur;
@@ -547,6 +702,8 @@ export function appliquerPatch(entree: EntreePatch): ResultatPatch {
           facts: {},
           exceptions: [],
           locked: false,
+          // Lieu à soi (décision 0147 § 6.1) : marque stockée dans l'instantané ; « Ajouté par toi. » sur la fiche.
+          addedBy: "person",
         };
         retirerRepasOuvert(jour, stop, configuration);
         jour.lignes.push({ genre: "etape", stop, fixe: true });
@@ -604,6 +761,25 @@ export function appliquerPatch(entree: EntreePatch): ResultatPatch {
   for (const operation of patch.operations) {
     const resultat = appliquerOperation(operation);
     if (resultat !== undefined) return resultat;
+  }
+
+  // 3 bis. Verrou seul (décision 0147 § 9) : la base, verrous basculés ; aucune replanification, aucune relecture.
+  if (patch.operations.every((operation) => operation.op === "lock" || operation.op === "unlock")) {
+    const verrous = new Map(brouillon.flatMap((jour) => jour.lignes.flatMap((ligne) => (ligne.genre === "etape" ? [[ligne.stop.id, ligne.stop.locked] as const] : []))));
+    const days = base.days.map((jour) =>
+      touches.has(jour.index)
+        ? { ...jour, items: jour.items.map((item) => (item.type === "stop" ? { ...item, stop: { ...item.stop, locked: verrous.get(item.stop.id) ?? item.stop.locked } } : item)) }
+        : jour,
+    );
+    const joursTouches = [...touches].sort((a, b) => a - b);
+    const instantane = TripSnapshotSchema.parse({ days });
+    const sansRelecture: ContextePatch = { ...contexte, moteur: { ...moteur, relectures: { validite: () => INCONNU, plages: () => INCONNU, duree: () => INCONNU } } };
+    const resultat = PatchResultSchema.parse({
+      version: patch.baseVersion + 1,
+      touchedDays: joursTouches,
+      changes: changements(base.days, instantane.days, joursTouches, cibles, sansRelecture),
+    });
+    return { ok: true, instantane, resultat, rapport: [] };
   }
 
   // 4. Replanification des seuls jours touchés, puis validation.

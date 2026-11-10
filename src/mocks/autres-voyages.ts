@@ -81,8 +81,9 @@ function buildDays(prefix: string, hotel: string, plans: readonly DayPlan[]): Da
   });
 }
 
-function check(id: string, label: string, when: ChecklistMoment, done: boolean): ChecklistItem {
-  return { id, label, when, done, sponsored: false };
+/** Ligne « À faire » simulée ; `kind` : sorte de la ligne (décision 0147 § 6.2). */
+function check(id: string, kind: ChecklistItem["kind"], label: string, when: ChecklistMoment, done: boolean): ChecklistItem {
+  return { id, kind, label, when, done, sponsored: false };
 }
 
 // --- Lisbonne : jeu. 14 mai – dim. 17 mai 2026, passé -----------------------
@@ -119,7 +120,7 @@ export const lisbonne: Trip = {
       meal: { name: "[Cave à vins du Bairro Alto]", facts: { area: "[Bairro Alto]" } },
     },
   ]),
-  checklist: [check("lis-check-hotel", "[Hôtel, Baixa]", { type: "beforeDeparture" }, true)],
+  checklist: [check("lis-check-hotel", "ticket", "[Hôtel, Baixa]", { type: "beforeDeparture" }, true)],
   unlocked: true,
 };
 
@@ -158,16 +159,16 @@ export const porto: Trip = {
     },
   ]),
   checklist: [
-    check("por-check-hotel", "[Hôtel, Ribeira]", { type: "beforeDeparture" }, true),
+    check("por-check-hotel", "ticket", "[Hôtel, Ribeira]", { type: "beforeDeparture" }, true),
     // « Une semaine avant » : début du voyage moins 7 jours (B2, E4).
     {
-      ...check("por-check-caves", "[Visite des caves de Gaia]", { type: "deadline", date: "2027-05-01" }, false),
+      ...check("por-check-caves", "reservation", "[Visite des caves de Gaia]", { type: "deadline", date: "2027-05-01" }, false),
       bookingUrl: "https://example.org/mock/caves",
       stopId: "por-j2-apres-midi",
     },
     // « La veille » de la visite du J2 : le J1, « À l'arrivée » (B2, E4).
     {
-      ...check("por-check-librairie", "[Librairie historique]", { type: "tripDay", day: 1 }, false),
+      ...check("por-check-librairie", "reservation", "[Librairie historique]", { type: "tripDay", day: 1 }, false),
       bookingUrl: "https://example.org/mock/librairie",
       stopId: "por-j2-activite",
     },

@@ -71,6 +71,7 @@ export function SharedShell({ token, days, current, maps, placesFromGoogle, chil
     current === "sejour" ? null : (
       <Link
         href={routes.sejour()}
+        prefetch={false}
         aria-label={t.retour}
         data-part="retour"
         className={iconButtonClassName("square", "absolute left-3 top-3 z-10")}
@@ -88,6 +89,7 @@ export function SharedShell({ token, days, current, maps, placesFromGoogle, chil
       }))}
       current={current}
       sejourHref={routes.sejour()}
+      prefetch={false}
       className="px-4"
     />
   );

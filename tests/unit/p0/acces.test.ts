@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ATTENTE_VERROU_ESSAIS,
   cookieAccesValide,
   DUREE_COOKIE_S,
   etatPageAcces,
@@ -15,6 +16,8 @@ import {
   saisirCodeAcces,
   valeurCookieAcces,
 } from "@/server/p0/acces";
+
+import type { PoolSql } from "@/server/usage/neon";
 
 import { baseEssais } from "../../support/base-essais-p0";
 
@@ -196,29 +199,139 @@ describe("p0: jeton limité à 5 essais par heure, masqué", () => {
     expect(base.connexions).toBe(0);
   });
 
-  it("au 6e essai de l'heure (acceptés compris) → too_many_attempts, sans comparaison ni ligne nouvelle ; libre une heure après", async () => {
+  it("5 refus puis bon code : accepté ; 5 refus puis mauvais code : too_many_attempts sans ligne ; libre une heure après", async () => {
+    // Décision 0165 § 1.2 et § 4.1 : seuls les refus sont comptés ; le bon code n'est jamais refusé par le compte.
     const base = baseEssais(T0);
     const pool = () => base.pool;
-    for (let i = 0; i < 4; i += 1) await saisirCodeAcces("faux", pool, dependances(base));
+    for (let i = 0; i < 5; i += 1) expect(await saisirCodeAcces("faux", pool, dependances(base))).toEqual({ ok: false, code: "invalid_code" });
     expect((await saisirCodeAcces(code.toString("hex"), pool, dependances(base))).ok).toBe(true);
-    expect(await saisirCodeAcces(code.toString("hex"), pool, dependances(base))).toEqual({ ok: false, code: "too_many_attempts" });
-    expect(base.essais).toHaveLength(5);
+    expect(await saisirCodeAcces("faux", pool, dependances(base))).toEqual({ ok: false, code: "too_many_attempts" });
+    expect(await saisirCodeAcces(randomBytes(32).toString("hex"), pool, dependances(base))).toEqual({ ok: false, code: "too_many_attempts" });
+    expect(base.essais.map((e) => e.resultat)).toEqual(["refuse", "refuse", "refuse", "refuse", "refuse", "accepte"]);
     base.maintenant += HEURE;
+    expect(await saisirCodeAcces("faux", pool, dependances(base))).toEqual({ ok: false, code: "invalid_code" });
+    expect(base.essais).toHaveLength(7);
     expect((await saisirCodeAcces(code.toString("hex"), pool, dependances(base))).ok).toBe(true);
   });
 
-  it("saisie de plus de 256 caractères : essai refusé et compté ; 6 essais simultanés → 5 lignes au plus, un refus", async () => {
+  it("saisie de plus de 256 caractères : essai refusé et compté ; 6 mauvaises saisies simultanées et le bon code → 5 refus au plus, un too_many_attempts, bon code accepté", async () => {
     const base = baseEssais(T0);
     const pool = () => base.pool;
     const long = "a".repeat(LONGUEUR_SAISIE_MAX + 1);
     const resultats = await Promise.all([
       saisirCodeAcces(long, pool, dependances(base)),
-      ...Array.from({ length: 4 }, () => saisirCodeAcces("faux", pool, dependances(base))),
+      ...Array.from({ length: 5 }, () => saisirCodeAcces("faux", pool, dependances(base))),
       saisirCodeAcces(code.toString("hex"), pool, dependances(base)),
     ]);
-    expect(base.essais.length).toBeLessThanOrEqual(5);
+    expect(base.essais.filter((e) => e.resultat === "refuse").length).toBeLessThanOrEqual(5);
+    expect(base.essais.filter((e) => e.resultat === "accepte")).toHaveLength(1);
     expect(resultats.filter((r) => !r.ok && r.code === "too_many_attempts")).toHaveLength(1);
     expect(resultats[0]).toEqual({ ok: false, code: "invalid_code" });
+    const dernier = resultats.at(-1);
+    expect(dernier?.ok).toBe(true);
+    if (dernier?.ok) expect(cookieAccesValide(dernier.cookie, code, T0)).toBe(true);
+  });
+
+  it("après 5 refus dans l'heure, le bon code (hexadécimal ou base64) est accepté et sa ligne « accepte » écrite, sans verrou ni compte", async () => {
+    const base = baseEssais(T0);
+    const pool = () => base.pool;
+    for (let i = 0; i < 5; i += 1) await saisirCodeAcces(randomBytes(32).toString("hex"), pool, dependances(base));
+    expect(await saisirCodeAcces("faux", pool, dependances(base))).toEqual({ ok: false, code: "too_many_attempts" });
+    for (const forme of [code.toString("hex"), code.toString("base64")]) {
+      const avant = base.requetes.length;
+      const resultat = await saisirCodeAcces(forme, pool, dependances(base));
+      expect(resultat.ok).toBe(true);
+      if (resultat.ok) expect(cookieAccesValide(resultat.cookie, code, T0)).toBe(true);
+      // Ordre des requêtes du bon code : ni `pg_advisory_xact_lock`, ni `pg_catalog.count(*)`.
+      const textes = base.requetes.slice(avant).map((r) => r.texte);
+      expect(textes).toEqual(["BEGIN", "INSERT INTO prototype.run_attempts (resultat) VALUES ($1)", "COMMIT"]);
+      expect(base.requetes.slice(avant).map((r) => r.valeurs)).toEqual([[], ["accepte"], []]);
+    }
+    expect(base.essais.map((e) => e.resultat)).toEqual(["refuse", "refuse", "refuse", "refuse", "refuse", "accepte", "accepte"]);
+  });
+
+  it("mauvais code : borne d'attente, verrou, compte des seuls refus, puis ligne « refuse » ; compte illisible → indisponible, sans ligne", async () => {
+    const base = baseEssais(T0);
+    const avant = base.requetes.length;
+    expect(await saisirCodeAcces("faux", () => base.pool, dependances(base))).toEqual({ ok: false, code: "invalid_code" });
+    const textes = base.requetes.slice(avant).map((r) => r.texte);
+    expect(textes).toHaveLength(6);
+    expect(textes[0]).toBe("BEGIN");
+    // `lock_timeout` local à la transaction, posé après `BEGIN` et avant le verrou (risque 4 de l'amendement de 0165).
+    expect(textes[1]).toBe(`SELECT pg_catalog.set_config('lock_timeout', '${ATTENTE_VERROU_ESSAIS}', true)`);
+    expect(textes[2]).toContain("pg_advisory_xact_lock");
+    expect(textes[3]).toContain("pg_catalog.count(*)");
+    expect(textes[3]).toContain("resultat = 'refuse'");
+    expect(textes[4]).toBe("INSERT INTO prototype.run_attempts (resultat) VALUES ($1)");
+    expect(textes[5]).toBe("COMMIT");
+    const illisible = (): PoolSql => ({
+      connect: async () => {
+        const client = await base.pool.connect();
+        return {
+          query: async (texte, valeurs) => (texte.includes("pg_catalog.count(*)") ? { rows: [{ n: "illisible" }] } : client.query(texte, valeurs)),
+          release: () => client.release(),
+        };
+      },
+    });
+    expect(await saisirCodeAcces("faux", illisible, dependances(base))).toEqual({ ok: false, code: "indisponible" });
+    expect(base.essais.map((e) => e.resultat)).toEqual(["refuse"]);
+  });
+
+  it("verrou tenu au-delà de la borne d'attente : mauvais code → indisponible, sans compte ni ligne ; le bon code passe", async () => {
+    // Risque 4 de l'amendement de 0165 ; revue de #1077, mineur 3 : l'attente du verrou est bornée (`lock_timeout`).
+    expect(ATTENTE_VERROU_ESSAIS).toBe("5s");
+    const base = baseEssais(T0);
+    const pool = () => base.pool;
+    base.verrouTenu = true;
+    for (const saisie of ["faux", randomBytes(32).toString("hex"), "a".repeat(LONGUEUR_SAISIE_MAX + 1)]) {
+      const avant = base.requetes.length;
+      expect(await saisirCodeAcces(saisie, pool, dependances(base))).toEqual({ ok: false, code: "indisponible" });
+      const textes = base.requetes.slice(avant).map((r) => r.texte);
+      expect(textes[0]).toBe("BEGIN");
+      expect(textes[1]).toContain("set_config('lock_timeout'");
+      expect(textes[2]).toContain("pg_advisory_xact_lock");
+      expect(textes.slice(3)).toEqual(["ROLLBACK"]);
+    }
+    expect(base.requetes.some((r) => r.texte.startsWith("INSERT") || r.texte.includes("pg_catalog.count(*)"))).toBe(false);
+    expect(base.essais).toEqual([]);
+    // Le bon code ne prend pas le verrou (0165 § 1.2, critère 4 de § 4.1) : accepté même verrou tenu, sans borne posée.
+    const avant = base.requetes.length;
+    const accepte = await saisirCodeAcces(code.toString("hex"), pool, dependances(base));
+    expect(accepte.ok).toBe(true);
+    expect(base.requetes.slice(avant).map((r) => r.texte)).toEqual(["BEGIN", "INSERT INTO prototype.run_attempts (resultat) VALUES ($1)", "COMMIT"]);
+    expect(base.essais.map((e) => e.resultat)).toEqual(["accepte"]);
+    // Verrou libéré : le mauvais code est de nouveau compté.
+    base.verrouTenu = false;
+    expect(await saisirCodeAcces("faux", pool, dependances(base))).toEqual({ ok: false, code: "invalid_code" });
+    expect(base.essais.map((e) => e.resultat)).toEqual(["accepte", "refuse"]);
+  });
+
+  it("six bons codes dans l'heure sont tous acceptés (six lignes « accepte »)", async () => {
+    const base = baseEssais(T0);
+    const pool = () => base.pool;
+    for (let i = 0; i < 6; i += 1) expect((await saisirCodeAcces(code.toString("hex"), pool, dependances(base))).ok).toBe(true);
+    expect(base.essais.map((e) => e.resultat)).toEqual(Array<string>(6).fill("accepte"));
+    expect(base.requetes.some((r) => r.texte.includes("pg_advisory_xact_lock") || r.texte.includes("pg_catalog.count(*)"))).toBe(false);
+  });
+
+  it("bon code : insertion ou COMMIT en échec → indisponible, jamais un cookie (échec fermé)", async () => {
+    for (const enEchec of ["INSERT", "COMMIT"]) {
+      const base = baseEssais(T0);
+      const pool = (): PoolSql => ({
+        connect: async () => {
+          const client = await base.pool.connect();
+          return {
+            query: async (texte, valeurs) => {
+              if (texte.startsWith(enEchec)) throw new Error("base");
+              return client.query(texte, valeurs);
+            },
+            release: () => client.release(),
+          };
+        },
+      });
+      expect(await saisirCodeAcces(code.toString("hex"), pool, dependances(base)), enEchec).toEqual({ ok: false, code: "indisponible" });
+      expect(base.essais).toEqual([]);
+    }
   });
 
   it("base indisponible → indisponible (échec fermé)", async () => {

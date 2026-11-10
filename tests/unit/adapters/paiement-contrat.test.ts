@@ -24,6 +24,7 @@ describe("adaptateurs: mock et simulated passent la même suite de contrat paiem
   decrireContratPaiement("mock", {
     offre: OFFRE,
     dureeVieMs: DUREE_VIE,
+    redirection: "chemin",
     async nouveau() {
       let t = Date.UTC(2026, 7, 1, 10);
       const adapter = createMockPaymentAdapter({

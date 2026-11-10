@@ -155,6 +155,55 @@
       "when": 1793240142267,
       "tag": "0021_compteurs_autocompletion",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793298270611,
+      "tag": "0022_feedback_signalements",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793485023703,
+      "tag": "0023_lien_prive_partage",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793492175153,
+      "tag": "0024_rappels",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793530568052,
+      "tag": "0025_recu_stripe",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794212611257,
+      "tag": "0026_apres_voyage",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794219316675,
+      "tag": "0027_rappels_relais",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1794255755034,
+      "tag": "0028_purge_place_coordinates",
+      "breakpoints": true
     }
   ]
 }

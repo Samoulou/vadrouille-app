@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-export type StatusBannerKind = "offline" | "conflict" | "noOption" | "error" | "generating" | "travel";
+export type StatusBannerKind = "offline" | "conflict" | "noOption" | "error" | "generating" | "travel" | "overlap";
 
 export interface StatusBannerProps {
   kind: StatusBannerKind;
@@ -26,7 +26,10 @@ export function statusBannerRole(kind: StatusBannerKind): "alert" | "status" {
   return kind === "error" || kind === "conflict" ? "alert" : "status";
 }
 
-/** Filet décoratif : `ink` pour `error` et `conflict`, `ink-soft` pour les autres types, jamais `line` (0012, Q13). */
+/**
+ * Filet décoratif : `ink` pour `error` et `conflict`, `ink-soft` pour les autres types, jamais `line` (0012, Q13) ;
+ * `overlap` compris, en `status` comme les autres (spécification M4-suite § 5, décision UX-M4S-A).
+ */
 const RAIL_CLASSES: Record<StatusBannerKind, string> = {
   offline: "bg-ink-soft",
   conflict: "bg-ink",
@@ -36,10 +39,13 @@ const RAIL_CLASSES: Record<StatusBannerKind, string> = {
   generating: "bg-ink-soft",
   // Temps de trajet du jour au-delà du budget du rythme (décision 0015 § 7 ; filet aligné par 0018 § 2 et 0012, Q13).
   travel: "bg-ink-soft",
+  // Engagement qui chevauche la ligne « Vers {ville} » (spécification M4-suite § 5, UX-M4S-A) : rien ne bloque la
+  // personne, donc `status` et filet `ink-soft`, sans exception à 0012.
+  overlap: "bg-ink-soft",
 };
 
 /**
- * Bandeau d'état transverse (hors ligne, conflit, aucune option, erreur, génération, trajet).
+ * Bandeau d'état transverse (hors ligne, conflit, aucune option, erreur, génération, trajet, chevauchement).
  * Le texte porte toute l'information ; le filet à gauche n'est qu'un repère visuel.
  * Rendu décidé par UX/UI (décision 0012, Q13), absent du design system.
  */
@@ -56,7 +62,9 @@ export function StatusBanner({ kind, message, action, announce = true, className
         className={cn("w-1 shrink-0 self-stretch rounded-full", RAIL_CLASSES[kind])}
       />
       <div className="flex min-w-0 flex-col items-start gap-2">
-        <p>{message}</p>
+        {/* `overlap` cite un libellé saisi, parfois sans espace : il se coupe n'importe où plutôt que de déborder
+            (`overflow-wrap: anywhere`, spécification M4-suite § 5, critère 17). Les autres types ne changent pas. */}
+        <p className={kind === "overlap" ? "wrap-anywhere" : undefined}>{message}</p>
         {action}
       </div>
     </div>

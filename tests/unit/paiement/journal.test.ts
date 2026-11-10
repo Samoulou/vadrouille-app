@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { CHECKOUT_TTL_MS } from "@/adapters";
 import { PAYMENT_EVENT_TYPES } from "@/contracts/values";
-import { formatLogLine, LOG_ALERT_CODES, LOG_EVENTS, LOG_PAYMENT_EVENT_TYPES } from "@/server/log";
+import { formatLogLine, LOG_ALERT_CODES, LOG_EVENTS, LOG_PAYMENT_EVENT_TYPES, LOG_PROVIDER_ERROR_CLASSES } from "@/server/log";
 import { DUREE_VIE_PAIEMENT_MS } from "@/server/payment/dependances";
 import { CODES_ALERTE_PAIEMENT } from "@/server/payment/webhook";
 
@@ -15,7 +15,7 @@ describe("paiement: journal et constantes", () => {
   it("codes d'alerte du journal = codes du webhook ; types d'événement du journal = `PAYMENT_EVENT_TYPES`", () => {
     expect([...LOG_ALERT_CODES].sort()).toEqual([...CODES_ALERTE_PAIEMENT].sort());
     expect([...LOG_PAYMENT_EVENT_TYPES]).toEqual([...PAYMENT_EVENT_TYPES]);
-    for (const evenement of ["payment.alert", "payment.followup_failed", "payment.webhook_config_invalid"]) expect(LOG_EVENTS).toContain(evenement);
+    for (const evenement of ["payment.alert", "payment.followup_failed", "payment.webhook_config_invalid", "payment.provider_failed"]) expect(LOG_EVENTS).toContain(evenement);
   });
 
   it("une ligne d'alerte porte `alertCode`, jamais `code` ; champs hors motif retirés", () => {
@@ -29,6 +29,17 @@ describe("paiement: journal et constantes", () => {
     expect(refusee.dropped).toBe(4);
     // `code` n'admet que `API_ERROR_CODES` : un code d'alerte y est retiré.
     expect(JSON.parse(formatLogLine("payment.alert", { code: "amount_mismatch" } as object, "error"))).not.toHaveProperty("code");
+  });
+
+  // B4c (PR 863 ; décision 0140 § 1.2) : classe d'erreur du prestataire, liste fermée, sur `payment.provider_failed` seulement
+  // (modèle `failureCode`) ; l'égalité avec les classes nommées de `stripe.ts` est testée dans `src/server/payment/stripe.test.ts`.
+  it("payment.provider_failed : errorClass de la liste fermée ; retiré sur tout autre événement de paiement", () => {
+    expect(LOG_PROVIDER_ERROR_CLASSES.slice(7)).toEqual(["invalid_response", "egress_refused", "other"]);
+    const ligne = JSON.parse(formatLogLine("payment.provider_failed", { errorClass: "StripeAPIError", checkoutId: "x" } as object, "warn")) as Record<string, unknown>;
+    expect(ligne).toEqual({ level: "warn", event: "payment.provider_failed", errorClass: "StripeAPIError", dropped: 1 });
+    for (const evenement of ["payment.alert", "payment.followup_failed", "payment.webhook_config_invalid"] as const) {
+      expect(JSON.parse(formatLogLine(evenement, { errorClass: "StripeAPIError" }, "warn"))).toEqual({ level: "warn", event: evenement, dropped: 1 });
+    }
   });
 
   it("durée de vie d'un paiement serveur = `CHECKOUT_TTL_MS` de l'adaptateur `mock` (30 minutes)", () => {

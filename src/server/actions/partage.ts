@@ -14,7 +14,8 @@ import { parseInput } from "../parse-input";
  *    sinon `unauthenticated` (B3c : seulement avec `better-auth` ; jamais `null` en `mock`) ;
  * 3. `parseInput` de l'entrée reçue en `unknown`, sinon `validation_failed` sans appel à l'adaptateur ;
  * 4. portée par `getSimulationScope()`, puis adaptateur de partage, qui lit le voyage par `getTripReader()`.
- * Codes renvoyés : `unauthenticated`, `validation_failed` et `not_found` seulement. Le jeton en clair n'existe que dans la réponse de
+ * Codes renvoyés : `unauthenticated`, `validation_failed` et `not_found` ; sur `api` (ticket 1013, M6a ; décision 0157
+ * § 1.3), aussi `rate_limited` (création au-delà de la limite `partage-lien`) et `internal` (lecture ou écriture en échec). Le jeton en clair n'existe que dans la réponse de
  * `createShareLink` ; aucun journal (lint `no-console`).
  */
 

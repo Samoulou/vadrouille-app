@@ -1,0 +1,527 @@
+{
+  "schema": 1,
+  "id": "paris-lyon-marseille-intense",
+  "cas": "Sortie simulée du prompt programme v5 (M4a, ticket #920), écrite à la main : noms usuels de l'IA, aucune donnée Google, aucune ville par créneau ; l'entrée est celle que construira M4b, sans libellé du billet de changement de ville ; Paris, Lyon puis Marseille au rythme intense, deux départs estimés (09:00) ; écart voulu : trois activités le jour de Lyon à Marseille (au plus deux)",
+  "entree": {
+    "destination": "Paris",
+    "pays": "France",
+    "arrivee": "2027-09-01",
+    "depart": "2027-09-08",
+    "heureArrivee": "09:30",
+    "heureDepart": "19:00",
+    "voyageurs": {
+      "adultes": 2,
+      "enfants": 0
+    },
+    "rythme": "intense",
+    "envies": [
+      "museum",
+      "heritage",
+      "restaurant",
+      "market"
+    ],
+    "deplacements": [
+      "walk",
+      "transit"
+    ],
+    "budgetRepas": 3,
+    "villes": [
+      {
+        "nom": "Paris",
+        "arrivee": "2027-09-01",
+        "nuits": 3,
+        "logement": "Le Marais, Paris"
+      },
+      {
+        "nom": "Lyon",
+        "arrivee": "2027-09-04",
+        "nuits": 2,
+        "logement": "Presqu'île, Lyon"
+      },
+      {
+        "nom": "Marseille",
+        "arrivee": "2027-09-06",
+        "nuits": 2,
+        "logement": "Vieux-Port, Marseille"
+      }
+    ],
+    "changements": [
+      {
+        "date": "2027-09-04",
+        "de": "Paris",
+        "vers": "Lyon",
+        "source": "estime",
+        "depart": "09:00",
+        "activitesMax": 2
+      },
+      {
+        "date": "2027-09-06",
+        "de": "Lyon",
+        "vers": "Marseille",
+        "source": "estime",
+        "depart": "09:00",
+        "activitesMax": 2
+      }
+    ],
+    "recit": "Trois villes en une semaine, on veut tout voir et bien manger."
+  },
+  "attendu": {
+    "incontournables": {
+      "Paris": [
+        [
+          "notre-dame de paris"
+        ],
+        [
+          "sainte-chapelle"
+        ],
+        [
+          "louvre"
+        ],
+        [
+          "orsay"
+        ],
+        [
+          "sacre-c"
+        ],
+        [
+          "tour eiffel"
+        ]
+      ],
+      "Lyon": [
+        [
+          "vieux lyon"
+        ],
+        [
+          "fourviere"
+        ],
+        [
+          "halles de lyon"
+        ],
+        [
+          "beaux-arts de lyon"
+        ]
+      ],
+      "Marseille": [
+        [
+          "vieux-port"
+        ],
+        [
+          "mucem"
+        ],
+        [
+          "notre-dame de la garde"
+        ],
+        [
+          "calanque"
+        ]
+      ]
+    }
+  },
+  "sortie": {
+    "titre": "Paris, Lyon, Marseille : une semaine intense",
+    "jours": [
+      {
+        "date": "2027-09-01",
+        "titre": "Marais et Île de la Cité",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "10:00",
+            "nature": "arrivee"
+          },
+          {
+            "debut": "10:30",
+            "fin": "12:00",
+            "nature": "visite",
+            "lieu": "Musée Picasso",
+            "quartier": "Marais",
+            "pourquoi": "Picasso de bout en bout, dans un hôtel particulier du Marais."
+          },
+          {
+            "debut": "12:15",
+            "fin": "13:30",
+            "nature": "repas_midi",
+            "lieu": "L'As du Fallafel",
+            "quartier": "Marais",
+            "pourquoi": "Le falafel de la rue des Rosiers."
+          },
+          {
+            "debut": "14:00",
+            "fin": "15:30",
+            "nature": "visite",
+            "lieu": "Cathédrale Notre-Dame de Paris",
+            "quartier": "Île de la Cité",
+            "pourquoi": "La cathédrale restaurée, incontournable.",
+            "incontournable": true
+          },
+          {
+            "debut": "15:45",
+            "fin": "16:45",
+            "nature": "visite",
+            "lieu": "Sainte-Chapelle",
+            "quartier": "Île de la Cité",
+            "pourquoi": "Les vitraux les plus beaux de Paris.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "17:15",
+            "fin": "18:15",
+            "nature": "visite",
+            "lieu": "Place des Vosges",
+            "quartier": "Marais",
+            "pourquoi": "La plus belle place de Paris, pour souffler."
+          },
+          {
+            "debut": "20:00",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "Chez Janou",
+            "quartier": "Marais",
+            "pourquoi": "Une cuisine provençale au cœur du Marais."
+          }
+        ]
+      },
+      {
+        "date": "2027-09-02",
+        "titre": "Louvre et Tuileries",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "12:00",
+            "nature": "visite",
+            "lieu": "Musée du Louvre",
+            "quartier": "Louvre",
+            "pourquoi": "Le plus grand musée du monde, en commençant tôt.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "12:15",
+            "fin": "13:30",
+            "nature": "repas_midi",
+            "lieu": "Café Marly",
+            "quartier": "Louvre",
+            "pourquoi": "Un déjeuner sous les arcades du Louvre."
+          },
+          {
+            "debut": "13:45",
+            "fin": "14:45",
+            "nature": "visite",
+            "lieu": "Jardin des Tuileries",
+            "quartier": "Tuileries",
+            "pourquoi": "La promenade royale jusqu'à la Concorde."
+          },
+          {
+            "debut": "15:00",
+            "fin": "17:00",
+            "nature": "visite",
+            "lieu": "Musée d'Orsay",
+            "quartier": "Saint-Germain",
+            "pourquoi": "Les impressionnistes dans une ancienne gare.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "17:30",
+            "fin": "18:30",
+            "nature": "visite",
+            "lieu": "Saint-Germain-des-Prés",
+            "quartier": "Saint-Germain",
+            "pourquoi": "Le quartier des cafés littéraires."
+          },
+          {
+            "debut": "20:00",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "Le Comptoir du Relais",
+            "quartier": "Saint-Germain",
+            "pourquoi": "Une bistronomie de référence."
+          }
+        ]
+      },
+      {
+        "date": "2027-09-03",
+        "titre": "Montmartre et Tour Eiffel",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "10:30",
+            "nature": "visite",
+            "lieu": "Sacré-Cœur",
+            "quartier": "Montmartre",
+            "pourquoi": "La basilique et la vue sur tout Paris.",
+            "incontournable": true
+          },
+          {
+            "debut": "10:45",
+            "fin": "11:45",
+            "nature": "visite",
+            "lieu": "Place du Tertre",
+            "quartier": "Montmartre",
+            "pourquoi": "Les peintres de Montmartre."
+          },
+          {
+            "debut": "12:00",
+            "fin": "13:15",
+            "nature": "repas_midi",
+            "lieu": "Le Consulat",
+            "quartier": "Montmartre",
+            "pourquoi": "Une terrasse de village sur la butte."
+          },
+          {
+            "debut": "15:00",
+            "fin": "17:00",
+            "nature": "visite",
+            "lieu": "Tour Eiffel",
+            "quartier": "Champ-de-Mars",
+            "pourquoi": "Le symbole de Paris, en fin d'après-midi.",
+            "aReserver": true,
+            "incontournable": true
+          },
+          {
+            "debut": "17:15",
+            "fin": "18:15",
+            "nature": "visite",
+            "lieu": "Trocadéro",
+            "quartier": "Chaillot",
+            "pourquoi": "La meilleure vue sur la tour."
+          },
+          {
+            "debut": "20:00",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "Café de l'Homme",
+            "quartier": "Chaillot",
+            "pourquoi": "Un dîner face à la tour illuminée."
+          }
+        ]
+      },
+      {
+        "date": "2027-09-04",
+        "dureeEstimeeMinutes": 150,
+        "creneaux": [
+          {
+            "debut": "12:00",
+            "fin": "13:15",
+            "nature": "repas_midi",
+            "lieu": "Les Halles de Lyon Paul Bocuse",
+            "quartier": "Part-Dieu",
+            "pourquoi": "Le marché couvert des grands produits lyonnais, en arrivant.",
+            "incontournable": true
+          },
+          {
+            "debut": "14:00",
+            "fin": "15:30",
+            "nature": "visite",
+            "lieu": "Vieux Lyon",
+            "quartier": "Vieux Lyon",
+            "pourquoi": "Les traboules et la ville Renaissance.",
+            "incontournable": true
+          },
+          {
+            "debut": "15:45",
+            "fin": "17:00",
+            "nature": "visite",
+            "lieu": "Basilique Notre-Dame de Fourvière",
+            "quartier": "Fourvière",
+            "pourquoi": "La basilique et la vue sur la Presqu'île.",
+            "incontournable": true
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "Daniel et Denise Saint-Jean",
+            "quartier": "Vieux Lyon",
+            "pourquoi": "Un bouchon lyonnais pour un premier soir."
+          }
+        ]
+      },
+      {
+        "date": "2027-09-05",
+        "titre": "Presqu'île et Croix-Rousse",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "11:00",
+            "nature": "visite",
+            "lieu": "Musée des Confluences",
+            "quartier": "Confluence",
+            "pourquoi": "Sciences et sociétés dans un bâtiment spectaculaire."
+          },
+          {
+            "debut": "11:30",
+            "fin": "12:30",
+            "nature": "visite",
+            "lieu": "Place Bellecour",
+            "quartier": "Presqu'île",
+            "pourquoi": "La grande place de Lyon."
+          },
+          {
+            "debut": "12:45",
+            "fin": "14:00",
+            "nature": "repas_midi",
+            "lieu": "Le Bouchon des Filles",
+            "quartier": "Croix-Rousse",
+            "pourquoi": "Un bouchon moderne et chaleureux."
+          },
+          {
+            "debut": "14:15",
+            "fin": "15:45",
+            "nature": "visite",
+            "lieu": "Mur des Canuts",
+            "quartier": "Croix-Rousse",
+            "pourquoi": "La fresque géante de la Croix-Rousse."
+          },
+          {
+            "debut": "16:00",
+            "fin": "17:30",
+            "nature": "visite",
+            "lieu": "Musée des Beaux-Arts de Lyon",
+            "quartier": "Terreaux",
+            "pourquoi": "Un des plus beaux musées de France.",
+            "incontournable": true
+          },
+          {
+            "debut": "20:00",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "La Mère Brazier",
+            "quartier": "Presqu'île",
+            "pourquoi": "La table historique des mères lyonnaises.",
+            "aReserver": true
+          }
+        ]
+      },
+      {
+        "date": "2027-09-06",
+        "dureeEstimeeMinutes": 118,
+        "creneaux": [
+          {
+            "debut": "11:30",
+            "fin": "12:00",
+            "nature": "visite",
+            "lieu": "Vieux-Port",
+            "quartier": "Vieux-Port",
+            "pourquoi": "Le port historique, en sortant de la gare.",
+            "incontournable": true
+          },
+          {
+            "debut": "12:15",
+            "fin": "13:30",
+            "nature": "repas_midi",
+            "lieu": "Chez Etienne",
+            "quartier": "Le Panier",
+            "pourquoi": "Une pizza au feu de bois dans le Panier."
+          },
+          {
+            "debut": "13:45",
+            "fin": "15:00",
+            "nature": "visite",
+            "lieu": "Le Panier",
+            "quartier": "Le Panier",
+            "pourquoi": "Le plus vieux quartier de Marseille."
+          },
+          {
+            "debut": "15:15",
+            "fin": "16:45",
+            "nature": "visite",
+            "lieu": "MuCEM",
+            "quartier": "Joliette",
+            "pourquoi": "Le musée des civilisations de la Méditerranée.",
+            "incontournable": true
+          },
+          {
+            "debut": "19:30",
+            "fin": "21:00",
+            "nature": "repas_soir",
+            "lieu": "Chez Fonfon",
+            "quartier": "Vallon des Auffes",
+            "pourquoi": "La bouillabaisse au bord de l'eau."
+          }
+        ]
+      },
+      {
+        "date": "2027-09-07",
+        "titre": "Notre-Dame de la Garde et calanques",
+        "creneaux": [
+          {
+            "debut": "09:00",
+            "fin": "10:30",
+            "nature": "visite",
+            "lieu": "Notre-Dame de la Garde",
+            "quartier": "Notre-Dame",
+            "pourquoi": "La Bonne Mère veille sur la ville.",
+            "incontournable": true
+          },
+          {
+            "debut": "11:00",
+            "fin": "14:00",
+            "nature": "visite",
+            "lieu": "Calanque de Sormiou",
+            "quartier": "Calanques",
+            "pourquoi": "Une calanque accessible en bus et à pied.",
+            "incontournable": true
+          },
+          {
+            "debut": "14:15",
+            "fin": "15:15",
+            "nature": "repas_midi",
+            "lieu": "Le Château",
+            "quartier": "Calanques",
+            "pourquoi": "Un déjeuner les pieds presque dans l'eau."
+          },
+          {
+            "debut": "17:00",
+            "fin": "18:00",
+            "nature": "visite",
+            "lieu": "Corniche Kennedy",
+            "quartier": "Endoume",
+            "pourquoi": "La promenade du bord de mer au coucher du soleil."
+          },
+          {
+            "debut": "20:00",
+            "fin": "21:30",
+            "nature": "repas_soir",
+            "lieu": "Le Petit Nice",
+            "quartier": "Endoume",
+            "pourquoi": "Une table étoilée pour la dernière soirée.",
+            "aReserver": true
+          }
+        ]
+      },
+      {
+        "date": "2027-09-08",
+        "titre": "Noailles et départ",
+        "creneaux": [
+          {
+            "debut": "09:30",
+            "fin": "10:30",
+            "nature": "visite",
+            "lieu": "Marché de Noailles",
+            "quartier": "Noailles",
+            "pourquoi": "Le ventre de Marseille et ses épices."
+          },
+          {
+            "debut": "12:00",
+            "fin": "13:15",
+            "nature": "repas_midi",
+            "lieu": "Café de l'Abbaye",
+            "quartier": "Vieux-Port",
+            "pourquoi": "Un dernier café face au port."
+          },
+          {
+            "debut": "17:00",
+            "fin": "17:30",
+            "nature": "depart"
+          }
+        ]
+      }
+    ],
+    "bonsPlans": [
+      "Réserve les trains Paris–Lyon et Lyon–Marseille ensemble pour un meilleur prix.",
+      "Réserve le Louvre, Orsay et la Sainte-Chapelle à créneau horaire."
+    ]
+  }
+}

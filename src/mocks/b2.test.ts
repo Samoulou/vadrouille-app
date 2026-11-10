@@ -5,6 +5,7 @@ import { PreviewSlotsSchema, type Proposal, type PreviewSlot, type Trip } from "
 
 import { lisbonne, porto } from "./autres-voyages";
 import { apercu, edimbourg, edimbourgDebloque, propositions, propositionsDebloque } from "./edimbourg";
+import { edimbourgRevision } from "./edimbourg-revision";
 
 /*
  * Données simulées après B2 (spécification B2, § 3) : aucun texte d'interface, voisins et liens cohérents,
@@ -94,5 +95,23 @@ describe("données simulées de B2", () => {
       true,
     );
     expect(edimbourg.checklist.filter((item) => item.stopId !== undefined).length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("jeu simulé et M5-C (décision 0147)", () => {
+  it("changements: un remplacement ne produit aucun removed (aperçus F7a sur mock)", () => {
+    for (const fixture of edimbourgRevision.replacements) {
+      expect(fixture.draft.changes.map((change) => change.type), fixture.stopId).not.toContain("removed");
+    }
+  });
+
+  it("chaque ligne « À faire » a une sorte (§ 6.2) ; les lignes faites d'un engagement sont `ticket` (§ 6.3)", () => {
+    for (const voyage of VOYAGES) {
+      for (const ligne of voyage.checklist) {
+        if (ligne.done) expect(ligne.kind, `${voyage.id} ${ligne.id}`).toBe("ticket");
+        else expect(ligne.kind, `${voyage.id} ${ligne.id}`).toBe("reservation");
+      }
+    }
+    expect(edimbourg.checklist.map((ligne) => ligne.kind)).toEqual(["ticket", "reservation", "reservation", "reservation", "reservation"]);
   });
 });

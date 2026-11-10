@@ -140,6 +140,31 @@ export const BUSINESS_TABLES = [
 ] as const;
 export type BusinessTable = (typeof BUSINESS_TABLES)[number];
 
+/**
+ * Tables des rappels (M6c-D, migration 0024_rappels, décision 0157 § 1.8) : tables métier (RLS, politique type,
+ * purgées par `purge_organization_data`), mais hors de `BUSINESS_TABLES` et du peuplement commun : `reminder_sends` n'a
+ * pas de colonne `id`, et une ligne d'accord empêcherait la purge des migrations inverses éprouvées sur base jetable
+ * (purge de 0014 rétablie par `0015_recalcul_lot.down.sql`). Isolation, droits et purge : `tests/db/rappels.test.ts`.
+ */
+export const REMINDER_TABLES = ["reminder_consents", "reminder_sends"] as const;
+
+/**
+ * Table des avis après le voyage (M8-D, migration 0026_apres_voyage, décision 0160 § 1.1) : table métier (RLS, purgée
+ * par `purge_organization_data`), hors de `BUSINESS_TABLES` et du peuplement commun pour la même raison que les rappels :
+ * une ligne d'avis empêcherait la purge de 0014 rétablie par `0015_recalcul_lot.down.sql` (clé `NO ACTION` vers `trips`)
+ * et la descente de 0026 (refusée dès qu'une ligne existe). Isolation, droits et purge : `tests/db/apres-voyage.test.ts`.
+ */
+export const REVIEW_TABLES = ["stop_reviews"] as const;
+
+/**
+ * Table des relais de rappels (R-D, migration 0027_rappels_relais, décision 0162 § 2) : réclamation insert-only d'une
+ * génération de la chaîne d'exécutions d'un accord, purgée par `purge_organization_data`. Hors de `REMINDER_TABLES` (les
+ * cas de `tests/db/rappels.test.ts` décrivent les deux tables de 0024 telles quelles), hors de `BUSINESS_TABLES` et du
+ * peuplement commun pour la même raison que les rappels (clé `NO ACTION` vers les accords). Isolation, droits et purge :
+ * `tests/db/rappels-relais.test.ts`.
+ */
+export const RELAY_TABLES = ["reminder_relays"] as const;
+
 /** Tables purgées par `purge_organization_data` : toutes sauf `billing` et `usage_ledger` (Q48). */
 export const PURGED_TABLES = BUSINESS_TABLES.filter((t) => t !== "billing" && t !== "usage_ledger");
 
@@ -255,7 +280,9 @@ export function insertSql(table: BusinessTable, ids: SeedIds): { sql: string; pa
       };
     case "preferences":
       return {
-        sql: "INSERT INTO preferences (organization_id, user_id, category, value, consented_at) VALUES ($1, $2, 'museum', 'like', now()) RETURNING id",
+        // M8-D (migration 0026_apres_voyage, décision 0160 § 1.3) : un sujet de catégorie, sans `consented_at` (posé par
+        // la base : `INSERT` par colonnes), pour la personne propriétaire (politiques par personne, S1).
+        sql: "INSERT INTO preferences (organization_id, user_id, subject_kind, category, direction, origin) VALUES ($1, $2, 'category', 'museum', 'less', 'confirmed') RETURNING id",
         params: [org, owner],
       };
     case "checklist_items":
@@ -265,7 +292,10 @@ export function insertSql(table: BusinessTable, ids: SeedIds): { sql: string; pa
       };
     case "share_links":
       return {
-        sql: "INSERT INTO share_links (organization_id, trip_id, token_hash, created_by, expires_at, revoked_at) VALUES ($1, $2, $3, $4, now() + interval '30 days', now()) RETURNING id",
+        // M6a-D (migration 0023, décision 0157 § 1.9) : `revoked_at` n'est plus fourni à l'insertion (un lien naît actif) ;
+        // sans ce retrait, les insertions croisées des tests d'isolation seraient refusées par un droit de colonne, et non
+        // plus par la RLS.
+        sql: "INSERT INTO share_links (organization_id, trip_id, token_hash, created_by, expires_at) VALUES ($1, $2, $3, $4, now() + interval '30 days') RETURNING id",
         params: [org, trip, token(), owner],
       };
     case "usage_ledger":

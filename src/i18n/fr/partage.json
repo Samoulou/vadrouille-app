@@ -24,7 +24,8 @@
     "desactive": "Lien désactivé.",
     "horsLigne": "Tu es hors ligne. Partager demande une connexion.",
     "erreur": "Impossible de modifier le partage pour le moment.",
-    "reessayer": "Réessayer"
+    "reessayer": "Réessayer",
+    "limite": "Tu as créé beaucoup de liens ces derniers temps. Réessaie plus tard."
   },
   "vue": {
     "region": "Programme partagé",
@@ -50,5 +51,9 @@
   "invalide": {
     "titre": "Ce lien de partage n'est pas valide.",
     "texte": "Demande un nouveau lien à la personne qui te l'a envoyé."
+  },
+  "limite": {
+    "titre": "Trop de visites sur ce lien pour le moment.",
+    "texte": "Réessaie dans une minute."
   }
 }

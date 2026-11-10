@@ -17,11 +17,13 @@ export {
   SegmentSchema,
   SourceSchema,
   StopFactsSchema,
+  StopReportSchema,
   StopSchema,
   SurpriseIdeaSchema,
   TimeSchema,
   TimeZoneSchema,
   TripBaseSchema,
+  TripCitySchema,
   TripSchema,
   WeekdaySchema,
 } from "./trip";
@@ -43,8 +45,11 @@ export type {
   Source,
   Stop,
   StopFacts,
+  StopReport,
   SurpriseIdea,
+  TransferItem,
   Trip,
+  TripCity,
   Weekday,
 } from "./trip";
 export {
@@ -86,6 +91,8 @@ export {
   MoveRequestSchema,
   ReplacementDraftSchema,
   ReplacementFixtureSchema,
+  ReplacementOfferSchema,
+  ReplacementWriteSchema,
   ReplacementRequestSchema,
   RevisionFixturesSchema,
   RevisionPreviewSchema,
@@ -98,12 +105,63 @@ export type {
   MoveRequest,
   ReplacementDraft,
   ReplacementFixture,
+  ReplacementOffer,
   ReplacementRequest,
+  ReplacementWrite,
   RevisionError,
   RevisionFixtures,
   RevisionPreview,
   RevisionResult,
 } from "./revision";
+export {
+  AddPlaceApplySchema,
+  AddPlaceRequestSchema,
+  AddPlaceUndoSchema,
+  GooglePlaceLabelSchema,
+  PlaceSearchRequestSchema,
+  PlaceSearchResultSchema,
+  PlaceSearchResultsSchema,
+  RevertApplySchema,
+  RevertPreviewRequestSchema,
+  RevertPreviewSchema,
+  TripVersionPageSchema,
+  TripVersionsRequestSchema,
+  TripVersionSummarySchema,
+} from "./retouches";
+export type {
+  AddPlaceApply,
+  AddPlaceRequest,
+  AddPlaceUndo,
+  GooglePlaceLabel,
+  PlaceSearchRequest,
+  PlaceSearchResult,
+  RevertApply,
+  RevertPreview,
+  RevertPreviewRequest,
+  TripVersionPage,
+  TripVersionsRequest,
+  TripVersionSummary,
+} from "./retouches";
+export { PreferenceKeySchema, PreferenceSubjectSchema, RetainedPreferenceSchema, RetainedTasteSchema } from "./preference";
+export type { PreferenceSubject, RetainedPreference, RetainedTaste, TasteCandidate } from "./preference";
+export {
+  RemoveAllTastesRequestSchema,
+  RemoveTasteRequestSchema,
+  RestoreTasteRequestSchema,
+  RetainTastesRequestSchema,
+  StopReviewRequestSchema,
+  StopReviewSchema,
+  TripReviewSchema,
+} from "./review";
+export type {
+  RemoveAllTastesRequest,
+  RemoveTasteRequest,
+  RestoreTasteRequest,
+  RetainTastesRequest,
+  StopReview,
+  StopReviewRequest,
+  TripReview,
+} from "./review";
 export { TripSummarySchema } from "./trip-summary";
 export type { TripSummary } from "./trip-summary";
 export {
@@ -168,6 +226,7 @@ export {
   OfferSchema,
   PaymentMethodSchema,
   PriceVariantSchema,
+  ReceiptSchema,
   SimulateOutcomeRequestSchema,
   TripIdSchema,
 } from "./billing";
@@ -178,6 +237,7 @@ export type {
   CheckoutStatusRequest,
   Offer,
   OfferConfig,
+  Receipt,
   SimulateOutcomeRequest,
 } from "./billing";
 export {
@@ -237,8 +297,21 @@ export type {
   SharedTrip,
   SharedTripView,
 } from "./share";
+// Rappels par e-mail (M6c, ticket 1021) : types seulement ; les schémas se lisent dans `./rappels`.
+export type { TripRemindersRequest, TripRemindersStatus, TripRemindersUpdate } from "./rappels";
 export { ApiErrorCodeSchema, ApiErrorSchema, fail, ok } from "./errors";
 export type { ApiError, Result } from "./errors";
+// Recherche de ville de l'écran 1 (décision 0141 § 6.1 point 5) : types par adaptateur.
+export type {
+  IssueChoix,
+  IssueChoixApi,
+  IssueChoixEssai,
+  IssueSuggestions,
+  IssueSuggestionsApi,
+  IssueSuggestionsEssai,
+  SuggestionVille,
+  VilleChoisie,
+} from "./villes";
 // Valeurs sans Zod (décision 0016 § 3.1 règle 1) : `mapPointKey`, `DETOUR_THRESHOLD_MINUTES`, `CATEGORIES`,
 // `PREFERENCE_REASONS` et celles du paiement. Le code serveur continue de les lire ici.
 export * from "./values";

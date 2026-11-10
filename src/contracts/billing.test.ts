@@ -10,7 +10,7 @@ import {
   OfferSchema,
   PriceVariantSchema,
 } from "./index";
-import { PaymentEventSchema } from "./billing";
+import { adressePrestataireAdmise, LONGUEUR_MAX_ADRESSE_PRESTATAIRE, ORIGINE_PRESTATAIRE, PaymentEventSchema } from "./billing";
 import { CHECKOUT_ID_PATTERN, OFFER_INCLUSIONS, PRICE_VARIANTS, isCheckoutFailure } from "./values";
 
 /** Contrats de paiement (décision 0020 § 1). */
@@ -109,6 +109,76 @@ describe("redirectUrl : chemin de l'application seulement", () => {
     "",
   ])("refuse %j", (path) => {
     expect(AppPathSchema.safeParse(path).success).toBe(false);
+  });
+});
+
+// B4c (PR 863 ; décision 0140 § 4, amendement de 0020 § 1.3 ; critère C4) : chaque ligne du tableau, par le schéma et
+// par `adressePrestataireAdmise` directement.
+describe("contrats: redirectUrl n'admet que l'origine de la liste fermée", () => {
+  const schema = (valeur: string) => CheckoutStartSchema.safeParse({ checkoutId: CHECKOUT_ID, redirectUrl: valeur }).success;
+  const longue = (longueur: number) => {
+    const debut = "https://checkout.stripe.com/c/pay/cs_test_a1#";
+    return debut + "f".repeat(longueur - debut.length);
+  };
+
+  it.each([
+    "https://checkout.stripe.com/c/pay/cs_test_a1#fidabc",
+    "https://checkout.stripe.com/",
+  ])("adresse du prestataire acceptée : %s", (valeur) => {
+    expect(adressePrestataireAdmise(valeur)).toBe(true);
+    expect(schema(valeur)).toBe(true);
+  });
+
+  it("chemin de l'application accepté par la règle du chemin, pas par la fonction du prestataire", () => {
+    expect(schema("/voyages/abc/debloquer/paiement")).toBe(true);
+    expect(adressePrestataireAdmise("/voyages/abc/debloquer/paiement")).toBe(false);
+  });
+
+  it("adresse valide de 4096 caractères (plus de 2048) acceptée, telle quelle", () => {
+    const valeur = longue(4096);
+    expect(valeur).toHaveLength(4096);
+    expect(adressePrestataireAdmise(valeur)).toBe(true);
+    expect(CheckoutStartSchema.parse({ checkoutId: CHECKOUT_ID, redirectUrl: valeur }).redirectUrl).toBe(valeur);
+  });
+
+  it("plafond de 8192 caractères : 8192 accepté, 8193 refusé (condition 1)", () => {
+    expect(LONGUEUR_MAX_ADRESSE_PRESTATAIRE).toBe(8192);
+    expect(adressePrestataireAdmise(longue(8192))).toBe(true);
+    expect(adressePrestataireAdmise(longue(8193))).toBe(false);
+    expect(schema(longue(8193))).toBe(false);
+  });
+
+  it.each([
+    "https://CHECKOUT.stripe.com/c/pay/x",
+    "https://Checkout.Stripe.com/c/pay/x",
+    "https://checkout.stripe.com:443/c/pay/x",
+    "https://checkout.stripe.com:444/c/pay/x",
+    "https://checkout.stripe.com",
+    "https://checkout.stripe.com.evil.example/x",
+    "https://checkout.stripe.com@evil.example/x",
+    "https://user@checkout.stripe.com/x",
+    "https://user:pw@checkout.stripe.com/x",
+    "https://evil.example/?https://checkout.stripe.com/",
+    "https://dashboard.stripe.com/x",
+    "https://api.stripe.com/x",
+    "http://checkout.stripe.com/x",
+    "https://evil.example/x",
+    "//checkout.stripe.com/x",
+    "javascript:alert(1)",
+    "data:text/html,<p>x</p>",
+    "https://checkout.stripe.com/x y",
+    "https://checkout.stripe.com/x\ny",
+    "https://checkout.stripe.com/x\ty",
+    "https://checkout.stripe.com/x\\y",
+    "https://checkout.stripe.com/x\u0000y",
+    "https://checkout.stripe.com/x\u007fy",
+  ])("refusée : %j", (valeur) => {
+    expect(adressePrestataireAdmise(valeur)).toBe(false);
+    expect(schema(valeur)).toBe(false);
+  });
+
+  it("valeur qui n'est pas une chaîne refusée", () => {
+    for (const valeur of [undefined, null, 1, {}, [`${ORIGINE_PRESTATAIRE}/`]]) expect(adressePrestataireAdmise(valeur)).toBe(false);
   });
 });
 

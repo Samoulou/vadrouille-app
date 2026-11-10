@@ -2,7 +2,8 @@
 
 import { cookies } from "next/headers";
 
-import { choisirVilleEssai, journaliserException, suggererVillesEssai, type IssueChoix, type IssueSuggestions } from "@/server/composition/villes";
+import type { IssueChoixEssai, IssueSuggestionsEssai } from "@/contracts/villes";
+import { choisirVilleEssai, journaliserException, suggererVillesEssai } from "@/server/composition/villes";
 import { NOM_COOKIE_ACCES } from "@/server/p0/acces";
 
 /**
@@ -17,7 +18,7 @@ async function cookieAcces(): Promise<string | undefined> {
 }
 
 /** Suggestions de villes pour la saisie de la destination. */
-export async function suggererVilles(entree: { readonly saisie: string; readonly session: string }): Promise<IssueSuggestions> {
+export async function suggererVilles(entree: { readonly saisie: string; readonly session: string }): Promise<IssueSuggestionsEssai> {
   try {
     return await suggererVillesEssai({ saisie: entree?.saisie, session: entree?.session }, { cookie: await cookieAcces() });
   } catch (erreur) {
@@ -32,7 +33,7 @@ export async function choisirVille(entree: {
   readonly session: string;
   readonly saisie: string;
   readonly principal: string;
-}): Promise<IssueChoix> {
+}): Promise<IssueChoixEssai> {
   try {
     return await choisirVilleEssai(
       { placeId: entree?.placeId, session: entree?.session, saisie: entree?.saisie, principal: entree?.principal },

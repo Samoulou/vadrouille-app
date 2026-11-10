@@ -64,7 +64,7 @@ test("sejour: aucune violation axe, Séjour (vue d'ensemble)", async ({ page }) 
 // F5c : contenu du Séjour (plaque, budget, liste à réserver cochée, événements, jours), à 92 % et à 25 %.
 test("sejour: aucune violation axe, Séjour à 92 % avec une ligne cochée et le compteur", async ({ page }) => {
   await openTrip(page, `/voyages/${TRIP}`);
-  await sheet(page).getByRole("button", { name: "[Château d'Édimbourg]", exact: true }).click();
+  await sheet(page).getByRole("button", { name: "Réserver : [Château d'Édimbourg]", exact: true }).click();
   await page.getByRole("button", { name: "Agrandir le panneau" }).click();
   await expectSheetAt(page, 0.92);
   await expectNoViolations(page);
@@ -76,7 +76,7 @@ test("sejour: aucune violation axe, Séjour à 92 % avec une ligne cochée et le
 
 test("sejour: aucune violation axe, Séjour à 25 %, toutes les lignes faites (compteur masqué)", async ({ page }) => {
   await openTrip(page, `/voyages/${TRIP}`);
-  for (const name of ["[Excursion dans les Highlands]", "[Château d'Édimbourg]", "[Visite de la distillerie]", "[Assurance voyage]"]) {
+  for (const name of ["Réserver : [Excursion dans les Highlands]", "Réserver : [Château d'Édimbourg]", "Réserver : [Visite de la distillerie]", "Réserver : [Assurance voyage]"]) {
     await sheet(page).getByRole("button", { name, exact: true }).click();
   }
   await page.getByRole("button", { name: "Agrandir le panneau" }).click();
@@ -117,4 +117,21 @@ test("fiche: aucune violation axe, fiche à 92 % et à 25 %", async ({ page }) =
   await fiche(page).getByRole("button", { name: "Réduire le panneau" }).click();
   await expectSheetAt(page, 0.25, "Fiche étape");
   await expectNoViolations(page);
+});
+
+test("calendrier: aucune violation axe, « Ajouter au calendrier » en ligne et hors ligne ; bouton de 52 px (cible de 44 px au moins)", async ({ page, context }) => {
+  // M6b (ticket 1005 ; spécification M6 § 6.2, critère 11) : Séjour du voyage débloqué (J6 en préparation).
+  await openTrip(page, "/voyages/mock_trip_edimbourg_debloque");
+  const lien = sheet(page).getByRole("link", { name: "Ajouter au calendrier", exact: true });
+  await lien.scrollIntoViewIfNeeded();
+  await expect(lien).toBeVisible();
+  const boite = await lien.boundingBox();
+  expect(boite?.height ?? 0).toBeGreaterThanOrEqual(52);
+  expect(boite?.width ?? 0).toBeGreaterThanOrEqual(44);
+  await expectNoViolations(page);
+  await context.setOffline(true);
+  await expect(lien).toHaveAttribute("aria-disabled", "true");
+  await expect(lien).toHaveAccessibleDescription("Tu es hors ligne. Ajouter au calendrier demande une connexion.");
+  await expectNoViolations(page);
+  await context.setOffline(false);
 });

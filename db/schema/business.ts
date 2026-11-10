@@ -13,6 +13,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -30,7 +31,7 @@ import {
   STOP_FACTS_KEYS,
   sqlTextArray,
 } from "../jsonb-keys.ts";
-import { organizations, users } from "./auth.ts";
+import { memberships, organizations, users } from "./auth.ts";
 import { uniqueKeyName } from "./naming.ts";
 
 /**
@@ -479,6 +480,18 @@ export const eventOccurrences = pgTable(
   ],
 );
 
+/**
+ * Motifs d'un signalement : valeurs de `STOP_REPORT_REASONS` (décision 0147 § 1 point 1, contrat de M5-C), dans le même
+ * ordre ; comparées à la migration 0022 par `tests/unit/db/migration-feedback.test.ts`.
+ */
+const FEEDBACK_REASONS = ["closed", "hours", "wrongPlace", "price", "other"] as const;
+
+/**
+ * Signalements d'une étape (décision 0147 § 2, migration 0022_feedback_signalements) : un motif fermé, **aucun texte**
+ * (`text` reste pour la purge, toujours nulle), idempotence par `request_id`, une seule ligne par motif, étape et lieu
+ * (`place_id` dans la clé : les identifiants d'étape sont réutilisés d'une version à l'autre, 0142 § 5.1). Jamais
+ * modifiée : `vadrouille_app` n'a que `SELECT, INSERT` (`REVOKE UPDATE` de 0022).
+ */
 export const feedback = pgTable(
   "feedback",
   {
@@ -494,11 +507,22 @@ export const feedback = pgTable(
       .notNull()
       .references(() => users.id),
     createdAt: createdAt(),
+    // 0147 § 2 point 1 : nullable pour la forme, toujours écrite par `reportStop`.
+    requestId: uuid("request_id"),
   },
   (t) => [
     tripFk("feedback_trip_fk", t),
     index("feedback_organization_id_trip_id_idx").on(t.organizationId, t.tripId),
+    uniqueIndex("feedback_organization_id_trip_id_request_id_idx")
+      .on(t.organizationId, t.tripId, t.requestId)
+      .where(sql`${t.requestId} IS NOT NULL`),
+    uniqueIndex("feedback_stop_dedup_idx")
+      .on(t.organizationId, t.tripId, t.targetStopId, t.reason, sql`COALESCE(${t.placeId}, '')`)
+      .where(sql`${t.scope} = 'stop'`),
     check("feedback_scope_check", oneOf(t.scope, ["stop", "trip"])),
+    check("feedback_reason_check", oneOf(t.reason, FEEDBACK_REASONS)),
+    check("feedback_text_check", sql`${t.text} IS NULL`),
+    check("feedback_target_stop_check", sql`${t.scope} <> 'stop' OR ${t.targetStopId} IS NOT NULL`),
   ],
 );
 
@@ -673,7 +697,53 @@ export const preferencePrompts = pgTable(
   ],
 );
 
-/** Goûts retenus avec l'accord de la personne (« Retenir mes goûts »). */
+/** Valeurs de `STOP_RATINGS` (`src/contracts/values.ts`), comparées par `tests/unit/db/migration-apres-voyage.test.ts`. */
+const STOP_REVIEW_OPINIONS = ["liked", "disliked", "notDone"] as const;
+/** Valeurs de `PREFERENCE_DIRECTIONS` et de `PREFERENCE_ORIGINS` (`src/contracts/values.ts`), comparées par le même test. */
+const TASTE_DIRECTIONS = ["more", "less"] as const;
+const TASTE_ORIGINS = ["confirmed", "inferred"] as const;
+
+/**
+ * Avis rapide après le voyage (M8-D, migration 0026_apres_voyage ; décision 0160 § 1.1, T1) : une ligne par étape et par
+ * lieu pour le voyage (`stop_id` maison, `place_id` de l'étape dans la version courante, seule donnée Google de la
+ * ligne, 0011), modifiable et supprimable par la personne qui l'a donné. Aucun texte libre, aucun nom. La colonne de la
+ * valeur s'appelle `opinion` (valeurs de `STOP_RATINGS`) : un nom en `rating` serait refusé par le test « schéma :
+ * aucune colonne de contenu Google » (motif `rating`, note de Google), que la spécification M8 § 6.2 critère 4 veut vert
+ * sans exception nouvelle. RLS, politiques et droits : migration.
+ */
+export const stopReviews = pgTable(
+  "stop_reviews",
+  {
+    id: id(),
+    organizationId: organizationId(),
+    tripId: uuid("trip_id").notNull(),
+    stopId: text("stop_id").notNull(),
+    placeId: text("place_id"),
+    opinion: text("opinion").notNull(),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    requestId: uuid("request_id").notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    tripFk("stop_reviews_trip_fk", t),
+    // Même raison que `feedback_stop_dedup_idx` : les identifiants d'étape sont réutilisés d'une version à l'autre (0142
+    // § 5.1). Cible de l'`INSERT … ON CONFLICT` de l'avis (0160 § 1.1 point 4).
+    uniqueIndex("stop_reviews_stop_place_idx").on(t.organizationId, t.tripId, t.stopId, sql`COALESCE(${t.placeId}, '')`),
+    check("stop_reviews_opinion_check", oneOf(t.opinion, STOP_REVIEW_OPINIONS)),
+  ],
+);
+
+/**
+ * Goûts retenus avec l'accord de la personne (« Retenir mes goûts » ; table de B1 durcie en place par M8-D, migration
+ * 0026_apres_voyage, décision 0160 § 1.3, T3). Un sujet (`preferenceKey` : catégorie et sens, ou distance) au plus une
+ * fois par personne et par organisation ; jamais modifié (« Annuler » un retrait réinsère la ligne). `consented_at` est
+ * posé par la base, jamais par l'application (`INSERT` par colonnes). Le voyage d'origine survit à sa suppression :
+ * la migration écrit `ON DELETE SET NULL ("source_trip_id")` (liste de colonnes, Postgres 15 et suivants), que Drizzle
+ * ne sait pas écrire : la clé est déclarée ici en `set null`, le SQL de la migration fait foi (0160 § 1.3 point 4).
+ */
 export const preferences = pgTable(
   "preferences",
   {
@@ -682,12 +752,44 @@ export const preferences = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    category: text("category").notNull(),
-    value: text("value").notNull(),
-    consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
+    subjectKind: text("subject_kind").notNull(),
+    category: text("category"),
+    direction: text("direction"),
+    origin: text("origin").notNull(),
+    sourceTripId: uuid("source_trip_id"),
+    consentedAt: timestamp("consented_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
   },
-  (t) => [index("preferences_organization_id_user_id_idx").on(t.organizationId, t.userId)],
+  (t) => [
+    index("preferences_organization_id_user_id_idx").on(t.organizationId, t.userId),
+    // La personne est membre de l'organisation du goût (clé unique existante de `memberships`), comme `reminder_consents`.
+    foreignKey({
+      name: "preferences_membership_fk",
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [memberships.organizationId, memberships.userId],
+    }),
+    // `ON DELETE SET NULL ("source_trip_id")` dans la migration (voir ci-dessus) : `organization_id` reste intact.
+    foreignKey({
+      name: "preferences_source_trip_fk",
+      columns: [t.organizationId, t.sourceTripId],
+      foreignColumns: [trips.organizationId, trips.id],
+    }).onDelete("set null"),
+    uniqueIndex("preferences_subject_idx").on(
+      t.organizationId,
+      t.userId,
+      t.subjectKind,
+      sql`COALESCE(${t.category}, '')`,
+      sql`COALESCE(${t.direction}, '')`,
+    ),
+    check("preferences_subject_kind_check", oneOf(t.subjectKind, ["category", "distance"])),
+    check(
+      "preferences_subject_check",
+      sql`((${t.subjectKind} = 'category') = (${t.category} IS NOT NULL AND ${t.direction} IS NOT NULL)) AND (${t.subjectKind} <> 'distance' OR (${t.category} IS NULL AND ${t.direction} IS NULL))`,
+    ),
+    check("preferences_category_check", sql`${t.category} IS NULL OR ${oneOf(t.category, SIGNAL_CATEGORIES)}`),
+    check("preferences_direction_check", sql`${t.direction} IS NULL OR ${oneOf(t.direction, TASTE_DIRECTIONS)}`),
+    check("preferences_origin_check", oneOf(t.origin, TASTE_ORIGINS)),
+  ],
 );
 
 /** Liste à réserver ; `moment` est un `ChecklistMoment` (PO-2), jamais un libellé. */
@@ -747,6 +849,107 @@ export const shareLinks = pgTable(
     unique(uniqueKeyName("share_links_token_hash")).on(t.tokenHash),
     uniqueIndex("share_links_one_active_idx").on(t.organizationId, t.tripId).where(sql`${t.revokedAt} IS NULL`),
     check("share_links_token_hash_check", sql`octet_length(${t.tokenHash}) = 32`),
+    // M6a-D (migration 0023, décision 0157 § 1.9, T9) : bornes d'`expires_at`, posées par rapport à `created_at` (valeur
+    // par défaut de la base, jamais fournie par l'application : `INSERT` par colonnes). Une borne de départ des voyages
+    // dans les contrats permettrait de resserrer la seconde, jamais de l'élargir sans décision.
+    check("share_links_expires_after_created_check", sql`${t.expiresAt} > ${t.createdAt}`),
+    check("share_links_expires_within_3_years_check", sql`${t.expiresAt} <= ${t.createdAt} + interval '3 years'`),
+  ],
+);
+
+/**
+ * Accords aux rappels de voyage (M6c-D, migration 0024, décision 0157 § 1.8) : une ligne par accord, jamais réécrite
+ * une fois retiré (déclencheur `reminder_consents_withdraw_once`, migration) ; réactiver crée une ligne. Au plus un
+ * accord actif par voyage et par personne. `consented_at` et `withdrawn_at` sont posés par la base, jamais par
+ * l'application (`INSERT` par colonnes, instant du retrait posé par le déclencheur). Aucune adresse, aucun texte, aucune
+ * donnée Google.
+ */
+export const reminderConsents = pgTable(
+  "reminder_consents",
+  {
+    id: id(),
+    organizationId: organizationId(),
+    tripId: uuid("trip_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    consentedAt: timestamp("consented_at", { withTimezone: true }).notNull().defaultNow(),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+  },
+  (t) => [
+    tripFk("reminder_consents_trip_fk", t),
+    // La personne est membre de l'organisation du voyage (clé unique existante de `memberships`).
+    foreignKey({
+      name: "reminder_consents_membership_fk",
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [memberships.organizationId, memberships.userId],
+    }),
+    uniqueIndex("reminder_consents_one_active_idx")
+      .on(t.organizationId, t.tripId, t.userId)
+      .where(sql`${t.withdrawnAt} IS NULL`),
+    check("reminder_consents_withdrawn_after_consented_check", sql`${t.withdrawnAt} IS NULL OR ${t.withdrawnAt} >= ${t.consentedAt}`),
+    // R-D (migration 0027, décision 0162 § 2 point 0) : cible de la clé étrangère composée de `reminder_relays`
+    // (additive : `id` est déjà unique, la paire l'est donc aussi).
+    unique(uniqueKeyName("reminder_consents_organization_id_id")).on(t.organizationId, t.id),
+  ],
+);
+
+/**
+ * Réclamations des rappels (M6c-D, migration 0024, décision 0157 § 1.8) : la réclamation d'une journée est
+ * l'insertion de sa ligne, validée avant l'envoi ; la clé primaire refuse la seconde. Aucune colonne d'horaire, aucune
+ * adresse, aucun texte.
+ */
+export const reminderSends = pgTable(
+  "reminder_sends",
+  {
+    organizationId: organizationId(),
+    tripId: uuid("trip_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    dayIndex: smallint("day_index").notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "reminder_sends_pkey", columns: [t.organizationId, t.tripId, t.userId, t.dayIndex] }),
+    tripFk("reminder_sends_trip_fk", t),
+    // Revue de la PR M6c-D, mineur 2 : la réclamation ne vise qu'un membre de l'organisation du voyage.
+    foreignKey({
+      name: "reminder_sends_membership_fk",
+      columns: [t.organizationId, t.userId],
+      foreignColumns: [memberships.organizationId, memberships.userId],
+    }),
+    check("reminder_sends_day_index_check", sql`${t.dayIndex} >= 1`),
+  ],
+);
+
+/**
+ * Réclamations des relais de rappels (R-D, migration 0027, décision 0162 § 2) : l'insertion de la ligne
+ * `(organization_id, consent_id, relay_n)` est la réclamation de la génération `relay_n` de la chaîne d'exécutions d'un
+ * accord ; la clé primaire refuse la seconde. Insertion seulement (aucun `UPDATE` ni `DELETE` pour l'application, purge
+ * du compte seule). `claimed_run_id` : identifiant de l'exécution qui a réclamé (`wrun_` puis un ULID), pour reconnaître
+ * une étape rejouée ; `claimed_at` posé par la base. Aucune adresse, aucun texte, aucune donnée Google.
+ */
+export const reminderRelays = pgTable(
+  "reminder_relays",
+  {
+    organizationId: organizationId(),
+    consentId: uuid("consent_id").notNull(),
+    relayN: smallint("relay_n").notNull(),
+    claimedRunId: text("claimed_run_id").notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "reminder_relays_pkey", columns: [t.organizationId, t.consentId, t.relayN] }),
+    // Accord de la même organisation (contrainte unique `(organization_id, id)` de `reminder_consents`).
+    foreignKey({
+      name: "reminder_relays_consent_fk",
+      columns: [t.organizationId, t.consentId],
+      foreignColumns: [reminderConsents.organizationId, reminderConsents.id],
+    }),
+    check("reminder_relays_relay_n_check", sql`${t.relayN} >= 1`),
+    // Borne lâche proposée par 0162 § 2 point 2 (format exact : question S-R5 à la Sécurité).
+    check("reminder_relays_claimed_run_id_check", sql`${t.claimedRunId} ~ '^wrun_[0-9A-Za-z]{1,59}$'`),
   ],
 );
 
@@ -778,7 +981,10 @@ export const usageLedger = pgTable(
 
 /**
  * Paiements : `vadrouille_app` écrit la ligne et une seule fois `stripe_checkout_session_id` ; le statut et le
- * montant ne sont mis à jour que par `vadrouille_webhook` (décision 0007).
+ * montant ne sont mis à jour que par `vadrouille_webhook` (décision 0007). `stripe_receipt_url` (migration
+ * 0025_recu_stripe, décision 0144 § 5.3 point 1) : lien du reçu de Stripe, écrit une seule fois par
+ * `vadrouille_webhook` (seul droit `UPDATE` de la colonne), jamais à l'insertion ; écriture unique et refus de
+ * l'insertion non nulle par le déclencheur `checkouts_receipt_once` (écrit à la main dans la migration).
  */
 export const checkouts = pgTable(
   "checkouts",
@@ -798,6 +1004,7 @@ export const checkouts = pgTable(
       .references(() => users.id),
     createdAt: createdAt(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    stripeReceiptUrl: text("stripe_receipt_url"),
   },
   (t) => [
     tripFk("checkouts_trip_fk", t),
@@ -809,6 +1016,12 @@ export const checkouts = pgTable(
     check(
       "checkouts_status_check",
       oneOf(t.status, ["pending", "succeeded", "duplicate", "declined", "cancelled", "expired"]),
+    ),
+    // Décision 0144 § 5.2 et § 5.3 point 1 : motif de la Sécurité, inchangé et sensible à la casse, puis refus de `..`
+    // et de ses formes encodées (`%2e`), sans égard à la casse ; 2048 caractères au plus.
+    check(
+      "checkouts_stripe_receipt_url_check",
+      sql`${t.stripeReceiptUrl} IS NULL OR (length(${t.stripeReceiptUrl}) <= 2048 AND ${t.stripeReceiptUrl} ~ '^https://pay\\.stripe\\.com/receipts/[A-Za-z0-9_%./~-]+(\\?[A-Za-z0-9_%=&.~-]*)?$' AND ${t.stripeReceiptUrl} !~* '(\\.|%2e)(\\.|%2e)')`,
     ),
   ],
 );

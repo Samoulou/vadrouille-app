@@ -41,6 +41,20 @@
  * `src/adapters/api-tri-instance.ts`. Rien n'est lu ni connecté ici. Un échec du branchement est journalisé
  * (`voyages.action_failed`, action `branchement-tri`) sans arrêter le serveur : chaque action du tri rend `internal`.
  *
+ * M1e (ticket 879 ; décision 0143, qui généralise 0128, sur le modèle de B10a) : environnement valide et
+ * `DATA_ADAPTER=api`, les photos du tri (`creerPhotosApi`, `src/server/photos/api.ts` : barrière B9-TL-8, lieu lu en base, limiteur, client non
+ * branché) sont branchées sur `src/adapters/api-photos-instance.ts`. Rien n'est lu ni connecté ici. Un échec du
+ * branchement est journalisé (`voyages.action_failed`, action `branchement-photos`) sans arrêter le serveur : les cartes
+ * gardent leur emplacement « Photo du lieu ».
+ *
+ * M6a (ticket 1013 ; décision 0157 § 1.2 à § 1.4, sur le modèle de B10a) : environnement valide et `DATA_ADAPTER=api`,
+ * les cas d'usage du partage (`creerCasLiens`, `src/server/partage/liens.ts` : `share_links` ; `creerLectureVue`,
+ * `src/server/partage/vue.ts` : vue partagée lue par les vues de la base) sont branchés sur
+ * `src/adapters/api-share-instance.ts`. Rien n'est lu ni connecté ici ; la garde (`apiShareAvailable`, puis
+ * `assertApiAdapter`) reste vérifiée à chaque `getShareAdapter()`. Un échec du branchement est journalisé
+ * (`voyages.action_failed`, action `branchement-partage`) sans arrêter le serveur : chaque action du partage échoue et la
+ * vue partagée mène à la page d'erreur commune.
+ *
  * B4b (spécification B4, B4b point 1 ; décision 0097 B4-TL-5, sur le modèle de B10a) : environnement valide et
  * `PAYMENT_ADAPTER=simulated` (admis par `parseServerEnv` en `local` et `ci` seulement, avec `DATA_ADAPTER=api`,
  * `AUTH_ADAPTER=better-auth` et le webhook simulé ouvert, B4-TL-7), la composition du paiement simulé
@@ -48,6 +62,12 @@
  * premier usage (rien n'est lu ni connecté ici, la clé n'est lue qu'à la construction). Un échec du branchement est
  * journalisé (`voyages.action_failed`, action `branchement-paiement`) sans arrêter le serveur : chaque action du paiement
  * rend `provider_error`.
+ *
+ * B4c (spécification B4, B4c ; décision 0140 § 5 point 1, même modèle) : environnement valide et `PAYMENT_ADAPTER=stripe`
+ * (admis par `parseServerEnv` hors production seulement, avec ses variables), la composition du paiement Stripe
+ * (`composerPaiementStripe`) est branchée sur `src/adapters/stripe-payment-instance.ts` ; elle n'est appelée qu'au premier
+ * usage, et la clé n'est lue qu'à chaque appel au prestataire. Un échec du branchement est journalisé
+ * (`voyages.action_failed`, action `branchement-paiement`) sans arrêter le serveur.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -62,7 +82,10 @@ export async function register(): Promise<void> {
       await brancherLectureApi(logEvent, errorNameOf);
       await brancherCreationApi(logEvent, errorNameOf);
       await brancherTriApi(logEvent, errorNameOf);
+      await brancherPhotosApi(logEvent, errorNameOf);
+      await brancherPartageApi(logEvent, errorNameOf);
       await brancherPaiementSimule(logEvent, errorNameOf);
+      await brancherPaiementStripe(logEvent, errorNameOf);
       return;
     } catch (error) {
       if (!(error instanceof ServerEnvError)) throw error;
@@ -198,6 +221,44 @@ async function brancherTriApi(
   }
 }
 
+/** Branche les photos du tri sur l'adaptateur `api` (ticket 879, M1e ; décision 0143, qui généralise 0128). */
+async function brancherPhotosApi(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { isMockAdapter, isPrototypeAdapter } = await import("@/adapters");
+    if (isMockAdapter() || isPrototypeAdapter()) return;
+    const { brancherPhotosApi: brancher } = await import("@/adapters/api-photos-instance");
+    const { creerPhotosApi, photosApiOuvertes } = await import("@/server/photos/api");
+    const photos = creerPhotosApi();
+    brancher({ photo: (lieu) => photos.photo(lieu), ouvertes: () => photosApiOuvertes() });
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-photos", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
+/** Branche les cas d'usage du partage sur l'adaptateur `api` (ticket 1013, M6a ; décision 0157 § 1.2 à § 1.4). */
+async function brancherPartageApi(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { isMockAdapter, isPrototypeAdapter } = await import("@/adapters");
+    if (isMockAdapter() || isPrototypeAdapter()) return;
+    const { brancherPartageApi: brancher } = await import("@/adapters/api-share-instance");
+    const { creerCasLiens } = await import("@/server/partage/liens");
+    const { creerLectureVue } = await import("@/server/partage/vue");
+    const liens = creerCasLiens();
+    const vue = creerLectureVue();
+    brancher({ creer: liens.creer, desactiver: liens.desactiver, etat: liens.etat, lireVue: (token, chemin) => vue.lire(token, chemin) });
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-partage", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
 /** Branche la composition du paiement simulé (spécification B4, B4b point 1 ; décision 0097 B4-TL-5). */
 async function brancherPaiementSimule(
   logEvent: typeof import("@/server/log").logEvent,
@@ -209,6 +270,23 @@ async function brancherPaiementSimule(
     const { brancherPaiementSimule: brancher } = await import("@/adapters/simulated-payment-instance");
     const { composerPaiementSimule } = await import("@/server/payment/composition");
     brancher(() => composerPaiementSimule());
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-paiement", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
+/** Branche la composition du paiement Stripe en mode test (spécification B4, B4c ; décision 0140 § 5 point 1). */
+async function brancherPaiementStripe(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { stripePaymentChosen } = await import("@/adapters/payment-guard");
+    if (!stripePaymentChosen()) return;
+    const { brancherPaiementStripe: brancher } = await import("@/adapters/stripe-payment-instance");
+    const { composerPaiementStripe } = await import("@/server/payment/composition-stripe");
+    brancher(() => composerPaiementStripe());
   } catch (error) {
     const errorName = errorNameOf(error);
     logEvent("voyages.action_failed", { action: "branchement-paiement", ...(errorName === undefined ? {} : { errorName }) }, "error");

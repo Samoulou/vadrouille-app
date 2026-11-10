@@ -5,7 +5,7 @@ import { axeViolations } from "../../../tests/unit/axe";
 
 import { StatusBanner, statusBannerRole, type StatusBannerKind } from "./StatusBanner";
 
-const KINDS: StatusBannerKind[] = ["offline", "conflict", "noOption", "error", "generating", "travel"];
+const KINDS: StatusBannerKind[] = ["offline", "conflict", "noOption", "error", "generating", "travel", "overlap"];
 
 describe("StatusBanner", () => {
   it("utilise role=alert pour error et conflict, role=status pour les autres types (0012, Q13)", () => {
@@ -53,6 +53,26 @@ describe("StatusBanner", () => {
     const rail = screen.getByRole("status").querySelector("[data-rail]");
     expect(rail).toHaveClass("bg-ink-soft");
     expect(rail?.className).not.toMatch(/animate-/);
+  });
+
+  it("type overlap (spécification M4-suite § 5, UX-M4S-A) : role=status, filet ink-soft, message coupé n'importe où", () => {
+    expect(statusBannerRole("overlap")).toBe("status");
+    const libelle = "x".repeat(80);
+    render(<StatusBanner kind="overlap" message={`À 11:30, « ${libelle} » tombe pendant que tu te rends à Florence.`} />);
+    const banner = screen.getByRole("status");
+    expect(banner).toHaveAttribute("data-kind", "overlap");
+    const rail = banner.querySelector("[data-rail]");
+    expect(rail).toHaveClass("bg-ink-soft");
+    expect(rail).not.toHaveClass("bg-ink");
+    expect(banner.querySelector("p")).toHaveClass("wrap-anywhere");
+  });
+
+  it("seul overlap coupe son message n'importe où : les autres types ne changent pas", () => {
+    for (const kind of KINDS.filter((candidate) => candidate !== "overlap")) {
+      const { container, unmount } = render(<StatusBanner kind={kind} message={`Message ${kind}`} />);
+      expect(container.querySelector("p"), kind).not.toHaveClass("wrap-anywhere");
+      unmount();
+    }
   });
 
   it("affiche une action éventuelle sous le message", () => {

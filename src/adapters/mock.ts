@@ -29,6 +29,8 @@ import {
 } from "@/mocks/edimbourg";
 import { deriveEdimbourgCarte, edimbourgCarte } from "@/mocks/edimbourg-carte";
 import { edimbourgRevision } from "@/mocks/edimbourg-revision";
+import { chevauchement } from "@/mocks/chevauchement";
+import { compostelleFlorence, propositionsRomeFlorence, romeFlorence } from "@/mocks/rome-florence";
 
 import type { AdapterContext, TripAdapter } from "./types";
 
@@ -39,7 +41,32 @@ interface MockEntry {
   previewSlots?: PreviewSlot[];
   /** Positions simulées des jours (F4), facultatives. */
   maps?: DayMap[];
+  /** Hors de « Mes voyages » (`listTrips`) : voyage servi à son adresse seulement (M4c, Rome puis Florence). */
+  unlisted?: true;
 }
+
+/** Identifiant du voyage de test « repas pas encore choisi » (M5d-3), servi à son adresse seulement. */
+export const MOCK_REPAS_LIBRE_TRIP_ID = "mock_trip_edimbourg_repas_libre";
+
+/**
+ * Jeu de test local de M5d-3 (revue de la PR 973, bloquant 2) : Édimbourg débloqué dont le dîner du J2 est un repas pas
+ * encore choisi, à la même heure (« Choisir » de la ligne du jour, F7-PO-8). Aucun jeu de `src/mocks` n'en a. Dérivé en
+ * mémoire, sans modifier le jeu simulé ; hors de « Mes voyages », sans positions ni révision simulée.
+ */
+const repasLibre: Trip = {
+  ...edimbourgDebloque,
+  id: MOCK_REPAS_LIBRE_TRIP_ID,
+  days: edimbourgDebloque.days.map((day) =>
+    day.index !== 2
+      ? day
+      : {
+          ...day,
+          items: day.items.map((item) =>
+            item.type === "stop" && item.stop.kind === "meal" && item.stop.start >= "18:00" ? { type: "openMeal" as const, time: item.stop.start, meal: "dinner" as const } : item,
+          ),
+        },
+  ),
+};
 
 const DEFAULT_ENTRIES: MockEntry[] = [
   { trip: edimbourg, proposals: propositions, previewSlots: apercu, maps: edimbourgCarte },
@@ -50,6 +77,16 @@ const DEFAULT_ENTRIES: MockEntry[] = [
   // ajoutés après les deux d'Édimbourg pour que les tests qui lisent les entrées par identifiant ne changent pas.
   { trip: lisbonne, proposals: [] },
   { trip: porto, proposals: [] },
+  // M4c (spécification M4 § 7 ; décision 0148 § 12) : voyage à deux villes, servi à son adresse seulement, pour que
+  // « Mes voyages » et ses tests ne changent pas (spécification M4 § 7.8). Sans positions : la carte montre son repli.
+  { trip: romeFlorence, proposals: propositionsRomeFlorence, unlisted: true },
+  // Même voyage, première ville au nom long (« Saint-Jacques-de-Compostelle », hors des 62) : mesures à 390 px.
+  { trip: compostelleFlorence, proposals: [], unlisted: true },
+  // M4-suite (critère 17) : trois villes, un engagement qui chevauche chaque ligne « Vers {ville} » ; bandeau de
+  // chevauchement de la Journée, axe et mesures à 390 px. Servi à son adresse seulement.
+  { trip: chevauchement, proposals: [], unlisted: true },
+  // M5d-3 (revue de la PR 973) : dîner du J2 pas encore choisi, pour le parcours « Choisir ». Servi à son adresse seulement.
+  { trip: repasLibre, proposals: [], unlisted: true },
 ];
 
 /**
@@ -134,9 +171,16 @@ export function createMockTripAdapter(entries: MockEntry[] = DEFAULT_ENTRIES): T
   };
 
   return {
+    // Révision enregistrée (M1g) : absente de `mock`, qui sert son jeu simulé (`getRevisionFixtures`). Clé déclarée pour
+    // que `mock` et `api` exposent la même surface (test « la fabrique de mock reste celle de la suite »).
+    revision: undefined,
+    // Signalement (M5c) : `mock` le tient dans la portée de simulation (`signalementsDuVoyage`), pas dans la fabrique.
+    reports: undefined,
+    // Versions (M5b) : `mock` tient son historique simulé dans la portée de simulation (`versionsDuVoyage`), pas dans la fabrique.
+    versions: undefined,
     async listTrips(ctx) {
       return entries
-        .filter((entry) => entry.trip.organizationId === ctx.organizationId)
+        .filter((entry) => entry.trip.organizationId === ctx.organizationId && entry.unlisted !== true)
         .map((entry) => toTripSummary(TripSchema.parse(entry.trip)));
     },
     async getTrip(ctx, tripId) {

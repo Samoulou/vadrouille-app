@@ -103,6 +103,12 @@ describe("lint: règles du tri partagées sans zod (B10a)", () => {
     expect(await messagesFor('import { x } from "../../domain/calculs";\nexport const y = x;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
   });
 
+  it("M4c : depuis src/features, @/domain/villes-du-voyage s'importe (fonction pure unique, décision 0148 § 6 point 3) ; les autres modules restent refusés", async () => {
+    expect(await messagesFor('import { villesDeLaDate } from "@/domain/villes-du-voyage";\nexport const x = villesDeLaDate;\n', ECRAN, IMPORTS)).toHaveLength(0);
+    expect(await messagesFor('import { x } from "@/domain/villes-du-voyage-bis";\nexport const y = x;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
+    expect(await messagesFor('import { classer } from "@/domain/classement";\nexport const x = classer;\n', ECRAN, IMPORTS)).not.toHaveLength(0);
+  });
+
   it("depuis src/features/presentation, @/server/actions/presentation s'importe ; un autre module de src/server est refusé (0112 § 2 point 4, 0020 § 11)", async () => {
     const ACTIONS = "src/features/presentation/server-actions.ts";
     expect(await messagesFor('import { decideCard } from "@/server/actions/presentation";\nexport const x = decideCard;\n', ACTIONS, IMPORTS)).toHaveLength(0);

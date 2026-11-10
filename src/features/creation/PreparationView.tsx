@@ -9,10 +9,11 @@ import type { EventRecorder, RecorderKind } from "@/analytics/track";
 import { Button } from "@/components/ligne/Button";
 import { DayBadge } from "@/components/ligne/DayBadge";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
-import type { GenerationStatus } from "@/contracts";
+import type { GenerationStatus, TripCity } from "@/contracts";
 import { presentationRoute } from "@/features/presentation/routes";
 import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
 import { mesVoyagesRoute, tripRoutes } from "@/features/sejour/routes";
+import { aPlusieursVilles, dateDuJour, texteDeVille, villeDeLaDate } from "@/features/voyage/villes";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,21 @@ export interface PreparationViewProps {
    * puis l'adresse est remplacée par l'écran 5 du nouveau voyage. Ailleurs, « Réessayer » reprend l'interrogation.
    */
   essai?: boolean;
+  /**
+   * Villes du voyage (`Trip.cities`, spécification M4 § 7.2), lues par la page quand le voyage est lisible ; absentes pour
+   * une seule ville (rangées inchangées, critère 25) ou tant que `getTrip` ne rend rien.
+   */
+  cities?: readonly TripCity[];
+}
+
+/**
+ * Ville d'une rangée de jour (spécification M4 § 7.2 et § 7.7 ; décision UX-M4S-B) : légende visible (« Rome », « De Rome
+ * à Florence ») et fin du nom de la pastille (« Rome », « de Rome à Florence ») ; `null` pour une seule ville.
+ */
+function villeDeLaRangee(cities: readonly TripCity[] | undefined, index: number): { legende: string; nom: string } | null {
+  if (!aPlusieursVilles(cities)) return null;
+  const ville = villeDeLaDate(cities, dateDuJour(cities, index));
+  return ville === undefined ? null : { legende: texteDeVille(ville, t.villes.changement), nom: texteDeVille(ville, t.villes.nomChangement) };
 }
 
 /**
@@ -66,7 +82,7 @@ export interface PreparationViewProps {
  *   validation de la mesure est chargée à ce moment (`createLazyTrack`), hors du JavaScript initial.
  * Aucun nom de lieu : les arrêts sont des anneaux sans numéro (F8-PO-12).
  */
-export function PreparationView({ tripId, initial, recorderKind = "none", recorder, fetchStatus = fetchFromAction, essai = false }: PreparationViewProps) {
+export function PreparationView({ tripId, initial, recorderKind = "none", recorder, fetchStatus = fetchFromAction, essai = false, cities }: PreparationViewProps) {
   const router = useRouter();
   const { status, interrupted, retry } = useGenerationStatus(tripId, initial, fetchStatus);
   // Relance d'un voyage d'essai : un `requestId` par écran (double appui : une seule exécution réservée).
@@ -173,13 +189,37 @@ export function PreparationView({ tripId, initial, recorderKind = "none", record
         </p>
       </div>
       <ul aria-label={t.jours} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3 gap-y-4">
-        {status.days.map((day) => (
-          <li key={day.index} className="col-span-3 grid grid-cols-subgrid items-center" data-day-state={day.state}>
-            <DayBadge day={day.index} size="sm" />
-            <MiniLine ready={day.state === "ready"} readyStops={day.readyStops} />
-            <DayStateLabel index={day.index} ready={day.state === "ready"} interrupted={showError} />
-          </li>
-        ))}
+        {status.days.map((day) => {
+          const ville = villeDeLaRangee(cities, day.index);
+          if (ville === null) {
+            return (
+              <li key={day.index} className="col-span-3 grid grid-cols-subgrid items-center" data-day-state={day.state}>
+                <DayBadge day={day.index} size="sm" />
+                <MiniLine ready={day.state === "ready"} readyStops={day.readyStops} />
+                <DayStateLabel index={day.index} ready={day.state === "ready"} interrupted={showError} />
+              </li>
+            );
+          }
+          // Plusieurs villes (décision UX-M4S-B, spécification M4-suite § 8.2) : légende au-dessus de la mini-ligne, dans la
+          // colonne centrale ; pastille, mini-ligne et état sur la seconde rangée, centrés entre eux, quelle que soit la
+          // hauteur de la légende.
+          return (
+            <li key={day.index} className="col-span-3 grid grid-cols-subgrid grid-rows-[auto_auto] items-center gap-y-1" data-day-state={day.state}>
+              <span aria-hidden="true" data-part="legende-ville" className="col-start-2 row-start-1 text-corps-s break-words text-ink-2">
+                {ville.legende}
+              </span>
+              <span className="col-start-1 row-start-2 flex">
+                <DayBadge day={day.index} size="sm" ville={ville.nom} />
+              </span>
+              <span className="col-start-2 row-start-2 flex min-w-0">
+                <MiniLine ready={day.state === "ready"} readyStops={day.readyStops} />
+              </span>
+              <span className="col-start-3 row-start-2 flex">
+                <DayStateLabel index={day.index} ready={day.state === "ready"} interrupted={showError} />
+              </span>
+            </li>
+          );
+        })}
       </ul>
       <div role="status" className="sr-only" data-annonces="">
         {announcements.map((message, index) => (

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { PreferenceReasonSchema } from "./deck";
-import { ChangeSchema, DaySchema, StopSchema, TimeSchema } from "./trip";
+import { ChangeSchema, DaySchema, IdSchema, StopSchema, TimeSchema } from "./trip";
 import { WISH_MAX_LENGTH } from "./values";
 
 /**
@@ -13,7 +13,6 @@ import { WISH_MAX_LENGTH } from "./values";
  * technique 2) : seul l'identifiant interne de l'étape, le code de raison, le souhait saisi et la version.
  */
 
-const IdSchema = z.string().min(1);
 
 /**
  * Demande de remplacement (0016 § 4.1). `wish` : saisie de la personne, espaces retirés aux extrémités,
@@ -66,8 +65,9 @@ interface DraftShape {
 
 /**
  * Raffinements d'un brouillon et d'un aperçu (0016 § 4.2) : jours distincts ; `changedStopIds` et `targetStopId`
- * désignent une étape de `days` ; aucune étape n'est un engagement (0015 § 9) ; la proposition d'un remplacement
- * est l'étape visée.
+ * désignent une étape de `days` ; une révision ne crée ni ne touche aucun engagement (0015 § 9) : ni l'étape visée ni
+ * une étape changée n'en porte, une étape intacte du jour garde le sien (décision 0145 § 2) ; la proposition d'un
+ * remplacement est l'étape visée.
  */
 function refineDraft(draft: DraftShape, ctx: z.RefinementCtx): void {
   const indexes = draft.days.map((day) => day.index);
@@ -82,8 +82,9 @@ function refineDraft(draft: DraftShape, ctx: z.RefinementCtx): void {
   if (!ids.has(draft.targetStopId)) {
     ctx.addIssue({ code: "custom", message: "targetStopId : étape absente de days", path: ["targetStopId"] });
   }
-  if (stops.some((stop) => stop.commitment !== undefined)) {
-    ctx.addIssue({ code: "custom", message: "une révision ne crée jamais d'engagement (commitment interdit)", path: ["days"] });
+  const touchees = new Set([draft.targetStopId, ...draft.changedStopIds]);
+  if (stops.some((stop) => touchees.has(stop.id) && stop.commitment !== undefined)) {
+    ctx.addIssue({ code: "custom", message: "une révision ne crée ni ne touche d'engagement (commitment interdit sur l'étape visée et les étapes changées)", path: ["days"] });
   }
   if (draft.proposal && draft.proposal.id !== draft.targetStopId) {
     ctx.addIssue({ code: "custom", message: "remplacement : targetStopId === proposal.id", path: ["targetStopId"] });
@@ -123,8 +124,22 @@ export const MoveDraftSchema = MoveDraftBaseSchema.superRefine(refineDraft);
 export type MoveDraft = z.infer<typeof MoveDraftSchema>;
 
 /**
+ * Champs d'un brouillon d'ajout d'un lieu à soi (F7c ; décision 0147 § 3 et § 11) : jour touché, sans proposition.
+ * L'étape ajoutée (`targetStopId`) porte le nom saisi par la personne (`Stop.name`) et `addedBy: "person"`, jamais un
+ * nom ni une adresse Google ; un trajet estimé ou absent vers elle fait dire « Temps de trajet calculé après l'ajout ».
+ */
+const AddDraftBaseSchema = z.strictObject({
+  /** Brouillon complet du jour touché. */
+  days: z.array(DaySchema).min(1),
+  changes: z.array(ChangeSchema),
+  changedStopIds: z.array(IdSchema),
+  /** Étape ajoutée : reçoit le focus après « Appliquer » (F7-PO-1). */
+  targetStopId: IdSchema,
+});
+
+/**
  * Aperçu d'une révision (`ReplacementPreview` du handover = variante `replace`), union discriminée sur `kind`
- * (0016 § 4.2). F7b ajoute `move` ; F7c ajoutera `add`.
+ * (0016 § 4.2). F7b ajoute `move` ; M5-C (décision 0147 § 14) ajoute `add`, aperçu d'un lieu à soi (`[add, lock]`).
  */
 export const RevisionPreviewSchema = z
   .discriminatedUnion("kind", [
@@ -135,6 +150,11 @@ export const RevisionPreviewSchema = z
     }),
     MoveDraftBaseSchema.extend({
       kind: z.literal("move"),
+      id: IdSchema,
+      baseVersion: z.number().int().nonnegative(),
+    }),
+    AddDraftBaseSchema.extend({
+      kind: z.literal("add"),
       id: IdSchema,
       baseVersion: z.number().int().nonnegative(),
     }),
@@ -201,3 +221,37 @@ export type RevisionResult = { ok: true; preview: RevisionPreview } | { ok: fals
 
 /** Réponse d'« Appliquer » : nouvelle version locale, ou refus sans rien appliquer. */
 export type ApplyResult = { ok: true; version: number } | { ok: false; error: "conflict" | "lockedStop" | "error" };
+
+/**
+ * Remplacement d'une étape sur l'adaptateur `api` (tâche M1g, ticket 869 ; plan `docs/plans/mvp-etapes-1-9.md`, étape 1) :
+ * réponses des actions serveur, **jamais stockées**. Le candidat vient des propositions déjà vérifiées du voyage (ligne
+ * `proposals` liée à sa ligne `candidates`), jamais d'un appel de modèle ; le serveur ne garde aucun aperçu.
+ *
+ * - `offer` : brouillon calculé par le moteur (`appliquerPatch`, opération `replace`) sur la version `version` : jours
+ *   touchés recomposés comme une lecture (durées comprises), changements, étape proposée ; `candidateId` est l'identifiant
+ *   du candidat (`candidates.id`, décision 0145 § 1) que l'application reprend. Brouillon raffiné comme un aperçu
+ *   (`refineDraft`) : un jour touché garde ses engagements intacts (décision 0145 § 2) ;
+ * - `noOption` : aucune proposition compatible, ou le moteur refuse ; `conflict` : la version de base n'est plus la
+ *   version courante ; `lockedStop` : l'étape est verrouillée.
+ */
+const VersionReponseSchema = z.number().int().nonnegative();
+
+export const ReplacementOfferSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("offer"), version: VersionReponseSchema, candidateId: IdSchema, draft: ReplacementDraftSchema }),
+  z.strictObject({ status: z.literal("noOption") }),
+  z.strictObject({ status: z.literal("conflict"), currentVersion: VersionReponseSchema }),
+  z.strictObject({ status: z.literal("lockedStop") }),
+]);
+export type ReplacementOffer = z.infer<typeof ReplacementOfferSchema>;
+
+/**
+ * Écriture d'un remplacement (`applied`) ou de son annulation (`undone`, opération `revert` de `TripPatch`) : nouvelle
+ * version courante ; sinon refus sans rien écrire (`conflict`, `noOption`, `lockedStop`).
+ */
+export const ReplacementWriteSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.enum(["applied", "undone"]), version: VersionReponseSchema }),
+  z.strictObject({ status: z.literal("conflict"), currentVersion: VersionReponseSchema }),
+  z.strictObject({ status: z.literal("noOption") }),
+  z.strictObject({ status: z.literal("lockedStop") }),
+]);
+export type ReplacementWrite = z.infer<typeof ReplacementWriteSchema>;

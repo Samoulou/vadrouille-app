@@ -100,6 +100,18 @@ describe("essai: sélection des premières propositions (fonctions pures)", () =
     expect(propositionsDesJours([jour(1, [trajet(null), etape("x")])], () => true)[0]?.travelFromPrevious).toBeUndefined();
   });
 
+  it("plusieurs-villes: un transfer n'est jamais le voisin d'une proposition (décision 0151 § 4)", () => {
+    const items: DayLineItem[] = [
+      { type: "terminus", role: "start", time: "09:00", label: "[Logement]" },
+      etape("a1"),
+      { type: "transfer", from: "Rome", to: "Florence", source: "estimated", start: "11:30", estimatedMinutes: 120 },
+      etape("a2"),
+    ];
+    const [p1, p2] = propositionsDesJours([jour(1, items)], () => true);
+    expect(p1?.neighbours.after).toBeUndefined();
+    expect(p2?.neighbours.before).toBeUndefined();
+  });
+
   it("voyage non débloqué : journées données, `unlocked: false`, lignes « À faire » d'une journée retirée enlevées", () => {
     const j1 = jour(1, [etape("a1")]);
     const trip = TripSchema.parse({
@@ -113,9 +125,9 @@ describe("essai: sélection des premières propositions (fonctions pures)", () =
       travellers: { adults: 2, children: 0 },
       days: [j1, jour(2, [etape("b1")])],
       checklist: [
-        { id: "c1", label: "Avant", when: { type: "beforeDeparture" }, done: false, sponsored: false },
-        { id: "c2", label: "Jour 2", when: { type: "tripDay", day: 2 }, done: false, sponsored: false },
-        { id: "c3", label: "Étape b1", when: { type: "beforeDeparture" }, done: false, sponsored: false, stopId: "b1" },
+        { id: "c1", kind: "other", label: "Avant", when: { type: "beforeDeparture" }, done: false, sponsored: false },
+        { id: "c2", kind: "other", label: "Jour 2", when: { type: "tripDay", day: 2 }, done: false, sponsored: false },
+        { id: "c3", kind: "other", label: "Étape b1", when: { type: "beforeDeparture" }, done: false, sponsored: false, stopId: "b1" },
       ],
       unlocked: true,
     });

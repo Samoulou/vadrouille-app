@@ -312,10 +312,16 @@ describe("confinement: dépôt", () => {
     expect(importeurs.filter((f) => !f.startsWith("db/schema/"))).toEqual([]);
   });
 
-  // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 (c)) : chemin de lecture du secret du webhook simulé.
-  it("confinement: src/server/env/payment.ts n'a que deux importeurs hors de ses tests (composition et webhook simulés)", () => {
+  // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 (c)) : chemin de lecture du secret du webhook simulé. B4c (PR 863 ;
+  // décision 0140 § 3 point 4 et § 6 ligne 10) : la composition et le webhook Stripe s'y ajoutent, et eux seuls.
+  it("confinement: src/server/env/payment.ts n'a que quatre importeurs hors de ses tests (compositions et webhooks simulés et Stripe)", () => {
     const importeurs = resultats.filter((r) => r.imports.some((i) => i.cible === "src/server/env/payment.ts")).map((r) => r.fichier);
-    expect(importeurs.filter((f) => !estFichierTest(f)).sort()).toEqual(["src/server/payment/composition.ts", "src/server/routes/simulated-webhook.ts"]);
+    expect(importeurs.filter((f) => !estFichierTest(f)).sort()).toEqual([
+      "src/server/payment/composition-stripe.ts",
+      "src/server/payment/composition.ts",
+      "src/server/routes/simulated-webhook.ts",
+      "src/server/routes/stripe-webhook.ts",
+    ]);
     expect(importeurs.filter((f) => estFichierTest(f) && !f.startsWith("src/server/env/"))).toEqual([]);
   });
 
@@ -325,6 +331,21 @@ describe("confinement: dépôt", () => {
       .map((f) => f.chemin)
       .sort();
     expect(appelants).toEqual(["src/server/env/payment.ts", "src/server/payment/composition.ts", "src/server/routes/simulated-webhook.ts"]);
+  });
+
+  // B4c (PR 863 ; décision 0140 § 6 ligne 9, modèle de `nodemailer` et de 0138 § 9 ligne 7b) : seul module qui importe
+  // `stripe`, et ses deux seuls importeurs hors des tests.
+  it("confinement: src/server/payment/stripe.ts n'a que la composition et le webhook Stripe pour importeurs hors des tests", () => {
+    const importeurs = resultats.filter((r) => r.imports.some((i) => i.cible === "src/server/payment/stripe.ts")).map((r) => r.fichier);
+    expect(importeurs.filter((f) => !estFichierTest(f)).sort()).toEqual(["src/server/payment/composition-stripe.ts", "src/server/routes/stripe-webhook.ts"]);
+  });
+
+  it("confinement: `cleStripe` n'est appelé, hors des tests, que par la composition Stripe (et défini dans son module)", () => {
+    const appelants = analyses
+      .filter((f) => f.chemin.startsWith("src/") && !estFichierTest(f.chemin) && /\bcleStripe\(/.test(lireFichier(f.chemin)))
+      .map((f) => f.chemin)
+      .sort();
+    expect(appelants).toEqual(["src/server/env/payment.ts", "src/server/payment/composition-stripe.ts"]);
   });
 
   // B3d (M2a ; décision 0138 § 9, ligne 7) : chemin de lecture de la clé de Resend.
@@ -412,8 +433,15 @@ describe("confinement: spécificateurs et paquets (dépôt)", () => {
     expect(fantomes).toEqual([]);
   });
 
-  it("aucun fichier .npmrc, .yarnrc ou pnpm-workspace.yaml suivi", () => {
-    expect(suivis.map((f) => f.chemin).filter((c) => /(^|\/)(\.npmrc|\.yarnrc[^/]*|pnpm-workspace\.yaml)$/.test(c))).toEqual([]);
+  // B4d-TL (décision 0144 § 6) : un seul `.npmrc`, à la racine, dont le contenu est exactement l'âge minimal de
+  // publication (20160 minutes) ; toute autre ligne (registre, jeton, script, hôte) le fait refuser.
+  it("aucun fichier .yarnrc ou pnpm-workspace.yaml suivi ; un seul .npmrc, à la racine, présent", () => {
+    expect(suivis.map((f) => f.chemin).filter((c) => /(^|\/)(\.npmrc|\.yarnrc[^/]*|pnpm-workspace\.yaml)$/.test(c))).toEqual([".npmrc"]);
+  });
+
+  it(".npmrc : fichier ordinaire (mode 100644, jamais un lien symbolique), contenu exact, l'âge minimal de publication seulement (décision 0144 § 6)", () => {
+    expect(suivis.filter((f) => f.chemin === ".npmrc").map((f) => f.mode)).toEqual(["100644"]);
+    expect(lireFichier(".npmrc")).toBe("minimum-release-age=20160\n");
   });
 });
 
@@ -491,6 +519,140 @@ describe("confinement: aucune exception à la section 2.4 (0040 D1 retirée par 
   });
 });
 
+describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)", () => {
+  const COMPTEURS = "src/server/villes/compteurs.ts";
+  const RECHERCHE = "src/server/villes/recherche.ts";
+  const TERMINAL_API = "src/server/composition/villes-api.ts";
+  const CONFIG = "src/server/config/villes.ts";
+  const horsTests = (chemin: string) => !estFichierTest(chemin) && !chemin.startsWith("docs/");
+  const importateursHorsTests = (cible: string) =>
+    resultats
+      .filter((r) => horsTests(r.fichier) && r.imports.some((i) => i.cible === cible))
+      .map((r) => r.fichier)
+      .sort();
+  /** Fichiers suivis hors des tests et de `docs/` : code analysé, et migrations de `db/migrations/` (SQL et clichés). */
+  const fichiersDuCode = () => suivis.map((f) => f.chemin).filter((c) => horsTests(c) && (estAnalyse(c) || c.startsWith("db/migrations/")));
+  const contenant = (texte: string) => fichiersDuCode().filter((c) => lireFichier(c).includes(texte)).sort();
+
+  it("compteurs : seul importateur hors des tests, le terminal de api ; cœur : les deux terminaux seulement", () => {
+    // Décision 0147 § 6.4 (M5d-1, ticket 939) : le terminal de la recherche d'un lieu à soi réserve le compteur `lieux`.
+    expect(importateursHorsTests(COMPTEURS)).toEqual(["src/server/composition/lieux-api.ts", TERMINAL_API]);
+    expect(importateursHorsTests(RECHERCHE)).toEqual(["src/server/composition/villes-api.ts", "src/server/composition/villes.ts"]);
+  });
+
+  it("rôle des compteurs pris dans le seul module des compteurs ; nom de la table dans le module, le schéma et les migrations 0021 et 0022 (colonne `lieux`, décision 0147 § 6.4 point 3)", () => {
+    expect(contenant("SET LOCAL ROLE vadrouille_autocomplete_counter")).toEqual([COMPTEURS]);
+    const table = contenant("autocomplete_daily_counts");
+    // Clichés drizzle-kit (`meta/<n>_snapshot.json`) : chacun recopie le schéma entier, donc la table, à chaque migration
+    // suivante (0023, M6a-D, ticket 1009 ; 0024, M6c-D, ticket 1014 ; 0025, B4e, ticket 887 ; 0026, M8-D, ticket 1055 ;
+    // 0027, R-D, ticket 1061 ; 0028, purge de `place_coordinates`, ticket 1091) ; ce sont des fichiers générés, jamais du
+    // code qui prend le rôle. Exemption limitée aux clichés nommés : un cliché suivant s'ajoute ici, à la main.
+    expect(
+      table.filter((c) => c !== COMPTEURS && c !== "db/schema/auth.ts" && !/^db\/migrations\/(meta\/)?002[12]_/.test(c) && !/^db\/migrations\/meta\/002[345678]_snapshot\.json$/.test(c)),
+    ).toEqual([]);
+    for (const attendu of [COMPTEURS, "db/schema/auth.ts", "db/migrations/0021_compteurs_autocompletion.sql"]) expect(table).toContain(attendu);
+  });
+
+  it("crochet accesReelApi : défini dans acces-reel.ts, lu par le seul terminal de api (jamais par la page de l'écran 1)", () => {
+    // Décision 0147 § 3 (M5d-1, ticket 939) : le terminal de la recherche d'un lieu à soi lit le même crochet.
+    expect(contenant("accesReelApi")).toEqual([
+      "src/server/composition/lieux-api.ts",
+      "src/server/composition/villes-api.ts",
+      "src/server/generation/acces-reel.ts",
+    ]);
+  });
+
+  it("SEUILS_AUTOCOMPLETION_VALIDES : une seule déclaration, `export const …: boolean = false`, aucune affectation", () => {
+    const NOM = "SEUILS_AUTOCOMPLETION_VALIDES";
+    const declarations: string[] = [];
+    const affectations: string[] = [];
+    const AFFECTATIONS = new Set([
+      ts.SyntaxKind.EqualsToken,
+      ts.SyntaxKind.BarBarEqualsToken,
+      ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+      ts.SyntaxKind.QuestionQuestionEqualsToken,
+    ]);
+    // Affectation directe, par propriété ou par crochets (revue du head `bc43913`, mineur 2) ; `Object.assign` et
+    // `Object.defineProperty` qui nomment la garde sont relevés aussi. Le reste (alias dynamiques) est pour M1h.
+    const nomme = (n: ts.Node) =>
+      (ts.isIdentifier(n) && n.text === NOM) ||
+      (ts.isPropertyAccessExpression(n) && n.name.text === NOM) ||
+      (ts.isElementAccessExpression(n) && ts.isStringLiteralLike(n.argumentExpression) && n.argumentExpression.text === NOM);
+    const ecritureObjet = (n: ts.Node) =>
+      ts.isCallExpression(n) &&
+      ts.isPropertyAccessExpression(n.expression) &&
+      ts.isIdentifier(n.expression.expression) &&
+      n.expression.expression.text === "Object" &&
+      ["assign", "defineProperty", "defineProperties"].includes(n.expression.name.text) &&
+      n.arguments.some((a) => a.getText().includes(NOM));
+    for (const chemin of suivis.map((f) => f.chemin).filter(estAnalyse)) {
+      const texte = lireFichier(chemin);
+      if (!texte.includes(NOM)) continue;
+      const arbre = ts.createSourceFile(chemin, texte, ts.ScriptTarget.Latest, true);
+      const visiter = (n: ts.Node) => {
+        if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === NOM) declarations.push(`${chemin}: ${n.parent.parent.getText(arbre)}`);
+        if (ts.isBinaryExpression(n) && AFFECTATIONS.has(n.operatorToken.kind) && nomme(n.left)) affectations.push(`${chemin}: ${n.getText(arbre)}`);
+        if (ecritureObjet(n)) affectations.push(`${chemin}: ${n.getText(arbre)}`);
+        ts.forEachChild(n, visiter);
+      };
+      visiter(arbre);
+    }
+    expect(declarations).toEqual([`${CONFIG}: export const ${NOM}: boolean = false;`]);
+    expect(affectations).toEqual([]);
+  });
+});
+
+describe("confinement: recherche d'un lieu à soi de api (décision 0147 § 3 et § 14 ligne M5d-1, ticket 939)", () => {
+  const COEUR = "src/server/lieux/recherche.ts";
+  const TERMINAL = "src/server/composition/lieux-api.ts";
+  const CLIENTS = "src/server/composition/clients-google.ts";
+  const horsTests = (chemin: string) => !estFichierTest(chemin) && !chemin.startsWith("docs/");
+  const importateursHorsTests = (cible: string) =>
+    resultats
+      .filter((r) => horsTests(r.fichier) && r.imports.some((i) => i.cible === cible))
+      .map((r) => r.fichier)
+      .sort();
+
+  it("cœur : importé par le seul terminal ; terminal : importé par la seule action serveur ; le cœur n'importe ni la fabrique ni la barrière", () => {
+    expect(importateursHorsTests(COEUR)).toEqual([TERMINAL]);
+    expect(importateursHorsTests(TERMINAL)).toEqual(["src/server/actions/lieux.ts"]);
+    const cibles = resultats.find((r) => r.fichier === COEUR)?.imports.map((i) => i.cible) ?? [];
+    for (const interdit of [CLIENTS, "src/server/generation/barriere.ts", "src/server/generation/acces-reel.ts", "src/server/villes/compteurs.ts"]) {
+      expect(cibles).not.toContain(interdit);
+    }
+    expect(resultats.find((r) => r.fichier === TERMINAL)?.imports.map((i) => i.cible)).toContain(CLIENTS);
+  });
+
+  it("SEUILS_LIEUX_VALIDES : une seule déclaration, `export const …: boolean = false`, aucune affectation", () => {
+    const NOM = "SEUILS_LIEUX_VALIDES";
+    const declarations: string[] = [];
+    const affectations: string[] = [];
+    for (const chemin of suivis.map((f) => f.chemin).filter(estAnalyse)) {
+      const texte = lireFichier(chemin);
+      if (!texte.includes(NOM)) continue;
+      const arbre = ts.createSourceFile(chemin, texte, ts.ScriptTarget.Latest, true);
+      const visiter = (n: ts.Node) => {
+        if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === NOM) declarations.push(`${chemin}: ${n.parent.parent.getText(arbre)}`);
+        if (
+          ts.isBinaryExpression(n) &&
+          n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+          n.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
+          n.left.getText(arbre).includes(NOM)
+        ) {
+          affectations.push(`${chemin}: ${n.getText(arbre)}`);
+        }
+        if (ts.isCallExpression(n) && /^Object\.define|^Object\.assign/.test(n.expression.getText(arbre)) && n.getText(arbre).includes(NOM)) {
+          affectations.push(`${chemin}: ${n.getText(arbre)}`);
+        }
+        ts.forEachChild(n, visiter);
+      };
+      visiter(arbre);
+    }
+    expect(declarations).toEqual([`src/server/config/lieux.ts: export const ${NOM}: boolean = false;`]);
+    expect(affectations).toEqual([]);
+  });
+});
+
 describe("confinement: le régime s'applique à lui-même", () => {
   const DU_REGIME = (chemin: string) => chemin.startsWith("tests/unit/confinement/") || chemin.startsWith("tests/support/");
 
@@ -515,6 +677,8 @@ describe("confinement: le régime s'applique à lui-même", () => {
     const capacites = duRegime.filter((c) => c.par?.startsWith("capacite:")).map((c) => c.par);
     expect([...new Set(capacites)].sort()).toEqual([
       idLigneCapacite("tests/support/serveur-local.ts", "module:node:http", "createServer"),
+      // B4c (PR 863 ; décision 0140 § 6 ligne 3) : émetteur Stripe de test, seul fichier de test qui importe `stripe`.
+      idLigneCapacite("tests/support/stripe-evenements.ts", "module:stripe", "default"),
       idLigneCapacite("tests/unit/confinement/fichiers.ts", "module:node:child_process", "execFileSync"),
     ]);
   });

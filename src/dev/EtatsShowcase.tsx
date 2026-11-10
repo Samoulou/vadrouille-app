@@ -26,7 +26,8 @@ export const DEV_ERROR_MESSAGE = "Erreur volontaire du catalogue des états (voy
 const TAGS = ["toConfirm", "unconfirmed"] as const satisfies readonly TagKind[];
 
 interface BannerState {
-  kind: StatusBannerKind;
+  /** Sans `overlap` (spécification M4-suite § 5) : pas encore au catalogue, rendu et testé par la Journée. */
+  kind: Exclude<StatusBannerKind, "overlap">;
   message: string;
   /** Clé d'exemple de `/dev/composants`, tant que l'écran propriétaire n'est pas livré (décision 0021 § 8). */
   example: boolean;

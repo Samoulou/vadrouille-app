@@ -1,12 +1,12 @@
 import type { EtapeRequete, Message, RequeteModele } from "@/ai/client";
 import type { TypeCreneau } from "@/ai/candidat";
 import type { ComplementP0 } from "@/ai/complement-p0";
-import type { CandidatPourModele, EntreeModeles, EntreeProgramme, EntreeQuartier, LieuRetenu } from "@/ai/entrees";
-import type { EntreeRevision } from "@/ai/entree-revision";
+import type { CandidatPourModele, EntreeModeles, EntreeProgramme, EntreeProgrammeV5, EntreeQuartier, LieuRetenu } from "@/ai/entrees";
+import type { EntreeRevision, EntreeRevisionV3 } from "@/ai/entree-revision";
 import { PROMPT_NOTATION } from "@/ai/prompts/notation";
 import { PROMPT_PLAN } from "@/ai/prompts/plan";
-import { PROMPT_PROGRAMME } from "@/ai/prompts/programme";
-import { PROMPT_REVISION } from "@/ai/prompts/revision";
+import { PROMPT_PROGRAMME, PROMPT_PROGRAMME_V5 } from "@/ai/prompts/programme";
+import { PROMPT_REVISION, PROMPT_REVISION_V3 } from "@/ai/prompts/revision";
 import { PROMPT_QUARTIER } from "@/ai/prompts/quartier";
 import { PROMPT_RAISONS } from "@/ai/prompts/raisons";
 import { PROMPT_RECHERCHE } from "@/ai/prompts/recherche";
@@ -254,8 +254,11 @@ export function requeteProgramme(entree: EntreeProgramme, modele: string, routag
   return requete("programme", PROMPT_PROGRAMME, modele, routage, { brief: projectionBrief(entree) });
 }
 
-/** Brief du prototype en projection champ par champ (requêtes `programme` et `revision`) : aucun autre champ ne passe. */
-function projectionBrief(entree: EntreeProgramme) {
+/**
+ * Champs communs des briefs v4 et v5, en projection champ par champ, dans l'ordre de la v4 (octets de la requête v4
+ * inchangés ; revue de la PR #921, mineur 2).
+ */
+function projectionCommune(entree: EntreeProgramme | EntreeProgrammeV5) {
   return {
     destination: entree.destination,
     pays: entree.pays,
@@ -269,11 +272,60 @@ function projectionBrief(entree: EntreeProgramme) {
     ...(entree.aEviter === undefined ? {} : { aEviter: [...entree.aEviter] }),
     deplacements: [...entree.deplacements],
     ...(entree.budgetRepas === undefined ? {} : { budgetRepas: entree.budgetRepas }),
+  };
+}
+
+/** Brief du prototype en projection champ par champ (requêtes `programme` et `revision`) : aucun autre champ ne passe. */
+function projectionBrief(entree: EntreeProgramme) {
+  return {
+    ...projectionCommune(entree),
     logements: entree.logements.map((logement) => ({ texte: logement.texte, nuits: logement.nuits })),
     ...(entree.engagements === undefined
       ? {}
       : { engagements: entree.engagements.map((engagement) => ({ libelle: engagement.libelle, date: engagement.date, heure: engagement.heure, type: engagement.type })) }),
     ...(entree.recit === undefined ? {} : { recit: entree.recit }),
+  };
+}
+
+/**
+ * Programme complet d'un voyage à une ou plusieurs villes (prompt `programme` v5, spécification M4 § 5 ; décision 0148
+ * § 8 point 3 ; verdict de la Sécurité 0149 § 1.3 point 1) : `EntreeProgrammeV5` en **projection** champ par champ
+ * (`projectionBriefV5`), jamais une décomposition d'un objet reçu ; aucun champ n'existe pour une donnée Google, pour une
+ * ville par créneau, ni pour le libellé du billet de changement de ville. Même étape de requête que la v4.
+ */
+export function requeteProgrammeV5(entree: EntreeProgrammeV5, modele: string, routage: Routage): RequeteModele {
+  return requete("programme", PROMPT_PROGRAMME_V5, modele, routage, { brief: projectionBriefV5(entree) });
+}
+
+/**
+ * Brief v5 en projection champ par champ : seuls les champs nommés ici passent (0149 § 1.3 point 1). Exportée pour la
+ * requête `revision` v3 (`requeteRevisionV3`), qui reprend la même projection avec `recit: false` (garde du récit).
+ */
+export function projectionBriefV5(entree: EntreeProgrammeV5, options: { readonly recit: boolean } = { recit: true }) {
+  return {
+    ...projectionCommune(entree),
+    villes: entree.villes.map((ville) => ({ nom: ville.nom, arrivee: ville.arrivee, nuits: ville.nuits, logement: ville.logement })),
+    changements: entree.changements.map((changement) => ({
+      date: changement.date,
+      de: changement.de,
+      vers: changement.vers,
+      source: changement.source,
+      depart: changement.depart,
+      ...(changement.arrivee === undefined ? {} : { arrivee: changement.arrivee }),
+      activitesMax: changement.activitesMax,
+    })),
+    ...(entree.engagements === undefined
+      ? {}
+      : {
+          engagements: entree.engagements.map((engagement) => ({
+            libelle: engagement.libelle,
+            date: engagement.date,
+            heure: engagement.heure,
+            ...(engagement.fin === undefined ? {} : { fin: engagement.fin }),
+            type: engagement.type,
+          })),
+        }),
+    ...(entree.recit === undefined || !options.recit ? {} : { recit: entree.recit }),
   };
 }
 
@@ -286,21 +338,47 @@ function projectionBrief(entree: EntreeProgramme) {
 export function requeteRevision(entree: EntreeRevision, modele: string, routage: Routage): RequeteModele {
   return requete("programme", PROMPT_REVISION, modele, routage, {
     brief: projectionBrief(entree.brief),
-    programme: {
-      jours: entree.programme.jours.map((jour) => ({
-        date: jour.date,
-        ...(jour.titre === undefined ? {} : { titre: jour.titre }),
-        etapes: jour.etapes.map((etape) => ({
-          id: etape.id,
-          debut: etape.debut,
-          ...(etape.fin === undefined ? {} : { fin: etape.fin }),
-          repas: etape.repas,
-          lieu: etape.lieu,
-          ...(etape.quartier === undefined ? {} : { quartier: etape.quartier }),
-          ...(etape.pourquoi === undefined ? {} : { pourquoi: etape.pourquoi }),
-        })),
+    programme: projectionProgrammeRevision(entree.programme, new Set()),
+    choix: { pasPourMoi: [...entree.choix.pasPourMoi], jAime: [...entree.choix.jAime] },
+  });
+}
+
+/**
+ * Programme précédent et choix d'une requête `revision`, champ par champ, dans l'ordre de la v2 (octets de la requête v2
+ * inchangés). `sansTitre` : dates dont le titre n'est pas renvoyé (v3 : journées de changement de ville, dont le titre
+ * est écrit par le code, jamais par l'IA ; 0148 § 5.1 point 2).
+ */
+function projectionProgrammeRevision(programme: EntreeRevision["programme"], sansTitre: ReadonlySet<string>) {
+  return {
+    jours: programme.jours.map((jour) => ({
+      date: jour.date,
+      ...(jour.titre === undefined || sansTitre.has(jour.date) ? {} : { titre: jour.titre }),
+      etapes: jour.etapes.map((etape) => ({
+        id: etape.id,
+        debut: etape.debut,
+        ...(etape.fin === undefined ? {} : { fin: etape.fin }),
+        repas: etape.repas,
+        lieu: etape.lieu,
+        ...(etape.quartier === undefined ? {} : { quartier: etape.quartier }),
+        ...(etape.pourquoi === undefined ? {} : { pourquoi: etape.pourquoi }),
       })),
-    },
+    })),
+  };
+}
+
+/**
+ * Révision d'un programme d'un voyage à une ou plusieurs villes (prompt `revision` v3, ticket #926 ; décision 0148 § 8
+ * point 2 ; verdict de la Sécurité 0149 § 1.3 point 1) : le brief v5 par **la même projection** que la requête
+ * `programme` v5 (`projectionBriefV5` : villes, cadre des changements de ville sans libellé de billet, `fin` des
+ * engagements), **sans récit** (garde du récit, 0139 § 1.2 ; le schéma le refuse déjà, la projection ne le recopierait
+ * pas), puis le programme précédent et les choix, champ par champ. Le titre d'une journée de changement de ville
+ * (écrit par le code) n'est pas renvoyé. Aucun champ n'existe pour une donnée Google, un verdict d'ancrage, une ville par
+ * étape ni un `transfer`. Même étape de requête que `programme` (`etape: "programme"` : même délai, même routage `zdr`).
+ */
+export function requeteRevisionV3(entree: EntreeRevisionV3, modele: string, routage: Routage): RequeteModele {
+  return requete("programme", PROMPT_REVISION_V3, modele, routage, {
+    brief: projectionBriefV5(entree.brief, { recit: false }),
+    programme: projectionProgrammeRevision(entree.programme, new Set(entree.brief.changements.map((changement) => changement.date))),
     choix: { pasPourMoi: [...entree.choix.pasPourMoi], jAime: [...entree.choix.jAime] },
   });
 }

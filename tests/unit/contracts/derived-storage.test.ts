@@ -46,7 +46,8 @@ interface Expectation {
 /** § 1 de la spécification B2 : clés omises et remplacées de chaque schéma dérivé objet. */
 const EXPECTED: Record<string, Expectation> = {
   TripSnapshot: {
-    omitted: ["id", "organizationId", "destination", "destinationColor", "start", "end", "timeZone", "travellers", "checklist", "unlocked"],
+    // `cities` (décision 0148 § 6 point 2) : lu depuis `stays`, jamais depuis l'instantané.
+    omitted: ["id", "organizationId", "destination", "destinationColor", "start", "end", "timeZone", "travellers", "checklist", "unlocked", "cities"],
     replaced: ["days"],
   },
   DaySnapshot: { omitted: ["budgetPerPerson", "generating", "travelMinutes"], replaced: ["items", "events", "surprise"] },
@@ -83,6 +84,8 @@ describe("schémas de stockage dérivés", () => {
         const o = variants(origin);
         expect([...d.keys()].sort()).toEqual([...o.keys()].sort());
         for (const value of ["terminus", "free", "openMeal"]) expect(d.get(value), value).toBe(o.get(value));
+        // `transfer` (décision 0148 § 1 point 1) : repris par référence, sans copie.
+        expect(d.get("transfer"), "transfer").toBe(o.get("transfer"));
         for (const [value, field] of [["stop", "stop"], ["segment", "segment"]] as const) {
           const dv = shapeOf(d.get(value) as Schema);
           const ov = shapeOf(o.get(value) as Schema);

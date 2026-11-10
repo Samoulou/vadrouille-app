@@ -3,7 +3,7 @@ import "server-only";
 import type { AdapterContext } from "@/adapters/types";
 import { TripRequestSchema, fail, ok, type CreatedTrip, type Result } from "@/contracts";
 import { controlerVilles, dateLocale } from "@/lib/fuseaux";
-import { briefDepuisFormulaire } from "@/server/programme/brief";
+import { briefProgrammeDepuisFormulaire } from "@/server/programme/brief";
 
 import { lignesDuBrouillon } from "./brouillon";
 import {
@@ -81,12 +81,13 @@ export async function creerVoyage(o: Outils, ctx: AdapterContext | null | undefi
   }
   if (deja !== null) return ok({ tripId: deja });
 
-  // Chaîne inversée (décision 0136 § 3.8) : la conversion du site d'essai (`briefDepuisFormulaire`, celle que relit l'étape
-  // `a` de `generateProgramme`) refuse **avant toute écriture** un brouillon qu'elle ne sait pas convertir, sur le champ
-  // qu'elle rend (`draft.otherCities`, `draft.destination`, `draft.end`). Récit : jamais lu ici tant que la garde
+  // Chaîne inversée (décision 0136 § 3.8 ; M4b, décision 0148 § 4) : la conversion que relit l'étape `a` de
+  // `generateProgramme` (`briefProgrammeDepuisFormulaire`, qui admet deux villes ou plus) refuse **avant toute écriture** un
+  // brouillon qu'elle ne sait pas convertir, sur le champ qu'elle rend (`draft.destination`, `draft.end`,
+  // `draft.otherCities.<i>.name` pour une ville hors de la table). Récit : jamais lu ici tant que la garde
   // `RECIT_API_AUTORISE` est fermée (0139 § 1.2 point 6), et `story` reste `NULL` (`SQL_BRIEF`). Ancienne chaîne : inchangée.
   if (o.chaine() === "inversee") {
-    const conversion = briefDepuisFormulaire(draft, request.brief, undefined);
+    const conversion = briefProgrammeDepuisFormulaire(draft, request.brief, undefined);
     if (!conversion.ok) return fail("validation_failed", conversion.champ);
   }
 

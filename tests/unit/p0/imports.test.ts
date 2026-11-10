@@ -397,7 +397,13 @@ const TYPES_PROTOTYPE_SERVEUR_P0: readonly string[] = proto("ancrage", "brief", 
  * externe (ni `src/prototype`, ni `src/server/p0`). `brief.ts`, `sites.ts` et `apercu.ts` du même dossier ne sont chargés
  * que sous Next.js.
  */
-const MODULES_PROGRAMME_P0: readonly string[] = ["src/server/programme/forme.ts", "src/server/programme/entree.ts", "src/server/programme/assemblage.ts"];
+const MODULES_PROGRAMME_P0: readonly string[] = [
+  "src/server/programme/forme.ts",
+  "src/server/programme/entree.ts",
+  "src/server/programme/assemblage.ts",
+  // M4b (décision 0149 § 6) : importé par `assemblage.ts` pour le second contrôle du cadrage.
+  "src/server/programme/cadrage.ts",
+];
 
 type Regle = { projet: (chemin: string) => boolean; externes: readonly string[]; formes?: ReadonlyMap<string, string> };
 
@@ -795,6 +801,16 @@ const GROUNDING_SOURCE_LECTURE: readonly string[] = ["src/grounding/fiches.ts", 
 const DOUBLE_RELECTURES = "src/mocks/relectures-voyages.ts";
 /** B10a (décision 0112 § 2) : règles du tri, importées par l'écran de présentation. */
 const PREFERENCES_DOMAINE = "src/domain/preferences.ts";
+/** M4c (décision 0148 § 6 point 3) : ville d'un jour, fonction pure unique appelée par le serveur et par les écrans. */
+const VILLES_DOMAINE = "src/domain/villes-du-voyage.ts";
+const VILLES_ECRANS = "src/features/voyage/villes.ts";
+/**
+ * M4-suite-front (spécification M4-suite § 4.2 et § 5 ; T-M4S-1 et T-M4S-2 ; décision 0151 § 6) : règles du changement de
+ * ville, fonction pure unique appelée par le serveur et par les écrans (chevauchement à l'affichage, départ saisi).
+ */
+const CHANGEMENT_DOMAINE = "src/domain/changement-de-ville.ts";
+/** Les deux seuls modules d'écran qui l'importent : le bandeau de la Journée et l'aide de l'écran 1. */
+const CHANGEMENT_ECRANS = ["src/features/sejour/BandeauChevauchement.tsx", "src/features/creation/aide-changement.ts"];
 const TYPES_RELECTURES_DOUBLE = "src/domain/relectures.ts";
 /** Classification des codes de la couche IA (B9b, 0081 B9-TL-1 point 2 ; 0077 § 3 point 4). */
 const NATURES_IA = "src/ai/natures.ts";
@@ -900,6 +916,30 @@ const ARETES_ADMISES: readonly AreteAdmise[] = [
     typeSeulement: false,
     exemple: "src/features/presentation/deck.ts",
     horsArete: "src/features/sejour/load.ts",
+  },
+  {
+    // M4c (décision 0148 § 6 point 3) : la ville d'un jour vient d'une fonction pure unique, `villesDeLaDate`
+    // (`src/domain/villes-du-voyage.ts`, types de `@/contracts` seulement), « appelée par le serveur et par les écrans ».
+    // Les écrans la lisent par un seul module, `src/features/voyage/villes.ts`, qui ne la recopie pas.
+    nom: "M4c : src/features/voyage/villes.ts → src/domain/villes-du-voyage.ts",
+    de: (chemin) => chemin === VILLES_ECRANS,
+    vers: [VILLES_DOMAINE],
+    typeSeulement: false,
+    exemple: VILLES_ECRANS,
+    horsArete: "src/features/sejour/SejourPanel.tsx",
+  },
+  {
+    // M4-suite-front (spécification M4-suite § 12, T-M4S-1 et T-M4S-2 ; décision 0151 § 6) : le chevauchement d'un
+    // engagement avec la ligne « Vers {ville} » (bandeau de la Journée, chargé à la demande) et la détection du départ
+    // saisi (aide de l'écran 1) viennent de `src/domain/changement-de-ville.ts`, la même fonction pure que le serveur, qui
+    // n'importe à l'exécution que des modules purs de src/domain et `@/contracts/values`. Deux modules d'écran l'importent,
+    // sans la recopier ; arête exacte : le parcours ne descend pas au-delà.
+    nom: "M4-suite-front : bandeau de chevauchement et aide de l'écran 1 → src/domain/changement-de-ville.ts",
+    de: (chemin) => CHANGEMENT_ECRANS.includes(chemin),
+    vers: [CHANGEMENT_DOMAINE],
+    typeSeulement: false,
+    exemple: "src/features/sejour/BandeauChevauchement.tsx",
+    horsArete: "src/features/sejour/JourneePanel.tsx",
   },
 ];
 
@@ -1580,7 +1620,7 @@ describe("p0: graphes d'import (décision 0032, A3.2)", () => {
       // Aucun autre fichier de l'application hors de src/server n'importe src/domain : l'arête ne vaut que pour le double.
       // B10a (0112 § 2) : seule autre arête, l'écran de présentation vers les règles du tri (`src/domain/preferences.ts`).
       const importeurs = application.filter(
-        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/"))),
+        (f) => !estTest(f) && !f.startsWith("src/server/") && voisinsReels(f).some((c) => c.startsWith("src/domain/") && !(c === PREFERENCES_DOMAINE && f.startsWith("src/features/presentation/")) && !(c === VILLES_DOMAINE && f === VILLES_ECRANS) && !(c === CHANGEMENT_DOMAINE && CHANGEMENT_ECRANS.includes(f))),
       );
       expect(importeurs).toEqual([DOUBLE_RELECTURES]);
     });
@@ -1939,7 +1979,7 @@ function importsExecutesDe(fichier: string, source: string): string[] {
  * (B9d, workflow 4), `./recalcul` (B10b, workflow 5, décision 0119 § 1.8) et `./programme` (M1a-2, `generateProgramme`,
  * décision 0136 § 2.1), même forme : un pont de `"use step"` vers `src/server/generation/`, jamais dans un paquet client.
  */
-const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./programme", "./recalcul", "./voyage-complet"];
+const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/api", "./apercu", "./complet", "./p0-run", "./programme", "./rappels", "./recalcul", "./region", "./voyage-complet"];
 
 /**
  * Seuls imports exécutés admis dans le terminal `src/server/composition/villes.ts` (recherche de ville du site d'essai,
@@ -1950,7 +1990,6 @@ const IMPORTS_TERMINAL_WORKFLOWS: readonly string[] = ["server-only", "workflow/
 const IMPORTS_TERMINAL_VILLES: readonly string[] = [
   "server-only",
   "../../../prototype/config/prix-google.json",
-  "@/contracts/values",
   "@/lib/fuseaux",
   "@/server/composition/clients-google",
   "@/server/log",
@@ -1958,8 +1997,62 @@ const IMPORTS_TERMINAL_VILLES: readonly string[] = [
   "@/server/p0/base",
   "@/server/usage/cout-google",
   "@/server/usage/neon",
-  "@/server/usage/periodes",
-  "@/server/usage/port",
+  // Décision 0141 § 6.1 point 3 (PR 885) : cœur commun ; `@/contracts/values`, `periodes` et `port` y sont passés.
+  "@/server/villes/recherche",
+];
+
+/**
+ * Seuls imports exécutés admis dans le terminal `src/server/composition/villes-api.ts` (recherche de ville de l'écran 1
+ * de `api`, décision 0141 § 6.1 point 4 et § 11 ligne 2) : tables maison, pont des clients Google, plafonds de la
+ * génération (barrière), garde des seuils, crochet d'accès et barrière B9-TL-8, journal, limiteur, compteurs du jour et
+ * cœur commun ; ni `periodes`, ni `port`, ni la table de prix (au cœur ou dans les compteurs), et rien du chemin d'essai.
+ */
+const IMPORTS_TERMINAL_VILLES_API: readonly string[] = [
+  "server-only",
+  "@/lib/fuseaux",
+  "@/server/composition/clients-google",
+  "@/server/config/usage",
+  "@/server/config/villes",
+  "@/server/generation/acces-reel",
+  "@/server/generation/barriere",
+  "@/server/log",
+  "@/server/rate-limit",
+  "@/server/villes/compteurs",
+  "@/server/villes/recherche",
+];
+
+/**
+ * Seuls imports exécutés admis dans le terminal `src/server/composition/lieux-api.ts` (recherche d'un lieu à soi de
+ * `api`, décision 0147 § 3 et § 14 ligne M5d-1, ticket 939), sur le modèle de `IMPORTS_TERMINAL_VILLES_API` : pont des
+ * clients Google, garde des seuils des lieux, plafonds de la génération (barrière), crochet d'accès et barrière B9-TL-8,
+ * journal, limiteur, compteurs du jour et cœur `src/server/lieux/recherche.ts` ; rien du chemin d'essai.
+ */
+const IMPORTS_TERMINAL_LIEUX_API: readonly string[] = [
+  "server-only",
+  "@/server/composition/clients-google",
+  "@/server/config/lieux",
+  "@/server/config/usage",
+  "@/server/generation/acces-reel",
+  "@/server/generation/barriere",
+  "@/server/log",
+  "@/server/rate-limit",
+  "@/server/villes/compteurs",
+  "@/server/lieux/recherche",
+];
+
+/**
+ * Seuls imports exécutés admis dans le terminal `src/server/composition/rappels.ts` (rappels par e-mail de `api`, M6c,
+ * ticket 1021 ; décision 0157 § 1.7), sur le modèle de `IMPORTS_TERMINAL_LIEUX_API` : composition des notifications
+ * (`rappelsDuServeur`), port désactivé, limiteur, décompte par espèce et démarrage du workflow 7 (le cœur
+ * `src/server/rappels/accord.ts` n'y est lu que pour son type) ; ni client Google, ni module d'IA.
+ */
+const IMPORTS_TERMINAL_RAPPELS: readonly string[] = [
+  "server-only",
+  "@/server/auth",
+  "@/server/mail/disabled",
+  "@/server/rate-limit",
+  "@/server/rappels/demarrage",
+  "@/server/rappels/limiteurs",
 ];
 
 /**
@@ -1999,6 +2092,19 @@ const IMPORTS_TERMINAL_VILLES: readonly string[] = [
  * `src/server/composition/villes.ts`, admis sans être parcouru au-delà d'une entrée seulement, s'il importe
  * `server-only`, ne porte aucune directive et si ses imports exécutés sont ceux d'`IMPORTS_TERMINAL_VILLES`. Verdicts
  * Tech Lead et Sécurité : décision 0129 (définitive à la fusion, 0093).
+ *
+ * Recherche de ville de l'écran 1 de `api` (décision 0141 § 6.1 point 4 et § 11 lignes 1 et 2 ; PR 885) : entrée
+ * `src/server/actions/villes.ts` (`"use server"`) et terminal `src/server/composition/villes-api.ts` (imports exécutés
+ * bornés par `IMPORTS_TERMINAL_VILLES_API`). La page de l'écran 1 (`src/app/(creation)/voyages/nouveau/page.tsx`,
+ * composant serveur sans directive) lit `rechercheVilleApiOuverte` dans ce terminal (0141 § 6.4) : elle n'est **pas** une
+ * entrée (revue consolidée du head `bcaa346`, bloquant 1 de la Sécurité) ; elle a une seule arête nominative,
+ * `ARETE_PAGE_VILLES_API` : vers ce terminal seulement, page sans directive et terminal qui porte sa propriété. Tous ses
+ * autres imports restent contrôlés comme ceux d'un fichier ordinaire.
+ *
+ * Recherche d'un lieu à soi de `api` (décision 0147 § 3 et § 14 ligne M5d-1, ticket 939) : entrée
+ * `src/server/actions/lieux.ts` (`"use server"`) et terminal `src/server/composition/lieux-api.ts` (imports exécutés
+ * bornés par `IMPORTS_TERMINAL_LIEUX_API`), sur le modèle exact de la recherche de ville de `api`. Entrée au-delà de
+ * 0147 § 13 (qui ne nomme que `retouches.ts`) : verdict Sécurité à rendre à la revue de M5d-1.
  */
 const FRONTIERE_P0R3B = {
   entrees: [
@@ -2006,11 +2112,44 @@ const FRONTIERE_P0R3B = {
     { fichier: "src/server/actions/p0-lancement.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // Recherche de ville du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129).
     { fichier: "src/server/actions/villes-essai.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Recherche de ville de api (décision 0141 § 6.1).
+    { fichier: "src/server/actions/villes.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Retouches de api (décision 0147 § 13 ligne 1 ; M5a, ticket 919 : `lockStop`, `unlockStop` ; M5c : `reportStop`).
+    { fichier: "src/server/actions/retouches.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Recherche d'un lieu à soi de api (décision 0147 § 3 ; M5d-1, ticket 939) : `searchPlaces`, `previewAddPlace`, `applyAddPlace`.
+    { fichier: "src/server/actions/lieux.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
+    // Rappels par e-mail de api (M6c, ticket 1021 ; décision 0157 § 1.7 point 5) : `setTripReminders`, `getTripReminders`.
+    // Entrée relevée par `pnpm test`, au-delà de 0157 : verdict Sécurité à rendre à la revue de M6c.
+    { fichier: "src/server/actions/rappels.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,
     // qui lit `serverEnv()` et `@/server/env/payment`. Verdict Sécurité : approuvé, revue du head d50acfa (PR 582).
     {
       fichier: "src/server/routes/simulated-webhook.ts",
+      admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
+    },
+    // B4c (PR 863 ; décision 0140 § 2.1) : webhook Stripe, sur le modèle exact du simulé : seul module importé par le route
+    // handler `src/app/api/v1/webhooks/stripe/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive, qui
+    // lit `serverEnv()` et `@/server/env/payment` (secret lu à l'appel par `secretWebhookStripe`). Entrée au-delà de
+    // 0140 § 6, relevée par `pnpm test` : verdict Sécurité à rendre à la revue de B4c.
+    {
+      fichier: "src/server/routes/stripe-webhook.ts",
+      admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
+    },
+    // M6b (ticket 1005 ; décision 0157 § 1.6 point 1) : fichier `.ics`, seul module importé par le route handler
+    // `src/app/api/v1/voyages/[id]/calendrier/route.ts` (`ligne/route-handlers`), sur le modèle des webhooks ; module
+    // `server-only` sans directive, qui lit `serverEnv()` (origine de `APP_URL`) et le limiteur en base. Entrée relevée
+    // par `pnpm test` : verdict Sécurité à rendre à la revue de M6b.
+    {
+      fichier: "src/server/routes/calendrier.ts",
+      admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
+    },
+    // M9a (ticket 1097 ; spécification M9 § 6.2, forme T2 à confirmer par la revue) : export du compte, seul module
+    // importé par le route handler `src/app/api/v1/compte/export/route.ts` (`ligne/route-handlers`), sur le modèle du
+    // calendrier ; module `server-only` sans directive, qui lit la session (`authOperations`), le limiteur et la base.
+    // Entrée relevée par `pnpm test` : verdict Sécurité à rendre à la revue de M9a.
+    {
+      fichier: "src/server/routes/compte-export.ts",
       admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
     },
     {
@@ -2043,8 +2182,44 @@ const FRONTIERE_P0R3B = {
         return directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source) && bornes;
       },
     },
+    {
+      // Recherche de ville de api (décision 0141 § 11 ligne 2) : non parcouru, imports exécutés bornés par nom.
+      fichier: "src/server/composition/villes-api.ts",
+      admis: (f: string, source: string) => {
+        const bornes = importsExecutesDe(f, source).every((i) => IMPORTS_TERMINAL_VILLES_API.includes(i));
+        return directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source) && bornes;
+      },
+    },
+    {
+      // Recherche d'un lieu à soi de api (décision 0147 § 3, ticket 939) : non parcouru, imports exécutés bornés par nom.
+      fichier: "src/server/composition/lieux-api.ts",
+      admis: (f: string, source: string) => {
+        const bornes = importsExecutesDe(f, source).every((i) => IMPORTS_TERMINAL_LIEUX_API.includes(i));
+        return directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source) && bornes;
+      },
+    },
+    {
+      // Rappels par e-mail de api (M6c, ticket 1021) : non parcouru, imports exécutés bornés par nom.
+      fichier: "src/server/composition/rappels.ts",
+      admis: (f: string, source: string) => {
+        const bornes = importsExecutesDe(f, source).every((i) => IMPORTS_TERMINAL_RAPPELS.includes(i));
+        return directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source) && bornes;
+      },
+    },
   ],
 } as const;
+
+/**
+ * Arête nominative unique de la page de l'écran 1 (décision 0141 § 6.4 ; revue consolidée du head `bcaa346`, bloquant 1) :
+ * `src/app/(creation)/voyages/nouveau/page.tsx` → `src/server/composition/villes-api.ts`, sans régime d'entrée. Admise
+ * seulement si la page ne porte aucune directive (ni paquet client, ni action) et si le terminal porte sa propriété
+ * (`FRONTIERE_P0R3B.terminaux`) ; le terminal n'est alors pas parcouru. Aucune autre arête de la page n'est admise.
+ */
+const ARETE_PAGE_VILLES_API = { de: "src/app/(creation)/voyages/nouveau/page.tsx", vers: "src/server/composition/villes-api.ts" } as const;
+
+function aretePageVillesApiAdmise(de: string, vers: string, lire: (fichier: string) => string): boolean {
+  return de === ARETE_PAGE_VILLES_API.de && vers === ARETE_PAGE_VILLES_API.vers && directivesDuPrologue(de, lire(de)).length === 0 && terminalFrontiereAdmis(vers, lire);
+}
 
 /** Vrai si `fichier` est un terminal de la frontière de P0r3b dont la propriété est vérifiée sur sa source. */
 function terminalFrontiereAdmis(fichier: string, lire: (fichier: string) => string): boolean {
@@ -2087,6 +2262,10 @@ function atteintsServeurSeulement(
       const cible = specificateur === "?import-non-litteral" ? ({ type: "externe", nom: specificateur } as const) : resoudreCible(fichierCourant, specificateur);
       const cle = cible.type === "projet" ? cible.chemin : `externe:${cible.nom}`;
       const suivant = noeud(cle, viaAction);
+      // Arête nominative de la page de l'écran 1 vers le terminal de api : ni violation, ni parcours au-delà. Testée
+      // **avant** le marquage du nœud (revue du head `bc43913`, bloquant 1) : l'arête ne marque jamais le terminal comme
+      // vu, et un autre fichier qui l'importe directement reste contrôlé, quel que soit l'ordre du parcours.
+      if (!viaAction && cible.type === "projet" && aretePageVillesApiAdmise(fichierCourant, cle, lire)) continue;
       if (precedent.has(suivant)) continue;
       precedent.set(suivant, courant);
       // Terminal admis au-delà d'une entrée admise : ni violation, ni parcours au-delà.
@@ -2221,18 +2400,31 @@ describe("p0: clé côté serveur seulement", () => {
     expect(directivesDuPrologue("x.ts", '"use strict";\n"use server";\nexport {};\n')).toEqual(["use strict", "use server"]);
   });
 
-  it("frontière de P0r3b sur le dépôt : les trois entrées réelles, celle du webhook simulé (B4a) et le terminal portent leur propriété", () => {
+  it("frontière de P0r3b sur le dépôt : les trois entrées réelles, celles des webhooks simulé (B4a) et Stripe (B4c) et le terminal portent leur propriété", () => {
     expect(FRONTIERE_P0R3B.entrees.map((e) => e.fichier)).toEqual([
       "src/server/actions/p0-acces.ts",
       "src/server/actions/p0-lancement.ts",
       "src/server/actions/villes-essai.ts",
+      "src/server/actions/villes.ts",
+      "src/server/actions/retouches.ts",
+      "src/server/actions/lieux.ts",
+      "src/server/actions/rappels.ts",
       "src/server/routes/simulated-webhook.ts",
+      "src/server/routes/stripe-webhook.ts",
+      "src/server/routes/calendrier.ts",
+      "src/server/routes/compte-export.ts",
       "src/server/p0/page-acces.ts",
     ]);
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);
-    expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual(["src/workflows/index.ts", "src/server/composition/villes.ts"]);
+    expect(FRONTIERE_P0R3B.terminaux.map((t) => t.fichier)).toEqual([
+      "src/workflows/index.ts",
+      "src/server/composition/villes.ts",
+      "src/server/composition/villes-api.ts",
+      "src/server/composition/lieux-api.ts",
+      "src/server/composition/rappels.ts",
+    ]);
     for (const terminal of FRONTIERE_P0R3B.terminaux) expect(terminalFrontiereAdmis(terminal.fichier, lireDepot), terminal.fichier).toBe(true);
-    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./programme", "./recalcul", "./voyage-complet", "server-only", "workflow/api"]);
+    expect(importsExecutesDe("src/workflows/index.ts", lireDepot("src/workflows/index.ts")).sort()).toEqual(["./apercu", "./complet", "./p0-run", "./p0-run", "./programme", "./rappels", "./recalcul", "./region", "./voyage-complet", "server-only", "workflow/api"]);
     // Le lancement réel passe bien par le terminal : sans arrêt, il atteindrait les modules de P0.
     const versIndex = (f: string) => importsClientDe(f, lireDepot(f)).includes("@/workflows");
     expect(versIndex("src/server/p0/lancement.ts") && versIndex("src/server/p0/page-acces.ts")).toBe(true);
@@ -2325,6 +2517,114 @@ describe("p0: clé côté serveur seulement", () => {
     ]);
     // Sur le dépôt : imports exécutés du terminal réel, exactement la liste bornée.
     expect([...new Set(importsExecutesDe("src/server/composition/villes.ts", lireDepot("src/server/composition/villes.ts")))].sort()).toEqual([...IMPORTS_TERMINAL_VILLES].sort());
+  });
+
+  // Décision 0147 § 3 (M5d-1, ticket 939) : même forme que le terminal de la recherche de ville de api.
+  it("terminal de la recherche d'un lieu à soi (src/server/composition/lieux-api.ts) : admis au-delà de l'action lieux seulement, avec server-only, sans directive, imports bornés", () => {
+    const resoudreFictif = (depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/") ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` } : { type: "externe", nom: specificateur };
+    const SERVEUR = 'import "server-only";\n';
+    const LIEUX = 'import { b } from "@/server/composition/clients-google";\nimport { c } from "@/server/generation/barriere";\nimport { r } from "@/server/lieux/recherche";\n';
+    const depot = (lieux: string, action = '"use server";\nimport { v } from "@/server/composition/lieux-api";\n', depart = '"use client";\nimport { s } from "@/server/actions/lieux";\n') =>
+      new Map<string, string>([
+        ["src/features/Lieu.tsx", depart],
+        ["src/server/actions/lieux.ts", action],
+        ["src/server/composition/lieux-api.ts", lieux],
+        ["src/server/composition/clients-google.ts", `${SERVEUR}import { c } from "@/grounding/client-fictif";\n`],
+        ["src/grounding/client-fictif.ts", `${SERVEUR}import { k } from "@/server/env/grounding";\n`],
+      ]);
+    const violations = (...args: Parameters<typeof depot>) => {
+      const d = depot(...args);
+      return atteintsServeurSeulement(["src/features/Lieu.tsx"], (f) => d.get(f) ?? "", resoudreFictif).sort();
+    };
+    const PARCOURU = "src/features/Lieu.tsx → src/server/actions/lieux.ts → src/server/composition/lieux-api.ts";
+    expect(violations(`${SERVEUR}${LIEUX}`)).toEqual([]);
+    // Sans server-only, avec une directive, ou un import exécuté hors de la liste bornée (client réel, chemin d'essai, terminal des villes) : refusé.
+    for (const lieux of [
+      LIEUX,
+      `"use client";\n${SERVEUR}${LIEUX}`,
+      `${SERVEUR}${LIEUX}import { g } from "@/grounding/client-fictif";\n`,
+      `${SERVEUR}${LIEUX}import { p } from "@/server/p0/base";\n`,
+      `${SERVEUR}${LIEUX}import { v } from "@/server/config/villes";\n`,
+    ]) {
+      expect(violations(lieux), JSON.stringify(lieux)).toEqual([PARCOURU]);
+    }
+    // Action sans "use server", ou terminal atteint directement par un composant client : refusé.
+    expect(violations(`${SERVEUR}${LIEUX}`, 'import { v } from "@/server/composition/lieux-api";\n')).toEqual([PARCOURU]);
+    expect(violations(`${SERVEUR}${LIEUX}`, undefined, '"use client";\nimport { v } from "@/server/composition/lieux-api";\n')).toEqual([
+      "src/features/Lieu.tsx → src/server/composition/lieux-api.ts",
+    ]);
+  });
+
+  // Décision 0141 § 11 lignes 1 et 2 (PR 885) : même forme que le terminal du site d'essai.
+  it("terminal de la recherche de ville de api (src/server/composition/villes-api.ts) : admis au-delà de l'action villes ou par l'arête nominative de la page de l'écran 1 seulement, avec server-only, sans directive, imports bornés", () => {
+    const resoudreFictif = (depuis: string, specificateur: string): Cible =>
+      specificateur.startsWith("@/") ? { type: "projet", chemin: `src/${specificateur.slice(2)}.ts` } : { type: "externe", nom: specificateur };
+    const SERVEUR = 'import "server-only";\n';
+    const VILLES = 'import { a } from "@/lib/fuseaux";\nimport { b } from "@/server/composition/clients-google";\nimport { c } from "@/server/generation/barriere";\n';
+    const depot = (villes: string, action = '"use server";\nimport { v } from "@/server/composition/villes-api";\n', depart = '"use client";\nimport { s } from "@/server/actions/villes";\n') =>
+      new Map<string, string>([
+        ["src/features/Ville.tsx", depart],
+        ["src/server/actions/villes.ts", action],
+        ["src/server/composition/villes-api.ts", villes],
+        ["src/server/composition/clients-google.ts", `${SERVEUR}import { c } from "@/grounding/client-fictif";\n`],
+        ["src/grounding/client-fictif.ts", `${SERVEUR}import { k } from "@/server/env/grounding";\n`],
+      ]);
+    const violations = (...args: Parameters<typeof depot>) => {
+      const d = depot(...args);
+      return atteintsServeurSeulement(["src/features/Ville.tsx"], (f) => d.get(f) ?? "", resoudreFictif).sort();
+    };
+    const PARCOURU = "src/features/Ville.tsx → src/server/actions/villes.ts → src/server/composition/villes-api.ts";
+    expect(violations(`${SERVEUR}${VILLES}`)).toEqual([]);
+    // Sans server-only, avec une directive, ou un import exécuté hors de la liste bornée (chemin d'essai, client réel) : refusé.
+    for (const villes of [VILLES, `"use client";\n${SERVEUR}${VILLES}`, `${SERVEUR}${VILLES}import { g } from "@/grounding/client-fictif";\n`, `${SERVEUR}${VILLES}import { p } from "@/server/p0/base";\n`]) {
+      expect(violations(villes), JSON.stringify(villes)).toEqual([PARCOURU]);
+    }
+    expect(violations(`${SERVEUR}${VILLES}`, 'import { v } from "@/server/composition/villes-api";\n')).toEqual([PARCOURU]);
+    expect(violations(`${SERVEUR}${VILLES}`, undefined, '"use client";\nimport { v } from "@/server/composition/villes-api";\n')).toEqual([
+      "src/features/Ville.tsx → src/server/composition/villes-api.ts",
+    ]);
+    // La page de l'écran 1 : une seule arête admise, vers ce terminal, sans directive ; avec "use client" ou "use server",
+    // ou un terminal qui ne porte plus sa propriété, l'arête est refusée.
+    const PAGE = "src/app/(creation)/voyages/nouveau/page.tsx";
+    const page = (source: string, villes = `${SERVEUR}${VILLES}`) =>
+      atteintsServeurSeulement([PAGE], (f) => (f === PAGE ? source : (depot(villes).get(f) ?? "")), resoudreFictif).sort();
+    const VERS_TERMINAL = `${PAGE} → src/server/composition/villes-api.ts`;
+    expect(page('import { o } from "@/server/composition/villes-api";\n')).toEqual([]);
+    expect(page('"use client";\nimport { o } from "@/server/composition/villes-api";\n')).toEqual([VERS_TERMINAL]);
+    expect(page('"use server";\nimport { o } from "@/server/composition/villes-api";\n')).toEqual([VERS_TERMINAL]);
+    expect(page('import { o } from "@/server/composition/villes-api";\n', `${SERVEUR}${VILLES}import { p } from "@/server/p0/base";\n`)).toEqual([VERS_TERMINAL]);
+    // Aucune autre arête : la page n'est pas une entrée (revue du head `bcaa346`, bloquant 1).
+    expect(page('import { o } from "@/server/composition/villes-api";\nimport { e } from "@/server/env/index";\n')).toEqual([`${PAGE} → src/server/env/index.ts`]);
+    expect(page('import { o } from "@/server/composition/villes";\n')).toEqual([`${PAGE} → src/server/composition/villes.ts`]);
+    const refusParRelais = (specificateur: string, relais: string) =>
+      atteintsServeurSeulement(
+        [PAGE],
+        (f) => (f === PAGE ? `import { x } from "${specificateur}";\n` : f === relais ? `${SERVEUR}import { k } from "@/server/env/p0";\n` : ""),
+        resoudreFictif,
+      );
+    expect(refusParRelais("@/server/p0/base", "src/server/p0/base.ts")).toEqual([`${PAGE} → src/server/p0/base.ts → src/server/env/p0.ts`]);
+    expect(refusParRelais("@/server/p0/acces", "src/server/p0/acces.ts")).toEqual([`${PAGE} → src/server/p0/acces.ts → src/server/env/p0.ts`]);
+    expect(refusParRelais("@/workflows", "src/workflows.ts")).toEqual([`${PAGE} → src/workflows.ts → src/server/env/p0.ts`]);
+    // Deux départs, dans les deux ordres (revue du head `bc43913`, bloquant 1) : l'arête de la page ne masque jamais
+    // l'import direct du terminal par un autre fichier (composant client ou autre page).
+    for (const autre of ["src/features/Ville.tsx", "src/app/(a)/page.tsx"]) {
+      const sources = new Map<string, string>([
+        [PAGE, 'import { o } from "@/server/composition/villes-api";\n'],
+        [autre, `${autre.endsWith("Ville.tsx") ? '"use client";\n' : ""}import { o } from "@/server/composition/villes-api";\n`],
+      ]);
+      const lireDeux = (f: string) => sources.get(f) ?? depot(`${SERVEUR}${VILLES}`).get(f) ?? "";
+      for (const departs of [[PAGE, autre], [autre, PAGE]]) {
+        expect(atteintsServeurSeulement(departs, lireDeux, resoudreFictif), departs.join(", ")).toEqual([`${autre} → src/server/composition/villes-api.ts`]);
+      }
+    }
+    // Sur le dépôt : la page n'est pas une entrée, et son arête vers le terminal est admise.
+    expect(FRONTIERE_P0R3B.entrees.map((e) => e.fichier)).not.toContain(PAGE);
+    expect(aretePageVillesApiAdmise(PAGE, "src/server/composition/villes-api.ts", lireDepot)).toBe(true);
+    // Sur le dépôt : imports exécutés du terminal réel, exactement la liste bornée.
+    expect([...new Set(importsExecutesDe("src/server/composition/villes-api.ts", lireDepot("src/server/composition/villes-api.ts")))].sort()).toEqual(
+      [...IMPORTS_TERMINAL_VILLES_API].sort(),
+    );
   });
 
   /**

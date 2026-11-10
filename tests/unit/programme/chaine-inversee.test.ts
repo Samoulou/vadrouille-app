@@ -130,8 +130,8 @@ function voyageDeRome(ancre: (rang: number) => boolean = () => true) {
 }
 
 describe("chaîne inversée : choix de la chaîne (0136 § 4)", () => {
-  it('CHAINE_APERCU vaut "ancienne" dans M1a-2 (M1a-3 la passe à "inversee") ; garde du récit fermée (0139 § 1.2 point 6)', () => {
-    expect(CHAINE_APERCU).toBe("ancienne");
+  it('CHAINE_APERCU vaut "inversee" depuis M1a-3 (attente modifiée (2) de 0136 § 9 : "ancienne" dans M1a-2) ; garde du récit fermée (0139 § 1.2 point 6)', () => {
+    expect(CHAINE_APERCU).toBe("inversee");
     expect(RECIT_API_AUTORISE).toBe(false);
   });
 
@@ -387,6 +387,7 @@ describe("chaîne inversée : lignes « À faire » (0136 § 3.3 ; 0139 § 3 con
       "Venir tôt",
     ].map((label, rang) => ({
       id: `bon-plan-${rang + 1}`,
+      kind: "other" as const,
       label,
       when: { type: "beforeDeparture" as const },
       done: false,
@@ -516,8 +517,23 @@ describe("journal: generation.programme_written (0139 § 2)", () => {
         "errorName",
       ].sort(),
     );
-    expect([...CHAMPS_ADMIS_PAR_EVENEMENT.keys()]).toEqual([
+    // Décision 0141 § 6.3 point 4 (PR 885) : `ville.refusee` et `ville.purge_failed` ont aussi leur liste fermée.
+    // Décision 0147 § 12 S1 point 4 (M5c, ticket 904) : `voyages.stop_reported`, motif seul.
+    // Décision 0147 § 12 S1 point 5 (M5d-1, ticket 939) : `lieu.recherche`, motif, nombre de résultats et diagnostic fermé.
+    // Décision 0155 § 2.4 (M5d-4, ticket 976) : `recalcul.lieux_a_soi`, deux compteurs.
+    // Spécification M6 § 4 (M6b, ticket 1005) : `calendrier.version_unavailable`, aucun champ.
+    // Décision 0144 § 5.3 point 4 (B4e, ticket 887) : `payment.receipt_unavailable`, `eventId` et raison fermée.
+    // Spécification M9 § 6.1 (M9a, ticket 1097) : `compte.export_failed`, nom de l'erreur seulement.
+    expect([...CHAMPS_ADMIS_PAR_EVENEMENT.keys()].sort()).toEqual([
+      "calendrier.version_unavailable",
+      "compte.export_failed",
       "generation.programme_written",
+      "lieu.recherche",
+      "payment.receipt_unavailable",
+      "recalcul.lieux_a_soi",
+      "ville.purge_failed",
+      "ville.refusee",
+      "voyages.stop_reported",
     ]);
     // Ligne `warn` : le nom de l'erreur passe, jamais son message.
     const warn = JSON.parse(

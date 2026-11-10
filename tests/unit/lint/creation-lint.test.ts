@@ -68,6 +68,52 @@ describe("création du voyage : imports", () => {
   });
 });
 
+describe("création du voyage : exception de la page de l'écran 1 (décision 0141 § 6.4)", () => {
+  // Revue consolidée du head `bcaa346`, bloquant 2 : limites de `SERVER_PATTERN_PAGE_VILLES` (eslint.config.mjs).
+  const PAGE = "src/app/(creation)/voyages/nouveau/page.tsx";
+
+  it("@/server/composition/villes-api admis dans la page de l'écran 1, et seulement là", async () => {
+    const predicat = 'import { rechercheVilleApiOuverte } from "@/server/composition/villes-api";\nexport const x = rechercheVilleApiOuverte;\n';
+    expect(await messagesFor(predicat, PAGE, IMPORTS)).toHaveLength(0);
+    expect(await messagesFor(importOf("@/server/actions/villes"), PAGE, IMPORTS)).toHaveLength(0);
+    for (const ailleurs of ["src/app/(creation)/voyages/nouveau/brief/page.tsx", "src/app/(creation)/voyages/nouveau/lancer/page.tsx", "src/features/creation/Exemple.tsx"]) {
+      expect((await messagesFor(predicat, ailleurs, IMPORTS)).length, ailleurs).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(["barriereApi", "suggererVillesApiTerminal", "choisirVilleApiTerminal", "journaliserExceptionApi", "NIVEAUX_VILLE_API"])(
+    "nom %s de villes-api refusé dans la page de l'écran 1 (seul rechercheVilleApiOuverte est admis)",
+    async (nom) => {
+      const code = `import { ${nom} } from "@/server/composition/villes-api";\nexport const x = ${nom};\n`;
+      expect((await messagesFor(code, PAGE, IMPORTS)).length).toBeGreaterThan(0);
+      expect((await messagesFor(importOf("@/server/composition/villes-api"), PAGE, IMPORTS)).length).toBeGreaterThan(0);
+    },
+  );
+
+  it("les autres motifs du bloc restent actifs dans la page : src/mocks, carte simulée, simulations", async () => {
+    expect((await messagesFor(importOf("@/mocks/creation-edimbourg"), PAGE, IMPORTS)).length).toBeGreaterThan(0);
+    expect((await messagesFor(importOf("@/components/carte/SimulatedMapRenderer"), PAGE, IMPORTS)).length).toBeGreaterThan(0);
+    expect((await messagesFor(importOf("@/adapters/simulation"), PAGE, IMPORTS)).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    "@/server/composition/villes",
+    "@/server/composition/generation",
+    "@/server/composition/villes-api/x",
+    "@/server/env",
+    "@/server/env/index",
+    "@/server/env/grounding",
+    "@/server/p0/page-acces",
+    "@/server/p0/base",
+    "@/server/config/villes",
+    "@/server/config/usage",
+    "../../server/composition/villes-api",
+    "../../../../server/composition/villes-api",
+  ])("%s refusé dans la page de l'écran 1", async (source) => {
+    expect((await messagesFor(importOf(source), PAGE, IMPORTS)).length).toBeGreaterThan(0);
+  });
+});
+
 describe("création du voyage : aucun journal", () => {
   it.each([
     "src/features/creation/Exemple.tsx",

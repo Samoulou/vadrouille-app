@@ -33,7 +33,12 @@ function voisin(ligne: DayLineItem | undefined): ProposalNeighbour | undefined {
       return { type: "free" };
     case "terminus":
       return { type: "terminus", role: ligne.role };
-    default:
+    case "segment":
+      return undefined;
+    case "transfer":
+      // Changement de ville (décision 0151 § 4) : jamais un voisin ; le site d'essai, à une seule ville, n'en a pas.
+      return undefined;
+    case undefined:
       return undefined;
   }
 }

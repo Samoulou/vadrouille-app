@@ -107,6 +107,25 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // M5d-2 (spécification M5 § 6 ; décision 0147 § 14) : « Ajouter un lieu » (F7c), sur le voyage débloqué du jeu simulé
+    // (l'ajout n'est proposé qu'après le déblocage, M5-PO-1). Route à part, chargée seulement depuis la Journée : le
+    // JavaScript initial reste sous le seuil (décision 0152) ; Lighthouse journalisé, comme R14.
+    id: "R-ajouter",
+    path: `/voyages/${INVENTORY_TRIP}_debloque/jour/2/ajouter`,
+    page: "voyages/[id]/(programme)/jour/[n]/ajouter/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "seuil" },
+  },
+  {
+    // M5b (spécification M5 § 4 ; décision 0147 § 5.3 point 3) : « Versions du programme », sur le voyage débloqué du jeu
+    // simulé (le lien du Séjour et la page n'existent qu'après le déblocage, M5-PO-1) ; budgets en `journal`, comme R14.
+    id: "R-versions",
+    path: `/voyages/${INVENTORY_TRIP}_debloque/versions`,
+    page: "voyages/[id]/(programme)/versions/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     // F10a : écran 15 « Aujourd'hui » ; hors des dates du voyage simulé, l'état mesuré est « avant le voyage ».
     id: "R15",
     path: `${TRIP}/aujourdhui`,
@@ -141,6 +160,17 @@ export const ROUTES: readonly RouteEntry[] = [
     path: `${TRIP}/debloquer/confirmation?paiement=[paiementId]`,
     page: "voyages/[id]/debloquer/confirmation/page.tsx",
     prepare: "confirmation-en-attente",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    // B4d (PR 878) : reçu maison du paiement simulé en base (`PAYMENT_ADAPTER=simulated`, projet `api`). Le serveur
+    // mesuré (adaptateur de paiement `mock`, sans reçu) sert la page introuvable ; la page réelle est éprouvée par
+    // `tests/e2e/debloquer-api.api.spec.ts` (axe compris).
+    id: "R9-recu",
+    path: `${TRIP}/debloquer/recu`,
+    page: "voyages/[id]/debloquer/recu/page.tsx",
+    status: 404,
     states: [],
     budgets: { lighthouse: "journal", javascript: "journal" },
   },

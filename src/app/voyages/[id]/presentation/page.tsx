@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getTripReader, isPrototypeAdapter, paymentAvailable } from "@/adapters";
+import { getTripReader, isPrototypeAdapter, paymentAvailable, photosDuTriActives } from "@/adapters";
 import { devPagesEnabled } from "@/dev/flags";
 import { exigerSession } from "@/features/compte/session";
 import { loadPresentation } from "@/features/presentation/load";
@@ -22,7 +22,9 @@ export const metadata: Metadata = {
  * Lecture par `getTripReader()` : après un paiement simulé réussi, l'écran 6 devient 6b (décision 0020
  * § 3). Lien « Débloquer » de la fin de l'aperçu seulement si le paiement simulé est disponible (F9-PO-19).
  * Mesures : console en développement et dans les tests sur le build de production (pages de
- * développement actives), aucun enregistrement en production tant que F6-Q3 est ouverte. Sans session
+ * développement actives), aucun enregistrement en production tant que F6-Q3 est ouverte. Photos du tri
+ * (décision 0128 ; ticket 879) : demandées sur le site d'essai, et sur `api` barrière ouverte seulement
+ * (`photosDuTriActives`) ; sinon l'emplacement « Photo du lieu » reste, sans appel. Sans session
  * (`better-auth`, B3c) : redirection vers l'écran 4.
  */
 export default async function PresentationPage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,11 +33,14 @@ export default async function PresentationPage({ params }: { params: Promise<{ i
   if (!data) {
     notFound();
   }
+  const photos = await photosDuTriActives();
   return (
     <PresentationScreen
       {...data}
       canUnlock={paymentAvailable()}
-      placesFromGoogle={isPrototypeAdapter()}
+      // Décision 0143 § 5 : une photo Google affichée sur `api` porte aussi « Données de lieux : Google » (0128 § 3).
+      placesFromGoogle={isPrototypeAdapter() || photos}
+      photos={photos}
       recorderKind={devPagesEnabled() ? "console" : "none"}
     />
   );

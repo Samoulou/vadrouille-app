@@ -51,9 +51,17 @@ describe("valeurs de F11a (décision 0021 § 1.1)", () => {
     expect(contracts.StopSchema.shape.kind.options).toEqual([...STOP_KINDS]);
   });
 
-  it("countToReserve compte les lignes non faites", () => {
+  it("countToReserve compte les seules réservations non faites (décision 0147 § 6.2)", () => {
     expect(countToReserve([])).toBe(0);
-    expect(countToReserve([{ done: true }, { done: false }, { done: false }])).toBe(2);
+    expect(
+      countToReserve([
+        { kind: "reservation", done: true },
+        { kind: "reservation", done: false },
+        { kind: "reservation", done: false },
+        { kind: "ticket", done: false },
+        { kind: "other", done: false },
+      ]),
+    ).toBe(2);
   });
 });
 

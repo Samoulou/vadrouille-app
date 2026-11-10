@@ -800,7 +800,7 @@ export function etapePlanification(entree: unknown, dependances?: DependancesGen
       await publier(
         contexte.dep,
         { organizationId: contexte.organizationId, generationRunId: contexte.generationRunId, tripId: contexte.tripId, requestId: contexte.requestId, echeance: contexte.echeance },
-        { instantane, cases, statut: pretes === CASES_APERCU ? "ready" : "incomplete", ...(ecrirePositions === undefined ? {} : { ecrirePositions }) },
+        { instantane, instantanePrecedent: null, cases, statut: pretes === CASES_APERCU ? "ready" : "incomplete", ...(ecrirePositions === undefined ? {} : { ecrirePositions }) },
       );
     },
     dependances,

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -11,11 +13,13 @@ import {
   useReducer,
   useRef,
   useState,
+  type FocusEvent,
   type ReactNode,
 } from "react";
 import { flushSync } from "react-dom";
 
 import { DayMap } from "@/components/carte/DayMap";
+import { buildDayRoute, moitieInitiale, type Moitie } from "@/components/carte/route";
 import { DayTabs } from "@/components/ligne/DayTabs";
 import { IconRetour } from "@/components/ligne/icons";
 import { Sheet } from "@/components/ligne/Sheet";
@@ -26,8 +30,10 @@ import { weekdayOf } from "@/contracts/values";
 import * as messages from "@/i18n/messages";
 import { ShareButton } from "@/features/partage/ShareButton";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
+import { aPlusieursVilles, estChangementDeVille, villeDeLaDate } from "@/features/voyage/villes";
 import { cn } from "@/lib/utils";
 
+import { villeDeLaPastille } from "./pastille-ville";
 import { DAY_LIST_ID, PLACES_FROM_GOOGLE } from "./constants";
 import { findFicheTarget, type FicheTarget } from "./fiche";
 import {
@@ -36,16 +42,27 @@ import {
   createMemoryProgramme,
   createMemoryProgrammeStore,
   programmeReducer,
+  sendToMemoryStore,
   type ProgrammeActions,
+  type ProgrammeEvent,
 } from "./programme";
 import { layoutFitPadding, layoutVisibleInsets, useMapLayout } from "./map-layout";
 import { HIGHLIGHT_MS, type RevisionActions } from "./revision";
+import { createServerRevision, createServerRevisionStore, recordServerRevert, syncServerRevisionVersion } from "./revision-serveur";
 import { tripRoutes, type TripRoutes, type TripRoutesBase } from "./routes";
 
 const t = messages.sejour;
 
+// Choix « Afficher sur la carte » (décision 0150) : rendu seulement à plusieurs villes ; chargé à la demande (décision 0152 § 4).
+const SegmentedControl = lazy(() => import("@/components/ligne/SegmentedControl").then((loaded) => ({ default: loaded.SegmentedControl })));
+
 /** Hauteur du panneau relevée par un marqueur, une fiche ou le lien d'évitement quand il est au plus bas (F5-PO-7, F5-PO-8). */
 const LOWEST: SnapPoint = 0.25;
+/** Option « Toutes les villes » du choix « Afficher sur la carte » (décision 0150 § 2 point 4). */
+const TOUTES_LES_VILLES = "toutes";
+/** Préfixe des options d'une ville : un nom de ville ne se confond jamais avec « toutes ». */
+const OPTION_VILLE = "ville:";
+
 /** Hauteur la plus haute du panneau : son bord est alors à hauteur de « Retour », posé sur la carte. */
 const HIGHEST: SnapPoint = Math.max(...SNAP_POINTS) as SnapPoint;
 
@@ -55,6 +72,10 @@ interface ToastState {
   message: string;
   /** Appelé après l'annulation (par exemple pour rendre le focus au bouton d'origine). */
   afterUndo?: () => void;
+  /** Toast revenu après une annulation qui n'a pas abouti : « Annuler » reprend le focus. */
+  refocus?: boolean;
+  /** Annulation propre à cette modification (retour à une version, M5b) ; sinon `actions.undo()`. */
+  undo?: () => Promise<void>;
 }
 
 /** Fiche fermée dont le lien d'origine doit reprendre le focus (handover § 7). */
@@ -70,6 +91,12 @@ export interface ClosedFiche {
 export interface FocusRequest {
   dayIndex: number;
   stopId?: Stop["id"];
+  /**
+   * Élément d'origine d'un écran quitté sans rien appliquer (« Ajouter un lieu », M5d-2 ; F7-PO-8) : `data-part` de
+   * l'entrée, le premier présent dans la Journée (« Ajouter à ma journée », puis « Surprends-moi » si l'idée est
+   * refermée), sinon le titre du jour.
+   */
+  originParts?: readonly string[];
 }
 
 /** Étapes surlignées 2 s après « Appliquer » (décision 0016 § 9). */
@@ -92,6 +119,11 @@ export interface AppliedChange {
   originStopId?: Stop["id"];
   /** Appelé une fois l'annulation résolue (mesure `replace_undone`). */
   onUndone?: () => void;
+  /**
+   * Annulation propre à cette modification (ajout d'un lieu à soi enregistré sur `api`, M5d-2 : un retour vers la version
+   * d'avant) ; sinon `actions.undo()`. Lève en cas d'échec : le toast revient avec l'annonce de l'échec.
+   */
+  undo?: () => Promise<void>;
 }
 
 export interface TripShellValue {
@@ -123,6 +155,8 @@ export interface TripShellValue {
   /** Focus à poser par la Journée, ou `null` ; la Journée le consomme. */
   focusRequest: FocusRequest | null;
   consumeFocusRequest: () => void;
+  /** Demande un focus à la Journée (retour d'un écran sans application, F7-PO-8). */
+  requestFocus: (request: FocusRequest) => void;
   /** Adresse de l'écran 14 ouvert depuis la fiche (« Remplacer ») : « Retour à la fiche » revient alors dans l'historique. */
   replaceOrigin: string | null;
   markReplaceOrigin: (href: string | null) => void;
@@ -140,8 +174,48 @@ export interface TripShellValue {
   placesFromGoogle: boolean;
   /** Adresse de l'écran 9 « Débloquer » pour un voyage non débloqué, paiement simulé disponible ; sinon `null`. */
   unlockHref: string | null;
+  /** « Signaler une erreur » sur la fiche (M5c) : adaptateurs `mock` et `api`, routes `/voyages`, décidé côté serveur. */
+  reportable: boolean;
+  /**
+   * « Verrouiller » sur la fiche : toujours avec l'implémentation en mémoire ; avec la révision enregistrée (adaptateur `api`,
+   * M5a), sur un voyage débloqué seulement (M5-PO-1 ; le serveur refuse aussi, `not_unlocked`).
+   */
+  lockable: boolean;
+  /**
+   * Fiche d'un engagement en lecture seule (« Déjà réservé », ni « Verrouiller », ni « Déplacer », ni « Remplacer ») : avec la
+   * révision enregistrée (adaptateur `api`, M5a ; M5-PO-3) seulement ; l'implémentation en mémoire (`mock`) est inchangée.
+   */
+  commitmentReadOnly: boolean;
   /** Retire `etape` inconnu de l'adresse et annonce l'absence (F5-PO-8). */
   reportMissingEtape: () => void;
+  /**
+   * Adresse de « Versions du programme » (M5b ; spécification M5 § 4) : voyage débloqué, adaptateurs `mock` et `api`,
+   * routes `/voyages` (décidé côté serveur par la mise en page) ; sinon `null` (ni lien, ni page).
+   */
+  versionsHref: string | null;
+  /**
+   * Retour à une version appliqué (M5b) : toast « Programme rétabli. » ; son « Annuler » appelle `undo` (un retour vers la
+   * version d'avant), qui lève en cas d'échec (le toast revient avec l'annonce de l'échec).
+   */
+  notifyReverted: (message: string, undo: () => Promise<void>) => void;
+  /**
+   * Version écrite par un retour ou par son annulation (M5b) : base des gestes suivants de la révision enregistrée
+   * (`api`), écarts locaux retirés, puis relecture du voyage.
+   */
+  recordRevert: (version: number) => void;
+  /** L'écran des versions signale son montage (`true`) et son démontage (`false`) : « Retour » mène alors au Séjour. */
+  markVersionsOpen: (open: boolean) => void;
+  /**
+   * « Ajouter un lieu » (M5d-2 ; spécification M5 § 6) : voyage débloqué (M5-PO-1), adaptateurs `mock` et `api`, routes
+   * `/voyages` (même condition serveur que les versions, `versionable`) ; sinon faux (ni bouton, ni formulaire).
+   */
+  addPlaceAvailable: boolean;
+  /**
+   * Ajout d'un lieu à soi appliqué (M5d-2) : les jours de l'aperçu s'affichent aussitôt. Sur `api` (`version` non nulle),
+   * la version écrite devient la base des gestes suivants (la modification précédente devient définitive), puis le voyage
+   * est relu ; sans révision enregistrée (`mock`), l'ajout reste en mémoire, annulable par `actions.undo()` (Q762).
+   */
+  showAddedPlace: (days: readonly Day[], version: number | null) => void;
 }
 
 const TripShellContext = createContext<TripShellValue | null>(null);
@@ -194,6 +268,12 @@ export interface TripShellProps {
   revision?: RevisionActions;
   /** Jeu simulé de révision lu par la mise en page (adaptateur `mock`) ; sans lui, aucune option compatible. */
   revisionFixtures?: RevisionFixtures | null;
+  /**
+   * Version courante du voyage pour la révision enregistrée (adaptateur `api`, M1g), lue par la mise en page : non nulle,
+   * le remplacement d'une étape et son annulation passent par les actions serveur (`revision-serveur.ts`) ; nulle ou
+   * absente, l'implémentation en mémoire.
+   */
+  revisionVersion?: number | null;
   /** Données de lieux Google (adaptateur `prototype`, spécification P0) ; `PLACES_FROM_GOOGLE` par défaut. */
   placesFromGoogle?: boolean;
   /**
@@ -206,6 +286,16 @@ export interface TripShellProps {
    * (voyage non débloqué, paiement simulé disponible, base `/voyages`) ; absente par défaut.
    */
   unlockHref?: string | null;
+  /**
+   * « Signaler une erreur » sur la fiche d'une étape (tâche M5c ; spécification M5 § 5) : décidé côté serveur par la mise en
+   * page (adaptateur `mock` ou `api`, base `/voyages`) ; absent par défaut.
+   */
+  reportable?: boolean;
+  /**
+   * « Versions du programme » (tâche M5b ; spécification M5 § 4) : décidé côté serveur par la mise en page (adaptateur
+   * `mock` ou `api`, base `/voyages`) ; le lien n'est montré que sur un voyage débloqué (M5-PO-1). Absent par défaut.
+   */
+  versionable?: boolean;
   children: ReactNode;
 }
 
@@ -224,9 +314,12 @@ export function TripShell({
   actions: injected,
   revision: injectedRevision,
   revisionFixtures = null,
+  revisionVersion = null,
   placesFromGoogle = PLACES_FROM_GOOGLE,
   shareable = false,
   unlockHref = null,
+  reportable = false,
+  versionable = false,
   children,
 }: TripShellProps) {
   const routes = useMemo(() => tripRoutes(base, sourceTrip.id), [base, sourceTrip.id]);
@@ -244,9 +337,40 @@ export function TripShell({
     () => createMemoryProgramme(sourceTrip, dispatch, revisionFixtures, memoryStore),
     [sourceTrip, revisionFixtures, memoryStore],
   );
-  const actions = injected ?? memory;
-  const revision = injectedRevision ?? memory;
+  // Révision enregistrée (adaptateur `api`, M1g) : état gardé pour la vie du shell, comme celui de la mémoire.
+  const [serverStore] = useState(() => (revisionVersion === null ? null : createServerRevisionStore(revisionVersion)));
+  const send = useCallback((event: ProgrammeEvent) => sendToMemoryStore(memoryStore, dispatch, event), [memoryStore]);
+  // Relecture du voyage demandée après une écriture : tout de suite, ou une fois l'écran 14 quitté (son étape n'existe plus).
+  const [writes, setWrites] = useState(0);
+  const refreshedWrites = useRef(0);
+  const afterWrite = useCallback(() => setWrites((count) => count + 1), []);
+  const server = useMemo(
+    () =>
+      serverStore === null
+        ? null
+        : createServerRevision({
+            tripId: sourceTrip.id,
+            store: serverStore,
+            memory,
+            currentDays: () => applyProgramme(sourceTrip, memoryStore.state).days,
+            showDays: (days) => send({ type: "applyRevision", days }),
+            afterWrite,
+          }),
+    [serverStore, sourceTrip, memory, memoryStore, send, afterWrite],
+  );
+  const actions = injected ?? server ?? memory;
+  // Verrou enregistré (M5a) : jamais proposé avant le déblocage.
+  const lockable = serverStore === null || sourceTrip.unlocked;
+  const commitmentReadOnly = serverStore !== null;
+  const revision = injectedRevision ?? server ?? memory;
   const trip = useMemo(() => applyProgramme(sourceTrip, programme), [sourceTrip, programme]);
+  // Voyage relu (révision enregistrée) : les jours affichés en attendant la relecture sont retirés.
+  useEffect(() => {
+    if (serverStore !== null) send({ type: "rebase" });
+  }, [sourceTrip, serverStore, send]);
+  useEffect(() => {
+    if (serverStore !== null && revisionVersion !== null) syncServerRevisionVersion(serverStore, revisionVersion);
+  }, [serverStore, revisionVersion]);
 
   const nParam = Array.isArray(params.n) ? params.n[0] : params.n;
   const day = nParam === undefined ? undefined : trip.days.find((candidate) => String(candidate.index) === nParam);
@@ -254,6 +378,11 @@ export function TripShell({
   // Écran 14 (`…/remplacer/[stopId]`) : l'étape remplacée est sélectionnée sur la carte (F7-PO-2).
   const stopParam = Array.isArray(params.stopId) ? params.stopId[0] : params.stopId;
   const replaceStopId = stopParam === undefined ? undefined : safeDecode(stopParam);
+  useEffect(() => {
+    if (writes === refreshedWrites.current || replaceStopId !== undefined) return;
+    refreshedWrites.current = writes;
+    router.refresh();
+  }, [writes, replaceStopId, router]);
   const replaceTarget =
     day && replaceStopId !== undefined
       ? day.items.some((item) => item.type === "stop" && item.stop.id === replaceStopId)
@@ -261,9 +390,27 @@ export function TripShell({
         : undefined
       : undefined;
 
+  // Carte à plusieurs villes (décision 0150) : ville de chaque jour (`villesDeLaDate`), noms maison de `Trip.cities`.
+  const cities = trip.cities;
+  const villes = useMemo(() => (aPlusieursVilles(cities) ? cities.map((city) => city.name) : undefined), [cities]);
+  const villesParJour = useMemo(
+    () => (villes ? trip.days.map((candidate) => villeDeLaDate(cities, candidate.date)) : undefined),
+    [villes, cities, trip.days],
+  );
+  const sejourAPositions = maps.some((map) => map.points.length > 0);
+  const dayMapData = day ? (maps.find((candidate) => candidate.dayIndex === day.index) ?? null) : null;
+  const villeDuJour = day ? villeDeLaDate(cities, day.date) : undefined;
+  const changement = estChangementDeVille(villeDuJour) ? villeDuJour : undefined;
+  const jourDeChangement = changement !== undefined;
+  // Tracé du jour, calculé une fois et passé à la carte ; un changement de ville y lit ses moitiés (avant et après le `transfer`).
+  const routeDuJour = useMemo(() => (day ? buildDayRoute(day, dayMapData) : null), [day, dayMapData]);
+  const moities = jourDeChangement && routeDuJour?.moities && routeDuJour.positions.length > 0 ? routeDuJour : null;
+  // Étiquettes de ville dessinées : Séjour à 2 villes ou plus, Journée d'un changement de ville à deux terminus distincts.
+  const etiquettes = day ? (moities?.termini.length ?? 0) === 2 : villes !== undefined && sejourAPositions;
+
   // Hauteur du panneau, mesures de `main`, marge du cadrage et partie couverte de la carte (module commun).
   const [snap, setSnap] = useState<SnapPoint>(DEFAULT_SNAP);
-  const { mainRef, largeScreen, visibleInsets, fitPadding, fitScope } = useMapLayout(snap);
+  const { mainRef, largeScreen, visibleInsets, fitPadding, fitScope } = useMapLayout(snap, etiquettes);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Fiche : ouverte depuis le panneau du jour (« Fermer » revient dans l'historique) ou directement.
@@ -336,6 +483,23 @@ export function TripShell({
           ? markerSelection.stopId
           : undefined;
 
+  // Vue de la carte (décision 0150, état d'écran, ni dans l'adresse ni stocké). Séjour : « Toutes les villes » à chaque
+  // affichage. Journée d'un changement de ville : moitié initiale à chaque changement de jour (§ 3 point 4), puis celle de
+  // l'étape sélectionnée quand elle est dans l'autre moitié (§ 3 point 5).
+  const [vueSejour, setVueSejour] = useState<{ dayIndex?: number; ville?: string }>({});
+  if (dayIndex !== vueSejour.dayIndex) setVueSejour({ dayIndex });
+  const villeChoisie = dayIndex === vueSejour.dayIndex ? vueSejour.ville : undefined;
+  const [moitieSuivie, setMoitieSuivie] = useState<{ dayIndex?: number; selection?: string; moitie: Moitie | null }>({ moitie: null });
+  let moitie = moitieSuivie.moitie;
+  if (dayIndex !== moitieSuivie.dayIndex) {
+    moitie = moities ? moitieInitiale(moities, selectedStopId) : null;
+    setMoitieSuivie({ dayIndex, selection: selectedStopId, moitie });
+  } else if (selectedStopId !== moitieSuivie.selection) {
+    const autre = moities?.stops.find((stop) => stop.stopId === selectedStopId)?.moitie;
+    if (autre) moitie = autre;
+    setMoitieSuivie({ dayIndex, selection: selectedStopId, moitie });
+  }
+
   // Marqueur touché : panneau relevé à 55 % s'il était à 25 %, liste défilée jusqu'à l'étape, focus laissé
   // sur le marqueur, adresse inchangée (F5-PO-7, F4-PO-4). Fiche ouverte : elle se ferme (adresse du jour
   // remplacée, sans nouvelle entrée d'historique), l'étape du marqueur devient l'étape sélectionnée, et le
@@ -392,6 +556,36 @@ export function TripShell({
     router.replace(routes.jour(dayIndex), { scroll: false });
   }, [dayIndex, router, routes]);
 
+  // « Versions du programme » (M5b) : voyage débloqué seulement (M5-PO-1 ; le serveur refuse aussi, `not_unlocked`).
+  const versionsRoute = routes.versions();
+  const versionsHref = versionable && sourceTrip.unlocked ? versionsRoute : null;
+  // Écran des versions monté (il le signale) : « Retour » sur la carte mène au Séjour, comme depuis une Journée.
+  const [onVersions, setOnVersions] = useState(false);
+  const markVersionsOpen = useCallback((open: boolean) => setOnVersions(open), []);
+  // « Ajouter un lieu » (M5d-2) : même condition serveur que les versions, voyage débloqué seulement (M5-PO-1).
+  const addPlaceAvailable = versionable && sourceTrip.unlocked;
+  const showAddedPlace = useCallback(
+    (days: readonly Day[], version: number | null) => {
+      if (serverStore !== null && version !== null) {
+        recordServerRevert(serverStore, version);
+        send({ type: "applyRevision", days });
+        afterWrite();
+        return;
+      }
+      send({ type: "applyRevision", days });
+    },
+    [serverStore, send, afterWrite],
+  );
+  const recordRevert = useCallback(
+    (version: number) => {
+      // Le retour rend définitive toute modification précédente (une seule modification annulable à la fois).
+      if (serverStore !== null) recordServerRevert(serverStore, version);
+      send({ type: "reset" });
+      afterWrite();
+    },
+    [serverStore, send, afterWrite],
+  );
+
   // Toast d'annulation, partagé par le verrou de F5 et les révisions de F7 (décision 0016 § 9) : une nouvelle
   // modification ferme le toast précédent et rend la précédente définitive.
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -409,6 +603,7 @@ export function TripShell({
   }, []);
   const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const consumeFocusRequest = useCallback(() => setFocusRequest(null), []);
+  const requestFocus = useCallback((request: FocusRequest) => setFocusRequest(request), []);
   // « Modification annulée. » : annonce de la région du toast après l'annulation d'une révision (F7-PO-1).
   const [undone, setUndone] = useState<{ id: number } | null>(null);
 
@@ -418,6 +613,17 @@ export function TripShell({
       clearHighlight();
       setUndone(null);
       setToast({ id: toastId.current, message, afterUndo });
+    },
+    [clearHighlight],
+  );
+  const notifyReverted = useCallback(
+    (message: string, undo: () => Promise<void>) => {
+      toastId.current += 1;
+      const id = toastId.current;
+      clearHighlight();
+      setUndone(null);
+      // « Annuler » réussi : « Modification annulée. » est annoncé par la région du toast, comme après une révision.
+      setToast({ id, message, undo, afterUndo: () => setUndone({ id }) });
     },
     [clearHighlight],
   );
@@ -436,6 +642,7 @@ export function TripShell({
       setToast({
         id,
         message: change.message,
+        undo: change.undo,
         afterUndo: () => {
           setUndone({ id });
           // Étape d'origine si elle est dans le jour affiché, sinon titre du jour (F7-PO-1).
@@ -446,13 +653,34 @@ export function TripShell({
     },
     [clearHighlight],
   );
+  // « Annuler » de la révision enregistrée (PR 869) : le toast reste affiché pendant l'appel (pas de clignotement), le
+  // surlignage n'est retiré qu'après un succès, et un second appui pendant l'attente est ignoré.
+  const undoing = useRef(false);
+  const undoButton = useRef<HTMLButtonElement>(null);
   const onUndo = useCallback(async () => {
     const current = toast;
-    setToast(null);
+    if (current === null || undoing.current) return;
+    undoing.current = true;
+    try {
+      if (current.undo) await current.undo();
+      else await actions.undo();
+    } catch {
+      // Annulation refusée ou réseau perdu : la modification reste, et reste annulable. Le toast revient (délai relancé)
+      // avec l'annonce de l'échec (`role="status"` de sa région) et le focus sur « Annuler ».
+      toastId.current += 1;
+      setToast({ id: toastId.current, message: messages.revision.annulationEchouee, afterUndo: current.afterUndo, undo: current.undo, refocus: true });
+      return;
+    } finally {
+      undoing.current = false;
+    }
+    setToast((shown) => (shown?.id === current.id ? null : shown));
     clearHighlight();
-    await actions.undo();
-    current?.afterUndo?.();
+    current.afterUndo?.();
   }, [actions, toast, clearHighlight]);
+  // Focus rendu à « Annuler » du toast revenu après un échec (le toast est remonté, son bouton est neuf).
+  useEffect(() => {
+    if (toast?.refocus) undoButton.current?.focus();
+  }, [toast]);
 
   const [replaceOrigin, setReplaceOrigin] = useState<string | null>(null);
   const markReplaceOrigin = useCallback((href: string | null) => setReplaceOrigin(href), []);
@@ -473,6 +701,7 @@ export function TripShell({
       highlight,
       focusRequest,
       consumeFocusRequest,
+      requestFocus,
       replaceOrigin,
       markReplaceOrigin,
       markOpenedFromPanel,
@@ -483,6 +712,15 @@ export function TripShell({
       reportMissingEtape,
       placesFromGoogle,
       unlockHref,
+      reportable,
+      lockable,
+      commitmentReadOnly,
+      versionsHref,
+      notifyReverted,
+      recordRevert,
+      markVersionsOpen,
+      addPlaceAvailable,
+      showAddedPlace,
     }),
     [
       routes,
@@ -498,6 +736,7 @@ export function TripShell({
       highlight,
       focusRequest,
       consumeFocusRequest,
+      requestFocus,
       replaceOrigin,
       markReplaceOrigin,
       markOpenedFromPanel,
@@ -508,6 +747,15 @@ export function TripShell({
       reportMissingEtape,
       placesFromGoogle,
       unlockHref,
+      reportable,
+      lockable,
+      commitmentReadOnly,
+      versionsHref,
+      notifyReverted,
+      recordRevert,
+      markVersionsOpen,
+      addPlaceAvailable,
+      showAddedPlace,
     ],
   );
 
@@ -518,7 +766,7 @@ export function TripShell({
 
   const retour = (
     <Link
-      href={day ? routes.sejour() : routes.mesVoyages()}
+      href={day || onVersions ? routes.sejour() : routes.mesVoyages()}
       aria-label={t.retour}
       data-part="retour"
       className="absolute left-3 top-3 z-10 inline-flex size-(--touch-target) items-center justify-center rounded-control border border-outline bg-raised text-ink"
@@ -541,11 +789,74 @@ export function TripShell({
         index: candidate.index,
         href: routes.jour(candidate.index),
         weekday: weekdayOf(candidate.date) ?? undefined,
+        // Journée d'un changement de ville : « Jour 3, lun., de Rome à Florence » (spécification M4 § 7.7).
+        ...villeDeLaPastille(trip.cities, candidate.date),
       }))}
       current={day ? day.index : "sejour"}
       sejourHref={routes.sejour()}
       className="px-4"
     />
+  );
+
+  // Choix « Afficher sur la carte » (décision 0150 § 2 point 4 et § 3 point 4) : dans l'en-tête du panneau, sous les
+  // onglets, sur le Séjour à 2 villes ou plus et sur la Journée d'un changement de ville ; hors de la carte.
+  const choixCarte =
+    !day && !onVersions && villes && sejourAPositions
+      ? {
+          options: [
+            { value: TOUTES_LES_VILLES, label: t.carteCadrage.toutes },
+            ...villes.filter((ville, index) => villes.indexOf(ville) === index).map((ville) => ({ value: `${OPTION_VILLE}${ville}`, label: ville })),
+          ],
+          value: villeChoisie === undefined ? TOUTES_LES_VILLES : `${OPTION_VILLE}${villeChoisie}`,
+          onChange: (value: string) =>
+            setVueSejour({ dayIndex, ville: value.startsWith(OPTION_VILLE) ? value.slice(OPTION_VILLE.length) : undefined }),
+        }
+      : day && moities && changement
+        ? {
+            options: [
+              { value: "avant", label: changement.de },
+              { value: "apres", label: changement.vers },
+            ],
+            value: moitie,
+            onChange: (value: string) => setMoitieSuivie({ dayIndex, selection: selectedStopId, moitie: value === "apres" ? "apres" : "avant" }),
+          }
+        : null;
+  // Focus clavier sur une option, panneau au plus bas (mobile) : le panneau remonte à 55 % pour que l'option ne soit
+  // jamais masquée (WCAG 2.4.11) ; un toucher ou un clic sur une option visible ne le fait pas bouger.
+  const onChoixFocus = (event: FocusEvent<HTMLDivElement>) => {
+    if (largeScreen || snap !== LOWEST) return;
+    let clavier = false;
+    try {
+      clavier = event.target.matches(":focus-visible");
+    } catch {
+      clavier = false;
+    }
+    if (clavier) setSnap(DEFAULT_SNAP);
+  };
+  const header = choixCarte ? (
+    <>
+      {tabs}
+      <div data-part="choix-carte" className="px-4" onFocus={onChoixFocus}>
+        {/* Repli : le rail vide d'une rangée (`p-1`, une cible tactile), pour que l'en-tête ne grandisse pas au chargement. */}
+        <Suspense
+          fallback={
+            <div aria-hidden="true" data-part="choix-carte-reserve" className="rounded-control bg-muted p-1">
+              <div className="min-h-(--touch-target)" />
+            </div>
+          }
+        >
+          <SegmentedControl
+            wrap
+            label={t.carteCadrage.nom}
+            options={choixCarte.options}
+            value={choixCarte.value}
+            onChange={choixCarte.onChange}
+          />
+        </Suspense>
+      </div>
+    </>
+  ) : (
+    tabs
   );
 
   // Panneau au plus haut : le toast, posé au-dessus du panneau, est décalé à droite de « Retour »
@@ -566,6 +877,7 @@ export function TripShell({
           key={toast.id}
           message={toast.message}
           onUndo={onUndo}
+          undoRef={undoButton}
           onExpire={() => setToast(null)}
           className="pointer-events-auto"
         />
@@ -585,7 +897,8 @@ export function TripShell({
             <DayMap
               mode="day"
               day={day}
-              map={maps.find((candidate) => candidate.dayIndex === day.index) ?? null}
+              map={dayMapData}
+              {...(routeDuJour ? { route: routeDuJour } : {})}
               selectedStopId={selectedStopId}
               onMarkerPress={onMarkerPress}
               listId={DAY_LIST_ID}
@@ -595,6 +908,7 @@ export function TripShell({
               onSkipToList={onSkipToList}
               controls={controls}
               placesFromGoogle={placesFromGoogle}
+              {...(changement ? { transferCities: changement, ...(moitie ? { moitie } : {}) } : {})}
             />
           ) : (
             <DayMap
@@ -605,6 +919,9 @@ export function TripShell({
               fitPadding={fitPadding}
               fitScope={fitScope}
               placesFromGoogle={placesFromGoogle}
+              {...(villes && villesParJour
+                ? { cities: villes, citiesOfDays: villesParJour, visibleInsets, ...(villeChoisie === undefined ? {} : { cityView: villeChoisie }) }
+                : {})}
             />
           )}
         </div>
@@ -612,7 +929,7 @@ export function TripShell({
           label={fiche ? t.regionFiche : t.region}
           snap={snap}
           onSnapChange={setSnap}
-          header={tabs}
+          header={header}
           bodyRef={bodyRef}
           above={toastRegion}
           sideOnLargeScreen

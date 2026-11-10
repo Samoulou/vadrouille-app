@@ -5,8 +5,20 @@ import { createTransport } from "nodemailer";
 import { SENDER_ADDRESS } from "@/server/config/email";
 import type { CanonicalEmail } from "@/server/email";
 
-import { preparerMessageCode } from "./avant-transport";
-import { type CodeMailer, CodeMailerRefusalError, type LoginCodeMessage } from "./port";
+import { logEvent } from "@/server/log";
+
+import { preparerMessageApercu, preparerMessageCode, preparerMessageRappel } from "./avant-transport";
+import { purgeEmailCounts, reserveEmail, type ReserveEmail } from "./plafond";
+import {
+  type ApercuPretMessage,
+  type CodeMailer,
+  CodeMailerCapError,
+  CodeMailerRefusalError,
+  type LoginCodeMessage,
+  type NotificationMailer,
+  PlafondIndisponibleError,
+  type RappelVeilleMessage,
+} from "./port";
 
 /**
  * Implémentation SMTP du port d'envoi du code, **vers Mailpit seulement** (spécification B3b-envoi, points 3 à 5 ;
@@ -108,6 +120,60 @@ export function createSmtpCodeMailer(cible: SmtpTarget, deps: SmtpDeps = {}): Co
       } catch {
         throw new SmtpEnvoiError();
       }
+    },
+  });
+}
+
+export type SmtpNotificationDeps = SmtpDeps & {
+  /** Réservation dans le plafond (tests : compteur injecté) ; sinon `reserveEmail` (`./plafond.ts`). */
+  readonly reserver?: ReserveEmail;
+  /** Purge des jours échus après le transport (tests) ; sinon `purgeEmailCounts`. */
+  readonly purger?: () => Promise<void>;
+};
+
+/**
+ * Implémentation SMTP du port des notifications (M7a), **vers Mailpit seulement** (`local` et `ci`, même cible et mêmes
+ * options que `createSmtpCodeMailer`). Ordre : préparation commune `preparerMessageApercu` (adresse refaite, origine et
+ * voyage, quatre champs, `checkEnvelope`) ; réservation de l'usage `notification` dans le plafond global du jour (seuil
+ * 80 : refus `email.cap_reached` et `CodeMailerCapError` ; base indisponible : `PlafondIndisponibleError`) ; un seul
+ * `sendMail` (enveloppe explicite, `maxRecipients: 1`) ; purge des jours échus, qui ne lève jamais ; `email.sent`. Le
+ * plafond est compté sur Mailpit aussi, pour que le test en CI vérifie le compteur que Resend utilisera.
+ */
+export function createSmtpNotificationMailer(cible: SmtpTarget, deps: SmtpNotificationDeps = {}): NotificationMailer {
+  let transport: TransportSmtp | undefined = deps.transport;
+  const reserver = deps.reserver ?? reserveEmail;
+  const purger = deps.purger ?? purgeEmailCounts;
+
+  /** Chemin commun aux deux notifications, après la préparation : réservation, un `sendMail`, purge, `email.sent`. */
+  async function envoyer(to: CanonicalEmail, envoi: ReturnType<typeof preparerMessageApercu>): Promise<void> {
+    const reservation = await reserver("notification");
+    if (!reservation.ok) {
+      if (reservation.reason === "cap_reached") {
+        logEvent("email.cap_reached", { usage: "notification" }, "warn");
+        throw new CodeMailerCapError();
+      }
+      throw new PlafondIndisponibleError();
+    }
+    let envoye = false;
+    try {
+      transport ??= creerTransportSmtp(cible);
+      await transport.sendMail({ ...envoi, envelope: { from: SENDER_ADDRESS, to: [to] }, maxRecipients: 1 });
+      envoye = true;
+    } catch {
+      // Message de la bibliothèque perdu à dessein (adresse, adresse IP) ; la purge court quand même.
+    }
+    await purger();
+    if (!envoye) throw new SmtpEnvoiError();
+    logEvent("email.sent", { usage: "notification" }, "info");
+  }
+
+  return Object.freeze({
+    async sendApercuPret(message: ApercuPretMessage): Promise<void> {
+      await envoyer(message.to, preparerMessageApercu(message, SENDER_ADDRESS, deps));
+    },
+    // M6c (ticket 1021 ; décision 0157 § 2.6) : même chemin, préparation `preparerMessageRappel`.
+    async sendRappelVeille(message: RappelVeilleMessage): Promise<void> {
+      await envoyer(message.to, preparerMessageRappel(message, SENDER_ADDRESS, deps));
     },
   });
 }

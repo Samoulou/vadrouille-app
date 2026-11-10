@@ -1,16 +1,34 @@
 import {
+  ChecklistItemSchema,
   DayMapSchema,
   DaySchema,
   DeckSessionSchema,
+  MoveDraftSchema,
+  MoveOptionsSchema,
+  PatchResultSchema,
   PreviewSlotsSchema,
+  RevisionPreviewSchema,
   ProposalSchema,
+  ReplacementOfferSchema,
+  ReplacementWriteSchema,
+  RevertPreviewSchema,
   TripSchema,
   TripSummarySchema,
+  TripVersionPageSchema,
+  type Result,
 } from "@/contracts";
+import { appliquerAjout, proposerAjout } from "@/server/lieux/ajout";
+import { annulerAjout } from "@/server/lieux/annulation";
 import { creerLectureDuTri } from "@/server/presentation/lecture";
+import { annulerRemplacement, appliquerRemplacement, proposerRemplacement, versionDuVoyage, type DependancesRemplacement } from "@/server/versions/remplacement";
+import { appliquerDeplacement, optionsDeDeplacement, proposerDeplacement } from "@/server/versions/deplacement";
+import { appliquerRetour, listerVersions, proposerRetour } from "@/server/versions/historique";
+import { deverrouillerEtape, verrouillerEtape, type DependancesRetouche } from "@/server/versions/retouches";
+import { basculerAFaire } from "@/server/voyages/a-faire";
 import { creerLectureVoyages, type DependancesLecture } from "@/server/voyages/lecture";
+import { signalerEtape } from "@/server/voyages/signalement";
 
-import type { TripAdapter } from "./types";
+import type { AddPlaceAdapter, AdapterContext, RevisionAdapter, StopReportAdapter, TripAdapter, TripVersionsAdapter } from "./types";
 
 /**
  * Adaptateur `api` (spécification B6, B6a point 5 ; handover § 11 : aucun appel HTTP vers soi-même) : implémente
@@ -25,10 +43,92 @@ import type { TripAdapter } from "./types";
  */
 export type OptionsAdaptateurApi = DependancesLecture;
 
+/**
+ * Révision enregistrée (M1g, ticket 869) : cas d'usage de `src/server/versions/remplacement.ts`, dans le même processus,
+ * avec le contexte de la session reçu de l'action serveur et **le même port de relectures** que la lecture (un appel par
+ * aperçu ou application, hors transaction). Chaque réponse est validée par son contrat. Le cochage d'une ligne « À faire »
+ * (`toggleChecklistItem`, B6b, branché sur l'écran 11 par M5e), le verrou de la fiche (`lockStop`, `unlockStop`, M5a,
+ * `src/server/versions/retouches.ts`, sans relecture) et le déplacement (`getMoveOptions`, `previewMove`, `applyMove`, ticket
+ * 947, `src/server/versions/deplacement.ts`, même port de relectures ; décision 0153, PR #959) passent par le même
+ * adaptateur.
+ */
+function revisionApi(options: OptionsAdaptateurApi): RevisionAdapter {
+  const { withOrg, relectures } = options;
+  const dependances = (ctx: AdapterContext | null): DependancesRemplacement => ({ contexte: async () => ctx, relectures, ...(withOrg === undefined ? {} : { withOrg }) });
+  const valide = <T>(schema: { parse(valeur: unknown): T }) => (resultat: Result<T>): Result<T> => (resultat.ok ? { ok: true, value: schema.parse(resultat.value) } : resultat);
+  return {
+    currentVersion: (ctx, input) => versionDuVoyage(dependances(ctx), input),
+    previewReplacement: async (ctx, input) => valide(ReplacementOfferSchema)(await proposerRemplacement(dependances(ctx), input)),
+    applyReplacement: async (ctx, input) => valide(ReplacementWriteSchema)(await appliquerRemplacement(dependances(ctx), input)),
+    undoReplacement: async (ctx, input) => valide(ReplacementWriteSchema)(await annulerRemplacement(dependances(ctx), input)),
+    toggleChecklistItem: async (ctx, input) =>
+      valide(ChecklistItemSchema)(await basculerAFaire({ contexte: async () => ctx, ...(withOrg === undefined ? {} : { withOrg }) }, input)),
+    // M5a (ticket 919) : verrou de la fiche ; aucun appel du port de relectures (décision 0147 § 9).
+    lockStop: async (ctx, input) => valide(PatchResultSchema)(await verrouillerEtape(dependances(ctx), input)),
+    unlockStop: async (ctx, input) => valide(PatchResultSchema)(await deverrouillerEtape(dependances(ctx), input)),
+    // Ticket 947 : déplacer une étape ; un appel du port de relectures par aperçu ou application (décision 0153, PR #959).
+    getMoveOptions: async (ctx, input) => valide(MoveOptionsSchema)(await optionsDeDeplacement(dependances(ctx), input)),
+    previewMove: async (ctx, input) => valide(MoveDraftSchema)(await proposerDeplacement(dependances(ctx), input)),
+    applyMove: async (ctx, input) => valide(PatchResultSchema)(await appliquerDeplacement(dependances(ctx), input)),
+  };
+}
+
+/**
+ * Signalement d'une erreur sur une étape (M5c, ticket 904) : cas d'usage de `src/server/voyages/signalement.ts`, dans le
+ * même processus, avec le contexte de la session reçu de l'action serveur. Aucun appel du port de relectures.
+ */
+function signalementsApi(options: OptionsAdaptateurApi): StopReportAdapter {
+  const { withOrg, chaine } = options;
+  return {
+    reportStop: (ctx, input) =>
+      signalerEtape({ contexte: async () => ctx, ...(withOrg === undefined ? {} : { withOrg }), ...(chaine === undefined ? {} : { chaine }) }, input),
+  };
+}
+
+/**
+ * Lieu à soi, aperçu et application d'un ajout (M5d-1, ticket 939) : cas d'usage de `src/server/lieux/ajout.ts`, dans le même
+ * processus, avec le contexte de la session et **le même port de relectures** que la lecture (un appel par aperçu ou
+ * application, hors transaction ; décision 0147 § 4). Chaque réponse est validée par son contrat. Un refus est rendu tel que
+ * le cas d'usage l'a construit (validé par `ApiErrorSchema`) : `no_option` porte sa `cause` (`no_room`, `place_not_found`,
+ * `place_closed`), une lecture des fiches en échec rend `provider_error` (décision 0155 § 1). L'annulation d'un ajout
+ * (`undoAddPlace`, M5d-6, `src/server/lieux/annulation.ts`) n'appelle pas le port : elle recopie la base de l'ajout.
+ */
+function lieuxApi(options: OptionsAdaptateurApi): AddPlaceAdapter {
+  const { withOrg, relectures } = options;
+  const dependances = (ctx: AdapterContext | null) => ({ contexte: async () => ctx, relectures, ...(withOrg === undefined ? {} : { withOrg }) });
+  const valide = <T>(schema: { parse(valeur: unknown): T }) => (resultat: Result<T>): Result<T> => (resultat.ok ? { ok: true, value: schema.parse(resultat.value) } : resultat);
+  return {
+    previewAddPlace: async (ctx, input) => valide(RevisionPreviewSchema)(await proposerAjout(dependances(ctx), input)),
+    applyAddPlace: async (ctx, input) => valide(PatchResultSchema)(await appliquerAjout(dependances(ctx), input)),
+    // M5d-6 (ticket 994) : annulation d'un ajout, sans appel du port de relectures (décision 0155 § 4.1).
+    undoAddPlace: async (ctx, input) => valide(PatchResultSchema)(await annulerAjout(dependances(ctx), input)),
+  };
+}
+
+/**
+ * Versions du programme et retour à une version (M5b, ticket 934) : cas d'usage de `src/server/versions/historique.ts`, dans
+ * le même processus, avec le contexte de la session reçu de l'action serveur. Aucun appel du port de relectures (un retour
+ * recopie un instantané). Chaque réponse est validée par son contrat.
+ */
+function versionsApi(options: OptionsAdaptateurApi): TripVersionsAdapter {
+  const { withOrg } = options;
+  const dependances = (ctx: AdapterContext | null): DependancesRetouche => ({ contexte: async () => ctx, ...(withOrg === undefined ? {} : { withOrg }) });
+  const valide = <T>(schema: { parse(valeur: unknown): T }) => (resultat: Result<T>): Result<T> => (resultat.ok ? { ok: true, value: schema.parse(resultat.value) } : resultat);
+  return {
+    listTripVersions: async (ctx, input) => valide(TripVersionPageSchema)(await listerVersions(dependances(ctx), input)),
+    previewRevert: async (ctx, input) => valide(RevertPreviewSchema)(await proposerRetour(dependances(ctx), input)),
+    applyRevert: async (ctx, input) => valide(PatchResultSchema)(await appliquerRetour(dependances(ctx), input)),
+  };
+}
+
 export function createApiTripAdapter(options: OptionsAdaptateurApi): TripAdapter {
   const lecture = creerLectureVoyages(options);
   const getDeckSession = creerLectureDuTri(options.withOrg === undefined ? {} : { withOrg: options.withOrg });
   return {
+    revision: revisionApi(options),
+    reports: signalementsApi(options),
+    places: lieuxApi(options),
+    versions: versionsApi(options),
     async listTrips(ctx) {
       return TripSummarySchema.array().parse(await lecture.listTrips(ctx));
     },

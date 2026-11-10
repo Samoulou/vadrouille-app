@@ -23,6 +23,8 @@ export function elementAFaire(ligne: Readonly<Record<string, unknown>>): Checkli
   const stopId = typeof ligne.stop_id === "string" ? ligne.stop_id : undefined;
   const item = ChecklistItemSchema.safeParse({
     id: ligne.id,
+    // Sorte de la ligne (décision 0147 § 6.2) : colonne `kind`, fermée par `checklist_items_kind_check`.
+    kind: ligne.kind,
     label: ligne.label,
     when: ligne.moment,
     done: ligne.done,

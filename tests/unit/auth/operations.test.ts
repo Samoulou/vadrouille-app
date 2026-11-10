@@ -56,9 +56,12 @@ describe("exports", () => {
         expect(Object.hasOwn(valeur, "$context")).toBe(false);
       }
     }
-    expect(Object.keys(operations).sort()).toEqual(["readSession", "requestCode", "signOut", "verifyCode"]);
+    // M9a (ticket 1097 ; spécification M9 § 1.3, T1) : instant de création d'une session, pour la réauthentification récente.
+    expect(Object.keys(operations).sort()).toEqual(["readSession", "readSessionCreatedAt", "requestCode", "signOut", "verifyCode"]);
     expect(Object.isFrozen(operations)).toBe(true);
-    expect(Object.keys(moduleAuth).sort()).toEqual(["AuthNotConfiguredError", "authOperations", "createAuthOperations"]);
+    // M7a (PR 870) : composition du port des notifications (`notificationsDuServeur`), qui rend le port et l'origine, jamais `auth`.
+    // M6c (ticket 1021 ; décision 0157 § 1.7 point 10) : composition des rappels (`rappelsDuServeur`), même forme.
+    expect(Object.keys(moduleAuth).sort()).toEqual(["AuthNotConfiguredError", "authOperations", "createAuthOperations", "notificationsDuServeur", "rappelsDuServeur"]);
     // Revue consolidée du head `ed79edb` (PR 446), mineur 4 ; B3c (ticket 447) : clés exportées des modules voisins.
     // `executeurSql` : export ajouté par B7c (ticket 449, PR 454), conservé à la fusion de main.
     expect(Object.keys(moduleWithOrg).sort()).toEqual(["WithOrgContextError", "creerWithOrg", "executeurSql", "withOrg"]);
@@ -75,6 +78,7 @@ describe("configuration injectée", () => {
     const operations = moduleAuth.createAuthOperations(configuration(null));
     expect(await operations.signOut(new Headers())).toEqual({ ok: false, code: "provider_error" });
     expect(await operations.readSession(new Headers())).toBeNull();
+    expect(await operations.readSessionCreatedAt("0d000000-0000-4000-8000-000000000001")).toBeNull();
   });
 });
 

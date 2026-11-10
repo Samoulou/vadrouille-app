@@ -36,6 +36,11 @@ export interface OperationsConnexion {
   verifyCode(demande: { readonly email: CanonicalEmail; readonly code: string; readonly headers?: Headers }): Promise<({ readonly ok: true } & SessionOuverte) | EchecConnexion>;
   readSession(headers: Headers): Promise<SessionOuverte | null>;
   signOut(headers: Headers): Promise<{ readonly ok: true } | EchecConnexion>;
+  /**
+   * Création de la session (`sessions.created_at`), `null` si inconnue ou expirée (M9a, réauthentification récente).
+   * Facultative pour les doubles qui ne l'exercent pas ; `authOperations()`, branché au démarrage, la porte toujours.
+   */
+  readSessionCreatedAt?(sessionId: string): Promise<Date | null>;
 }
 
 /** Demande au limiteur (forme de `RateLimitRequest`, `src/server/rate-limit.ts`). */
@@ -206,6 +211,21 @@ function branchee(): ConnexionReelle {
 /** Contexte de la session de la requête (`getServerRequestContext()`, branché) ; non branché : lève. */
 export function contexteDeSessionBranche(): Promise<AdapterContext | null> {
   return branchee().contexte();
+}
+
+/**
+ * Session lue par les opérations branchées (M9a, route de l'export du compte : il lui faut l'identifiant de session,
+ * absent de `AdapterContext`). `headers` : le cookie seul, filtré par l'appelant. Non branché : lève.
+ */
+export async function sessionBranchee(headers: Headers): Promise<SessionOuverte | null> {
+  return branchee().operations().readSession(headers);
+}
+
+/** Création de la session lue par les opérations branchées (M9a, réauthentification récente). Non branché, ou opération absente : lève. */
+export async function creationDeSessionBranchee(sessionId: string): Promise<Date | null> {
+  const operations = branchee().operations();
+  if (operations.readSessionCreatedAt === undefined) throw new ConnexionIndisponibleError();
+  return operations.readSessionCreatedAt(sessionId);
 }
 
 /** Adaptateur du serveur : connexion branchée au démarrage, en-têtes de la requête Next.js. */

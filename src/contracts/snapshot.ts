@@ -12,6 +12,7 @@ import {
   StopSchema,
   SurpriseIdeaSchema,
   TerminusItemSchema,
+  TransferItemSchema,
   TripBaseSchema,
 } from "./trip";
 
@@ -46,8 +47,8 @@ export const SurpriseIdeaSnapshotSchema = SurpriseIdeaSchema.omit({ verifiedAt: 
 export type SurpriseIdeaSnapshot = z.infer<typeof SurpriseIdeaSnapshotSchema>;
 
 /**
- * Mêmes variantes que `DayLineItemSchema` : `terminus` (avec son `label`, Q50), `free` et `openMeal` par référence ;
- * `stop` et `segment` portent leur version de stockage.
+ * Mêmes variantes que `DayLineItemSchema` : `terminus` (avec son `label`, Q50), `free`, `openMeal` et `transfer`
+ * (décision 0148 § 1, aucune donnée Google) par référence ; `stop` et `segment` portent leur version de stockage.
  */
 export const DayLineItemSnapshotSchema = z.discriminatedUnion("type", [
   TerminusItemSchema,
@@ -55,6 +56,7 @@ export const DayLineItemSnapshotSchema = z.discriminatedUnion("type", [
   SegmentItemSchema.extend({ segment: SegmentSnapshotSchema }),
   FreeItemSchema,
   OpenMealItemSchema,
+  TransferItemSchema,
 ]);
 export type DayLineItemSnapshot = z.infer<typeof DayLineItemSnapshotSchema>;
 

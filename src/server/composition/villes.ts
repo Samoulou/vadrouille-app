@@ -1,15 +1,14 @@
 import "server-only";
 
-import { JETON_SESSION_MOTIF, PLACE_ID_MOTIF } from "@/contracts/values";
-import { fuseauParPosition, paysParCode, villeDuPays } from "@/lib/fuseaux";
+import type { IssueChoixEssai, IssueSuggestionsEssai } from "@/contracts/villes";
+import { villeDuPays } from "@/lib/fuseaux";
 import { creerClientVilles, type OptionsClientsGoogle } from "@/server/composition/clients-google";
 import { errorNameOf, logEvent, type LogFields, type LogVilleReason } from "@/server/log";
 import { cookieAccesValide, empreinteCookieAcces, ouvertureP0, type DependancesAcces } from "@/server/p0/acces";
 import { poolPrototype } from "@/server/p0/base";
 import { TablePrixGoogleSchema } from "@/server/usage/cout-google";
 import { reserverVille, type DemandeVille, type LimitesVille, type ResultatVille } from "@/server/usage/neon";
-import { periodesDe } from "@/server/usage/periodes";
-import { horlogeSysteme, type PortConsommation } from "@/server/usage/port";
+import { choisirVille, suggererVilles, type ClientVilles, type PortsRecherche } from "@/server/villes/recherche";
 
 import prixGoogle from "../../../prototype/config/prix-google.json";
 
@@ -34,21 +33,13 @@ import prixGoogle from "../../../prototype/config/prix-google.json";
  * Aucune donnée Google ni saisie n'est journalisée. Chaque refus écrit `p0.ville_refusee` (constat du 2026-10-25 : les
  * refus étaient muets), motif fermé seulement (`MotifRefus`), avec la garde fermée, le code fermé et le code HTTP d'une
  * erreur de Google : ni texte tapé, ni `placeId`, ni texte Google, ni cookie, ni clé.
+ *
+ * **Terminal mince** (décision 0141 § 6.1 point 3) : contrôles d'entrée, port borné à un appel, fabrique, diagnostic,
+ * lecture de la fiche et ordre d'une action sont au cœur commun `src/server/villes/recherche.ts` ; ce module ne garde
+ * que ses ports (barrière `ouvertureP0` et cookie, `reserverVille` sur `poolPrototype()` sous `LIMITES_VILLE`, coût au
+ * prix plein, table élargie `villeDuPays`, journal `p0.ville_refusee`). Comportement inchangé
+ * (`tests/unit/composition/villes.test.ts`, attentes inchangées).
  */
-
-/**
- * Formes du client de recherche de ville (`ClientVilles` de `@/grounding/interfaces`), recopiées ici : ce module est
- * atteint par une action serveur, et l'application n'atteint `src/grounding` que par la fabrique commune (test « graphe
- * de l'application », 0081 B9-TL-1). Le contrôle de type de `creerClientVilles` ci-dessous les tient égales.
- */
-type SuggestionVille = { readonly placeId: string; readonly principal: string; readonly secondaire: string | null };
-type ClientVilles = {
-  suggererVilles(saisie: string, session: string): Promise<readonly SuggestionVille[]>;
-  ficheVille(placeId: string, session: string): Promise<{ readonly placeId: string; readonly pays: string | null; readonly position: { lat: number; lng: number } }>;
-};
-
-const SAISIE = { min: 2, max: 80 } as const;
-const TEXTE_SUGGESTION_MAX = 300;
 
 /**
  * Limites de la recherche de ville (décision 0129 § 3) : 150 suggestions et 40 choix par jour de quota Google, et
@@ -57,27 +48,6 @@ const TEXTE_SUGGESTION_MAX = 300;
  * mois de 0027 § 2 même sans tranche gratuite ; dans les tranches gratuites (10 000 par mois chacune), 0 USD.
  */
 export const LIMITES_VILLE: LimitesVille = { suggestionsParJour: 150, choixParJour: 40, actionsParMinuteEtCookie: 20 };
-
-export type IssueSuggestions =
-  | { readonly statut: "ok"; readonly suggestions: readonly SuggestionVille[] }
-  | { readonly statut: "acces" | "indisponible" | "limite" | "limite_jour" | "entree_invalide" };
-
-/** Ville choisie : valeurs maison seulement, et le `placeId`. */
-export type VilleChoisie = {
-  readonly placeId: string;
-  /** Code ISO 3166-1 alpha-2 de la table maison des pays. */
-  readonly country: string;
-  /** Fuseau IANA de la table maison (ville de la table, seul fuseau du pays, ou repère maison le plus proche). */
-  readonly timeZone: string;
-  /** Nom français du pays, table maison. */
-  readonly nomPays: string;
-  /** Nom maison de la ville (table des villes, dans ce pays), ou `null` : la destination reste le texte tapé. */
-  readonly nomMaison: string | null;
-};
-
-export type IssueChoix =
-  | { readonly statut: "ok"; readonly ville: VilleChoisie }
-  | { readonly statut: "acces" | "indisponible" | "limite" | "limite_jour" | "entree_invalide" | "pays_inconnu" };
 
 export type DependancesVilles = DependancesAcces & {
   /** Valeur du cookie `__Host-p0_acces` reçu avec la requête. */
@@ -105,40 +75,6 @@ export function journaliserRefus(action: Action, motif: MotifRefus, details: Pic
 export function journaliserException(action: Action, erreur: unknown): void {
   const errorName = errorNameOf(erreur);
   journaliserRefus(action, "exception", errorName !== undefined ? { errorName } : {});
-}
-
-/**
- * Diagnostic fermé d'une erreur levée par un client Google : code, code HTTP, nom de classe ; jamais le message.
- * `status` n'existe que sur une `ErreurClientGoogle` née d'une réponse autre que 200 : une fiche introuvable
- * (`ErreurAncrage("place_not_found")`, 404 traduit par le client) n'a pas de `httpStatus`, seulement son code.
- */
-function diagnosticGoogle(erreur: unknown): Pick<LogFields, "googleCode" | "httpStatus" | "errorName"> {
-  const lu = typeof erreur === "object" && erreur !== null ? (erreur as { code?: unknown; status?: unknown }) : {};
-  return {
-    ...(typeof lu.code === "string" ? { googleCode: lu.code } : {}),
-    ...(typeof lu.status === "number" ? { httpStatus: lu.status } : {}),
-    ...(errorNameOf(erreur) !== undefined ? { errorName: errorNameOf(erreur) } : {}),
-  };
-}
-
-/** Port en mémoire borné à **une** requête : chaque action ne peut appeler Google qu'une fois. */
-function portUnAppel(): PortConsommation {
-  let reservees = 0;
-  return {
-    async reserve() {
-      if (reservees >= 1) return { ok: false, code: "cap_reached" };
-      reservees += 1;
-      return { ok: true, reservationId: "ville_1" };
-    },
-    async confirm() {},
-    async abandon() {},
-    async release() {
-      reservees = Math.max(0, reservees - 1);
-    },
-    async consumption() {
-      return { requetes: reservees, elements: 0, coutMicros: 0 };
-    },
-  };
 }
 
 /** Barrière : l'empreinte du cookie si elle est ouverte, sinon le statut à rendre (aucune connexion, aucun appel). */
@@ -195,100 +131,42 @@ async function reserver(action: DemandeVille["action"], empreinte: string, depen
   return statut;
 }
 
-function client(dependances: DependancesVilles): ClientVilles {
-  const fabrique = dependances.client ?? creerClientVilles;
-  const horloge = horlogeSysteme;
-  return fabrique({
-    usage: portUnAppel(),
-    // Aucune nature nouvelle au port de consommation (`NATURES` reste fermé) : comme les actions sans compte, nature
-    // `execution` sans exécution ; le plafond persistant est la ligne `ville` réservée avant l'appel.
-    contexte: () => ({ nature: "execution", executionId: null, periodes: periodesDe("google", horloge) }),
-    plafonds: [],
-    horloge,
-  });
-}
+type RefusEssai = "acces" | "indisponible" | "limite" | "limite_jour";
 
-/**
- * Client construit **avant** la réservation (revue du head de4ab92, mineur 16) : la construction lit la clé serveur
- * après la barrière de sortie, sans appel ; clé absente ou sortie refusée, `indisponible` sans consommer d'unité du
- * plafond.
- */
-function construire(action: Action, dependances: DependancesVilles): ClientVilles | null {
-  try {
-    return client(dependances);
-  } catch (erreur) {
-    journaliserRefus(action, "client", diagnosticGoogle(erreur));
-    return null;
-  }
+/** Ports du site d'essai pour une action (l'empreinte du cookie passe de la barrière à la réservation). */
+function ports(dependances: DependancesVilles): PortsRecherche<RefusEssai, "fuseau"> {
+  let empreinte: string | null = null;
+  return {
+    async ouvrir(action) {
+      const ouverte = barriere(action, dependances);
+      if ("refus" in ouverte) return ouverte.refus;
+      empreinte = ouverte.empreinte;
+      return null;
+    },
+    fabrique: (options) => (dependances.client ?? creerClientVilles)(options),
+    async reserver(action) {
+      return empreinte === null ? "indisponible" : reserver(action, empreinte, dependances);
+    },
+    async apres() {},
+    villeDeLaTable: villeDuPays,
+    horsTable: "fuseau",
+    journal: (action, motif, details = {}) => journaliserRefus(action, motif, details),
+  };
 }
-
-const texte = (valeur: unknown, max: number): string | null => (typeof valeur === "string" && valeur.length <= max ? valeur : null);
 
 /** Suggestions de villes pour la saisie (Autocomplete (New), `(cities)`, en français, jeton de session). */
-export async function suggererVillesEssai(entree: { readonly saisie: unknown; readonly session: unknown }, dependances: DependancesVilles): Promise<IssueSuggestions> {
-  const saisie = texte(entree.saisie, 200)?.trim() ?? "";
-  const session = texte(entree.session, 36);
-  if (saisie.length < SAISIE.min || saisie.length > SAISIE.max || session === null || !JETON_SESSION_MOTIF.test(session)) {
-    journaliserRefus("suggestions", "entree_invalide");
-    return { statut: "entree_invalide" };
-  }
-  const ouverte = barriere("suggestions", dependances);
-  if ("refus" in ouverte) return { statut: ouverte.refus };
-  const places = construire("suggestions", dependances);
-  if (places === null) return { statut: "indisponible" };
-  const refus = await reserver("suggestions", ouverte.empreinte, dependances);
-  if (refus !== null) return { statut: refus };
-  try {
-    return { statut: "ok", suggestions: await places.suggererVilles(saisie, session) };
-  } catch (erreur) {
-    journaliserRefus("suggestions", "google_erreur", diagnosticGoogle(erreur));
-    return { statut: "indisponible" };
-  }
+export async function suggererVillesEssai(entree: { readonly saisie: unknown; readonly session: unknown }, dependances: DependancesVilles): Promise<IssueSuggestionsEssai> {
+  return suggererVilles(entree, ports(dependances));
 }
 
 /**
  * Ville choisie : fiche Essentials dans la même session (close la session), puis pays et fuseau des tables maison. Le
- * nom maison est cherché dans la table des villes du pays, d'après le texte tapé puis le texte principal de la
+ * nom maison est cherché dans la table élargie des villes du pays, d'après le texte tapé puis le texte principal de la
  * suggestion (comparaison en mémoire seulement : le texte Google n'est jamais rendu ni stocké).
  */
 export async function choisirVilleEssai(
   entree: { readonly placeId: unknown; readonly session: unknown; readonly saisie: unknown; readonly principal: unknown },
   dependances: DependancesVilles,
-): Promise<IssueChoix> {
-  const placeId = texte(entree.placeId, 256);
-  const session = texte(entree.session, 36);
-  const saisie = texte(entree.saisie, 200)?.trim() ?? "";
-  const principal = texte(entree.principal, TEXTE_SUGGESTION_MAX) ?? "";
-  const entreeValide =
-    placeId !== null &&
-    PLACE_ID_MOTIF.test(placeId) &&
-    session !== null &&
-    JETON_SESSION_MOTIF.test(session) &&
-    saisie.length >= SAISIE.min &&
-    saisie.length <= SAISIE.max;
-  if (!entreeValide) {
-    journaliserRefus("choix", "entree_invalide");
-    return { statut: "entree_invalide" };
-  }
-  const ouverte = barriere("choix", dependances);
-  if ("refus" in ouverte) return { statut: ouverte.refus };
-  const places = construire("choix", dependances);
-  if (places === null) return { statut: "indisponible" };
-  const refus = await reserver("choix", ouverte.empreinte, dependances);
-  if (refus !== null) return { statut: refus };
-  let fiche;
-  try {
-    fiche = await places.ficheVille(placeId, session);
-  } catch (erreur) {
-    journaliserRefus("choix", "google_erreur", diagnosticGoogle(erreur));
-    return { statut: "indisponible" };
-  }
-  const pays = fiche.pays === null ? null : paysParCode(fiche.pays);
-  const maison = pays === null ? null : (villeDuPays(saisie, pays.code) ?? (principal === "" ? null : villeDuPays(principal, pays.code)));
-  const timeZone = pays === null ? null : (maison?.zone ?? fuseauParPosition(pays.code, fiche.position));
-  if (pays === null || timeZone === null) {
-    journaliserRefus("choix", "pays_inconnu");
-    return { statut: "pays_inconnu" };
-  }
-  return { statut: "ok", ville: { placeId: fiche.placeId, country: pays.code, timeZone, nomPays: pays.nom, nomMaison: maison?.nom ?? null } };
+): Promise<IssueChoixEssai> {
+  return choisirVille(entree, ports(dependances));
 }

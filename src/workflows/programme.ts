@@ -1,7 +1,9 @@
 import "server-only";
 
+import { notificationsDuServeur } from "@/server/auth";
 import { etapeClotureProgramme as cloture, etapeProgrammeDebut as debut, etapeProgrammeEcriture as ecriture } from "@/server/generation/etapes-programme";
 import type { EtatProgramme } from "@/server/generation/etat";
+import { envoyerApercuPret } from "@/server/mail/apercu-pret";
 
 /**
  * Workflow `generateProgramme` (chaîne inversée sur `api`, décision 0136 § 2) : le pont qui **câble** les étapes de
@@ -16,6 +18,10 @@ import type { EtatProgramme } from "@/server/generation/etat";
  *   `a` : 2 reprises (déterministe, sans appel). `e` : aucune (une étape rejouée repaierait).
  * - **Arrêt** : une étape arrêtée a clos l'exécution en `failed` sur un code fermé ; une erreur inattendue qui sort d'une
  *   étape clôt l'exécution sur `upstream_unavailable` (`etapeClore`).
+ * - **Fin (M7a)** : après `e` sans arrêt seulement, l'étape `etapeApercuPret` envoie l'e-mail « propositions prêtes »
+ *   (`@/server/mail/apercu-pret`, composition de `@/server/auth`) : au plus une fois par voyage (réclamation en base avant
+ *   l'envoi), sans reprise (`maxRetries` 0), et **jamais bloquante** : son issue, même une erreur, ne change ni l'état rendu
+ *   ni l'exécution, déjà publiée.
  */
 
 export async function etapeDebut(entree: EtatProgramme): Promise<EtatProgramme> {
@@ -36,6 +42,13 @@ export async function etapeClore(entree: EtatProgramme): Promise<EtatProgramme> 
 }
 etapeClore.maxRetries = 0;
 
+/** Dernière étape (M7a) : e-mail « propositions prêtes » ; ne lève jamais, ne rend rien (aucune valeur dans l'état). */
+export async function etapeApercuPret(entree: EtatProgramme): Promise<void> {
+  "use step";
+  await envoyerApercuPret({ organizationId: entree.organizationId, generationRunId: entree.generationRunId }, { composer: notificationsDuServeur });
+}
+etapeApercuPret.maxRetries = 0;
+
 /** L'exécution `preview` réservée par `createTrip` ou `retryGeneration` sous la chaîne inversée, de `a` à la publication. */
 export async function generateProgramme(entree: EtatProgramme): Promise<EtatProgramme> {
   "use workflow";
@@ -46,7 +59,14 @@ export async function generateProgramme(entree: EtatProgramme): Promise<EtatProg
       etat = await etape(etat);
     }
   } catch {
-    etat = await etapeClore(etat);
+    return etapeClore(etat);
+  }
+  if (etat.arret === undefined) {
+    try {
+      await etapeApercuPret(etat);
+    } catch {
+      // Jamais bloquant (M7a) : l'aperçu est publié, l'état rendu reste celui de `e`.
+    }
   }
   return etat;
 }

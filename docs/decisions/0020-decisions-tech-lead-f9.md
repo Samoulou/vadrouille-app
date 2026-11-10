@@ -1,5 +1,7 @@
 # 0020 — Décisions du Tech Lead pour F9 (Débloquer, paiement simulé, Programme ajusté)
 
+> **§ 1.3 et § 2.3 amendés par 0140 (B4c, ticket #863)** : `redirectUrl` admet aussi une adresse du prestataire de la liste fermée (`adressePrestataireAdmise`, 0140 § 4) ; `PAYMENT_ADAPTER=stripe` est accepté, avec sa branche de `paymentAvailable` (0140 § 5 point 1, § 3 point 6).
+
 > **§ 1.3 amendé par 0097 B4-TL-1 point 5** : « 128 bits aléatoires » se lit « au moins 122 bits aléatoires » (identifiant public du paiement serveur tiré de `checkouts.id`, `gen_random_uuid()`) ; le motif `CHECKOUT_ID_PATTERN` ne change pas et l'adaptateur `mock` garde ses 128 bits.
 
 Statut : décision déléguée, définitive sans veto de Samuel sous 2 jours (avant le 2026-10-11) ; à lister dans la note de version suivante, rubrique « Décisions prises par le studio » · Date : 2026-10-09 · Décideur : Tech Lead (architecture, bibliothèques, outillage, tests ; délégation « Qui décide quoi » de `docs/CONTEXT.md`) · Ticket #78
@@ -58,8 +60,29 @@ Les schémas en dérivent (`PriceVariantSchema = z.enum(PRICE_VARIANTS)`, etc.) 
 #### 1.3 Paiement
 - `CheckoutRequestSchema = { tripId, method }`, `tripId` conforme à `TRIP_ID_PATTERN`. Champ inconnu refusé (objet strict) : un `amount` envoyé par le navigateur fait échouer la validation et n'est jamais lu.
 - `CheckoutStartSchema = { checkoutId, redirectUrl }`.
-  - En phase 0, `redirectUrl` est un **chemin de l'application** : il commence par `/`, pas par `//` ni `/\`, et il est construit par le module d'adresses du § 5. Raffinement du schéma, testé (`//evil.example`, `/\evil`, `https://…` refusés).
-  - La tâche de paiement réel élargira ce raffinement à une liste fermée d'origines du prestataire, par amendement de cette décision ; jamais une adresse libre.
+  - `redirectUrl` est un **chemin de l'application** : il commence par `/`, pas par `//` ni `/\`, et il est construit par le module d'adresses du § 5. Raffinement du schéma, testé (`//evil.example`, `/\evil` refusés). Adaptateurs `mock` et `simulated`.
+  - **Amendement B4c (décision 0140 § 4)** : `redirectUrl` peut aussi être une **adresse du prestataire**, validée par **une seule fonction**, `adressePrestataireAdmise(valeur): boolean`, exportée de `src/contracts/billing.ts` et employée à la fois par le raffinement du schéma (`CheckoutStartSchema.redirectUrl` = chemin de l'application **ou** `adressePrestataireAdmise`) et par l'adaptateur `stripe` sur le champ `url` de la réponse de Stripe (refusée ⇒ `provider_error`, rien d'autre écrit que la session). Elle est vraie **seulement** si toutes ces conditions tiennent, dans cet ordre : (1) longueur ≤ 8192 caractères (plafond large, non tiré d'une mesure : l'adresse de Stripe porte un fragment `#fid…` de longueur non documentée ; 8192 borne seulement l'analyse) ; (2) aucun espace, caractère de contrôle (U+0000-U+001F, U+007F) ni antislash ; (3) la valeur **commence exactement**, octet pour octet et casse comprise, par l'un des préfixes de la liste fermée `PREFIXES_PRESTATAIRE = ["https://checkout.stripe.com/"]` (l'origine suivie de `/`) ; (4) `new URL(valeur)` réussit **sans base** ; (5) `url.origin` est exactement `https://checkout.stripe.com`, `url.username` et `url.password` sont vides. La condition (3) tranche la casse et le port de façon déterministe : l'hôte doit être écrit en minuscules et **sans port**, même `:443` (que `new URL` accepterait et normaliserait) ; la valeur est alors rendue **telle quelle**, chemin, requête et fragment compris (l'adresse de Stripe porte un fragment). Aucune autre origine, aucune adresse libre ; ajouter une origine demande un amendement de cette décision. Les adaptateurs `mock` et `simulated` ne rendent jamais d'adresse absolue (test de la suite de contrat).
+
+  | Valeur | Résultat |
+  |---|---|
+  | `https://checkout.stripe.com/c/pay/cs_test_a1#fid…` | acceptée |
+  | `https://checkout.stripe.com/` | acceptée |
+  | `/voyages/abc/debloquer/paiement` (chemin actuel) | acceptée (règle du chemin) |
+  | `https://CHECKOUT.stripe.com/c/pay/x`, `https://Checkout.Stripe.com/c/pay/x` | refusée (casse, condition 3) |
+  | `https://checkout.stripe.com:443/c/pay/x` | refusée (port écrit, condition 3) |
+  | `https://checkout.stripe.com:444/c/pay/x` | refusée (condition 3) |
+  | `https://checkout.stripe.com` (sans `/`) | refusée (condition 3) |
+  | `https://checkout.stripe.com.evil.example/x` | refusée (condition 3) |
+  | `https://checkout.stripe.com@evil.example/x` | refusée (condition 3) |
+  | `https://user@checkout.stripe.com/x`, `https://user:pw@checkout.stripe.com/x` | refusée (condition 3) |
+  | `https://evil.example/?https://checkout.stripe.com/` | refusée (condition 3) |
+  | `https://dashboard.stripe.com/x`, `https://api.stripe.com/x` | refusée (condition 3) |
+  | `http://checkout.stripe.com/x` | refusée (condition 3) |
+  | `https://evil.example/x` (`https://…` hors liste, cas existant de 0020) | refusée (conservé) |
+  | `//checkout.stripe.com/x`, `javascript:alert(1)`, `data:text/html,…` | refusée (conditions 3 et règle du chemin) |
+  | `https://checkout.stripe.com/x y` (espace), une valeur contenant un retour à la ligne, une tabulation ou un antislash | refusée (condition 2) |
+  | adresse valide `https://checkout.stripe.com/c/pay/cs_test_…#…` de 4096 caractères (plus de 2048) | acceptée |
+  | toute valeur de 8193 caractères commençant par le préfixe | refusée (condition 1) |
 - `checkoutId` : identifiant **opaque et aléatoire**, `crypto.randomBytes(16).toString("base64url")` (128 bits, 22 caractères). Il n'est dérivé ni du voyage ni de la personne. `crypto.randomUUID()` n'est pas retenu : 122 bits aléatoires seulement, sous le minimum de la spécification.
 - `CheckoutStatusSchema = { checkoutId, tripId, method, status, priceVariant, amount, currency }`. `priceVariant`, `amount` et `currency` sont un instantané pris à la création du paiement : `R9-sim` affiche le montant du paiement en cours, et l'écran envoie `price_variant` sans lire la configuration.
 - **Résultats** : le format d'erreur commun de 0017 § 4, `Result<T> = { ok: true; value: T } | { ok: false; error: ApiError }`, avec :
@@ -105,7 +128,7 @@ Les schémas en dérivent (`PriceVariantSchema = z.enum(PRICE_VARIANTS)`, etc.) 
   - L'application différée passe par la même fonction de transition que l'application immédiate : une seule règle.
 
 #### 2.3 Choix et garde (`src/adapters/index.ts`, `src/adapters/payment-guard.ts`)
-- **Choix** : variable serveur `PAYMENT_ADAPTER` (sans préfixe `NEXT_PUBLIC_`), normalisée par `adapterChoice` (absente ou vide = `mock`). Valeurs : `mock` ; `simulated` depuis B4b (paiement simulé en base, voir l'amendement B4-TL-14 ci-dessous) ; `stripe` est réservé à la tâche de paiement réel et lève « non implémenté » d'ici là ; toute autre valeur lève une erreur.
+- **Choix** : variable serveur `PAYMENT_ADAPTER` (sans préfixe `NEXT_PUBLIC_`), normalisée par `adapterChoice` (absente ou vide = `mock`). Valeurs : `mock` ; `simulated` depuis B4b (paiement simulé en base, voir l'amendement B4-TL-14 ci-dessous) ; `stripe` depuis B4c (paiement Stripe en mode test, voir l'amendement B4c ci-dessous) ; toute autre valeur lève une erreur.
 - **`paymentDemoAllowed(env)`**, fonction pure, **fermée par défaut**, sur le modèle de 0017 § 11.2 :
   - **toujours faux** si `isProductionDeployment(env)` est vrai (`VADROUILLE_ENV=production`, posé par le `Dockerfile`, ou `VERCEL_ENV=production`), quels que soient `NODE_ENV` et le drapeau ;
   - sinon vrai **seulement** si `NODE_ENV` vaut `development` ou `test`, ou si `VADROUILLE_DEMO_PAYMENT` vaut exactement `1`.
@@ -120,6 +143,7 @@ Les schémas en dérivent (`PriceVariantSchema = z.enum(PRICE_VARIANTS)`, etc.) 
       3. **Écart 3** : les lignes `checkouts`, `billing` et `entitlements` sont vérifiées en base par `tests/db/deblocage-api.test.ts` et non par l'e2e (`tests/e2e/debloquer-api.api.spec.ts` en vérifie les effets à l'écran), en dérogation à B1 et B4-PO-14.
 
       Hors de ces écarts : le message `génération : type de logement illisible` de `etapeCompletDebut` (écart 4 de la PR) est hors du périmètre de B4b (M1c), reporté au CEO.
+  - **Amendement B4c (décision 0140 § 5 point 1 et § 3 point 6 ; spécification B4, B4c ; ticket #863)**. Date : 2026-10-29 · Décideur : Tech Lead (décision 0140 ; rédaction : backend). `PAYMENT_ADAPTER` admet aussi `stripe` (fin du « non implémenté » ; le texte de B4-TL-14 ci-dessus, « `stripe` reste fermé », se lit jusqu'à B4c). `paymentAvailable(env)` reste faux si `isProductionDeployment(env)` est vraie ; pour `stripe`, il est faux si `isProductionTarget(env)` est vraie (prédicat partagé de `src/dev/flags.ts` : `isProductionDeployment` ou `VERCEL_TARGET_ENV=production`, appelé directement, `payment-guard.ts` ne pouvant pas importer `src/server/env/payment`), sinon il vaut `DATA_ADAPTER=api` **et** `AUTH_ADAPTER=better-auth` **et** `betterAuthAllowed(env)`. `VADROUILLE_DEMO_PAYMENT` n'y ouvre rien et la clé n'est jamais lue par la garde. `getPaymentAdapter()` rend l'adaptateur branché au démarrage par `src/instrumentation.ts` (`src/adapters/stripe-payment-instance.ts`, composition `src/server/payment/composition-stripe.ts`, qui refuse de se construire en production, `productionPaiement`), et un adaptateur qui refuse tout (`provider_error`, aucun droit) s'il n'est pas branché ; `getPaymentSimulator()` rend `null` pour `stripe` (seul le webhook Stripe signé accorde le droit). Les filets de sécurité et l'ordre ci-dessous sont inchangés ; la table de `tests/unit/payment-guard.test.ts` est complétée sans retirer de ligne. L'API de Stripe n'étant appelable que sur une préversion (barrière de sortie) et `better-auth` n'y étant pas encore admis, l'essai réel (C6) attend l'ouverture des gardes de `mvp-essai` (0140 § 3 point 5).
 - **Ordre** : les pages `R9`, `R9-sim`, `R9-retour` et les trois actions consultent `paymentAvailable()` **en premier**, avant toute lecture (contexte, portée, adaptateur), et répondent `notFound()` ou `not_found`.
 - **Filets de sécurité** :
   - `getPaymentAdapter()` lève une erreur si `paymentAvailable()` est faux (jamais atteint par une page, testé) ;

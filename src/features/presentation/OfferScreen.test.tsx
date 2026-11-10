@@ -5,6 +5,7 @@ import { createMemoryRecorder } from "@/analytics/track";
 import { createMockTripAdapter } from "@/adapters/mock";
 import { createMockPaymentAdapter } from "@/adapters/mock-payment";
 import { OFFER_INCLUSIONS, type Offer, type OfferConfig } from "@/contracts";
+import { ORIGINE_PRESTATAIRE } from "@/contracts/billing";
 import { TripSessionProvider, useTripSession } from "@/features/voyage/TripSessionProvider";
 import { MOCK_ORGANIZATION_ID } from "@/mocks/edimbourg";
 
@@ -142,7 +143,23 @@ describe("voyage déjà débloqué", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/CHF/);
     expect(recorder.events).toEqual([]);
+    expect(screen.queryByRole("link", { name: "Voir le reçu" })).not.toBeInTheDocument();
     expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("PR 878 : avec un reçu, « Voir le reçu » vers R9-recu, après « Voir le programme » ; toujours aucun bouton", async () => {
+    const href = `/voyages/${TRIP}/debloquer/recu`;
+    const { container } = await renderOffer({ offer: null, receiptHref: href });
+    const liens = within(screen.getByRole("main")).getAllByRole("link");
+    expect(liens.map((lien) => lien.textContent)).toEqual(["", "Voir le programme", "Voir le reçu"]);
+    expect(screen.getByRole("link", { name: "Voir le reçu" })).toHaveAttribute("href", href);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("PR 878 : voyage non débloqué : aucun lien de reçu, même si une adresse est passée", async () => {
+    await renderOffer({ receiptHref: `/voyages/${TRIP}/debloquer/recu` });
+    expect(screen.queryByRole("link", { name: "Voir le reçu" })).not.toBeInTheDocument();
   });
 });
 
@@ -162,6 +179,17 @@ describe("paiement", () => {
     await act(async () => resolve({ ok: true, value: { checkoutId: "c".repeat(22), redirectUrl: "/voyages/x/debloquer/paiement-simule/c" } }));
     expect(recorder.events.at(-1)).toEqual({ name: "payment_started", properties: { method: "twint", price_variant: "chf_29" } });
     expect(router.push).toHaveBeenCalledWith("/voyages/x/debloquer/paiement-simule/c");
+  });
+
+  // B4c (PR 863 ; décision 0140 § 4, dernier paragraphe) : l'adresse absolue du prestataire est passée telle quelle au
+  // routeur, qui fait pour une adresse externe une navigation complète (Next 16.4.1 : `completeHardNavigation`, puis
+  // `location.assign`).
+  it("carte (stripe) : adresse absolue du prestataire passée telle quelle au routeur", async () => {
+    const adresse = `${ORIGINE_PRESTATAIRE}/c/pay/cs_test_a1#fidabc`;
+    const start = vi.fn(async () => ({ ok: true as const, value: { checkoutId: "c".repeat(22), redirectUrl: adresse } }));
+    await renderOffer({ start: start as unknown as StartCheckout });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Payer par carte" })));
+    expect(router.push).toHaveBeenCalledWith(adresse);
   });
 
   it("erreur : bandeau « Le paiement n'a pas pu commencer. » avec « Réessayer », focus sur le bouton appuyé", async () => {

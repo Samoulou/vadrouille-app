@@ -2,10 +2,13 @@
   "titreDocument": {
     "sejour": "{destination} · Séjour",
     "jour": "{destination} · Jour {n}",
-    "etape": "{name} · Jour {n}"
+    "etape": "{name} · Jour {n}",
+    "versions": "{destination} · Versions du programme",
+    "ajouter": "Ajouter un lieu · Jour {n}"
   },
   "region": "Programme",
   "retour": "Retour",
+  "echecEnregistrement": "Impossible d'enregistrer. Réessaie.",
   "journee": {
     "trajet": "{duree} de trajet",
     "trajetBudget": "{duree} de trajet · environ {montant} CHF par personne",
@@ -15,7 +18,34 @@
     "enPreparation": "Jour {n} en préparation",
     "etapes": "Étapes du jour {n}",
     "bandeauTrajet": "{trajet} de trajet ce jour, au-delà des {budget} prévues pour ton rythme.",
-    "bandeauPlusLong": "Le plus long : {segment}, vers {name}."
+    "bandeauPlusLong": "Le plus long : {segment}, vers {name}.",
+    "changement": {
+      "vers": "Vers {ville}",
+      "nom": "{titre}, {detail}",
+      "saisi": "{libelle}, {depart} – {arrivee}",
+      "saisiSansArrivee": "{libelle}, départ à {heure}, arrivée à confirmer",
+      "depart": "départ vers {heure} (estimation)",
+      "duree": "environ {duree} (estimation)",
+      "sansDuree": "durée à confirmer",
+      "modes": {
+        "transit": "En train ou en bus",
+        "car": "En voiture"
+      },
+      "pastille": "de {de} à {vers}"
+    },
+    "ajouterUnLieu": "Ajouter un lieu",
+    "choisirRepas": {
+      "libelle": "Choisir",
+      "lunch": "Choisir le déjeuner",
+      "dinner": "Choisir le dîner"
+    },
+    "chevauchement": {
+      "un": "À {heure}, « {libelle} » tombe pendant que tu te rends à {ville}. Vérifie tes horaires.",
+      "unEstime": "À {heure}, « {libelle} » tombe pendant que tu te rends à {ville}, d'après la durée estimée. Vérifie tes horaires.",
+      "plusieurs": "{n} de tes réservations tombent pendant que tu te rends à {ville}. Vérifie tes horaires.",
+      "plusieursEstime": "{n} de tes réservations tombent pendant que tu te rends à {ville}, d'après la durée estimée. Vérifie tes horaires.",
+      "action": "Voir les événements du jour"
+    }
   },
   "evenements": {
     "titreJour": "Événements du jour",
@@ -24,7 +54,8 @@
   },
   "surprise": {
     "bouton": "Surprends-moi",
-    "mention": "Une idée pour ta journée, pas encore dans ton programme."
+    "mention": "Une idée pour ta journée, pas encore dans ton programme.",
+    "ajouterAMaJournee": "Ajouter à ma journée"
   },
   "regionFiche": "Fiche étape",
   "fiche": {
@@ -41,9 +72,34 @@
     "remplacer": "Remplacer",
     "deplacer": "Déplacer",
     "verrouiller": "Verrouiller",
+    "signaler": "Signaler une erreur",
     "toastVerrouillee": "Étape verrouillée.",
     "toastDeverrouillee": "Verrou retiré.",
-    "absente": "Cette étape n'est plus dans ce jour."
+    "dejaReserve": "Déjà réservé : cette étape ne bouge pas.",
+    "verrouConflit": "Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.",
+    "absente": "Cette étape n'est plus dans ce jour.",
+    "ajouteParToi": "Ajouté par toi."
+  },
+  "signaler": {
+    "titre": "Signaler une erreur",
+    "groupe": "Ce qui ne va pas",
+    "motifs": {
+      "closed": "Fermé ou n'existe plus",
+      "hours": "Horaires faux",
+      "wrongPlace": "Mauvais lieu ou mauvaise adresse",
+      "price": "Prix faux",
+      "other": "Autre erreur"
+    },
+    "envoyer": "Envoyer",
+    "annuler": "Annuler",
+    "sansMotif": "Choisis ce qui ne va pas.",
+    "merci": "Merci, c'est noté.",
+    "remplacer": "Remplacer cette étape",
+    "plafond": "Trop de signalements pour le moment. Réessaie plus tard.",
+    "erreur": "Le signalement n'a pas pu être envoyé. Réessaie.",
+    "introuvable": "Cette étape n'existe plus.",
+    "nonSignalable": "Cette étape ne peut pas être signalée.",
+    "envoi": "Envoi…"
   },
   "sejour": {
     "budget": "Budget estimé : environ {montant} CHF par personne",
@@ -53,7 +109,9 @@
       "compteur": {
         "un": "1 réservation à faire",
         "plusieurs": "{n} réservations à faire"
-      }
+      },
+      "reserver": "Réserver : {nom}",
+      "horsLigne": "Tu es hors ligne. Cocher une ligne demande une connexion."
     },
     "pendant": {
       "titre": "Pendant ton séjour",
@@ -71,10 +129,118 @@
       "enPreparation": "En préparation",
       "aDebloquer": "À débloquer",
       "nomADebloquer": "Jour {day}, à débloquer",
-      "debloquer": "Débloquer"
+      "debloquer": "Débloquer",
+      "versVille": "Vers {ville}"
+    },
+    "calendrier": {
+      "bouton": "Ajouter au calendrier",
+      "aide": "Un fichier pour ton agenda, avec une entrée par étape. Si ton programme change, ajoute-le à nouveau.",
+      "enPreparation": "Les journées encore en préparation n'y sont pas.",
+      "aucuneEtape": "Aucune étape à ajouter pour l'instant.",
+      "horsLigne": "Tu es hors ligne. Ajouter au calendrier demande une connexion.",
+      "nom": "{destination} · Programme",
+      "aReserver": "À réserver."
+    },
+    "rappels": {
+      "interrupteur": "Rappel par e-mail la veille",
+      "aide": "Chaque soir vers 18:00, heure de ta destination, un e-mail avec le lien de ta journée du lendemain. Tu peux l'arrêter à tout moment.",
+      "actives": "Rappels activés.",
+      "arretes": "Rappels arrêtés.",
+      "erreur": "Impossible de modifier les rappels pour le moment.",
+      "reessayer": "Réessayer",
+      "horsLigne": "Tu es hors ligne. Modifier les rappels demande une connexion."
+    },
+    "villes": {
+      "separateur": " · ",
+      "titre": {
+        "une": "{ville} · 1 nuit",
+        "plusieurs": "{ville} · {n} nuits"
+      }
     }
+  },
+  "carteCadrage": {
+    "nom": "Afficher sur la carte",
+    "toutes": "Toutes les villes"
   },
   "aujourdhui": {
     "lien": "Aujourd'hui · Jour {n}"
+  },
+  "versions": {
+    "lien": "Versions du programme",
+    "titre": "Versions du programme",
+    "retourSejour": "Retour au Séjour",
+    "actuelle": "Version actuelle",
+    "avantDeblocage": "Avant le déblocage",
+    "plusAnciennes": "Voir les versions plus anciennes",
+    "revenir": "Revenir à cette version",
+    "revenirNomme": "Revenir à cette version : {libelle}",
+    "moment": "{jour} {date}, {heure}",
+    "momentPhrase": "{jour} {date} à {heure}",
+    "libelles": {
+      "prepared": "Programme préparé",
+      "adjusted": "Programme ajusté après ton tri",
+      "complete": "Voyage complet",
+      "replaced": "{ancien} remplacé par {nouveau}",
+      "added": "{nom} ajouté",
+      "moved": "{nom} déplacé au jour {n}",
+      "locked": "{nom} verrouillé",
+      "unlocked": "Verrou retiré : {nom}",
+      "reverted": "Retour à la version du {date}"
+    },
+    "apercuTitre": "Revenir à la version du {date}",
+    "verrouillees": "Ce retour peut toucher des étapes verrouillées.",
+    "rienNeChange": "Rien ne change dans ton programme.",
+    "calcul": "Calcul de ce qui change.",
+    "chargement": "Chargement des versions.",
+    "pret": "Ce qui change est prêt.",
+    "retabli": "Programme rétabli.",
+    "conflit": "Ton programme a changé entre-temps. Regarde la dernière version, puis réessaie.",
+    "trop": "Tu as fait beaucoup de retouches sur ce voyage : le retour à une version n'est plus possible.",
+    "erreurApercu": "Les changements n'ont pas pu être calculés. Ton programme est inchangé. Réessaie.",
+    "erreurRetour": "Le retour n'a pas pu être appliqué. Ton programme est inchangé. Réessaie.",
+    "erreurListe": "Les versions n'ont pas pu être chargées. Réessaie."
+  },
+  "ajouter": {
+    "titre": "Ajouter un lieu",
+    "jour": "Jour {n}",
+    "retourJournee": "Retour à la Journée",
+    "nonDebloque": "Tu pourras ajouter tes propres lieux une fois ton voyage débloqué.",
+    "champRecherche": "Lieu à ajouter",
+    "aideIdee": "Idée de « Surprends-moi ». Lance la recherche pour choisir le lieu exact.",
+    "rechercher": "Rechercher",
+    "deuxLettres": "Écris au moins 2 lettres.",
+    "enCours": "Recherche en cours.",
+    "resultats": "Résultats",
+    "nResultats": "{n} résultats.",
+    "unResultat": "1 résultat.",
+    "aucunResultat": "Aucun lieu trouvé. Essaie un autre nom.",
+    "rechercheIndisponible": "La recherche n'est pas disponible pour le moment. Réessaie plus tard.",
+    "plafondRecherche": "Tu as fait beaucoup de recherches aujourd'hui pour ce voyage. Réessaie demain.",
+    "resultat": "{name}, {address}",
+    "nom": "Nom dans ton programme",
+    "nomAide": "C'est le nom qui apparaîtra dans ton programme.",
+    "nomVide": "Donne un nom à ce lieu.",
+    "nomRefuse": "Écris un nom de 80 caractères au plus, sans adresse web.",
+    "quelMoment": "Quel moment ?",
+    "tempsLibre": "Temps libre {from} – {to}",
+    "dejeuner": "Déjeuner pas encore choisi",
+    "diner": "Dîner pas encore choisi",
+    "choisisMoment": "Choisis un moment.",
+    "aucunMoment": "Plus aucun moment libre ce jour-là. Choisis un autre jour, ou remplace une étape.",
+    "voirEffet": "Voir l'effet",
+    "calcul": "Calcul de l'effet.",
+    "pret": "Effet calculé.",
+    "moment": "{start} – {end}",
+    "trajetsApres": "Temps de trajet calculé après l'ajout",
+    "pasDePlace": "Pas de place à ce moment-là. Ton programme est inchangé. Choisis un autre moment ou un autre jour.",
+    "lieuIntrouvable": "Ce lieu est introuvable. Ton programme est inchangé. Choisis un autre résultat ou cherche un autre nom.",
+    "lieuFerme": "Ce lieu est fermé définitivement. Ton programme est inchangé. Choisis un autre lieu.",
+    "conflit": "Ton programme a changé entre-temps. Rien n'a été modifié.",
+    "revoirEffet": "Revoir l'effet",
+    "calculIndisponible": "Le calcul n'est pas disponible pour le moment. Ton programme est inchangé. Réessaie plus tard.",
+    "tropDeGestes": "Trop de retouches en peu de temps. Ton programme est inchangé. Réessaie dans une heure.",
+    "tropDeVersions": "Tu as fait beaucoup de retouches sur ce voyage. Ton programme est inchangé.",
+    "enPreparation": "Ton programme est en train d'être mis à jour. Réessaie dans un instant.",
+    "ajoute": "Lieu ajouté."
   }
 }

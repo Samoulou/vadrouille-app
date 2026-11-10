@@ -221,7 +221,7 @@ Thème clair uniquement au MVP. Pas d'ombres : la profondeur vient des aplats et
 | `Tag` | Exception | `kind: toReserve \| toConfirm \| unconfirmed` | Texte toujours présent |
 | `Counter` | Compteur jaune | `value` | `aria-label` explicite |
 | `DestinationPlate` | Plaque destination | `name`, `meta`, `color` | Contraste vérifié par test |
-| `ChecklistRow` | Ligne « à réserver » | `label`, `when`, `done`, `bookingUrl`, `sponsored` | Case de 44 px, `aria-pressed` |
+| `ChecklistRow` | Ligne « à réserver » | `label`, `when`, `done`, `bookingUrl`, `sponsored`, `disabledBy` (facultatif, M5e : identifiant de l'élément qui explique l'inactivité) | Case de 44 px, `aria-pressed` ; avec `disabledBy` : `aria-disabled`, `aria-describedby`, rendu indisponible de `Chip`, aucun appel |
 | `ReasonBlock` | « Pourquoi pour toi » | `text`, `sourceLabel`, `sourceUrl`, `verifiedAt` | Lien source obligatoire |
 | `DeckCard` | Carte de présentation | `proposal`, `onLike`, `onDislike`, `onOpen` | Carte entière = bouton ; gestes doublés de boutons |
 | `DeckProgress` | Progression en ligne | `current`, `total`, `label` | Texte « 4 sur 8 » lisible |
@@ -231,7 +231,7 @@ Thème clair uniquement au MVP. Pas d'ombres : la profondeur vient des aplats et
 | `Chip` | Choix multiple | `selected`, `inferred` (pointillé) | `aria-pressed` |
 | `OtpInput` | Code à 6 chiffres | `length=6`, `onComplete` | Collage du code accepté, `autocomplete="one-time-code"` |
 | `ChangeSet` | « Ce qui change » sur la ligne | `changes: Change[]` | Ancien barré + texte « à la place de » |
-| `StatusBanner` | États transverses | `kind: offline \| conflict \| noOption \| error \| generating` | `role="status"` ou `alert` selon gravité |
+| `StatusBanner` | États transverses | `kind: offline \| conflict \| noOption \| error \| generating \| travel \| overlap` | `role="alert"` et filet `ink` pour `error` et `conflict`, `role="status"` et filet `ink-soft` pour les autres (0012, Q13) ; `travel` : budget de trajet du jour dépassé (0015 § 7) ; `overlap` : engagement qui chevauche la ligne « Vers {ville} » de la Journée, message coupé n'importe où (`overflow-wrap: anywhere`), action « Voir les événements du jour » (spécification M4-suite § 5, UX-M4S-A) |
 
 Chaque composant a une story ou une page de démonstration (`/dev/composants`, désactivée en production) et un test d'accessibilité axe.
 
@@ -376,6 +376,8 @@ export interface Trip {
 }
 
 export interface ChecklistItem { id: string; label: string; when: string; done: boolean; bookingUrl?: string; sponsored: boolean }
+// Ajout de M5-C (décision 0147 § 6.2) : `kind: "reservation" | "ticket" | "other"`, obligatoire ; seules les lignes
+// `reservation` non faites sont comptées (« {n} réservations à faire »). Forme à jour : `src/contracts/trip.ts`.
 
 export interface Proposal {
   id: string;
@@ -394,7 +396,13 @@ export type Change =
   | { type: "moved"; label: string; before: string; after: string }
   | { type: "segment"; before: number; after: number; estimated: boolean }
   | { type: "budget"; deltaPerPerson: number }
-  | { type: "unchanged"; label: string; time: string };
+  | { type: "unchanged"; label: string; time: string }
+  // Ajouts de M5-C (décision 0147 § 5.1), à la fin de l'union ; `added` (F7a) et les formes structurées de `moved` et
+  // `segment` (0016 § 4.5) sont dans `src/contracts/trip.ts`, qui fait foi.
+  | { type: "removed"; label: string; before: { day: number; time: string } }   // étape retirée
+  | { type: "locked"; label: string; time: string }                              // verrou posé
+  | { type: "unlocked"; label: string; time: string }                            // verrou retiré
+  | { type: "checklist"; action: "added" | "removed"; label: string };          // ligne « À faire » ajoutée ou retirée
 ```
 
 Règles : les montants arrivent en nombres et sont formatés côté interface (`Intl.NumberFormat("fr-CH")`) ; les heures sont déjà en heure locale de la destination ; aucun texte d'interface n'est stocké dans les données.
@@ -448,7 +456,11 @@ Noms en `snake_case`, propriétés sans donnée personnelle. Ils alimentent les 
 | `preference_prompt_answered` | `category` (dont `distance`), `answer: yes \| no`, `reason?` |
 | `paywall_viewed` / `payment_started` / `payment_succeeded` | `method: twint \| card`, `price_variant` |
 | `replace_applied` / `replace_undone` | `reason`, `from_reserve: boolean`, `duration_ms` |
-| `place_added` / `stop_moved` | `method: button \| drag` |
+| `place_added` | `method: button` (seul geste d'ajout ; décision 0155 § 4.2) |
+| `stop_reviewed` | `rating: liked \| disliked \| notDone`, `kind: activity \| meal \| event` ; jamais à l'effacement d'un avis (F11-PO-16 ; décision 0160 § 1.2 point 7) |
+| `tastes_retained` | `count` (≥ 1), `inferred_count` (0 à `count`) (F11-PO-16) |
+| `taste_removed` | `category` (dont `distance`), `origin: confirmed \| inferred` ; à l'expiration du délai d'annulation (F11-PO-16) |
+| `stop_moved` | `method: button \| drag` |
 | `checklist_item_done` | — |
 | `today_opened` | `offline: boolean` |
 | `error_reported` | `kind` |

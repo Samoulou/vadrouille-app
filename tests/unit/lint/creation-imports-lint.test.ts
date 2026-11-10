@@ -90,6 +90,11 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     ["src/workflows/recalcul.ts", SYSTEME],
     ["src/server/presentation/tri.ts", SYSTEME],
     ["scripts/autre.ts", SYSTEME],
+    // PR 879 (M1e) : photos du tri sur api, la seule barrière ; ses voisins restent refusés.
+    ["src/server/photos/api.ts", GENERATION],
+    ["src/server/photos/api.ts", "@/server/generation/garde"],
+    ["src/server/photos/api.ts", COMPOSITION],
+    ["src/server/photos/autre.ts", "@/server/generation/barriere"],
   ])("%s : chargement de %s signalé sous toutes ses formes", async (fichier, source) => {
     for (const code of formes(source)) expect(await signalements(code, fichier), code).not.toHaveLength(0);
   });
@@ -108,6 +113,8 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     ["src/server/presentation/tri.ts", "@/server/generation/lot"],
     ["src/server/presentation/tri.ts", "@/server/generation/expiration"],
     ["src/server/presentation/tri.ts", "@/server/generation/demarrage"],
+    // PR 879 (M1e) : photos du tri sur api, barrière B9-TL-8 seulement.
+    ["src/server/photos/api.ts", "@/server/generation/barriere"],
     ["src/workflows/index.ts", GENERATION],
     // M1a-2 : pont de `generateProgramme` (chaîne inversée, 0136 § 2.1, amende 0101 § 4).
     ["src/workflows/programme.ts", GENERATION],
@@ -148,6 +155,27 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     expect(await signalements(imp(CREATION), "src/adapters/api-creation.ts")).toEqual([]);
     expect(await signalements(imp(CREATION), "src/adapters/api.ts")).not.toHaveLength(0);
     expect(await signalements(imp(CREATION), "src/adapters/mock-creation.ts")).not.toHaveLength(0);
+  });
+
+  // Décision 0141 § 6.2 point 3 et § 11 ligne 8 (T23, PR 885 ; Tech Lead, bloquant 1 de la revue du head d8b9f0b).
+  it("villes-api.ts n'importe que barriere et acces-reel de src/server/generation (0141 § 6.2) ; la page de l'écran 1 et tout autre module de la génération sont refusés", async () => {
+    const TERMINAL = "src/server/composition/villes-api.ts";
+    const PAGE = "src/app/(creation)/voyages/nouveau/page.tsx";
+    for (const source of ["@/server/generation/barriere", "@/server/generation/acces-reel", "../generation/barriere", "../generation/acces-reel"]) {
+      for (const code of formes(source)) expect(await signalements(code, TERMINAL), `${source} ${code}`).toEqual([]);
+    }
+    for (const source of [GENERATION, REPRISE, "@/server/generation/dependances", "@/server/generation/barriere-autre", "@/server/generation/acces-reel/x", CREATION, COMPOSITION, SYSTEME]) {
+      for (const code of formes(source)) expect(await signalements(code, TERMINAL), `${source} ${code}`).not.toHaveLength(0);
+    }
+    // La page passe par `rechercheVilleApiOuverte` (0141 § 6.4) : la barrière et le crochet y sont refusés.
+    for (const source of ["@/server/generation/barriere", "@/server/generation/acces-reel"]) {
+      for (const code of formes(source)) expect(await signalements(code, PAGE), `${source} ${code}`).not.toHaveLength(0);
+    }
+    // Les voisins du terminal ne sont pas admis.
+    for (const fichier of ["src/server/composition/villes.ts", "src/server/villes/recherche.ts", "src/server/actions/villes.ts", "src/server/composition/villes-api.ts/x.ts"]) {
+      expect(await signalements(imp("@/server/generation/barriere"), fichier), fichier).not.toHaveLength(0);
+      expect(await signalements(imp("@/server/generation/acces-reel"), fichier), fichier).not.toHaveLength(0);
+    }
   });
 
   it("le module feuille de reprise est le seul de src/server/generation que la commande du studio charge (0087 § 1.6)", async () => {

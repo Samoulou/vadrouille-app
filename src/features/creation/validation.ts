@@ -13,7 +13,7 @@ import {
   PROTOTYPE_STAY_DAYS_MAX,
   STORY_LENGTH,
 } from "@/contracts/values";
-import { fuseauDeVille, fuseauDuPays, paysParCode, villeDuPays } from "@/lib/fuseaux";
+import { controlerVilles, fuseauDeVille, fuseauDuPays, memeVilleQueLaPrecedente, paysParCode, villeDuPays } from "@/lib/fuseaux";
 
 import { DESTINATION_KEY, markedFields, type BriefForm, type BriefValues, type LodgingChoice, type LodgingForm, type TripForm } from "./draft";
 
@@ -39,8 +39,15 @@ export type FieldError =
   | "selectCity"
   | "cityCharacters"
   | "cityUnavailable"
+  // Écran 1 de `api` (décision 0141 § 8.2) : la recherche a répondu, la ville n'est pas l'une des 62 villes du MVP.
+  | "cityNotOffered"
   | "singleCity"
-  | "tooLong";
+  | "tooLong"
+  // Autres villes sur `api` (spécification M4 § 7.1 et § 8 ; décision 0148 § 4 point 2) : ville hors des 62 villes du MVP,
+  // même ville que la précédente, autre décalage horaire que la destination.
+  | "cityUnknown"
+  | "cityRepeated"
+  | "cityTimeZone";
 
 /** Erreur d'un champ ; `field` est aussi la base de l'identifiant du champ dans la page. */
 export interface FormError {
@@ -134,10 +141,46 @@ export interface ValidateTripOptions {
    */
   essai?: boolean;
   /**
-   * Site d'essai : la recherche de ville a répondu (`true`) : un choix dans les suggestions est exigé, même pour une
-   * ville de la table. Absent ou faux (recherche indisponible, écran 2) : une ville de la table suffit.
+   * Site d'essai (ou écran 1 de `api` avec `rechercheApi`) : la recherche de ville a répondu (`true`) : un choix dans les
+   * suggestions est exigé, même pour une ville de la table. Absent ou faux (recherche indisponible, écran 2) : une ville
+   * de la table suffit (site d'essai), ou le champ d'aujourd'hui (`api`).
    */
   suggestions?: boolean;
+  /**
+   * Écran 1 de `api`, recherche de ville montée par la page (décision 0141 § 6.4) : avec `suggestions`, un choix dans les
+   * suggestions est exigé ; sans, aucun changement (champ d'aujourd'hui, contrôle des 62 villes par `createTrip`).
+   */
+  rechercheApi?: boolean;
+  /**
+   * Écran 1 de `api` : la saisie actuelle est celle que la recherche a refusée hors des 62 villes (`hors_table`) ;
+   * « Continuer » répète alors `cityNotOffered` au lieu de `selectCity` (une seule consigne pour le champ).
+   */
+  horsTable?: boolean;
+  /**
+   * Écran 1 de `api` (spécification M4 § 7.1 ; décision 0148 § 4 point 2) : chaque autre ville est contrôlée comme le
+   * fera `createTrip` (`controlerVilles`, `memeVilleQueLaPrecedente`) : ville connue des 62 villes du MVP, différente de
+   * la précédente, même décalage horaire que la destination. Erreur sous le nom de la ville. Absent : aucun contrôle de plus.
+   */
+  controleVilles?: boolean;
+}
+
+/**
+ * Erreur du nom de chaque autre ville sous `controleVilles` (même ordre que `controlerVilles` : inconnue, répétée,
+ * décalage), indexée comme `otherCities` ; `null` sans erreur. Une destination inconnue ne fait refuser aucune autre ville
+ * (son erreur relève de la destination). Le décalage n'est contrôlé qu'avec des dates cohérentes.
+ */
+export function erreursDesVilles(trip: Pick<TripForm, "destination" | "start" | "end" | "otherCities">, datesValides: boolean): (FieldError | null)[] {
+  const noms = trip.otherCities.map((city) => city.name.trim());
+  const destination = trip.destination.trim();
+  const repetee = memeVilleQueLaPrecedente([destination, ...noms]);
+  return noms.map((nom, index) => {
+    if (textError(nom, CITY_NAME_LENGTH) !== null) return null;
+    if (fuseauDeVille(nom) === null) return "cityUnknown";
+    if (repetee === index + 1) return "cityRepeated";
+    if (!datesValides || fuseauDeVille(destination) === null) return null;
+    const controle = controlerVilles([destination, nom], trip.start, trip.end);
+    return !controle.ok && controle.raison === "decalage" ? "cityTimeZone" : null;
+  });
 }
 
 /** Vrai si la destination saisie (non vide) est absente de la table maison des villes. */
@@ -167,11 +210,16 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
   const essai = options.essai === true;
   const destinationError = textError(trip.destination, DESTINATION_LENGTH);
   push("destination", destinationError);
-  const region = essai && destinationError === null ? destinationRegion(trip) : null;
+  const api = !essai && options.rechercheApi === true && options.suggestions === true;
+  const region = (essai || api) && destinationError === null ? destinationRegion(trip) : null;
   if (essai && destinationError === null && region === null) {
     // Recherche disponible : choisir dans les suggestions ; sinon (repli sans réseau), une ville de la table suffit.
     if (options.suggestions === true) push("destination", "selectCity");
     else if (fuseauDeVille(trip.destination) === null) push("destination", "cityUnavailable");
+  } else if (api && destinationError === null && region === null) {
+    // Écran 1 de `api`, recherche montée et disponible (décision 0141 § 6.4) : choisir dans les suggestions. Sans
+    // réponse de la recherche, le champ d'aujourd'hui (62 villes, contrôle de `createTrip`).
+    push("destination", options.horsTable === true ? "cityNotOffered" : "selectCity");
   }
   // Ville choisie hors de la table : seul un nom fait de lettres atteint le brief (décision 0129 § 4, même règle que le serveur).
   if (region !== null && villeDuPays(trip.destination, region.country) === null && destinationEssaiFiltree(trip.destination) === null) {
@@ -194,9 +242,10 @@ export function validateTrip(trip: TripForm, today: string, options: ValidateTri
   errors.push(...lodgingErrors(trip.lodging, "lodging"));
 
   let previous = start;
+  const villes = !essai && options.controleVilles === true ? erreursDesVilles(trip, datesValid) : [];
   trip.otherCities.forEach((city, index) => {
     const base = `otherCities.${index}`;
-    push(`${base}.name`, essai ? "singleCity" : textError(city.name, CITY_NAME_LENGTH));
+    push(`${base}.name`, essai ? "singleCity" : (textError(city.name, CITY_NAME_LENGTH) ?? villes[index] ?? null));
     if (!isDate(city.arrival)) {
       push(`${base}.arrival`, "required");
     } else if (datesValid) {

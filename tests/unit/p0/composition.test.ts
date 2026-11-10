@@ -66,7 +66,15 @@ const IMPORTATEURS_COMPOSITION: readonly string[] = [IMPORTATEUR_COMPOSITION, RE
 const CLIENTS_GOOGLE = "src/server/composition/clients-google.ts";
 const COMPOSITION_LECTURE = "src/server/composition/lecture.ts";
 // Recherche de la ville de l'écran 1 du site d'essai (demande de Samuel du 23 octobre 2026, décision 0129).
-const IMPORTATEURS_CLIENTS_GOOGLE: readonly string[] = [COMPOSITION_LECTURE, "src/server/composition/generation.ts", "src/server/composition/villes.ts"];
+// Décision 0141 § 11 ligne 3 (PR 885) : terminal de la recherche de ville de `api` ; le cœur n'en est pas importateur.
+const IMPORTATEURS_CLIENTS_GOOGLE: readonly string[] = [
+  COMPOSITION_LECTURE,
+  "src/server/composition/generation.ts",
+  "src/server/composition/villes.ts",
+  "src/server/composition/villes-api.ts",
+  // Décision 0147 § 3 et § 14 ligne M5d-1 (ticket 939) : terminal de la recherche d'un lieu à soi, sur le modèle de M1f.
+  "src/server/composition/lieux-api.ts",
+];
 const CAPACITES_GOOGLE = ["src/grounding/places-client.ts", "src/grounding/routes-client.ts"];
 
 /**

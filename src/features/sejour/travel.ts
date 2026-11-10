@@ -1,4 +1,4 @@
-import type { Day, DayLineItem, Segment, Stop } from "@/contracts";
+import type { ChecklistItem, Day, DayLineItem, Segment, Stop } from "@/contracts";
 import { segmentLabel } from "@/components/ligne/DayLine";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -189,3 +189,12 @@ export function tripEvents<E extends Pick<Stop, "start">, D extends { index: num
     .sort((a, b) => a.index - b.index)
     .flatMap((day) => [...day.events].sort((a, b) => a.start.localeCompare(b.start)).map((event) => ({ day, event })));
 }
+
+/**
+ * Libellé affiché d'une ligne (spécification M5 § 7.1 et § 9 ; décision 0147 § 7.1) : une ligne `reservation` stocke le seul
+ * nom de l'étape, l'écran compose « Réserver : {nom} » ; les autres sortes s'affichent telles quelles.
+ */
+export function checklistLabel(item: Pick<ChecklistItem, "kind" | "label">): string {
+  return item.kind === "reservation" ? format(messages.sejour.sejour.aFaire.reserver, { nom: item.label }) : item.label;
+}
+

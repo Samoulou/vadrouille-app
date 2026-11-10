@@ -13,6 +13,7 @@ import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
 import { cn } from "@/lib/utils";
 
+import { ARIA_DISABLED } from "./aria-disabled";
 import { travelBannerMessage } from "./travel";
 
 const t = messages.revision;
@@ -20,8 +21,8 @@ const t = messages.revision;
 /** Titres de niveau 3 en style `bloc` (décision 0018 § 7). */
 const BLOC = "text-(length:--ligne-texte-bloc) leading-(--ligne-texte-bloc-interligne) font-extrabold text-ink";
 
-/** Bouton en `aria-disabled` (hors ligne, F7-PO-13) : rendu de l'état désactivé, toujours atteignable au clavier. */
-export const ARIA_DISABLED = "aria-disabled:cursor-not-allowed aria-disabled:border-muted aria-disabled:bg-muted aria-disabled:text-ink-soft";
+/** Bouton en `aria-disabled` (hors ligne, F7-PO-13) : classes de `./aria-disabled`, réexportées pour les lecteurs existants. */
+export { ARIA_DISABLED };
 
 /** Jour du brouillon qui contient l'étape visée (jour affiché après « Appliquer »). */
 export function targetDay(preview: RevisionPreviewData): Day | undefined {

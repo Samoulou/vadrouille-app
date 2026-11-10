@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "mode": "simule",
+  "prompt": {
+    "id": "programme",
+    "version": 5
+  },
+  "mesures": [
+    {
+      "cas": "rome-florence-billet",
+      "lecture": {
+        "joursRetires": 0,
+        "creneauxRetires": 0,
+        "champsRetires": 0,
+        "textesCoupes": 0
+      },
+      "changements": [
+        {
+          "date": "2027-05-07",
+          "source": "saisi",
+          "activites": 2,
+          "activitesMax": 2,
+          "activitesEnTrop": 0,
+          "aReserver": 0,
+          "aChevalOuPendantLeTrajet": 0,
+          "titreEcrit": false,
+          "dureeEstimee": "non demandee",
+          "adhesion": true
+        }
+      ],
+      "adhesion": {
+        "journees": 1,
+        "tenues": 1
+      },
+      "villesParCreneau": 0,
+      "incontournables": [
+        {
+          "ville": "Rome",
+          "attendus": 5,
+          "surSesJours": 5
+        },
+        {
+          "ville": "Florence",
+          "attendus": 3,
+          "surSesJours": 3
+        }
+      ]
+    },
+    {
+      "cas": "lisbonne-porto-estime",
+      "lecture": {
+        "joursRetires": 0,
+        "creneauxRetires": 0,
+        "champsRetires": 0,
+        "textesCoupes": 0
+      },
+      "changements": [
+        {
+          "date": "2027-06-13",
+          "source": "estime",
+          "activites": 2,
+          "activitesMax": 2,
+          "activitesEnTrop": 0,
+          "aReserver": 0,
+          "aChevalOuPendantLeTrajet": 0,
+          "titreEcrit": false,
+          "dureeEstimee": "lue",
+          "adhesion": true
+        }
+      ],
+      "adhesion": {
+        "journees": 1,
+        "tenues": 1
+      },
+      "villesParCreneau": 0,
+      "incontournables": [
+        {
+          "ville": "Lisbonne",
+          "attendus": 4,
+          "surSesJours": 4
+        },
+        {
+          "ville": "Porto",
+          "attendus": 3,
+          "surSesJours": 3
+        }
+      ]
+    },
+    {
+      "cas": "paris-lyon-marseille-intense",
+      "lecture": {
+        "joursRetires": 0,
+        "creneauxRetires": 0,
+        "champsRetires": 0,
+        "textesCoupes": 0
+      },
+      "changements": [
+        {
+          "date": "2027-09-04",
+          "source": "estime",
+          "activites": 2,
+          "activitesMax": 2,
+          "activitesEnTrop": 0,
+          "aReserver": 0,
+          "aChevalOuPendantLeTrajet": 0,
+          "titreEcrit": false,
+          "dureeEstimee": "lue",
+          "adhesion": true
+        },
+        {
+          "date": "2027-09-06",
+          "source": "estime",
+          "activites": 3,
+          "activitesMax": 2,
+          "activitesEnTrop": 1,
+          "aReserver": 0,
+          "aChevalOuPendantLeTrajet": 0,
+          "titreEcrit": false,
+          "dureeEstimee": "lue",
+          "adhesion": false
+        }
+      ],
+      "adhesion": {
+        "journees": 2,
+        "tenues": 1
+      },
+      "villesParCreneau": 0,
+      "incontournables": [
+        {
+          "ville": "Paris",
+          "attendus": 6,
+          "surSesJours": 6
+        },
+        {
+          "ville": "Lyon",
+          "attendus": 4,
+          "surSesJours": 4
+        },
+        {
+          "ville": "Marseille",
+          "attendus": 4,
+          "surSesJours": 4
+        }
+      ]
+    },
+    {
+      "cas": "controle-rome-florence",
+      "lecture": {
+        "joursRetires": 0,
+        "creneauxRetires": 0,
+        "champsRetires": 1,
+        "textesCoupes": 0
+      },
+      "changements": [
+        {
+          "date": "2027-05-07",
+          "source": "saisi",
+          "activites": 5,
+          "activitesMax": 2,
+          "activitesEnTrop": 3,
+          "aReserver": 1,
+          "aChevalOuPendantLeTrajet": 2,
+          "titreEcrit": true,
+          "dureeEstimee": "non demandee",
+          "adhesion": false
+        }
+      ],
+      "adhesion": {
+        "journees": 1,
+        "tenues": 0
+      },
+      "villesParCreneau": 6,
+      "incontournables": []
+    }
+  ]
+}

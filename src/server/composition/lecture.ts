@@ -68,10 +68,20 @@ export function choisirSourceRelectures(repli: SourceRelectures, env?: Readonly<
 }
 
 /**
- * Préfixe des `placeId` des fixtures d'Édimbourg de la variante simulée (`prototype/fixtures/places/edimbourg.json` :
- * valeurs sentinelles fabriquées, aucune réponse réelle). Le double de B6 ne les connaît pas (`mock_place_`, `test_place_`).
+ * Préfixe des `placeId` des fixtures de la variante simulée (`prototype/fixtures/places/edimbourg.json` et
+ * `rome-chaine-inversee.json` : valeurs sentinelles fabriquées, aucune réponse réelle). Le double de B6 ne les connaît pas
+ * (`mock_place_`, `test_place_`).
  */
 export const PREFIXE_LIEU_FIXTURES = "SENTINELLE_PLACE_ID";
+
+/**
+ * Ville du voyage relu, qui choisit le jeu de fixtures (décision 0136 § 9 : liste fermée `JEUX_PAR_DESTINATION`, pour la
+ * génération **comme pour la lecture** des voyages simulés ; Édimbourg sinon) : `stays.city` de la première nuit qui en a une
+ * (une seule ville dans M1a, M1a-PO-3). Jamais un chemin : le nom n'est comparé qu'à la liste fermée, par `chargerDoubles`.
+ */
+function villeDuVoyage(voyage: VoyageARelire): string | undefined {
+  return voyage.sejoursParNuit.find((sejour) => sejour.ville !== null)?.ville ?? undefined;
+}
 
 /** Lieux d'une lecture : nuits, lieux demandés et points des trajets. */
 function lieuxDeLaLecture(voyage: VoyageARelire, demande: DemandeRelectures): string[] {
@@ -92,7 +102,8 @@ function lieuxDeLaLecture(voyage: VoyageARelire, demande: DemandeRelectures): st
  *   (`PLAFONDS_VARIANTE_SIMULEE`), **en mémoire seulement** (aucune ligne dans `usage_ledger`, 0110 § 3) ; aucune écriture de position (`positionsSuspendues` vrai) : les positions des fixtures ne
  *   viennent pas de Google.
  * - **Fixtures** : lues à l'appel par `fixtures-simulees.ts`, atteint par `import()` dynamique (décision 0105 § 2), qui
- *   refuse de lire en production ou sous une déclaration inconnue.
+ *   refuse de lire en production ou sous une déclaration inconnue ; jeu de la ville du voyage (`villeDuVoyage`, liste fermée :
+ *   Rome pour la chaîne inversée, M1a-3), Édimbourg sinon.
  */
 export function avecVoyagesGeneresSimules(repli: SourceRelectures, declarations: Readonly<Record<string, string | undefined>>): SourceRelectures {
   return {
@@ -101,7 +112,7 @@ export function avecVoyagesGeneresSimules(repli: SourceRelectures, declarations:
       if (lieux.length === 0 || !lieux.every((l) => l.startsWith(PREFIXE_LIEU_FIXTURES))) return repli.pour(voyage, demande);
       let doubles;
       try {
-        doubles = (await (await import("@/server/composition/fixtures-simulees")).chargerDoublesEdimbourg(declarations))();
+        doubles = (await (await import("@/server/composition/fixtures-simulees")).chargerDoubles(declarations, villeDuVoyage(voyage)))();
       } catch {
         return { ok: false, refus: "unavailable" };
       }

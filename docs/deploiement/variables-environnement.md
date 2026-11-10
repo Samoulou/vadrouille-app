@@ -140,6 +140,7 @@ L'une des deux est requise ; sans aucune, le serveur ne démarre pas. Comparaiso
 - `STRIPE_*` : une valeur qui commence par `sk_live_`, `pk_live_` ou `rk_live_` (casse et espaces ignorés) est refusée dans tous les environnements ; `STRIPE_SECRET_KEY`, si présente, doit commencer par `sk_test_` (ou `rk_test_`).
 - `SIMULATED_WEBHOOK_ENABLED=true` : refusée en `production`.
 - `AUTH_ADAPTER` : `mock` (ou absente) seulement en B3a.
+- `RAPPELS_ACCELERATION` (M6c, ticket 1021) : accélération des durées des rappels par e-mail pour le test sur le monde local du Workflow SDK (entier de 1 à 86 400) ; refusée (`forbidden`) hors de `local` et `ci`. Posée par le seul serveur `api` de `playwright.config.ts`.
 
 ## Carte Google Maps (F4, Q3)
 

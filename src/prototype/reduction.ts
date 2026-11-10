@@ -59,6 +59,9 @@ function ligne(item: DayLineItem): LigneReduite {
       return { type: "stop", stop: etape(item.stop) };
     case "segment":
       return { type: "segment", segment: segment(item.segment) };
+    case "transfer":
+      // Le site d'essai n'a qu'une ville (décision 0148 § 4) : un changement de ville n'a pas de forme réduite.
+      throw new ReductionRefusee();
     default:
       return item;
   }
@@ -96,7 +99,13 @@ export function reduireProgramme(
     justifications: ReadonlyMap<string, string>;
   },
 ): ProgrammeReduit {
-  const trip = { ...sans(complet.trip, "days"), days: complet.trip.days.map(jour) } as VoyageReduit;
+  // La forme réduite des lignes « À faire » n'a pas de `kind` (bons plans seulement, `ChecklistReduiteSchema`) : la sorte
+  // (`other`, décision 0147 § 6.2) est reposée à la lecture par l'adaptateur `prototype`.
+  const trip = {
+    ...sans(complet.trip, "days", "checklist"),
+    days: complet.trip.days.map(jour),
+    checklist: complet.trip.checklist.map((ligne) => sans(ligne, "kind")),
+  } as VoyageReduit;
   const proposals = complet.proposals.map((valeur) => {
     const justification = options.justifications.get(valeur.id);
     if (justification === undefined) throw new ReductionRefusee();

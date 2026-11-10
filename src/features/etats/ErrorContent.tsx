@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition } from "react";
 
-import { Button } from "@/components/ligne/Button";
+import { buttonClassName } from "@/components/ligne/button-variants";
 import { PRODUCT_NAME } from "@/config/site";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -38,12 +37,17 @@ export function ErrorContent({ reset }: ErrorContentProps) {
     <>
       <title>{format(t.erreur.titreDocument, { produit: PRODUCT_NAME })}</title>
       <EtatPage title={t.erreur.titre} text={t.erreur.texte}>
-        <Button onClick={retry}>{t.erreur.reessayer}</Button>
-        <Button asChild variant="text">
-          <Link href="/" prefetch={false}>
-            {t.accueil}
-          </Link>
-        </Button>
+        {/* Ni `Button` ni `next/link` (décision 0152) : `error.tsx` et `global-error.tsx` sont chargés par toutes les
+            pages, chacun dans son bloc, qui embarquait sa copie de `Slot` et du routeur de liens. Mêmes éléments et
+            mêmes classes que `Button` et `Button asChild` ; le retour à l'accueil recharge la page, ce qui repart
+            aussi d'un état propre après une erreur. */}
+        <button type="button" className={buttonClassName()} onClick={retry}>
+          {t.erreur.reessayer}
+        </button>
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- lien ordinaire voulu, voir ci-dessus (décision 0152) */}
+        <a href="/" className={buttonClassName({ variant: "text" })}>
+          {t.accueil}
+        </a>
       </EtatPage>
     </>
   );

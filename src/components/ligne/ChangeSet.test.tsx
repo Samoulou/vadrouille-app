@@ -88,3 +88,47 @@ describe("ChangeSet", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 });
+
+/** Variantes de M5 (décision 0147 § 5.1), textes provisoires à valider par UX/UI. */
+const M5: Change[] = [
+  { type: "removed", label: "[Musée]", before: { day: 2, time: "13:25" } },
+  { type: "locked", label: "[Château]", time: "09:30" },
+  { type: "unlocked", label: "[Château]", time: "09:30" },
+  { type: "checklist", action: "added", label: "[Distillerie]" },
+  { type: "checklist", action: "removed", label: "[Excursion]" },
+];
+
+describe("ChangeSet, variantes de M5 (décision 0147 § 5.1)", () => {
+  it("toutes rendues, dans l'ordre des données", () => {
+    const { container } = render(<ChangeSet changes={M5} />);
+    expect(lines(container).map((li) => li.dataset.change)).toEqual(["removed", "locked", "unlocked", "checklist", "checklist"]);
+    expect(M5.every(isShownChange)).toBe(true);
+  });
+
+  it("removed : « J{n} {heure} {nom} retiré », nom barré, « retiré » en texte (le barré ne porte pas seul l'information)", () => {
+    const { container } = render(<ChangeSet changes={[M5[0]!]} />);
+    const li = lines(container)[0]!;
+    expect(li).toHaveTextContent("J2 13:25 [Musée] retiré");
+    expect(li.querySelector("del")).toHaveTextContent("[Musée]");
+  });
+
+  it("locked et unlocked : « {heure} {nom} verrouillé », « {heure} Verrou retiré : {nom} »", () => {
+    const { container } = render(<ChangeSet changes={[M5[1]!, M5[2]!]} />);
+    const [pose, retire] = lines(container);
+    expect(pose).toHaveTextContent("09:30 [Château] verrouillé");
+    expect(retire).toHaveTextContent("09:30 Verrou retiré : [Château]");
+  });
+
+  it("checklist : « À faire : {libellé} ajouté » ou « retiré »", () => {
+    const { container } = render(<ChangeSet changes={[M5[3]!, M5[4]!]} />);
+    const [ajoutee, retiree] = lines(container);
+    expect(ajoutee).toHaveTextContent("À faire : [Distillerie] ajouté");
+    expect(retiree).toHaveTextContent("À faire : [Excursion] retiré");
+  });
+
+  it("aucun texte interdit ; aucune violation axe", async () => {
+    const { container } = render(<ChangeSet changes={[...ALL, ...M5]} />);
+    expect(container.textContent).not.toMatch(/Aperçu|Valider|\bOK\b|Supprimer|Vérifié/);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+});

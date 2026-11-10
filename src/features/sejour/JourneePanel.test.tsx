@@ -135,6 +135,21 @@ describe("JourneePanel (écran 12, F5-PO-5)", () => {
     expect(container.querySelectorAll("a[data-part='arret']")).toHaveLength(4);
   });
 
+  it("voyage débloqué : « Choisir » du dîner pas encore choisi vers « Ajouter un lieu » avec l'heure et le repas (F7-PO-8, M5d-3)", async () => {
+    const items = day(2).items;
+    const lastStop = items.map((item) => item.type).lastIndexOf("stop");
+    const withOpenMeal: Day = {
+      ...day(2),
+      items: [...items.slice(0, lastStop), { type: "openMeal", time: "19:30", meal: "dinner" }, ...items.slice(lastStop + 1)],
+    };
+    const { container } = render(<JourneePanel day={withOpenMeal} routes={routes} addPlaceHref={routes.ajouter(2)} />);
+    const choisir = screen.getByRole("link", { name: "Choisir le dîner" });
+    expect(choisir).toHaveTextContent(/^Choisir$/);
+    expect(choisir).toHaveAttribute("href", "/voyages/mock_trip_edimbourg/jour/2/ajouter?de=19:30&repas=dinner");
+    expect(container.querySelectorAll("a[data-part='arret']")).toHaveLength(4);
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
   it("lignes d'événements : nom et faits en ink-2 sur muted (décision 0018 § 3)", () => {
     render(<JourneePanel day={day(2)} routes={routes} />);
     const concert = within(screen.getByRole("region", { name: "Événements du jour" })).getByRole("link", { name: /Concert d'orgue/ });

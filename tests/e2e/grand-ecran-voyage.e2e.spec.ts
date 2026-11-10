@@ -268,7 +268,7 @@ test.describe("grand écran", () => {
   test("grand écran: trouver la liste à réserver au clavier", async ({ page }) => {
     await openTrip(page, SEJOUR);
     const aFaire = sheet(page).getByRole("region", { name: "À faire avant de partir" });
-    const chateau = aFaire.getByRole("button", { name: "[Château d'Édimbourg]", exact: true });
+    const chateau = aFaire.getByRole("button", { name: "Réserver : [Château d'Édimbourg]", exact: true });
     // Au clavier depuis le début de la page : la case du château est atteinte par Tab et cochée par Espace.
     await page.locator("body").focus();
     let reached = false;

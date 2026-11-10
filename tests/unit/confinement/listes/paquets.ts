@@ -89,6 +89,13 @@ const PAQUETS_TS = [
       "B3b (ticket 444) ; verdict Sécurité : approuvé sur le head `ed79edb` (revue consolidée, PR 446), lockfile cité : version exacte 1.7.7, aucun paquet ajouté à " +
       "`onlyBuiltDependencies`, scripts d'installation ignorés inchangés",
   },
+  {
+    paquet: "stripe",
+    usage:
+      "SDK de Stripe en mode test (B4c, décision 0140 § 1) : création de la session Checkout et vérification de signature du webhook Stripe, importé par src/server/payment/stripe.ts seulement ; module à capacité",
+    verdict:
+      "B4c (décision 0140 § 1.1 et § 6) ; Sécurité : verdict Sécurité rendu sur le head final de la PR de la décision 0140 (PR 848) ; entrée du verrou à vérifier dans la PR de B4c : version exacte 23.0.0, intégrité sha512-MDE2A5ZVVluYURORaZEVghSmnLJc3w6aHAlZSxDQMsOjOb3V0O6ro/CiaeFlJS4N7uIVmsg98ocRsPmUK6YfyA==, aucune dépendance, aucun script d'installation, hors de onlyBuiltDependencies",
+  },
 ] as const satisfies readonly LignePaquet[];
 
 export const PAQUETS: readonly LignePaquet[] = [...PAQUETS_TS, ...PAQUETS_TEXTES];

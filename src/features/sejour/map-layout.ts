@@ -16,10 +16,12 @@ import { useElementSize, type ElementSize } from "@/lib/use-element-size";
 /**
  * Marge du cadrage (décision 0022 § 6, amende 0016 § 1.3) : `--touch-target` de chaque côté ; en mobile, le panneau
  * à 55 % de la hauteur de `main` en bas ; en grand écran, rien de plus (le panneau ne couvre pas la carte).
+ * Étiquettes de ville dessinées (`etiquettes`, décision 0150 § 4) : marge haute de deux `--touch-target`, en mobile comme
+ * en grand écran, pour qu'une étiquette ne passe jamais sous « Retour » ni « Partager ».
  */
-export function layoutFitPadding(main: ElementSize, largeScreen: boolean): FitPadding {
+export function layoutFitPadding(main: ElementSize, largeScreen: boolean, etiquettes = false): FitPadding {
   const side = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--touch-target")) || 0;
-  return { top: side, right: side, bottom: largeScreen ? side : DEFAULT_SNAP * main.height, left: side };
+  return { top: etiquettes ? 2 * side : side, right: side, bottom: largeScreen ? side : DEFAULT_SNAP * main.height, left: side };
 }
 
 /**
@@ -41,19 +43,21 @@ export interface MapLayout {
 
 /**
  * Mesures de `main`, marge du cadrage et partie de la carte couverte par le panneau à la hauteur `snap` (état du
- * panneau, gardé par chaque mise en page).
+ * panneau, gardé par chaque mise en page). `etiquettes` : étiquettes de ville dessinées (décision 0150 § 4) ; la marge est
+ * recalculée quand l'indication change, et c'est le recadrage du changement de vue qui l'applique.
  */
-export function useMapLayout(snap: SnapPoint): MapLayout {
+export function useMapLayout(snap: SnapPoint, etiquettes = false): MapLayout {
   const [mainRef, main] = useElementSize<HTMLElement>();
   const largeScreen = useLargeScreen();
   const visibleInsets = useMemo<FitPadding | undefined>(
     () => (main && main.height > 0 ? layoutVisibleInsets(main, snap, largeScreen) : undefined),
     [main, snap, largeScreen],
   );
-  // Marge du cadrage : calculée à la première mesure, puis seulement au passage du seuil (recadrage unique).
-  const [fit, setFit] = useState<{ largeScreen: boolean; padding: FitPadding } | null>(null);
-  if (main && main.height > 0 && (fit === null || fit.largeScreen !== largeScreen)) {
-    setFit({ largeScreen, padding: layoutFitPadding(main, largeScreen) });
+  // Marge du cadrage : calculée à la première mesure, puis seulement au passage du seuil (recadrage unique) ou quand
+  // l'indication « étiquettes de ville dessinées » change.
+  const [fit, setFit] = useState<{ largeScreen: boolean; etiquettes: boolean; padding: FitPadding } | null>(null);
+  if (main && main.height > 0 && (fit === null || fit.largeScreen !== largeScreen || fit.etiquettes !== etiquettes)) {
+    setFit({ largeScreen, etiquettes, padding: layoutFitPadding(main, largeScreen, etiquettes) });
   }
   return {
     mainRef,

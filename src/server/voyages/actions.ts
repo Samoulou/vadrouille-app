@@ -40,7 +40,36 @@ export type DependancesAction = {
 };
 
 /** Nom fixe de l'action, journalisé (`ACTION` de `src/server/log.ts` : minuscules, chiffres, tirets). */
-export type NomAction = "toggle-checklist-item" | "decide-card" | "undo-decision" | "answer-preference-prompt" | "complete-deck";
+export type NomAction =
+  | "toggle-checklist-item"
+  | "decide-card"
+  | "undo-decision"
+  | "answer-preference-prompt"
+  | "complete-deck"
+  // M1g (ticket 869) : remplacer une étape sur `api` (`src/server/versions/remplacement.ts`).
+  | "preview-replacement"
+  | "apply-replacement"
+  | "undo-replacement"
+  | "revision-version"
+  // M5c (ticket 904) : signaler une erreur sur une étape (`src/server/voyages/signalement.ts`).
+  | "report-stop"
+  // M5a (ticket 919) : verrouiller ou déverrouiller une étape sur `api` (`src/server/versions/retouches.ts`).
+  | "lock-stop"
+  | "unlock-stop"
+  // M5d-1 (ticket 939) : lieu à soi sur `api` (`src/server/lieux/recherche.ts`, `src/server/lieux/ajout.ts`).
+  | "search-places"
+  | "preview-add-place"
+  | "apply-add-place"
+  // M5d-6 (ticket 994) : annuler un ajout de lieu à soi sur `api` (`src/server/lieux/annulation.ts`).
+  | "undo-add-place"
+  // M5b (ticket 934) : versions du programme et retour à une version sur `api` (`src/server/versions/historique.ts`).
+  | "list-versions"
+  | "preview-revert"
+  | "apply-revert"
+  // Ticket 947 : déplacer une étape sur `api` (`src/server/versions/deplacement.ts`).
+  | "move-options"
+  | "preview-move"
+  | "apply-move";
 
 type EntreeVoyage = { readonly tripId: string };
 
@@ -81,8 +110,11 @@ export async function executerActionVoyage<S extends z.ZodType<EntreeVoyage>, T>
     return resultat === null ? fail("not_found") : ok(resultat);
   } catch (erreur) {
     if (erreur instanceof RefusAction) {
-      // `generation_in_progress` exige `retryable: true` (`ApiErrorSchema`, décision 0112 § 1.6) : jamais `fail(code)` seul.
-      return erreur.code === "generation_in_progress" ? { ok: false, error: { code: erreur.code, retryable: true } } : fail(erreur.code);
+      // `generation_in_progress` exige `retryable: true` (`ApiErrorSchema`, décision 0112 § 1.6) : jamais `fail(code)` seul ;
+      // `not_unlocked` exige `retryable: false` (décision 0147 § 8).
+      if (erreur.code === "generation_in_progress") return { ok: false, error: { code: erreur.code, retryable: true } };
+      if (erreur.code === "not_unlocked") return { ok: false, error: { code: erreur.code, retryable: false } };
+      return fail(erreur.code);
     }
     const errorName = errorNameOf(erreur);
     logEvent("voyages.action_failed", { action: nom, ...(errorName === undefined ? {} : { errorName }), ...(tripId === undefined ? {} : { tripId }) }, "error");

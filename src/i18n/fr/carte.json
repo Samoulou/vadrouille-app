@@ -8,6 +8,13 @@
   "erreur": "La carte n'a pas pu être chargée. La liste contient tout le programme.",
   "reessayer": "Réessayer",
   "attribution": "Données de lieux : Google",
+  "etiquetteVille": "{n} · {ville}",
+  "etiquetteVilles": "{liste} · {ville}",
+  "repereVille": "{ville}, ville {n}",
+  "repereVilles": "{ville}, villes {liste}",
+  "listeNumeros": "{debut} et {dernier}",
+  "logementQuitte": "Logement quitté, {ville}",
+  "nouveauLogement": "Nouveau logement, {ville}",
   "zone": {
     "region": "Carte du quartier {nom}",
     "horsLigne": "Carte indisponible hors ligne. Le quartier est décrit ci-dessus.",

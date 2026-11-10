@@ -143,6 +143,8 @@ export const VoyageReduitSchema = TripBaseSchema.omit({
   id: true,
   unlocked: true,
   checklist: true,
+  /** Le site d'essai n'a qu'une ville (décision 0148 § 4) : `Trip.cities` refusé (revue de M4-C, bloquant 1). */
+  cities: true,
 }).extend({
   id: z.string().regex(TRIP_ID_PATTERN, "identifiant de voyage conforme à TRIP_ID_PATTERN"),
   organizationId: z.literal(PROTOTYPE_ORG_ID),

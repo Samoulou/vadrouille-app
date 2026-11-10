@@ -84,15 +84,37 @@ export type SuggestionVille = { readonly placeId: string; readonly principal: st
 
 /**
  * Fiche d'une ville au masque `id,addressComponents,location` (Place Details Essentials, même session que les
- * suggestions) : code ISO 3166-1 alpha-2 du pays (composante `country`, `null` si absente) et position. Données Google,
+ * suggestions) : code ISO 3166-1 alpha-2 du pays (composante `country`, `null` si absente) et position (`null` au masque
+ * `id,addressComponents` de `api`, décision 0141 § 6.3 point 3). Données Google,
  * lues en mémoire pour retrouver le pays et le fuseau dans les tables maison ; ni stockées ni envoyées à un modèle.
  */
-export type FicheVille = { readonly placeId: string; readonly pays: string | null; readonly position: Coordonnees };
+export type FicheVille = { readonly placeId: string; readonly pays: string | null; readonly position: Coordonnees | null };
 
-/** Recherche de la ville de l'écran 1 (site d'essai) : suggestions puis fiche, dans une même session Google. */
+/**
+ * Options de la fiche : `position: false` (recherche de ville de `api`, décision 0141 § 6.3 point 3) demande le masque
+ * `id,addressComponents` et rend `position: null` ; par défaut, masque `id,addressComponents,location` (site d'essai).
+ */
+export type OptionsFicheVille = { readonly position?: boolean };
+
+/** Recherche de la ville de l'écran 1 (site d'essai et `api`) : suggestions puis fiche, dans une même session Google. */
 export interface ClientVilles {
   suggererVilles(saisie: string, session: string): Promise<readonly SuggestionVille[]>;
-  ficheVille(placeId: string, session: string): Promise<FicheVille>;
+  ficheVille(placeId: string, session: string, options?: OptionsFicheVille): Promise<FicheVille>;
+}
+
+/**
+ * Résultat de la recherche d'un lieu à soi (Text Search (New), masque `places.id,places.displayName,places.shortFormattedAddress`,
+ * décision 0147 § 3 point 1) : **donnée Google affichée**, avec l'attribution « Données de lieux : Google », jamais stockée
+ * (seul `placeId` l'est, et seulement si la personne ajoute le lieu), journalisée ni envoyée à un modèle (§ 12 S2 et S3).
+ */
+export type ResultatLieu = { readonly placeId: string; readonly nom: string; readonly adresse: string | null };
+
+/**
+ * Recherche d'un lieu à soi (M5d-1, décision 0147 § 3) : une requête Text Search par le texte saisi, orientée par le **nom
+ * maison** de la ville de la journée (`null` : texte seul), sans position ; 5 résultats au plus ; aucune fiche ensuite.
+ */
+export interface ClientLieux {
+  rechercherLieux(texte: string, ville: string | null): Promise<readonly ResultatLieu[]>;
 }
 
 /**

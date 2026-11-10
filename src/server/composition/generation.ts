@@ -3,8 +3,9 @@ import "server-only";
 import type { ClientModeles, RequeteModele } from "@/ai/client";
 import { usdEnMicros } from "@/ai/client";
 import { creerCoucheIa, type CoucheIa } from "@/ai/couche";
-import { creerRedigerProgramme } from "@/ai/rediger-programme";
-import { lieuxDuProgramme, lireProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
+import { creerRedigerProgramme, creerRedigerProgrammeV5 } from "@/ai/rediger-programme";
+import { creerRedigerRevision, creerRedigerRevisionV3 } from "@/ai/rediger-revision";
+import { cadreLectureChangements, lieuxDuProgramme, lireProgramme, ordreEcrit, type ProgrammeIa } from "@/ai/sorties";
 import type { EntreeModeles } from "@/ai/entrees";
 import { ErreurOpenRouter, createOpenRouterClient } from "@/ai/openrouter-client";
 import type { ClientRechercheWeb } from "@/ai/recherche-web";
@@ -192,15 +193,47 @@ export type CreneauProgramme = {
   readonly ville?: string;
 };
 
-/** Brief de l'étape (forme de `BriefEssai`) : ce que lisent l'ancrage des logements et l'entrée du modèle. */
+/**
+ * Brief de l'étape (forme de `BriefEssai` et de `BriefProgramme`) : ce que lisent l'ancrage des logements et l'entrée du
+ * modèle. `ville` d'un logement (nom maison, `BriefProgramme`, décision 0148 § 8 point 2) : il est ancré sur sa ville, et la
+ * zone de cette ville est gardée en mémoire (`zonesParVille`, § 7.1 point 6).
+ */
 export type BriefDuProgramme = {
   readonly destination: string;
   readonly pays: string;
-  readonly logements: readonly { readonly texte: string; readonly nuits: number }[];
+  readonly logements: readonly { readonly texte: string; readonly nuits: number; readonly ville?: string }[];
 };
 
 /** Entrée de la requête `programme` (validée par son schéma strict dans `creerRedigerProgramme`). */
 export type EntreeRedaction = Parameters<ReturnType<typeof creerRedigerProgramme>>[0];
+
+/**
+ * Entrée de la requête `programme` **v5**, plusieurs villes (`EntreeProgrammeV5`, validée par son schéma strict dans
+ * `creerRedigerProgrammeV5` : aucun libellé de billet, aucune donnée Google ; décision 0149 § 1.3 points 1 et 2).
+ */
+export type EntreeRedactionV5 = Parameters<ReturnType<typeof creerRedigerProgrammeV5>>[0];
+
+/**
+ * Entrée de la requête `revision` (validée par son schéma strict `EntreeRevisionSchema` dans `creerRedigerRevision` : aucun
+ * champ pour une donnée Google ni un verdict ; décision 0126 § 3, portée sur `api` par M1b).
+ */
+export type EntreeRevisionDuProgramme = Parameters<ReturnType<typeof creerRedigerRevision>>[0];
+
+/**
+ * Entrée de la requête `revision` **v3** (M4a-2 ; voyage à plusieurs villes, M4b) : brief v5 **sans récit**, programme et choix
+ * de la v2 ; validée par son schéma strict `EntreeRevisionV3Schema` dans `creerRedigerRevisionV3` (aucune clé en trop, aucun
+ * libellé de billet ni donnée Google).
+ */
+export type EntreeRevisionV3DuProgramme = Parameters<ReturnType<typeof creerRedigerRevisionV3>>[0];
+
+/**
+ * Filet du code de la révision (décision 0126 § 4), passé par l'étape (`retirerEtapesEcartees` de `src/server/programme/`, que
+ * ce pont n'importe pas) : appliqué à la sortie relue **avant** l'ordre écrit et la vérification, il rend la sortie filtrée et
+ * le nombre de créneaux retirés.
+ */
+export type FiltreRevision = <P extends { readonly jours: readonly { readonly creneaux: readonly { readonly lieu?: string }[] }[] }>(
+  programme: P,
+) => { readonly programme: P; readonly retires: number };
 
 /** Vérificateur de statut des sites (forme de `VerificateurSites` et de `VerificateurStatut`). */
 export type VerificateurDesSites = {
@@ -208,9 +241,18 @@ export type VerificateurDesSites = {
   verifier(adresse: string, signal?: AbortSignal): Promise<{ readonly ok: boolean }>;
 };
 
-/** Programme lu, **dans l'ordre écrit** (`ordreEcrit`, une seule fois, avant toute vérification). */
+/**
+ * Programme lu, **dans l'ordre écrit** (`ordreEcrit`, une seule fois, avant toute vérification). `dureeEstimeeMinutes` :
+ * durée estimée d'une journée de changement de ville à départ estimé (prompt v5, lue par `lireDureeEstimee`), passée telle
+ * quelle jusqu'au cadrage (décision 0148 § 5.3 ; 0149 S-M4-2).
+ */
 export type ProgrammeRedige = {
-  readonly jours: readonly { readonly date: string; readonly titre?: string; readonly creneaux: readonly CreneauProgramme[] }[];
+  readonly jours: readonly {
+    readonly date: string;
+    readonly titre?: string;
+    readonly dureeEstimeeMinutes?: number;
+    readonly creneaux: readonly CreneauProgramme[];
+  }[];
   readonly bonsPlans: readonly string[];
 };
 
@@ -246,15 +288,51 @@ export type LieuxVerifies = { readonly placeIdDe: (jour: number, rang: number) =
  * `placeId` sortent de Google, jamais un nom, une position ni un verdict ; les noms vérifiés sont ceux de l'IA (0139 § 5.2).
  */
 export interface CapaciteProgramme {
-  /** `placeId` de chaque logement du brief, dans son ordre ; un logement introuvable ou fermé lève `lodging_unresolved`. */
-  logements(brief: BriefDuProgramme): Promise<readonly string[]>;
+  /**
+   * `placeId` de chaque logement du brief, dans son ordre ; un logement introuvable ou fermé lève `lodging_unresolved`.
+   * `plusieursVilles` : le seul prédicat de bascule (`briefAPlusieursVilles`, lu par l'étape sur son brief ; revue de la PR
+   * 932, Sécurité M2), passé ici parce que ce pont n'importe pas `src/server/programme/` (confinement) ; il fixe la zone
+   * de vérification des lieux (`zoneDe`).
+   */
+  logements(brief: BriefDuProgramme, plusieursVilles: boolean): Promise<readonly string[]>;
   /** Une requête `programme` (entrée validée par son schéma strict), lecture tolérante et ordre écrit. */
   rediger(entree: EntreeRedaction, sejour: { readonly arrivee: string; readonly depart: string }): Promise<RedactionProgramme>;
   /**
-   * Lieux distincts du dernier programme rédigé (ordre écrit) : leur nombre, et leur vérification sous `controle` (part et
-   * échéance avant chaque appel ; non tenu : les lieux restants sans `placeId`). Rend le `placeId` vérifié de chaque créneau.
+   * Même chose avec le prompt `programme` **v5** (voyage à plusieurs villes, décision 0148 § 8 point 3) : `zdr` et
+   * `data_collection: "deny"` imposés ; la durée estimée n'est lue qu'aux dates des changements de ville à départ estimé de
+   * l'entrée (`cadre.joursDureeEstimee` de `lireProgramme`, 0149 S-M4-2 point 2).
    */
-  lieux(destination: string): { readonly nombre: number; verifier(controle: ControleVerification): Promise<LieuxVerifies> };
+  redigerV5(entree: EntreeRedactionV5, sejour: { readonly arrivee: string; readonly depart: string }): Promise<RedactionProgramme>;
+  /**
+   * Révision (décision 0126, portée sur `api` par M1b) : **une** requête `revision` (entrée validée par son schéma strict, `zdr`
+   * et `data_collection: "deny"` imposés, même réglage de modèle que `programme`, comme le site d'essai), lecture tolérante, filet
+   * `filtrer` (étapes écartées retirées, compté dans `creneauxRetires`), puis ordre écrit. Le filet qui vide toutes les journées
+   * rend `programme: null` (sortie illisible, 0126 § 4). Se substitue à `rediger` : `lieux` lit ensuite la sortie filtrée.
+   */
+  reviser(entree: EntreeRevisionDuProgramme, sejour: { readonly arrivee: string; readonly depart: string }, filtrer: FiltreRevision): Promise<RedactionProgramme>;
+  /**
+   * Même chose avec le prompt `revision` **v3** (voyage à plusieurs villes, M4a-2 ; décision 0148 § 8 point 2) : `zdr` et
+   * `data_collection: "deny"` imposés par `creerRedigerRevisionV3` ; la durée estimée n'est lue qu'aux dates des changements
+   * de ville à départ estimé (`cadreLectureChangements`).
+   */
+  reviserV3(entree: EntreeRevisionV3DuProgramme, sejour: { readonly arrivee: string; readonly depart: string }, filtrer: FiltreRevision): Promise<RedactionProgramme>;
+  /**
+   * Lieux distincts du programme **cadré** reçu (ordre écrit ; décision 0148 § 5.1 point 3 et § 8 point 2 : les indices
+   * `(jour, rang)` de `placeIdDe` sont ceux de ce programme) : leur nombre, et leur vérification sous `controle` (part et
+   * échéance avant chaque appel ; non tenu : les lieux restants sans `placeId`). Chaque lieu est cherché par
+   * `« {lieu}, {ville} »` et contrôlé dans la **zone de sa ville** (`zonesParVille`, ville posée par le cadrage, § 7.1 point 6) ;
+   * un lieu sans ville, ou une ville sans zone, lève une `RangeError` avant tout appel (échec fermé, jamais la zone commune).
+   * Aucun programme rédigé avant : `RangeError`.
+   */
+  lieux(programme: ProgrammeRedige): { readonly nombre: number; verifier(controle: ControleVerification): Promise<LieuxVerifies> };
+  /**
+   * Voyage complet de la chaîne inversée (M1c, ticket 1048 ; réponse de Samuel à Q638) : **même vérification que `lieux`**
+   * (mêmes lieux distincts, même texte `« {lieu}, {ville} »`, même zone, même contrôle avant chaque appel), sur un programme
+   * **reconstruit par l'étape** depuis les étapes de la version courante restées sans `placeId` (noms et villes maison : ceux
+   * que l'IA a écrits et que la lecture tolérante a contrôlés, jamais une donnée Google), **sans requête de modèle** : aucun
+   * programme rédigé n'est exigé. Les logements doivent avoir été ancrés avant (`logements`), sinon `RangeError`.
+   */
+  lieuxRestants(programme: ProgrammeRedige): { readonly nombre: number; verifier(controle: ControleVerification): Promise<LieuxVerifies> };
   /** Vérification de statut des sites proposés (0122 § 1) : variante simulée, barrière fermée, ni résolution ni connexion. */
   readonly sites: VerificateurDesSites;
 }
@@ -606,7 +684,17 @@ function capaciteFinale(places: ClientsPlaces, routes: ClientRoutes, ia: CoucheI
 function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites: VerificateurDesSites): CapaciteProgramme {
   const ancrage = capacitesAncrage(places);
   const rediger = creerRedigerProgramme(modeles, CONFIGURATION_IA.programme);
-  let zone: RectangleZone | undefined;
+  // Prompt v5 (plusieurs villes, M4b) : même réglage que la v4 ; `zdr` et `data_collection: "deny"` imposés par la fabrique.
+  const redigerV5 = creerRedigerProgrammeV5(modeles, CONFIGURATION_IA.programme);
+  // Révision (0126 ; M1b) : même réglage que `programme`, comme le site d'essai (`composerP0Reel`) ; `zdr` et
+  // `data_collection: "deny"` imposés par `creerRedigerRevision` quel que soit le réglage reçu.
+  const redigerRevision = creerRedigerRevision(modeles, CONFIGURATION_IA.programme);
+  // Révision v3 (plusieurs villes, M4a-2) : même réglage ; `zdr` et `data_collection: "deny"` imposés par la fabrique.
+  const redigerRevisionV3 = creerRedigerRevisionV3(modeles, CONFIGURATION_IA.programme);
+  // Zones des logements (0148 § 7.1 point 6) : la zone commune et une zone par ville ; destination du brief ancré.
+  let zones:
+    | { readonly commune: RectangleZone; readonly parVille: ReadonlyMap<string, RectangleZone>; readonly destination: string; readonly plusieursVilles: boolean }
+    | undefined;
   let lu: ProgrammeIa | undefined;
   // Positions lues d'une fiche Google de cette étape (logements ancrés, lieux vérifiés), en mémoire ; marquées pour l'écriture
   // au cache par `positionsFraiches` (`@/grounding/fiches`) au moment d'écrire, et seules celles de la version publiée.
@@ -614,57 +702,93 @@ function capaciteProgramme(places: ClientsPlaces, modeles: ClientModeles, sites:
   const retenir = (placeId: string, position: { readonly lat: number; readonly lng: number }) => {
     if (!positions.has(placeId)) positions.set(placeId, { lat: position.lat, lng: position.lng });
   };
+  /** Requête unique, lecture tolérante, filet éventuel (révision), puis ordre écrit, une seule fois (0116 § 1.7, 0126 § 4). */
+  async function lireRedaction(
+    envoyer: () => ReturnType<typeof rediger>,
+    sejour: { readonly arrivee: string; readonly depart: string },
+    filtrer?: FiltreRevision,
+    joursDureeEstimee?: readonly string[],
+  ): Promise<RedactionProgramme> {
+    const reponse = await envoyer();
+    const lecture = lireProgramme(reponse.texte, sejour, joursDureeEstimee === undefined ? {} : { joursDureeEstimee });
+    const filtre = lecture.valeur === null || filtrer === undefined ? undefined : filtrer(lecture.valeur);
+    const valeur = filtre === undefined ? lecture.valeur : filtre.retires > 0 && filtre.programme.jours.every((jour) => jour.creneaux.length === 0) ? null : filtre.programme;
+    lu = valeur === null ? undefined : ordreEcrit(valeur);
+    return {
+      programme: lu === undefined ? null : { jours: lu.jours, bonsPlans: lu.bonsPlans },
+      joursRetires: lecture.joursRetires,
+      creneauxRetires: lecture.creneauxRetires + (filtre?.retires ?? 0),
+      champsRetires: lecture.champsRetires,
+      textesCoupes: lecture.textesCoupes,
+      ...(reponse.fin === undefined ? {} : { fin: reponse.fin }),
+      ...(reponse.tokens === undefined ? {} : { tokens: { entree: reponse.tokens.entree, sortie: reponse.tokens.sortie } }),
+    };
+  }
+  /** Lieux distincts du programme reçu et leur vérification (corps commun de `lieux` et de `lieuxRestants`). */
+  function verification(programme: ProgrammeRedige): ReturnType<CapaciteProgramme["lieux"]> {
+    const destination = zones?.destination ?? "";
+    const { lieux, cleDe } = lieuxDuProgramme(programme, destination);
+    return {
+      nombre: lieux.length,
+      async verifier(controle) {
+        if (zones === undefined) throw new RangeError("programme : logements non ancrés");
+        const { commune, parVille, plusieursVilles } = zones;
+        // Zone de la ville du lieu, posée par le cadrage (0148 § 7.1 point 6 ; 0149 § 1.3 point 5) : jamais la zone commune
+        // d'un voyage à plusieurs villes. Le choix suit le seul prédicat de bascule (`briefAPlusieursVilles`, revue de la PR 932,
+        // Sécurité M2), jamais la taille de `parVille` : plusieurs villes sans zone pour la ville du lieu lève (échec fermé).
+        // Une seule ville : la zone du séjour, inchangée.
+        const zoneDe = (lieu: { readonly ville?: string }) => {
+          if (!plusieursVilles) return commune;
+          const zone = lieu.ville === undefined ? undefined : parVille.get(lieu.ville);
+          if (zone === undefined) throw new RangeError("programme : zone de la ville introuvable");
+          return zone;
+        };
+        const issue = await verifierLieuxDuProgramme(lieux, destination, { textSearch: ancrage.textSearch, places }, zoneDe, controle);
+        for (const fiche of issue.fiches.values()) retenir(fiche.placeId, fiche.position);
+        return {
+          placeIdDe: (jour, rang) => {
+            const cle = cleDe(jour, rang);
+            return cle === undefined ? undefined : issue.fiches.get(cle)?.placeId;
+          },
+          positions: {
+            ecrire: (executeur, publies, obtenuesA, creerPort) =>
+              ecrirePositionsAbsentes(
+                executeur,
+                positionsFraiches([...positions].filter(([placeId]) => publies.has(placeId)).map(([placeId, position]) => ({ issue: "chargee" as const, placeId, position }))),
+                obtenuesA,
+                creerPort,
+              ),
+          },
+        };
+      },
+    };
+  }
   return {
-    async logements(brief) {
+    async logements(brief, plusieursVilles) {
       // L'étape passe le `BriefEssai` entier, forme structurelle de `Brief` (`src/prototype/brief.ts`), que ce pont n'importe pas
       // (zone sensible). Cast gardé : `BriefEssai` est en lecture seule (listes `readonly`), `Brief` ne l'est pas, et l'ancrage
       // ne modifie rien ; un type commun demanderait d'importer `src/server/programme/` ici (revue du head 3536d13, mineur 2).
-      const issue = await ancrerLogementsDuSejour(brief as Parameters<typeof ancrerLogementsDuSejour>[0], { detailsLogement: ancrage.detailsLogement });
-      zone = issue.zone;
+      const issue = await ancrerLogementsDuSejour(brief, { detailsLogement: ancrage.detailsLogement });
+      zones = { commune: issue.zone, parVille: issue.zonesParVille, destination: brief.destination, plusieursVilles };
       for (const logement of issue.logements) retenir(logement.placeId, logement.position);
       return issue.logements.map((logement) => logement.placeId);
     },
-    async rediger(entree, sejour) {
-      const reponse = await rediger(entree);
-      const lecture = lireProgramme(reponse.texte, sejour);
-      lu = lecture.valeur === null ? undefined : ordreEcrit(lecture.valeur);
-      return {
-        programme: lu === undefined ? null : { jours: lu.jours, bonsPlans: lu.bonsPlans },
-        joursRetires: lecture.joursRetires,
-        creneauxRetires: lecture.creneauxRetires,
-        champsRetires: lecture.champsRetires,
-        textesCoupes: lecture.textesCoupes,
-        ...(reponse.fin === undefined ? {} : { fin: reponse.fin }),
-        ...(reponse.tokens === undefined ? {} : { tokens: { entree: reponse.tokens.entree, sortie: reponse.tokens.sortie } }),
-      };
-    },
-    lieux(destination) {
+    rediger: (entree, sejour) => lireRedaction(() => rediger(entree), sejour),
+    redigerV5: (entree, sejour) =>
+      lireRedaction(
+        () => redigerV5(entree),
+        sejour,
+        undefined,
+        cadreLectureChangements(entree.changements).joursDureeEstimee ?? [],
+      ),
+    reviser: (entree, sejour, filtrer) => lireRedaction(() => redigerRevision(entree), sejour, filtrer),
+    reviserV3: (entree, sejour, filtrer) =>
+      lireRedaction(() => redigerRevisionV3(entree), sejour, filtrer, cadreLectureChangements(entree.brief.changements).joursDureeEstimee ?? []),
+    lieux(programme) {
       if (lu === undefined) throw new RangeError("programme : aucun programme rédigé");
-      const { lieux, cleDe } = lieuxDuProgramme(lu, destination);
-      return {
-        nombre: lieux.length,
-        async verifier(controle) {
-          if (zone === undefined) throw new RangeError("programme : logements non ancrés");
-          const issue = await verifierLieuxDuProgramme(lieux, destination, { textSearch: ancrage.textSearch, places }, zone, controle);
-          for (const fiche of issue.fiches.values()) retenir(fiche.placeId, fiche.position);
-          return {
-            placeIdDe: (jour, rang) => {
-              const cle = cleDe(jour, rang);
-              return cle === undefined ? undefined : issue.fiches.get(cle)?.placeId;
-            },
-            positions: {
-              ecrire: (executeur, publies, obtenuesA, creerPort) =>
-                ecrirePositionsAbsentes(
-                  executeur,
-                  positionsFraiches([...positions].filter(([placeId]) => publies.has(placeId)).map(([placeId, position]) => ({ issue: "chargee" as const, placeId, position }))),
-                  obtenuesA,
-                  creerPort,
-                ),
-            },
-          };
-        },
-      };
+      return verification(programme);
     },
+    lieuxRestants: (programme) => verification(programme),
     sites,
   };
 }

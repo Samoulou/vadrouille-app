@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, type MouseEvent } from "react";
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { createLazyTrack } from "@/analytics/lazy";
 import type { EventRecorder, RecorderKind } from "@/analytics/track";
@@ -11,17 +11,25 @@ import { ChecklistRow } from "@/components/ligne/ChecklistRow";
 import { Counter } from "@/components/ligne/Counter";
 import { DayBadge } from "@/components/ligne/DayBadge";
 import { DestinationPlate } from "@/components/ligne/DestinationPlate";
+import { StatusBanner } from "@/components/ligne/StatusBanner";
 import type { ChecklistItem } from "@/contracts";
+import { countToReserve } from "@/contracts/values";
+import { EMPTY_LIVE_REGION_CLASS } from "@/features/creation/fields";
 import { formatDateCourte, plateMeta } from "@/features/voyage/plate";
 import { currentDayIndex } from "@/features/voyage/today";
+import { aPlusieursVilles } from "@/features/voyage/villes";
 import { useClientNow } from "@/features/voyage/use-client-now";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { accessUntil, formatTitreJour } from "@/lib/dates";
+import { useOnline } from "@/lib/online";
+import { cn } from "@/lib/utils";
 
+import { AjouterAuCalendrier } from "./AjouterAuCalendrier";
 import { EventLines, eventRange } from "./EventLines";
+import type { LigneDuJour } from "./JoursParVille";
 import { useSejourOrigin } from "./SejourOrigin";
-import { daySummary, tripBudgetLine, tripEvents } from "./travel";
+import { checklistLabel, daySummary, tripBudgetLine, tripEvents } from "./travel";
 import { useTripShell } from "./TripShell";
 
 const t = messages.sejour;
@@ -34,6 +42,17 @@ export interface SejourPanelProps {
   recorder?: EventRecorder;
   /** Horloge injectable (tests) ; `Date.now` par défaut. Fonction stable. */
   now?: () => number;
+  /**
+   * Adresse du fichier `.ics` (« Ajouter au calendrier », M6b, ticket 1005), décidée par la page serveur : adaptateurs
+   * `mock` et `api` et base `/voyages` seulement ; le lien n'est montré que pour un voyage débloqué (M6-PO-6).
+   */
+  calendrierHref?: string | null;
+  /**
+   * Interrupteur « Rappel par e-mail la veille » (M6c, ticket 1021) : état de l'accord lu par la page serveur
+   * (`getTripReminders`), présent seulement si les rappels sont disponibles (adaptateur `api`, port des notifications
+   * branché, personne propriétaire) ; `null` : pas d'interrupteur, sans texte de remplacement (spécification M6 § 5.2 point 4).
+   */
+  rappels?: { readonly active: boolean } | null;
 }
 
 /** Nom accessible du compteur : « 1 réservation à faire », « 4 réservations à faire ». */
@@ -59,6 +78,12 @@ export function joursADebloquer(trip: { unlocked: boolean; start: string; end: s
   return jours;
 }
 
+/** Interrupteur des rappels (M6c) : chargé à la demande, seulement quand la page en rend l'état (adaptateur `api`). */
+const RappelsInterrupteur = lazy(() => import("./RappelsInterrupteur").then((loaded) => ({ default: loaded.RappelsInterrupteur })));
+
+/** « Jour par jour » groupé par ville : chargé à la demande, pour un voyage à plusieurs villes seulement. */
+const JoursParVille = lazy(() => import("./JoursParVille").then((loaded) => ({ default: loaded.JoursParVille })));
+
 /**
  * Contenu du panneau de l'écran 11 « Séjour » (spécification F5, F5-PO-3), dans cet ordre : plaque de la
  * destination (titre de niveau 1), budget, « À faire avant de partir », « Pendant ton séjour », « Jour par
@@ -66,8 +91,8 @@ export function joursADebloquer(trip: { unlocked: boolean; start: string; end: s
  * l'autre, en mémoire seulement (F5-PO-16). La validation de la mesure est chargée au premier cochage
  * (`createLazyTrack`), hors du JavaScript initial du Séjour.
  */
-export function SejourPanel({ recorderKind = "none", recorder, now: clock }: SejourPanelProps) {
-  const { trip, routes, actions, placesFromGoogle, unlockHref } = useTripShell();
+export function SejourPanel({ recorderKind = "none", recorder, now: clock, calendrierHref = null, rappels = null }: SejourPanelProps) {
+  const { trip, routes, actions, placesFromGoogle, unlockHref, versionsHref } = useTripShell();
   // Journées « À débloquer » seulement avec un lien de déblocage (voyage non débloqué, routes `/voyages`, paiement simulé
   // disponible) : sans lui, la liste ne montre que les journées servies, comme avant.
   const verrouilles = unlockHref ? joursADebloquer(trip) : [];
@@ -84,8 +109,20 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
   const eventsRef = useRef<HTMLElement>(null);
 
   const budget = tripBudgetLine(trip.days);
-  const remaining = trip.checklist.filter((item) => !item.done).length;
+  // Compteur : réservations non faites seulement (M5-PO-13, décision 0147 § 6.2) ; absent à 0 (`Counter`).
+  const remaining = countToReserve(trip.checklist);
+  // Cochage enregistré (adaptateur `api`, M5e) : hors ligne, cases inactives décrites par le bandeau ; échec annoncé.
+  const online = useOnline();
+  const offlineId = `${useId()}-hors-ligne`;
+  const checklistOffline = actions.checklistOnServer === true && !online;
+  // Échecs consécutifs de l'enregistrement : l'alerte reste jusqu'au prochain cochage réussi (revue UX de M5e, m3) ; un
+  // nouvel échec la remonte (clé), pour qu'elle soit annoncée de nouveau.
+  const [echecs, setEchecs] = useState(0);
+  const toggleFailed = echecs > 0;
   const events = tripEvents(trip.days);
+  // Voyage à plusieurs villes (spécification M4 § 7.5, M4-PO-10) : liste des villes sous la plaque, et « Jour par jour »
+  // groupé par ville. Une seule ville (`Trip.cities` absent) : écran inchangé (critère 25).
+  const villes = aPlusieursVilles(trip.cities) ? trip.cities : null;
   const dayOfEvent = new Map(events.map(({ day, event }) => [event.id, day]));
 
   // Retour du navigateur depuis la fiche d'un événement ouverte ici : focus sur sa ligne (F5-PO-8).
@@ -103,11 +140,61 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
     if (href) origin?.remember(href);
   };
 
-  // Cocher envoie `checklist_item_done` une fois l'action résolue ; décocher n'envoie rien (décision 0015 § 6).
+  // Cocher envoie `checklist_item_done` une fois l'action résolue ; décocher n'envoie rien (décision 0015 § 6). Un échec de
+  // l'action (case non enregistrée, rétablie par l'implémentation) affiche « Impossible d'enregistrer. Réessaie. ».
   const onToggle = async (item: ChecklistItem, done: boolean) => {
-    await actions.setChecklistItemDone(item.id, done);
+    try {
+      await actions.setChecklistItemDone(item.id, done);
+    } catch {
+      setEchecs((n) => n + 1);
+      return;
+    }
+    setEchecs(0);
     if (done) await track({ name: "checklist_item_done", properties: {} });
   };
+
+  /** Ligne d'un jour : lien vers la Journée, ou journée « À débloquer ». */
+  function ligneDuJour(ligne: LigneDuJour, vers?: string) {
+    if (ligne.kind === "verrouille") {
+      return (
+        <li key={`verrouille-${ligne.index}`} data-part="jour-a-debloquer" className="border-b border-hairline last:border-b-0">
+          <span className="flex min-h-(--touch-target) items-center gap-3 py-2">
+            {/* Pastille réduite non active, sans « complet » (réservé à Déplacer) ; le nom lu est « Jour 3, à débloquer ». */}
+            <span aria-hidden="true">
+              <DayBadge day={ligne.index} size="sm" />
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="sr-only" data-part="nom-jour-a-debloquer">
+                {format(ts.jourParJour.nomADebloquer, { day: ligne.index })}
+              </span>
+              <span className="text-corps font-bold text-ink">{formatTitreJour(ligne.date)}</span>
+              <span aria-hidden="true" className="text-corps-s text-ink-soft">
+                {ts.jourParJour.aDebloquer}
+              </span>
+            </span>
+          </span>
+        </li>
+      );
+    }
+    const { day } = ligne;
+    return (
+      <li key={day.index} className="border-b border-hairline last:border-b-0">
+        <Link href={routes.jour(day.index)} data-part="jour" className="flex min-h-(--touch-target) items-center gap-3 rounded-control py-2">
+          <DayBadge day={day.index} size="sm" />
+          <span className="flex min-w-0 flex-col">
+            <span className="text-corps font-bold text-ink">{formatTitreJour(day.date)}</span>
+            {/* Journée du changement de ville : « Vers {ville} », puis le résumé actuel (spécification M4 § 7.5). */}
+            {vers ? (
+              <span data-part="vers-ville" className="text-corps-s font-semibold break-words text-ink-2">
+                {format(ts.jourParJour.versVille, { ville: vers })}
+              </span>
+            ) : null}
+            <span className="text-corps-s text-ink-soft tabular-nums">{day.generating ? ts.jourParJour.enPreparation : daySummary(day)}</span>
+          </span>
+        </Link>
+      </li>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5 px-5 pt-2 pb-8">
@@ -121,6 +208,12 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
         </Link>
       ) : null}
       <DestinationPlate name={trip.destination} meta={plateMeta(trip)} color={trip.destinationColor} />
+      {villes ? (
+        // Hors de la plaque, en `ink-2` sur le fond de la page ; passe à la ligne, jamais tronquée (spécification M4 § 7.5).
+        <p data-part="villes" className="-mt-2 text-corps font-semibold break-words text-ink-2">
+          {villes.map((ville) => ville.name).join(ts.villes.separateur)}
+        </p>
+      ) : null}
 
       {budget ? (
         <p data-part="budget" className="text-corps text-ink-2 tabular-nums">
@@ -135,20 +228,28 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
           </h2>
           <Counter value={remaining} label={counterLabel(remaining)} />
         </div>
+        {checklistOffline ? (
+          <div id={offlineId}>
+            <StatusBanner kind="offline" message={ts.aFaire.horsLigne} />
+          </div>
+        ) : null}
+        <p key={echecs} role="alert" data-part="a-faire-echec" className={cn("text-corps-s font-semibold text-ink", toggleFailed ? undefined : EMPTY_LIVE_REGION_CLASS)}>
+          {toggleFailed ? t.echecEnregistrement : null}
+        </p>
         <ul>
           {trip.checklist.map((item) => (
             <li key={item.id} className="border-b border-hairline last:border-b-0">
               <ChecklistRow
-                label={item.label}
+                label={checklistLabel(item)}
                 when={item.when}
                 done={item.done}
                 bookingUrl={item.bookingUrl}
                 sponsored={item.sponsored}
+                disabledBy={checklistOffline ? offlineId : undefined}
                 onToggle={(done) => {
                   onToggle(item, done).catch(() => {
-                    // Échec de l'action (B11) ou de la mesure (chargement impossible) : aucun texte d'erreur
-                    // n'est prévu par F5 (F5-Q1). La case garde l'état rendu par le programme ; la mesure
-                    // perdue n'est pas réessayée, et le prochain cochage retente le chargement (`createLazyTrack`).
+                    // Échec de la mesure (chargement impossible) : la mesure perdue n'est pas réessayée, et le
+                    // prochain cochage retente le chargement (`createLazyTrack`).
                   });
                 }}
               />
@@ -187,44 +288,20 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
         <h2 id="jour-par-jour" className="text-section font-extrabold text-ink">
           {ts.jourParJour.titre}
         </h2>
-        <ul>
-          {trip.days.map((day) => (
-            <li key={day.index} className="border-b border-hairline last:border-b-0">
-              <Link
-                href={routes.jour(day.index)}
-                data-part="jour"
-                className="flex min-h-(--touch-target) items-center gap-3 rounded-control py-2"
-              >
-                <DayBadge day={day.index} size="sm" />
-                <span className="flex min-w-0 flex-col">
-                  <span className="text-corps font-bold text-ink">{formatTitreJour(day.date)}</span>
-                  <span className="text-corps-s text-ink-soft tabular-nums">
-                    {day.generating ? ts.jourParJour.enPreparation : daySummary(day)}
-                  </span>
-                </span>
-              </Link>
-            </li>
-          ))}
-          {verrouilles.map((day) => (
-            <li key={`verrouille-${day.index}`} data-part="jour-a-debloquer" className="border-b border-hairline last:border-b-0">
-              <span className="flex min-h-(--touch-target) items-center gap-3 py-2">
-                {/* Pastille réduite non active, sans « complet » (réservé à Déplacer) ; le nom lu est « Jour 3, à débloquer ». */}
-                <span aria-hidden="true">
-                  <DayBadge day={day.index} size="sm" />
-                </span>
-                <span className="flex min-w-0 flex-col">
-                  <span className="sr-only" data-part="nom-jour-a-debloquer">
-                    {format(ts.jourParJour.nomADebloquer, { day: day.index })}
-                  </span>
-                  <span className="text-corps font-bold text-ink">{formatTitreJour(day.date)}</span>
-                  <span aria-hidden="true" className="text-corps-s text-ink-soft">
-                    {ts.jourParJour.aDebloquer}
-                  </span>
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
+        {villes ? (
+          <Suspense fallback={null}>
+            <JoursParVille
+              cities={villes}
+              lignes={[...trip.days.map((day): LigneDuJour => ({ kind: "servi", day })), ...verrouilles.map((day): LigneDuJour => ({ kind: "verrouille", ...day }))]}
+              rendreLigne={ligneDuJour}
+            />
+          </Suspense>
+        ) : (
+          <ul>
+            {trip.days.map((day) => ligneDuJour({ kind: "servi", day }))}
+            {verrouilles.map((day) => ligneDuJour({ kind: "verrouille", ...day }))}
+          </ul>
+        )}
         {verrouilles.length > 0 && unlockHref ? (
           <Button asChild className="mt-2 self-start">
             <Link href={unlockHref} prefetch={false} data-part="debloquer">
@@ -233,6 +310,31 @@ export function SejourPanel({ recorderKind = "none", recorder, now: clock }: Sej
           </Button>
         ) : null}
       </section>
+
+      {calendrierHref && trip.unlocked ? (
+        // « Ajouter au calendrier » (M6b ; spécification M6 § 4) : voyage débloqué seulement (M6-PO-6). Place validée par l'UX/UI (U1, spécification M6 § 7).
+        <AjouterAuCalendrier href={calendrierHref} days={trip.days} />
+      ) : null}
+
+      {rappels && (trip.unlocked || rappels.active) ? (
+        // « Rappel par e-mail la veille » (M6c ; spécification M6 § 5.2) : voyage débloqué ; un accord actif reste toujours
+        // retirable, même si le voyage n'est plus débloqué (décision 0157 § 1.7 point 5). Place : décision UX/UI (U2) au § 7 de
+        // la spécification M6, à confirmer par la revue de la PR 1024. Réserve de hauteur pendant le chargement (mineur 14).
+        <Suspense fallback={<div aria-hidden="true" data-part="rappels-reserve" className="min-h-22" />}>
+          <RappelsInterrupteur tripId={trip.id} active={rappels.active} />
+        </Suspense>
+      ) : null}
+
+      {versionsHref ? (
+        // « Versions du programme » (M5b ; spécification M5 § 4) : en bas du Séjour, voyage débloqué seulement (M5-PO-1).
+        <Link
+          href={versionsHref}
+          data-part="versions"
+          className="inline-flex min-h-(--touch-target) items-center self-start rounded-control text-corps font-bold text-line underline underline-offset-2"
+        >
+          {t.versions.lien}
+        </Link>
+      ) : null}
 
       <PlacesAttribution placesFromGoogle={placesFromGoogle} />
     </div>

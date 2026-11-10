@@ -45,6 +45,9 @@ const NEUTRAL_SET = new Map<string, string>([
   ["preference_signals", "status = status"],
   ["preference_prompts", "state = state"],
   ["generation_runs", "updated_at = updated_at"],
+  // M6a-D (migration 0023, décision 0157 § 1.9) : seule colonne modifiable par `vadrouille_app` ; les lignes de B sont
+  // cachées par la RLS, le déclencheur de désactivation définitive n'est donc jamais atteint.
+  ["share_links", "revoked_at = revoked_at"],
 ]);
 const neutralSet = (table: string) => NEUTRAL_SET.get(table) ?? "organization_id = organization_id";
 

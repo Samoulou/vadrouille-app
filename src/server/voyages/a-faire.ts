@@ -11,13 +11,14 @@ import { elementAFaire, identifiantLisible } from "./conversion";
  * État final, idempotent : rejouer la même entrée donne la même ligne ; `done_at` est posé par la base (`now()`) au
  * premier cochage et gardé tant que la ligne reste cochée, remis à nul au décochage. Rend la ligne à jour validée par
  * `ChecklistItemSchema` ; une ligne inconnue, d'un autre voyage ou d'une autre organisation : `not_found`, sans
- * écriture. **Non branché sur l'écran 11** (B6-PO-14 : la liste reste gérée par les actions locales jusqu'à B11).
+ * écriture. **Branché sur l'écran 11** par M5e (spécification M5 § 7.3 ; `src/features/sejour/revision-serveur.ts`) sur
+ * l'adaptateur `api` ; admis avant le déblocage (M5-PO-14, décision 0147 § 8 point 2).
  */
 
 const SQL_COCHER = `UPDATE public.checklist_items
   SET done = $4, done_at = CASE WHEN $4 THEN COALESCE(done_at, now()) ELSE NULL END
   WHERE organization_id = $1 AND trip_id = $2 AND id = $3
-  RETURNING id, label, moment, done, booking_url, sponsored, stop_id`;
+  RETURNING id, kind, label, moment, done, booking_url, sponsored, stop_id`;
 
 /** Erreur d'une ligne écrite qui ne valide plus le contrat : convertie en `internal` par le cadre. */
 class LigneAFaireInvalide extends Error {
