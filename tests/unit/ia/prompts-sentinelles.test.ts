@@ -16,12 +16,20 @@ import { PROMPT_REVISION } from "@/ai/prompts/revision";
 import { creerRedigerProgramme, creerRedigerProgrammeV5 } from "@/ai/rediger-programme";
 import { creerRedigerRevision, creerRedigerRevisionV3 } from "@/ai/rediger-revision";
 import { requeteProgrammeV5, requeteRevisionV3 } from "@/ai/requetes";
-import { MAX_CITIES, type LodgingRequest } from "@/contracts";
+import { MAX_CITIES, type Brief, type LodgingRequest, type RetainedTaste, type TripDraft } from "@/contracts";
+import { candidatsDeGouts } from "@/domain/gouts";
+import { draftReducer, initialDraft, type DraftAction, type DraftState } from "@/features/creation/draft";
+import { goutsProposables } from "@/features/creation/gouts";
+import { toBrief } from "@/features/creation/validation";
 import { creerPlacesSimule } from "@/grounding/places.simule";
 import { creerRoutesSimule } from "@/grounding/routes.simule";
 import { EDIMBOURG_TRIP_ID, MOCK_ORGANIZATION_ID, MOCK_USER_ID } from "@/mocks/edimbourg";
 import { RECIT_API_AUTORISE } from "@/server/config/generation";
-import type { EntreeProgramme } from "@/server/programme/entree";
+import { GOUT_DEDUIT_SEUIL, GOUT_DISTANCE_PROPOSE } from "@/server/config/gouts";
+import type { SignalLuDuRecalcul } from "@/server/generation/signaux";
+import { goutDeLigne, projeterSignal } from "@/server/gouts/lecture";
+import { briefProgrammeDepuisFormulaire } from "@/server/programme/brief";
+import { entreeProgrammeV5DepuisBrief, type EntreeProgramme } from "@/server/programme/entree";
 import { entreeRevisionDepuisJours } from "@/server/programme/revision";
 import { candidatPourModele, entreeModelesDepuisBrief, entreeProgrammeDepuisBrief, lieuRetenuDepuisCandidat } from "@/server/p0/vers-couche-ia";
 
@@ -592,5 +600,148 @@ describe("prompts: lieu à soi jamais dans une entrée de modèle (0147 § 12 S4
     await reviser(entree);
     expect(journal.requetes).toHaveLength(1);
     for (const sentinelle of [NOM, PLACE, AJOUT]) expect(journal.texte(), sentinelle).not.toContain(sentinelle);
+  });
+});
+
+/**
+ * M8c-2 (ticket 1131 ; spécification M8 § 5.4 points 5 et 6, critères M8c-2-5 et M8c-2-6 ; décision 0160 § 1.7 et § 2.4) :
+ * un goût retenu après un voyage précédent n'entre dans le prompt `programme` que par le **code de sa catégorie**, dans
+ * les champs existants `aEviter` ou `envies`, et seulement s'il est coché à l'écran 2. Chaîne de production, sans réseau :
+ * signaux du voyage d'origine → candidats (`candidatsDeGouts`) → lignes de `preferences` relues (`goutDeLigne`) → cases de
+ * l'écran 2 (`goutsProposables`) → bascule du brouillon (`draftReducer`, la même action qu'une `Chip` du champ) →
+ * `toBrief` → `briefProgrammeDepuisFormulaire` → `entreeProgrammeV5DepuisBrief` → requête journalisée. Le voyage
+ * d'origine porte des sentinelles partout où une valeur pourrait fuir (signaux, ligne relue) : aucune dans la requête.
+ */
+describe("prompts: goûts retenus proposés au voyage suivant (M8c-2)", () => {
+  const VOYAGE_ORIGINE = "5e471e11-0000-4000-8000-0000000008c2";
+  const SENTINELLES = {
+    place: "SENTINELLE_PLACE_ORIGINE_M8C2",
+    candidat: "SENTINELLE-CANDIDAT-ORIGINE-M8C2",
+    proposition: "SENTINELLE-PROPOSITION-ORIGINE-M8C2",
+    ligne: "SENTINELLE-LIGNE-SIGNAL-M8C2",
+    etape: "SENTINELLE-NOM-ETAPE-M8C2",
+    decouverte: "SENTINELLE-NOM-DECOUVERT-M8C2",
+  };
+  const signal = (signal: SignalLuDuRecalcul["signal"], category: SignalLuDuRecalcul["category"], rang: number): SignalLuDuRecalcul => ({
+    signal,
+    category,
+    origin: signal === "answerYes" ? "question" : "gesture",
+    status: "confirmed",
+    placeId: SENTINELLES.place,
+    candidatId: SENTINELLES.candidat,
+    proposalId: SENTINELLES.proposition,
+    ligne: `${SENTINELLES.ligne}-${rang}`,
+  });
+  // Voyage d'origine : « éviter les musées » confirmé, trois « J'aime » sur des dégustations (déduit).
+  const SIGNAUX = [signal("answerYes", "museum", 0), signal("like", "tasting", 1), signal("like", "tasting", 2), signal("like", "tasting", 3)];
+  const DRAFT: TripDraft = { destination: "Rome", start: "2027-05-04", end: "2027-05-08", lodging: { kind: "area", label: "Rione Monti" }, otherCities: [], commitments: [] };
+
+  /** Goûts relus de `preferences`, comme `lireGoutsRetenus` : la ligne porte des colonnes sentinelles que rien ne lit. */
+  const goutsRelus = (): RetainedTaste[] =>
+    candidatsDeGouts(SIGNAUX.map(projeterSignal), { seuilDeduit: GOUT_DEDUIT_SEUIL, distance: GOUT_DISTANCE_PROPOSE }).map((candidat) =>
+      goutDeLigne(candidat.subject, { origin: candidat.origin, source_trip_id: VOYAGE_ORIGINE, name: SENTINELLES.etape, place_id: SENTINELLES.place, discovered: SENTINELLES.decouverte }),
+    );
+
+  /** Écran 2 : « Remplir moi-même », rythme, une envie et un moyen de déplacement, puis les cases cochées (`coches`). */
+  const brouillon = (coches: readonly string[]): DraftState => {
+    const actions: DraftAction[] = [
+      { type: "fillMyself" },
+      { type: "pace", pace: "balanced" },
+      { type: "toggle", field: "wishes", value: "restaurant" },
+      { type: "toggle", field: "mobility", value: "walk" },
+      ...goutsProposables(goutsRelus())
+        .filter((gout) => coches.includes(gout.id))
+        .map((gout): DraftAction => ({ type: "toggle", field: gout.field, value: gout.category })),
+    ];
+    return actions.reduce(draftReducer, { ...initialDraft(), tripReady: true });
+  };
+
+  const entreeDe = (coches: readonly string[]): { brief: Brief; entree: EntreeProgrammeV5 } => {
+    const brief = toBrief(brouillon(coches).brief);
+    const conversion = briefProgrammeDepuisFormulaire(DRAFT, brief, undefined);
+    if (!conversion.ok) throw new Error(conversion.champ);
+    return { brief, entree: entreeProgrammeV5DepuisBrief(conversion.brief) };
+  };
+
+  const requeteDe = async (entree: EntreeProgrammeV5): Promise<string> => {
+    const modeles: ClientModeles = { envoyer: async () => ({ texte: "{}", coutUsd: 0 }) };
+    const journal = journalDePrompts(modeles);
+    const rediger = creerRedigerProgrammeV5(journal.client, { modele: "test/programme", routage: { data_collection: "allow", zdr: false } as unknown as ReglagesIa["plan"]["routage"] });
+    await rediger(entree);
+    expect(journal.requetes).toHaveLength(1);
+    expect(journal.requetes[0]?.prompt).toEqual({ id: "programme", version: 5 });
+    return journal.texte();
+  };
+
+  it("deux goûts relus du voyage d'origine : codes maison seulement, proposés sans « distance »", () => {
+    const gouts = goutsRelus();
+    expect(gouts.map((gout) => gout.id)).toEqual(["category:museum:less", "category:tasting:more"]);
+    expect(goutsProposables([...gouts, { id: "distance", origin: "confirmed", subject: { kind: "distance" } }])).toEqual([
+      { id: "category:museum:less", category: "museum", field: "limits" },
+      { id: "category:tasting:more", category: "tasting", field: "wishes" },
+    ]);
+    const texte = JSON.stringify(goutsProposables(gouts));
+    for (const sentinelle of [...Object.values(SENTINELLES), VOYAGE_ORIGINE]) expect(texte, sentinelle).not.toContain(sentinelle);
+  });
+
+  it("sans case cochée : entrée programme identique à celle du même brief sans goût retenu (critère 6)", async () => {
+    const sansGout = toBrief(([{ type: "fillMyself" }, { type: "pace", pace: "balanced" }, { type: "toggle", field: "wishes", value: "restaurant" }, { type: "toggle", field: "mobility", value: "walk" }] as DraftAction[]).reduce(draftReducer, { ...initialDraft(), tripReady: true }).brief);
+    const reference = briefProgrammeDepuisFormulaire(DRAFT, sansGout, undefined);
+    if (!reference.ok) throw new Error(reference.champ);
+    const { brief, entree } = entreeDe([]);
+    expect(brief).toEqual(sansGout);
+    expect(entree).toEqual(entreeProgrammeV5DepuisBrief(reference.brief));
+    expect(entree).not.toHaveProperty("aEviter");
+    expect(entree.envies).toEqual(["restaurant"]);
+    expect(await requeteDe(entree)).toBe(await requeteDe(entreeProgrammeV5DepuisBrief(reference.brief)));
+  });
+
+  it("goût « éviter » coché : le code de catégorie dans aEviter, rien d'autre de nouveau, aucune sentinelle (critère 5)", async () => {
+    const reference = entreeDe([]);
+    const { brief, entree } = entreeDe(["category:museum:less"]);
+    expect(brief.limits).toEqual(["museum"]);
+    // Une case cochée est une saisie de la personne : aucun champ déduit (critère 2).
+    expect(brief.inferredFields).toEqual([]);
+    expect(entree).toEqual({ ...reference.entree, aEviter: ["museum"] });
+    expect(EntreeProgrammeV5Schema.safeParse(entree).success).toBe(true);
+    const texte = await requeteDe(entree);
+    expect(texte).toContain("museum");
+    for (const sentinelle of [...Object.values(SENTINELLES), VOYAGE_ORIGINE, "category:museum:less", "fromTripId", "placeId"]) expect(texte, sentinelle).not.toContain(sentinelle);
+  });
+
+  it("goût « aimer » coché : le code de catégorie dans envies, rien d'autre de nouveau, aucune sentinelle (critère 5)", async () => {
+    const reference = entreeDe([]);
+    const { brief, entree } = entreeDe(["category:tasting:more"]);
+    expect(brief.inferredFields).toEqual([]);
+    expect(entree).toEqual({ ...reference.entree, envies: ["restaurant", "tasting"] });
+    expect(entree).not.toHaveProperty("aEviter");
+    const texte = await requeteDe(entree);
+    for (const sentinelle of [...Object.values(SENTINELLES), VOYAGE_ORIGINE, "category:tasting:more", "fromTripId", "placeId"]) expect(texte, sentinelle).not.toContain(sentinelle);
+  });
+});
+
+/**
+ * M8c-2, critère 7 et spécification § 5.4 point 4 (décision 0160 § 1.6 point 4) : le serveur ne fusionne aucun goût à la
+ * création ; les goûts n'entrent dans un voyage que par les cases cochées à l'écran 2. Aucun module de la création, du
+ * programme, de la génération ni des prompts ne lit la table `preferences`, n'importe `src/server/gouts` ni ne nomme un
+ * goût retenu : il n'y a donc ni lecture de goût ni écriture de signal tirée d'un goût pour le nouveau voyage.
+ */
+describe("goûts: jamais lus par la création, la génération ni les prompts", () => {
+  const RACINE = path.resolve(__dirname, "../../..");
+  const DOSSIERS = ["src/ai", "src/research", "src/server/creation", "src/server/generation", "src/server/programme", "src/server/p0", "src/workflows"];
+  const INTERDITS = [/server\/gouts|domain\/gouts|config\/gouts/, /\bpreferences\b/, /RetainedPreference|RetainedTaste|goutsRetenus|goutsEnregistres/];
+  const fichiers = (dossier: string): string[] =>
+    readdirSync(path.join(RACINE, dossier), { withFileTypes: true }).flatMap((entree) => {
+      const relatif = `${dossier}/${entree.name}`;
+      if (entree.isDirectory()) return fichiers(relatif);
+      return /\.tsx?$/.test(entree.name) && !/\.test\.tsx?$/.test(entree.name) ? [relatif] : [];
+    });
+
+  it("aucun de ces modules ne lit preferences ni n'importe les goûts", () => {
+    const sources = DOSSIERS.flatMap(fichiers);
+    expect(sources).toContain("src/server/creation/creer-voyage.ts");
+    expect(sources).toContain("src/server/programme/brief.ts");
+    const fautifs = sources.filter((fichier) => INTERDITS.some((motif) => motif.test(readFileSync(path.join(RACINE, fichier), "utf8"))));
+    expect(fautifs).toEqual([]);
   });
 });

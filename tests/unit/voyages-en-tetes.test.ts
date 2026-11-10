@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import { pagesLegalesRoutes } from "@/features/accueil/routes";
+
 import { nextConfig, RESPONSE_HEADERS } from "../../next.config";
 
 /**
@@ -47,6 +49,15 @@ describe("en-têtes de `/precommande`", () => {
       { key: "Referrer-Policy", value: "strict-origin" },
       { key: "X-Robots-Tag", value: "noindex, nofollow" },
     ]);
+  });
+
+  // Ticket 1125 : les trois pages légales dépendent de variables lues à chaque requête ; elles restent sous la règle
+  // de la précommande (ni cache ni indexation), sans règle à elles.
+  it("pages légales : sous `/precommande/`, couvertes par la même règle", () => {
+    const adresses = Object.values(pagesLegalesRoutes);
+    expect(adresses).toHaveLength(3);
+    for (const adresse of adresses) expect(adresse).toMatch(/^\/precommande\/[a-z-]+$/);
+    expect(RESPONSE_HEADERS.filter((entry) => entry.source.startsWith("/precommande"))).toHaveLength(1);
   });
 });
 

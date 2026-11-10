@@ -103,6 +103,15 @@ export const LECTURES_ENV = [
   // littérale ; `PREVENTE` comparé à « 1 », `PREVENTE_LIEN_PAIEMENT` admis seulement comme lien HTTPS de l'hôte de paiement
   // de Stripe, sinon ignoré ; aucune clé, aucun appel sortant. Verdict Sécurité à rendre à la revue de la PR.
   { fichier: "src/adapters/prevente.ts", noms: ["PREVENTE", "PREVENTE_LIEN_PAIEMENT"] },
+  // Pages légales de la précommande (ticket 1125 ; décision 0168, « Conditions d'activation ») : six noms non secrets
+  // lus par propriété littérale (identité du vendeur, durée de conservation, date de publication des textes), validés
+  // (longueur bornée, aucun caractère de contrôle, e-mail et date de forme stricte) puis affichés sur trois pages
+  // publiques ; une valeur absente ou invalide : 404. Aucune clé, aucun appel sortant. Verdict Sécurité :
+  // approuvé (revue de la PR #1129, 708aba5).
+  {
+    fichier: "src/adapters/pages-legales.ts",
+    noms: ["VENDEUR_NOM", "VENDEUR_STATUT", "VENDEUR_ADRESSE", "VENDEUR_CONTACT", "VENDEUR_CONSERVATION", "TEXTES_LEGAUX_DATE"],
+  },
   // B4b (ticket 831 ; spécification B4, B4b point 5 ; amendement B4-TL-14 de 0020 § 2.3) : garde élargie à `simulated`,
   // noms non secrets lus par propriété littérale et comparés à une valeur exacte, jamais rendus (jamais
   // `SIMULATED_WEBHOOK_SECRET`). Verdict Sécurité : approuvé (revue de la PR #836, a1a61d7).

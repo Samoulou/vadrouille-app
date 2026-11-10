@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 
+import type { EventRecorder, RecorderKind } from "@/analytics/track";
 import { Button } from "@/components/ligne/Button";
 import { Counter } from "@/components/ligne/Counter";
 import { DestinationPlate } from "@/components/ligne/DestinationPlate";
-import type { TripSummary } from "@/contracts";
+import type { RetainedTaste, TripSummary } from "@/contracts";
 import { yearOf } from "@/features/voyage/today";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
 import { useClientNow } from "@/features/voyage/use-client-now";
@@ -13,6 +15,7 @@ import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { formatTripDates } from "@/lib/dates";
 
+import { RetainedTastes } from "./RetainedTastes";
 import { classifyTrips, reopenTarget, reviewLinkShown, tripToday, type ReviewLink, type TripSections } from "./trips";
 
 const t = messages.mesVoyages;
@@ -37,6 +40,14 @@ export interface TripsScreenProps {
    * affiché à partir du dernier jour du voyage (`reviewLinkShown`). Absent : aucun lien.
    */
   reviewLinks?: Readonly<Record<string, ReviewLink>>;
+  /**
+   * « Tes goûts retenus » (M8c-1) : goûts de la personne lus par la page sur `api` ; absent (`mock`), ceux de la mémoire de
+   * l'onglet. La section n'est rendue que s'il y en a au moins un.
+   */
+  retainedTastes?: readonly RetainedTaste[];
+  /** Enregistreur des mesures choisi par la page (aucun envoi réseau, décision 0013 § 3.3) ; injecté dans les tests. */
+  recorderKind?: RecorderKind;
+  recorder?: EventRecorder;
   /** Horloge injectable (tests) ; `Date.now` par défaut. Fonction stable. */
   now?: () => number;
   /**
@@ -65,7 +76,8 @@ function tripDates(summary: TripSummary, now: number): string {
 function Title({ embedded }: { embedded: boolean }) {
   const Heading = embedded ? "h3" : "h1";
   return (
-    <Heading id="mes-voyages-titre" className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
+    // `tabIndex={-1}` : cible du focus quand le dernier goût retenu est retiré (F11-PO-13).
+    <Heading id="mes-voyages-titre" tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
       {t.titre}
     </Heading>
   );
@@ -226,9 +238,32 @@ function reviewHrefOf(summary: TripSummary, links: Readonly<Record<string, Revie
   return link && reviewLinkShown(summary, now) ? link.href : undefined;
 }
 
-export function TripsScreen({ trips, createHref, accountHref, receiptHrefs = AUCUN_RECU, reviewLinks = AUCUN_AVIS, now: clock, embedded = false }: TripsScreenProps) {
+export function TripsScreen({
+  trips,
+  createHref,
+  accountHref,
+  receiptHrefs = AUCUN_RECU,
+  reviewLinks = AUCUN_AVIS,
+  retainedTastes,
+  recorderKind,
+  recorder,
+  now: clock,
+  embedded = false,
+}: TripsScreenProps) {
   const now = useClientNow(clock ? { now: clock } : undefined);
   const memory = useOptionalTripSession();
+  const destinations = useMemo(() => new Map(trips.map((summary) => [summary.id, summary.destination])), [trips]);
+  // Après les sections de voyages, quel que soit leur état : un goût doit toujours pouvoir être retiré (M8 § 5.3 point 4).
+  const tastes = (
+    <RetainedTastes
+      {...(retainedTastes === undefined ? {} : { tastes: retainedTastes })}
+      destinations={destinations}
+      focusFallbackId="mes-voyages-titre"
+      headingLevel={embedded ? "h4" : "h2"}
+      {...(recorderKind === undefined ? {} : { recorderKind })}
+      {...(recorder === undefined ? {} : { recorder })}
+    />
+  );
 
   let body;
   if (trips.length === 0) {
@@ -266,6 +301,7 @@ export function TripsScreen({ trips, createHref, accountHref, receiptHrefs = AUC
       <div data-part="mes-voyages" className="flex flex-col gap-6 rounded-block border border-hairline p-4">
         <Title embedded />
         {body}
+        {tastes}
       </div>
     );
   }
@@ -273,6 +309,7 @@ export function TripsScreen({ trips, createHref, accountHref, receiptHrefs = AUC
     <main aria-labelledby="mes-voyages-titre" className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-4 pt-6 pb-10">
       <Title embedded={false} />
       {body}
+      {tastes}
       {/* M9c (spécification M9 § 6.4, critère 1) : après les voyages, pour ne pas changer l'ordre de leurs liens. */}
       {accountHref ? (
         <Button asChild variant="text" size="sm" className="self-start px-0">
