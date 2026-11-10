@@ -178,7 +178,7 @@ describe("TripsScreen : attente et état vide", () => {
     render(<TripsScreen trips={[]} createHref="/voyages/nouveau" now={clock(AUG_01)} />);
     const create = screen.getByRole("link", { name: "Créer un voyage" });
     expect(create.getAttribute("href")).toBe("/voyages/nouveau");
-    expect(create).toHaveClass("bg-line", "w-full");
+    expect(create).toHaveClass("bg-ink", "w-full");
   });
 
   it("avec voyages et écran 1 : « Créer un voyage » secondaire en tête ; sans écran 1 : aucun lien de création", async () => {

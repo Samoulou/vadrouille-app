@@ -21,7 +21,7 @@ Thème clair uniquement pour l'instant.
 |---|---|---|
 | Fond | `page` | Fond de page et panneaux. `raised` pour ce qui est posé sur la carte. `muted` pour les blocs secondaires. |
 | Texte | `ink`, `ink-2`, `ink-soft` | `ink` pour le texte principal, `ink-2` sur `muted`, `ink-soft` pour le secondaire. Pas de noir pur, pas de gris plus clair. |
-| Ligne | `line`, `on-line` | Tracé, arrêts, pastille active, bouton principal, liens d'action. Texte blanc dessus. |
+| Ligne | `line`, `on-line` | Tracé, arrêts, pastille active, sélection, liens d'action. Texte blanc dessus. Le bouton principal est un aplat `ink` (décision 0171). |
 | Action requise | `quai`, `on-quai` | Tags « À réserver » et compteurs. Toujours avec du texte `ink`. |
 | Contours | `hairline`, `outline`, `outline-strong`, `border-control` | Les trois premiers sont décoratifs. Un contour qui seul identifie un contrôle (champ de saisie) utilise `border-control` (3,2:1). |
 | Destination | `dest-bruyere`, `dest-azulejo`, `dest-ocre`, `dest-granit` | Plaque destination uniquement, texte `on-line`. Palette fermée : on n'en génère pas d'autres sans vérifier le contraste. |
@@ -31,9 +31,9 @@ Exemple : un tag « À réserver » est un aplat `quai` avec du texte `ink` en s
 
 ## Typographie
 
-Une seule famille, **Hanken Grotesk**, servie par Google Fonts en 400, 600, 700 et 800. Elle est nette, lisible en petit et dehors, sans effet. La personnalité vient de la graisse 800 des titres, légèrement resserrés, et de l'alignement des chiffres.
+Deux voix (décision 0171). **Hanken Grotesk** (400, 600, 700, 800) pour tout ce qui se lit : nette, lisible en petit et dehors. **Bricolage Grotesque**, étroite (largeur 85 %) et en 800, pour les titres d'écran et de section et pour les styles `destination`, `titre-fiche`, `titre-jour` : c'est elle qui donne le caractère. Les chiffres restent alignés.
 
-- Titres : `destination`, `titre-fiche`, `titre-jour` en 800 ; `section`, `arret`, `bloc` pour structurer un écran.
+- Titres : `destination`, `titre-fiche`, `titre-jour` en 800, police de titrage ; `section`, `arret`, `bloc` pour structurer un écran.
 - Texte : `corps` pour expliquer, `corps-s` pour les métadonnées, `legende` pour les trajets et les aides.
 - Données : `heure`, `heure-l`, `montant`, `pastille`, `etiquette`, toujours en chiffres tabulaires.
 - Ni capitales pour les libellés, ni italique, ni mot isolé mis en couleur dans un titre.

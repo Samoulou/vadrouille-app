@@ -12,7 +12,8 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-line px-5 text-(length:--ligne-bouton-texte) font-extrabold text-on-line",
+        // Aplat `ink` (décision 0171) : le bleu `line` reste à la ligne, à la sélection et aux liens d'action.
+        primary: "bg-ink px-5 text-(length:--ligne-bouton-texte) font-extrabold text-on-line",
         secondary:
           "border-(length:--ligne-trait-controle) border-ink bg-raised px-5 text-(length:--ligne-bouton-texte) font-bold text-ink disabled:border-muted aria-pressed:not-disabled:bg-ink aria-pressed:not-disabled:text-page",
         text: "bg-transparent px-2 text-corps font-normal underline underline-offset-2",

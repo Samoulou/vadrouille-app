@@ -12,14 +12,13 @@ export const hankenGrotesk = Hanken_Grotesk({
 });
 
 /**
- * Police de titrage de la page de précommande (décisions 0168 et 0170) : grotesque étroite à fort caractère, pour
- * les grands titres seulement, dans la même famille de formes que la police de Ligne. Variable (graisse, largeur,
- * taille optique). Jamais préchargée : seules les pages qui l'emploient la téléchargent.
+ * Police de titrage (décisions 0170 et 0171) : grotesque étroite à fort caractère, pour les titres seulement, dans
+ * la même famille de formes que la police de Ligne. Variable (graisse, largeur, taille optique). Employée sur tous
+ * les écrans, donc préchargée.
  */
 export const titrage = Bricolage_Grotesque({
   subsets: ["latin"],
   axes: ["opsz", "wdth"],
   display: "swap",
-  preload: false,
   variable: "--font-titrage",
 });
