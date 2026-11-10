@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { apresVoyageDisponible, getPaymentAdapter, getTripReader, paymentAvailable, siteEssaiAutorise } from "@/adapters";
 import type { TripSummary } from "@/contracts";
 import { PRODUCT_NAME } from "@/config/site";
+import { compteRoute } from "@/features/compte/routes";
 import { exigerSession } from "@/features/compte/session";
 import { TripsScreen } from "@/features/compte/TripsScreen";
 import { creationRoutes } from "@/features/creation/routes";
@@ -35,18 +36,22 @@ export const metadata: Metadata = {
  *
  * « Donner ton avis » (M8a, ticket 1062) : voir `reviewLinksOf`.
  *
+ * « Ton compte » (M9c, ticket 1122) : lien vers `/compte`, sauf sur le site d'essai (aucun compte).
+ *
  * Sans session (`better-auth`, B3c) : redirection vers `/connexion?suite=/voyages`.
  */
 export default async function MesVoyagesPage() {
   const ctx = await exigerSession(mesVoyagesRoute());
   const trips = await getTripReader().listTrips(ctx);
   const receiptHrefs = paymentAvailable() ? await loadReceiptLinks(getPaymentAdapter(), ctx, (id) => unlockRoutes(id).recu()) : {};
+  const essai = siteEssaiAutorise();
   return (
     <TripsScreen
       trips={trips}
       receiptHrefs={receiptHrefs}
       reviewLinks={reviewLinksOf(trips)}
-      createHref={creationRoutes.nouveau({ essai: siteEssaiAutorise() })}
+      createHref={creationRoutes.nouveau({ essai })}
+      accountHref={essai ? undefined : compteRoute()}
     />
   );
 }

@@ -84,6 +84,15 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // M9c (spécification M9 § 6.4, T7) : « Ton compte », sur le jeu simulé (export simulé, suppression non proposée) ;
+    // les étapes (code, confirmation) n'existent que sur `api` : aucun état de plus ici. Budgets journalisés, comme R17.
+    id: "R-compte",
+    path: "/compte",
+    page: "compte/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     id: "R11",
     path: TRIP,
     page: "voyages/[id]/(programme)/page.tsx",
