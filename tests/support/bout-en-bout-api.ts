@@ -69,3 +69,11 @@ export const ADRESSE_AVIS = "m8a-avis@exemple.test";
  * scénario en retient un, le retrouve dans « Mes voyages », le retire, annule, puis retire tout.
  */
 export const ADRESSE_GOUTS = "m8c-gouts@exemple.test";
+
+/**
+ * Goûts proposés au voyage suivant sur `api` (M8c-2, ticket 1131 ; `tests/e2e/creation-gouts-api.api.spec.ts`) : une
+ * organisation propre, les mêmes données que `ADRESSE_GOUTS` (un voyage débloqué terminé depuis 2 jours, deux réponses
+ * « éviter » actives). Le scénario retient un goût, le retrouve proposé à l'écran 2 d'un nouveau voyage, puis retire tout.
+ * Adresse à part : les deux scénarios retiennent et retirent des goûts en parallèle.
+ */
+export const ADRESSE_GOUTS_CREATION = "m8c-gouts-creation@exemple.test";
