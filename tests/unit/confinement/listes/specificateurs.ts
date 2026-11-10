@@ -60,7 +60,20 @@ export const SPECIFICATEURS = [
   { specificateur: "next/headers", zones: ["src/**", "next.config.ts"], sousChemins: "exacts" },
   // M6a (ticket 1013 ; décision 0157 § 2.1) : proxy de Next.js (`NextResponse`, `NextRequest`), et son test (matcher par
   // l'outil de test de Next.js). Sans capacité. Verdict Sécurité à rendre.
-  { specificateur: "next/server", zones: ["src/proxy.ts", "tests/unit/server/partage/proxy.test.ts"], sousChemins: "exacts" },
+  // C2b (ticket 1130 ; spécification C2 § 2.2 point 6) : `after` seul, dans le compteur de visites de la prévente
+  // (l'écriture part après l'envoi de la réponse ; proposition pour T3), et ses deux tests colocalisés, qui le doublent
+  // par une file. Sans capacité. Verdict Sécurité à rendre à la revue de la PR.
+  {
+    specificateur: "next/server",
+    zones: [
+      "src/proxy.ts",
+      "tests/unit/server/partage/proxy.test.ts",
+      "src/adapters/prevente-mesure.ts",
+      "src/adapters/prevente-mesure.test.tsx",
+      "src/adapters/prevente-disponibilite.test.tsx",
+    ],
+    sousChemins: "exacts",
+  },
   { specificateur: "next/experimental/testing/server", zones: ["tests/unit/server/partage/proxy.test.ts"], sousChemins: "exacts" },
   // `scripts/p0/**` : section 9 (P0a1, `scripts/p0/rapport.ts`).
   { specificateur: "zod", zones: ["src/**", "scripts/p0/**"] },

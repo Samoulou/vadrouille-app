@@ -600,6 +600,8 @@ describe("module de journal", () => {
       "compte.export_failed",
       // M9b (ticket 1106) : suppression du compte en échec, nom de l'erreur seulement.
       "compte.suppression_failed",
+      // C2b (ticket 1130) : visite de la page de prévente non écrite, nom de l'erreur seulement.
+      "prevente.visite_perdue",
       "log.unknown_event",
     ]);
   });

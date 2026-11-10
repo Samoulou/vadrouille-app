@@ -195,6 +195,11 @@ export const LOG_EVENTS = [
   // cours » et une prochaine vérification de code reprend ; niveau `error`. **`errorName` seul** : jamais l'adresse ni un
   // identifiant.
   "compte.suppression_failed",
+  // C2b (ticket 1130 ; spécification C2 § 2.2 point 6) : visite de la page de prévente non écrite (base en panne, trop
+  // lente, garde de connexion, refus de rôle, fonction absente) ; la page a déjà répondu, la visite est perdue, sans
+  // nouvelle tentative ; niveau `warn`. **`errorName` seul** (`CHAMPS_ADMIS_PAR_EVENEMENT`) : jamais la chaîne de
+  // connexion, l'hôte, l'agent utilisateur, l'adresse IP, la provenance ni le message de l'erreur (décision 0172 § 6).
+  "prevente.visite_perdue",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -940,6 +945,8 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   ["compte.export_failed", new Set(["errorName"])],
   // M9b (ticket 1106) : nom de l'erreur seulement ; tout autre champ est retiré.
   ["compte.suppression_failed", new Set(["errorName"])],
+  // C2b (ticket 1130) : nom de l'erreur seulement ; tout autre champ est retiré.
+  ["prevente.visite_perdue", new Set(["errorName"])],
   [
     "generation.programme_written",
     new Set([

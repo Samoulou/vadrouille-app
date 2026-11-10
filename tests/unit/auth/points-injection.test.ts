@@ -49,6 +49,18 @@ const POINTS: Readonly<Record<string, readonly string[]>> = {
   // B4c (ticket 863) : branchement du paiement Stripe, même modèle.
   brancherPaiementStripe: ["src/adapters/stripe-payment-instance.ts", "src/instrumentation.ts"],
   debrancherPaiementStripePourTests: ["src/adapters/stripe-payment-instance.ts"],
+  // C2b (ticket 1130) : branchement de la mesure de la prévente (compteur Postgres et « limiteur configuré »), même
+  // modèle ; la fabrique du compteur Postgres (pool injecté) ne sert qu'aux tests. Exception nominative : ses deux
+  // tests sont colocalisés, parce que le régime de confinement n'admet le double de `next/headers` que sous `src/`.
+  brancherMesurePrevente: [
+    "src/adapters/prevente-mesure-instance.ts",
+    "src/instrumentation.ts",
+    "src/adapters/prevente-mesure.ts",
+    "src/adapters/prevente-mesure.test.tsx",
+    "src/adapters/prevente-disponibilite.test.tsx",
+  ],
+  debrancherMesurePreventePourTests: ["src/adapters/prevente-mesure-instance.ts", "src/adapters/prevente-mesure.test.tsx", "src/adapters/prevente-disponibilite.test.tsx"],
+  creerVisitesPrevente: ["src/server/prevente/visites.ts", "src/adapters/prevente-disponibilite.test.tsx"],
 };
 
 const DOSSIERS = ["src", "db", "scripts", "eslint-rules"];

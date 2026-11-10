@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   MOCK_DEMO_TRIP,
   MOCK_DEMO_UNLOCKED_TRIP,
+  compterVisitePrevente,
   getPrevente,
   getTripAdapter,
   isMockAdapter,
@@ -57,6 +58,8 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   // Précommande (`PREVENTE=1`) : la provenance `?src=` suit le bouton jusqu'au paiement (`docs/commercial/suivi.md`).
   const prevente = getPrevente();
   const src = prevente ? sourcePrevente((await searchParams)?.src) : null;
+  // Mesure (spécification C2, C2b) : un affichage compté, écrit après la réponse ; ne lève ni n'attend jamais l'écriture.
+  if (prevente) await compterVisitePrevente(src);
   let demo: { destination?: string } | null = null;
   if (isMockAdapter()) {
     const trip = await getTripAdapter().getTrip(MOCK_DEMO_TRIP.ctx, MOCK_DEMO_TRIP.tripId);

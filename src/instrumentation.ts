@@ -68,6 +68,14 @@
  * (`composerPaiementStripe`) est branchée sur `src/adapters/stripe-payment-instance.ts` ; elle n'est appelée qu'au premier
  * usage, et la clé n'est lue qu'à chaque appel au prestataire. Un échec du branchement est journalisé
  * (`voyages.action_failed`, action `branchement-paiement`) sans arrêter le serveur.
+ *
+ * C2b (ticket 1130 ; spécification C2 § 2.2 point 6 et § 6.2) : environnement valide, quel que soit l'adaptateur, la
+ * mesure de la prévente est branchée sur `src/adapters/prevente-mesure-instance.ts` : le compteur de visites sur Postgres
+ * (`visitesPrevente`, `src/server/prevente/visites.ts`) et le prédicat « limiteur configuré » (`limiteurConfigure`,
+ * `src/server/rate-limit.ts`). Rien n'est lu ni connecté ici (le pool n'est créé qu'au premier affichage de la page de
+ * prévente, et seulement si la garde de connexion l'admet). Un échec du branchement est journalisé
+ * (`voyages.action_failed`, action `branchement-prevente`) sans arrêter le serveur : rien n'est compté, le questionnaire
+ * reste indisponible, et la page de prévente s'affiche comme sans base.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -86,6 +94,7 @@ export async function register(): Promise<void> {
       await brancherPartageApi(logEvent, errorNameOf);
       await brancherPaiementSimule(logEvent, errorNameOf);
       await brancherPaiementStripe(logEvent, errorNameOf);
+      await brancherMesurePrevente(logEvent, errorNameOf);
       return;
     } catch (error) {
       if (!(error instanceof ServerEnvError)) throw error;
@@ -290,5 +299,27 @@ async function brancherPaiementStripe(
   } catch (error) {
     const errorName = errorNameOf(error);
     logEvent("voyages.action_failed", { action: "branchement-paiement", ...(errorName === undefined ? {} : { errorName }) }, "error");
+  }
+}
+
+/** Branche la mesure de la prévente : compteur Postgres et « limiteur configuré » (spécification C2, C2b ; § 6.2). */
+async function brancherMesurePrevente(
+  logEvent: typeof import("@/server/log").logEvent,
+  errorNameOf: typeof import("@/server/log").errorNameOf,
+): Promise<void> {
+  try {
+    const { brancherMesurePrevente: brancher } = await import("@/adapters/prevente-mesure-instance");
+    const { visitesPrevente } = await import("@/server/prevente/visites");
+    const { limiteurConfigure } = await import("@/server/rate-limit");
+    const { journaliserVisitePerdue } = await import("@/server/prevente/journal");
+    brancher({
+      compteurDisponible: () => visitesPrevente().disponible(),
+      compterVisite: (src) => visitesPrevente().compter(src),
+      limiteurConfigure: () => limiteurConfigure(),
+      visitePerdue: journaliserVisitePerdue,
+    });
+  } catch (error) {
+    const errorName = errorNameOf(error);
+    logEvent("voyages.action_failed", { action: "branchement-prevente", ...(errorName === undefined ? {} : { errorName }) }, "error");
   }
 }
