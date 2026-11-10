@@ -18,11 +18,16 @@ import { requestCode, verifyCode } from "@/server/actions/compte";
 const t = messages.compte.reauthentification;
 const c = messages.connexion;
 
-/** Erreurs qui ont leur propre texte, celles de `/connexion` (spécification M9 § 1.3 point 2) ; toute autre : texte générique. */
+/** Erreurs qui ont leur propre texte, celles de `/connexion` (spécification M9 § 1.3 point 2) ; toute autre : texte de l'étape. */
 type ErreurCode = "invalid_code" | "code_expired" | "too_many_attempts" | "rate_limited" | "generique";
 
 function erreurDe(code: ApiErrorCode): ErreurCode {
   return code === "invalid_code" || code === "code_expired" || code === "too_many_attempts" || code === "rate_limited" ? code : "generique";
+}
+
+/** Textes de `/connexion` pour les erreurs du code et de la limite ; texte propre à l'étape pour toute autre erreur. */
+function texteErreur(code: ErreurCode): string {
+  return code === "generique" ? t.erreur : c.erreurs[code];
 }
 
 export interface ReauthStepProps {
@@ -50,7 +55,7 @@ export function ReauthStep({ email, titleRef, onDone }: ReauthStepProps) {
   const [phase, setPhase] = useState<"demande" | "code">("demande");
   const [error, setError] = useState<ErreurCode | null>(null);
   const [locked, setLocked] = useState(false);
-  const [status, setStatus] = useState<"verification" | "nouveauCode" | null>(null);
+  const [status, setStatus] = useState<"verification" | "nouveauCode" | "envoye" | null>(null);
   const [verifying, setVerifying] = useState(false);
   // Nouvelle `key` d'`OtpInput` : cases vidées et focus sur la première.
   const [round, setRound] = useState(0);
@@ -89,6 +94,11 @@ export function ReauthStep({ email, titleRef, onDone }: ReauthStepProps) {
     if (resend) {
       setStatus("nouveauCode");
       setRound((value) => value + 1);
+    } else {
+      // La région `role="status"` est rendue vide avec l'étape, puis le texte y est écrit : il est annoncé.
+      requestAnimationFrame(() => {
+        if (mounted.current) setStatus((actuel) => actuel ?? "envoye");
+      });
     }
   }
 
@@ -142,7 +152,7 @@ export function ReauthStep({ email, titleRef, onDone }: ReauthStepProps) {
       {phase === "demande" ? (
         <>
           <p role="alert" className={error ? "text-corps-s font-semibold text-ink" : EMPTY_LIVE_REGION_CLASS}>
-            {error ? c.erreurs[error] : null}
+            {error ? texteErreur(error) : null}
           </p>
           <Button
             className={cn("w-full", ARIA_DISABLED)}
@@ -170,10 +180,10 @@ export function ReauthStep({ email, titleRef, onDone }: ReauthStepProps) {
             />
             {/* Régions présentes dès l'affichage de l'étape, sous les cases (0018 § 18) ; texte rendu une seule fois. */}
             <p role="status" className={status ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}>
-              {status ? c.code[status] : null}
+              {status === "envoye" ? t.envoye : status ? c.code[status] : null}
             </p>
             <p id={alertId} role="alert" className={error ? "text-corps-s font-semibold text-ink" : EMPTY_LIVE_REGION_CLASS}>
-              {error ? c.erreurs[error] : null}
+              {error ? texteErreur(error) : null}
             </p>
           </div>
           {/* `-ml-2` compense le `px-2` du bouton `text` : le texte s'aligne sur la marge de la colonne. */}

@@ -65,6 +65,8 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
   const [exportEtat, setExportEtat] = useState<EtatExport>(null);
   const [suppression, setSuppression] = useState<DeleteIssue | null>(null);
   const [sortieEnEchec, setSortieEnEchec] = useState(false);
+  /** Demande en cours, pour le retour visible et annoncé (le verrou reste `busy`). */
+  const [enCours, setEnCours] = useState<"export" | "continuer" | "suppression" | null>(null);
   const titre = useRef<HTMLHeadingElement>(null);
   const premiere = useRef(true);
   const mounted = useRef(true);
@@ -91,9 +93,11 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
     if (busy.current || !online) return;
     busy.current = true;
     setExportEtat(null);
+    setEnCours("export");
     const issue = await demanderExport();
     busy.current = false;
     if (!mounted.current) return;
+    setEnCours(null);
     if (issue.kind === "fichier") {
       enregistrerFichier(issue.nom, issue.contenu);
       setExportEtat("pret");
@@ -105,6 +109,7 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
   async function continuer() {
     if (busy.current || !online) return;
     busy.current = true;
+    setEnCours("continuer");
     let recente = false;
     try {
       recente = await hasRecentSignIn();
@@ -113,6 +118,7 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
     }
     busy.current = false;
     if (!mounted.current) return;
+    setEnCours(null);
     setVue(recente ? { nom: "confirmation" } : { nom: "code", pour: "suppression" });
   }
 
@@ -120,6 +126,7 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
     if (busy.current || !online) return;
     busy.current = true;
     setSuppression(null);
+    setEnCours("suppression");
     let issue: "supprime" | "session" | "code" | DeleteIssue = "erreur";
     try {
       const result = await deleteAccount();
@@ -133,6 +140,8 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
     }
     busy.current = false;
     if (!mounted.current) return;
+    // Compte supprimé : l'état en cours reste jusqu'au chargement de l'accueil.
+    if (issue !== "supprime") setEnCours(null);
     if (issue === "supprime") quitterVers(accueilApresSuppressionRoute());
     // Second onglet après la suppression (§ 4.3 point 2) : plus de session, l'écran mène à l'accueil.
     else if (issue === "session") quitterVers(accueilRoute());
@@ -186,7 +195,7 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
   if (vue.nom === "explication") {
     return (
       <CreationShell onBack={retourAuCompte}>
-        <DeleteExplanation titleRef={titre} online={online} onKeep={retourAuCompte} onContinue={() => void continuer()} />
+        <DeleteExplanation titleRef={titre} online={online} onKeep={retourAuCompte} pending={enCours === "continuer"} onContinue={() => void continuer()} />
       </CreationShell>
     );
   }
@@ -194,7 +203,15 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
   if (vue.nom === "confirmation") {
     return (
       <CreationShell onBack={retourAuCompte}>
-        <DeleteConfirmation titleRef={titre} online={online} onKeep={retourAuCompte} onDelete={() => void supprimer()} issue={suppression} />
+        <DeleteConfirmation
+          titleRef={titre}
+          online={online}
+          onKeep={retourAuCompte}
+          pending={enCours === "suppression"}
+          onDelete={() => void supprimer()}
+          issue={suppression}
+          email={email}
+        />
       </CreationShell>
     );
   }
@@ -217,7 +234,7 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
         <Button
           variant="secondary"
           className={cn("w-full", ARIA_DISABLED)}
-          aria-disabled={online ? undefined : true}
+          aria-disabled={online && enCours !== "export" ? undefined : true}
           aria-describedby={online ? exportAideId : `${exportAideId} ${offlineId}`}
           onClick={() => void exporter()}
         >
@@ -226,9 +243,12 @@ export function AccountScreen({ email, simulated }: AccountScreenProps) {
         <p id={exportAideId} className="text-corps-s text-ink-soft">
           {t.export.aide}
         </p>
-        {/* Région présente dès l'affichage ; texte rendu une seule fois. */}
-        <p role="status" className={exportEtat === "pret" ? "text-corps-s font-semibold text-ink" : EMPTY_LIVE_REGION_CLASS}>
-          {exportEtat === "pret" ? t.export.pret : null}
+        {/* Région présente dès l'affichage ; texte rendu une seule fois (« Préparation… », puis « Ton fichier est prêt. »). */}
+        <p
+          role="status"
+          className={exportEtat === "pret" ? "text-corps-s font-semibold text-ink" : enCours === "export" ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}
+        >
+          {exportEtat === "pret" ? t.export.pret : enCours === "export" ? t.export.enCours : null}
         </p>
         {exportEtat === "limite" ? <StatusBanner kind="error" message={messages.connexion.erreurs.rate_limited} /> : null}
         {exportEtat === "erreur" ? (

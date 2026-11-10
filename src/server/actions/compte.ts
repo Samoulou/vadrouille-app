@@ -15,6 +15,7 @@ import { exportCompte, nomFichierExport, serialiserExport } from "@/server/accou
 import { ACTION_LIMITEUR_EXPORT, exporterMonCompte, type FichierExport } from "@/server/account/export-demande";
 import { construireExportSimule } from "@/server/account/export-simule";
 import { controleConnexionRecente } from "@/server/account/reauthentification";
+import { cookieSeulement } from "@/server/cookie-seulement";
 import { verdictRateLimit } from "@/server/rate-limit";
 
 import { parseInput } from "../parse-input";
@@ -125,12 +126,7 @@ export type AccountDeleted = CompteSupprime;
 export async function deleteAccount(): Promise<Result<AccountDeleted>> {
   return supprimerMonCompte({
     disponible: () => isApiAdapter() && authAdapterChoice() === "better-auth",
-    session: async () => {
-      const filtres = new Headers();
-      const cookie = (await headers()).get("cookie");
-      if (cookie !== null) filtres.set("cookie", cookie);
-      return sessionBranchee(filtres);
-    },
+    session: sessionDuCookie,
     connexionRecente: controleConnexionRecente,
     limiteur: async (userId) => verdictRateLimit({ action: ACTION_LIMITEUR_SUPPRESSION, headers: new Headers(await headers()), userId }),
     compte: { decision: (ctx) => suppressionCompte().decision(ctx), supprimer: (ctx) => suppressionCompte().supprimer(ctx) },
@@ -144,12 +140,12 @@ function compteReel(): boolean {
   return isApiAdapter() && authAdapterChoice() === "better-auth";
 }
 
-/** Session du cookie de la requête (connexion réelle) : seul le cookie est transmis à la lecture. */
+/**
+ * Session du cookie de la requête (connexion réelle), pour `deleteAccount`, `exportAccount`, `accountEmail` et
+ * `hasRecentSignIn` : seul le cookie est transmis à la lecture (`cookieSeulement`, `src/server/cookie-seulement.ts`).
+ */
 async function sessionDuCookie() {
-  const filtres = new Headers();
-  const cookie = (await headers()).get("cookie");
-  if (cookie !== null) filtres.set("cookie", cookie);
-  return sessionBranchee(filtres);
+  return sessionBranchee(cookieSeulement(await headers()));
 }
 
 /**
@@ -189,8 +185,8 @@ export type AccountExportFile = FichierExport;
 /**
  * « Exporter mes données » pour l'écran « Ton compte » (M9c ; spécification M9 § 6.4, critères 3 et 10). **Aucune
  * entrée** ; le fichier est rendu à l'écran, qui le fait enregistrer par le navigateur.
- * - `api` avec la connexion réelle : `exporterMonCompte` (`src/server/account/export-demande.ts`), mêmes contrôles, même
- *   ordre et même compteur que la route `GET /api/v1/compte/export` de M9a ; erreurs : `unauthenticated`, `forbidden`,
+ * - `api` avec la connexion réelle : `exporterMonCompte` (`src/server/account/export-demande.ts`), cœur unique partagé
+ *   avec la route `GET /api/v1/compte/export` de M9a ; erreurs : `unauthenticated`, `forbidden`,
  *   `reauthentication_required`, `rate_limited`, `internal`.
  * - `mock` avec la connexion simulée (forme T8 proposée) : le fichier du jeu simulé, construit par
  *   `construireExportSimule` et validé par le schéma de l'export réel ; erreur : `internal`, sans détail.

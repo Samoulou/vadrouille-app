@@ -3,14 +3,15 @@
   "titreDocument": "Ton compte · {produit}",
   "adresse": "Connecté avec {email}",
   "lien": "Ton compte",
-  "horsLigne": "Tu es hors ligne. Exporter tes données et supprimer ton compte demandent une connexion.",
+  "horsLigne": "Tu es hors ligne. Exporter tes données et supprimer ton compte demandent d'être en ligne.",
   "export": {
     "notice": "Ce fichier contient les données que {produit} garde sur toi et tes voyages, à la date indiquée. Les lieux y sont désignés par leur identifiant Google, sans autre information Google. Les codes (catégories, avis, statuts) sont ceux de l'application.",
     "bouton": "Exporter mes données",
     "aide": "Un fichier avec tes voyages, tes avis, tes goûts retenus, tes accords aux rappels et tes paiements.",
     "pret": "Ton fichier est prêt.",
     "erreur": "Impossible de préparer ton fichier pour le moment.",
-    "reessayer": "Réessayer"
+    "reessayer": "Réessayer",
+    "enCours": "Préparation de ton fichier…"
   },
   "suppression": {
     "titre": "Supprimer ton compte",
@@ -27,13 +28,18 @@
     "confirmer": "Supprimer définitivement",
     "confirmerNom": "Supprimer définitivement mon compte",
     "reessayer": "Réessayer",
-    "simulee": "Disponible avec un vrai compte."
+    "simulee": "Disponible avec un vrai compte.",
+    "enCours": "Suppression en cours…",
+    "verification": "Un instant…",
+    "compte": "Compte : {email}"
   },
   "reauthentification": {
     "titre": "Confirme que c'est toi",
     "texte": "Pour protéger tes données, on t'envoie un code à {email}.",
     "recevoir": "Recevoir un code",
-    "saisie": "Saisis le code reçu par e-mail."
+    "saisie": "Saisis le code reçu par e-mail.",
+    "envoye": "Code envoyé.",
+    "erreur": "Impossible d'envoyer ou de vérifier le code pour le moment. Réessaie dans quelques minutes."
   },
   "deconnexion": {
     "bouton": "Se déconnecter",

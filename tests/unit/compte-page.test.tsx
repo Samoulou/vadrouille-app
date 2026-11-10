@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { brancherConnexionReelle, debrancherConnexionReellePourTests } from "@/adapters/better-auth";
@@ -120,9 +120,11 @@ describe("« Mes voyages » : lien « Ton compte »", () => {
 });
 
 describe("accueil : annonce après la suppression du compte", () => {
-  it("?compte=supprime : « Ton compte est supprimé. » en role=status", async () => {
+  it("?compte=supprime : région role=status rendue vide, puis « Ton compte est supprimé. » y est écrit", async () => {
     render(await HomePage({ searchParams: Promise.resolve({ compte: "supprime" }) }));
-    expect(screen.getByRole("status")).toHaveTextContent(t.suppression.fin);
+    const region = screen.getByRole("status");
+    expect(region).toBeEmptyDOMElement();
+    await waitFor(() => expect(region).toHaveTextContent(t.suppression.fin));
   });
 
   it.each([[{}], [{ compte: "autre" }], [{ compte: ["supprime", "supprime"] }]])("%j : aucune annonce", async (searchParams) => {

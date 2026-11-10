@@ -7,8 +7,9 @@ import { ACTION_LIMITEUR_EXPORT, exporterMonCompte, type DependancesDemandeExpor
 import { ACTION_LIMITEUR } from "@/server/routes/compte-export";
 
 /**
- * Cœur de l'action `exportAccount` (M9c, ticket 1122 ; spécification M9 § 3.5, § 6.2 et § 6.4, critère 3) : mêmes
- * contrôles, même ordre et même compteur que la route de M9a, sur des dépendances injectées (aucune base).
+ * Cœur unique de l'export (M9c, ticket 1122 ; spécification M9 § 3.5, § 6.2 et § 6.4, critère 3), partagé par la route
+ * de M9a et l'action `exportAccount`, sur des dépendances injectées (aucune base). La route sur ce cœur :
+ * `src/server/routes/compte-export.test.ts` et `tests/db/export-compte.test.ts`.
  */
 
 const SESSION = {
@@ -58,7 +59,7 @@ describe("exporterMonCompte", () => {
     expect(ACTION_LIMITEUR_EXPORT).toBe(ACTION_LIMITEUR);
   });
 
-  it("contrôles dans l'ordre de la route, puis le fichier sérialisé et son nom daté", async () => {
+  it("contrôles dans l'ordre, puis le fichier sérialisé et son nom daté", async () => {
     const { d, ordre } = banc();
     expect(await exporterMonCompte(d)).toEqual({
       ok: true,

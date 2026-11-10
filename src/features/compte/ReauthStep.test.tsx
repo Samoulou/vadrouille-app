@@ -73,9 +73,9 @@ describe("ReauthStep", () => {
 
   it.each([
     ["rate_limited", c.erreurs.rate_limited],
-    ["email_cap_reached", c.erreurs.generique],
-    ["provider_error", c.erreurs.generique],
-  ] as const)("envoi refusé (%s) : message de /connexion, la saisie n'est pas affichée", async (code, message) => {
+    ["email_cap_reached", t.erreur],
+    ["provider_error", t.erreur],
+  ] as const)("envoi refusé (%s) : limite de /connexion ou texte de l'étape, la saisie n'est pas affichée", async (code, message) => {
     vi.mocked(requestCode).mockResolvedValueOnce(fail(code));
     renderStep();
     await recevoir();
@@ -119,12 +119,21 @@ describe("ReauthStep", () => {
     expect(screen.queryByText(c.erreurs.too_many_attempts)).toBeNull();
   });
 
-  it("erreur de réseau à la vérification : texte générique", async () => {
+  it("code envoyé : « Code envoyé. » écrit dans la région role=status rendue vide avec la saisie", async () => {
+    renderStep();
+    await recevoir();
+    const region = screen.getAllByRole("status").find((element) => element.closest("[data-part='reauthentification']"));
+    expect(region).toBeDefined();
+    await waitFor(() => expect(region).toHaveTextContent(t.envoye));
+  });
+
+  it("erreur de réseau à la vérification : texte de l'étape, pas celui de la connexion", async () => {
     vi.mocked(verifyCode).mockRejectedValueOnce(new Error("réseau"));
     renderStep();
     await recevoir();
     await saisir("246810");
-    expect(screen.getByText(c.erreurs.generique)).toBeVisible();
+    expect(screen.getByText(t.erreur)).toBeVisible();
+    expect(screen.queryByText(c.erreurs.generique)).toBeNull();
     expect(onDone).not.toHaveBeenCalled();
   });
 });

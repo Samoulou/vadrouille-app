@@ -383,3 +383,57 @@ describe("AccountScreen : hors ligne (critère 7)", () => {
     expect(requestCode).not.toHaveBeenCalled();
   });
 });
+
+describe("AccountScreen : retour pendant les demandes lentes (revue de la PR 1127, mineur 8)", () => {
+  /** Promesse tenue en attente, pour observer l'état en cours. */
+  function enAttente<T>() {
+    let tenir: (valeur: T) => void = () => undefined;
+    const promesse = new Promise<T>((resolve) => {
+      tenir = resolve;
+    });
+    return { promesse, tenir };
+  }
+
+  it("export : « Préparation de ton fichier… » en role=status, bouton en aria-disabled, un seul appel ; puis « Ton fichier est prêt. »", async () => {
+    const attente = enAttente<IssueExport>();
+    vi.mocked(demanderExport).mockReturnValueOnce(attente.promesse);
+    renderScreen();
+    await cliquer(t.export.bouton);
+    expect(screen.getByRole("status")).toHaveTextContent(t.export.enCours);
+    expect(bouton(t.export.bouton)).toHaveAttribute("aria-disabled", "true");
+    await cliquer(t.export.bouton);
+    expect(demanderExport).toHaveBeenCalledTimes(1);
+    await act(async () => attente.tenir(FICHIER));
+    expect(screen.getByRole("status")).toHaveTextContent(t.export.pret);
+    expect(bouton(t.export.bouton)).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("« Continuer » : « Un instant… », bouton en aria-disabled pendant la lecture de la connexion récente", async () => {
+    const attente = enAttente<boolean>();
+    vi.mocked(hasRecentSignIn).mockReturnValueOnce(attente.promesse);
+    renderScreen();
+    await cliquer(t.suppression.bouton);
+    await cliquer(t.suppression.continuer);
+    expect(screen.getByRole("status")).toHaveTextContent(t.suppression.verification);
+    expect(bouton(t.suppression.continuer)).toHaveAttribute("aria-disabled", "true");
+    await act(async () => attente.tenir(true));
+    expect(bouton(t.suppression.confirmerNom)).toBeInTheDocument();
+  });
+
+  it("« Supprimer définitivement » : l'adresse du compte est rappelée ; « Suppression en cours… », un seul appel", async () => {
+    const attente = enAttente<Awaited<ReturnType<typeof deleteAccount>>>();
+    vi.mocked(deleteAccount).mockReturnValueOnce(attente.promesse);
+    renderScreen();
+    await cliquer(t.suppression.bouton);
+    await cliquer(t.suppression.continuer);
+    expect(screen.getByText(`Compte : ${EMAIL}`)).toBeVisible();
+    await cliquer(t.suppression.confirmerNom);
+    expect(screen.getByRole("status")).toHaveTextContent(t.suppression.enCours);
+    expect(bouton(t.suppression.confirmerNom)).toHaveAttribute("aria-disabled", "true");
+    await cliquer(t.suppression.confirmerNom);
+    expect(deleteAccount).toHaveBeenCalledTimes(1);
+    await act(async () => attente.tenir(fail("rate_limited")));
+    expect(bouton(t.suppression.confirmerNom)).not.toHaveAttribute("aria-disabled");
+    expect(quitterVers).not.toHaveBeenCalled();
+  });
+});

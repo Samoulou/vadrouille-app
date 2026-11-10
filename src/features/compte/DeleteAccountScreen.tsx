@@ -5,7 +5,9 @@ import { useId, type RefObject } from "react";
 import { Button } from "@/components/ligne/Button";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { TITLE_CLASS } from "@/features/creation/CreationShell";
+import { EMPTY_LIVE_REGION_CLASS } from "@/features/creation/fields";
 import { ARIA_DISABLED } from "@/features/sejour/aria-disabled";
+import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +25,17 @@ interface StepProps {
   online: boolean;
   /** « Garder mon compte » : retour à « Ton compte », toujours actif (critère 7). */
   onKeep: () => void;
+  /** Demande en cours : le bouton principal est inactif (`aria-disabled`) et une ligne `role="status"` le dit. */
+  pending: boolean;
+}
+
+/** Région présente dès l'affichage de l'étape ; texte écrit pendant la demande. */
+function EnCours({ pending, texte }: { pending: boolean; texte: string }) {
+  return (
+    <p role="status" className={pending ? "text-corps-s text-ink-soft" : EMPTY_LIVE_REGION_CLASS}>
+      {pending ? texte : null}
+    </p>
+  );
 }
 
 function Hors({ id }: { id: string }) {
@@ -34,7 +47,7 @@ function Hors({ id }: { id: string }) {
 }
 
 /** Étape 1 : ce qui est supprimé, ce qui est gardé (option A de Q48), rien ne se rétablit ; « Continuer », « Garder mon compte ». */
-export function DeleteExplanation({ titleRef, online, onKeep, onContinue }: StepProps & { onContinue: () => void }) {
+export function DeleteExplanation({ titleRef, online, onKeep, pending, onContinue }: StepProps & { onContinue: () => void }) {
   const offlineId = `${useId()}-hors-ligne`;
   return (
     <div data-part="suppression-explication" className="flex flex-col gap-6">
@@ -50,12 +63,13 @@ export function DeleteExplanation({ titleRef, online, onKeep, onContinue }: Step
       <div className="flex flex-col gap-3">
         <Button
           className={cn("w-full", ARIA_DISABLED)}
-          aria-disabled={online ? undefined : true}
+          aria-disabled={online && !pending ? undefined : true}
           aria-describedby={online ? undefined : offlineId}
           onClick={onContinue}
         >
           {t.continuer}
         </Button>
+        <EnCours pending={pending} texte={t.verification} />
         <Button variant="secondary" className="w-full" onClick={onKeep}>
           {t.garder}
         </Button>
@@ -75,15 +89,20 @@ export function DeleteConfirmation({
   titleRef,
   online,
   onKeep,
+  pending,
   onDelete,
   issue,
-}: StepProps & { onDelete: () => void; issue: DeleteIssue | null }) {
+  email,
+}: StepProps & { onDelete: () => void; issue: DeleteIssue | null; email: string }) {
   const offlineId = `${useId()}-hors-ligne`;
   return (
     <div data-part="suppression-confirmation" className="flex flex-col gap-6">
       <h1 ref={titleRef} tabIndex={-1} className={TITLE_CLASS}>
         {t.titre}
       </h1>
+      <p data-part="compte" className="text-corps text-ink-2 wrap-anywhere">
+        {format(t.compte, { email })}
+      </p>
       <p className="text-corps font-bold text-ink">{t.irreversible}</p>
       {online ? null : <Hors id={offlineId} />}
       {issue === "paiement" ? <StatusBanner kind="error" message={t.paiementEnAttente} /> : null}
@@ -104,13 +123,14 @@ export function DeleteConfirmation({
           <Button
             className={cn("w-full", ARIA_DISABLED)}
             aria-label={t.confirmerNom}
-            aria-disabled={online ? undefined : true}
+            aria-disabled={online && !pending ? undefined : true}
             aria-describedby={online ? undefined : offlineId}
             onClick={onDelete}
           >
             {t.confirmer}
           </Button>
         )}
+        <EnCours pending={pending} texte={t.enCours} />
         <Button variant="secondary" className="w-full" onClick={onKeep}>
           {t.garder}
         </Button>

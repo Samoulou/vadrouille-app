@@ -8,12 +8,13 @@ import type { RateLimitVerdict } from "@/server/rate-limit";
 import { EXPORT_TAILLE_MAX_OCTETS, ExportTropVolumineuxError, nomFichierExport, type ResultatExport, serialiserExport } from "./export";
 
 /**
- * Cœur de l'action `exportAccount` (`src/server/actions/compte.ts` ; M9c, ticket 1122 ; spécification M9 § 3.5, § 6.2 et
- * § 6.4, critère 3). L'écran ne peut pas appeler la route `GET /api/v1/compte/export` de M9a par `fetch` (régime de
- * confinement de `src/features`) : l'action rend le même fichier, **avec les mêmes contrôles, dans le même ordre**, que
- * `src/server/routes/compte-export.ts`, et le **même compteur** du limiteur (`export`, par personne). Forme à confirmer
- * par la revue du Tech Lead et de la Sécurité (T2) : tant que les deux chemins existent, tout changement d'un contrôle se
- * fait dans les deux.
+ * Cœur **unique** de « Exporter mes données » (M9a, M9c ; spécification M9 § 3.5, § 6.2 et § 6.4, critère 3 ; revue
+ * consolidée du head `797df67`, bloquant 1), appelé par les deux points d'entrée :
+ * - la route `GET /api/v1/compte/export` (`src/server/routes/compte-export.ts`), qui n'ajoute que les refus propres à HTTP
+ *   (demande intersite, préchargement, paramètre dans l'adresse) et traduit les codes en statuts ;
+ * - l'action `exportAccount` (`src/server/actions/compte.ts`), pour l'écran « Ton compte » (le régime de confinement de
+ *   `src/features` n'admet pas de `fetch` vers la route).
+ * Un contrôle ne s'écrit qu'ici ; le compteur du limiteur (`export`, par personne) est le même pour les deux.
  *
  * Aucune entrée : l'organisation et la personne viennent de la session seule. Contrôles, tous avant la moindre lecture de
  * l'export :
@@ -28,14 +29,14 @@ import { EXPORT_TAILLE_MAX_OCTETS, ExportTropVolumineuxError, nomFichierExport, 
  * Une exception d'un contrôle donne `internal`. Aucune copie, aucun journal du contenu, aucune mesure.
  */
 
-/** Nom d'action du limiteur : celui de la route de M9a (`src/server/config/limites.ts`), pour un seul compteur. */
+/** Nom d'action du limiteur (`src/server/config/limites.ts`) : un seul compteur pour la route et l'action. */
 export const ACTION_LIMITEUR_EXPORT = "export";
 
 export type FichierExport = { fileName: string; content: string };
 
 export type SessionDemandeExport = { readonly sessionId: string; readonly userId: string; readonly organizationId: string; readonly role: MemberRole };
 
-/** Dépendances de l'action, injectables par les tests (aucune base, aucun `process.env`). */
+/** Dépendances du cœur, injectables par les tests (aucune base, aucun `process.env`). */
 export type DependancesDemandeExport = {
   readonly disponible: () => boolean;
   readonly session: () => Promise<SessionDemandeExport | null>;

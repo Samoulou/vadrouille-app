@@ -15,6 +15,7 @@ import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
 import { Landing } from "@/features/accueil/Landing";
 import { LandingPrevente } from "@/features/accueil/LandingPrevente";
 import { preventeRoutes } from "@/features/accueil/routes";
+import { DeletedNotice } from "@/features/compte/DeletedNotice";
 import { annonceCompteSupprime } from "@/features/compte/routes";
 import { creationRoutes } from "@/features/creation/routes";
 import { formatPrice } from "@/features/presentation/price";
@@ -75,13 +76,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   return (
     <Landing
       createHref={creationRoutes.nouveau({ essai })}
-      notice={
-        compteSupprime ? (
-          <p role="status" data-part="compte-supprime" className="rounded-block bg-muted p-4 text-corps text-ink-2">
-            {messages.compte.suppression.fin}
-          </p>
-        ) : null
-      }
+      notice={compteSupprime ? <DeletedNotice /> : null}
       secondary={
         essai ? (
           <Button asChild variant="secondary" className="w-full">

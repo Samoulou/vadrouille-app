@@ -4,7 +4,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 export const R_COMPTE = "/compte";
 export const TITRE = "Ton compte";
-export const HORS_LIGNE = "Tu es hors ligne. Exporter tes données et supprimer ton compte demandent une connexion.";
+export const HORS_LIGNE = "Tu es hors ligne. Exporter tes données et supprimer ton compte demandent d'être en ligne.";
 export const NOM_EXPORT = /^vadrouille-mes-donnees-\d{4}-\d{2}-\d{2}\.json$/;
 
 export const bouton = (page: Page, name: string): Locator => page.getByRole("button", { name, exact: true });
