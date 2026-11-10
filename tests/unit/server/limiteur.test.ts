@@ -554,6 +554,8 @@ describe("module de journal", () => {
       // M6c : relais du workflow 7 en échec, fin sur pannes répétées ; nom seul.
       "rappels.relay_failed",
       "rappels.abandoned",
+      // R-B (décision 0162 § 3 point 3) : réclamation du relais tenue par une autre exécution ; nom seul.
+      "rappels.relay_duplicate",
       "auth.library_log",
       "auth.operation_failed",
       "auth.purge_failed",
@@ -594,6 +596,8 @@ describe("module de journal", () => {
       // M5d-4 (décision 0155 § 2.4) : lieux à soi réinjectés par la révision M1b, deux compteurs seulement.
       "recalcul.lieux_a_soi",
       "calendrier.version_unavailable",
+      // M9a (ticket 1097) : export du compte en échec, nom de l'erreur seulement.
+      "compte.export_failed",
       "log.unknown_event",
     ]);
   });

@@ -545,10 +545,10 @@ describe("confinement: recherche de ville de api (décision 0141 § 11 ligne 6)"
     const table = contenant("autocomplete_daily_counts");
     // Clichés drizzle-kit (`meta/<n>_snapshot.json`) : chacun recopie le schéma entier, donc la table, à chaque migration
     // suivante (0023, M6a-D, ticket 1009 ; 0024, M6c-D, ticket 1014 ; 0025, B4e, ticket 887 ; 0026, M8-D, ticket 1055 ;
-    // 0027, R-D, ticket 1061) ; ce sont des fichiers générés, jamais du code qui prend le rôle. Exemption limitée aux
-    // clichés nommés : un cliché suivant s'ajoute ici, à la main.
+    // 0027, R-D, ticket 1061 ; 0028, purge de `place_coordinates`, ticket 1091) ; ce sont des fichiers générés, jamais du
+    // code qui prend le rôle. Exemption limitée aux clichés nommés : un cliché suivant s'ajoute ici, à la main.
     expect(
-      table.filter((c) => c !== COMPTEURS && c !== "db/schema/auth.ts" && !/^db\/migrations\/(meta\/)?002[12]_/.test(c) && !/^db\/migrations\/meta\/002[34567]_snapshot\.json$/.test(c)),
+      table.filter((c) => c !== COMPTEURS && c !== "db/schema/auth.ts" && !/^db\/migrations\/(meta\/)?002[12]_/.test(c) && !/^db\/migrations\/meta\/002[345678]_snapshot\.json$/.test(c)),
     ).toEqual([]);
     for (const attendu of [COMPTEURS, "db/schema/auth.ts", "db/migrations/0021_compteurs_autocompletion.sql"]) expect(table).toContain(attendu);
   });

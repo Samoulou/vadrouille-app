@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { PROTOTYPE_ORG_ID } from "@/prototype/programme-reduit";
 import { type Forfait, type LimitesForfait } from "@/server/usage/forfait";
-import { ESSAIS_PAR_HEURE, LONGUEUR_SAISIE_MAX, saisirCodeAcces } from "@/server/p0/acces";
+import { ATTENTE_VERROU_ESSAIS, ESSAIS_PAR_HEURE, LONGUEUR_SAISIE_MAX, saisirCodeAcces } from "@/server/p0/acces";
 import { verifierGardeEtape } from "@/server/p0/garde";
 import { type ClientSql, type PoolSql, reserverExecution } from "@/server/usage/neon";
 
@@ -12,8 +12,9 @@ import { closeAll, connect, type DbClient } from "./helpers";
 
 /**
  * Garde et accès du mode réel sur une vraie base Postgres (P0r3b ; décision 0055, section 1 point 2 et section 2
- * point 3 ; revue du head 6be9299, bloquant 2) : les trois requêtes de `src/server/p0/acces.ts` (verrou consultatif,
- * compte des essais de l'heure glissante, ligne d'essai) et celle de `src/server/p0/garde.ts` (exécution réservée)
+ * point 3 ; revue du head 6be9299, bloquant 2) : les requêtes de `src/server/p0/acces.ts` (borne d'attente
+ * `lock_timeout`, verrou consultatif, compte des refus de l'heure glissante, ligne d'essai ; décision 0165 § 1.2 : le bon
+ * code ne prend ni le verrou ni le compte) et celle de `src/server/p0/garde.ts` (exécution réservée)
  * tournent sous `vadrouille_prototype` (`VADROUILLE_DB_PROTOTYPE_URL`), avec ses droits, la RLS, `make_interval`,
  * `quota_day_at` et `pg_advisory_xact_lock` sous concurrence réelle.
  *
@@ -203,9 +204,9 @@ describe("p0: essais du code d'accès sur la base (vadrouille_prototype)", () =>
     const codes = resultats.map((r) => (r.ok ? "ok" : r.code)).sort();
     expect(codes).toEqual([...Array<string>(ESSAIS_PAR_HEURE).fill("invalid_code"), "too_many_attempts"].sort());
     expect(await essaisDeLHeure()).toEqual({ accepte: 0, refuse: ESSAIS_PAR_HEURE });
-    // Le bon code ne passe plus : refusé sans comparaison ni ligne nouvelle.
-    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "too_many_attempts" });
-    expect(await essaisDeLHeure()).toEqual({ accepte: 0, refuse: ESSAIS_PAR_HEURE });
+    // Le bon code passe (décision 0165 § 1.2) : une ligne « accepte » de plus, aucun refus de plus.
+    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await essaisDeLHeure()).toEqual({ accepte: 1, refuse: ESSAIS_PAR_HEURE });
   });
 
   it(`saisie de plus de ${LONGUEUR_SAISIE_MAX} caractères : refusée et comptée`, async () => {
@@ -216,12 +217,51 @@ describe("p0: essais du code d'accès sur la base (vadrouille_prototype)", () =>
   });
 
   it("un essai de plus d'une heure n'est pas compté ; un essai de moins d'une heure l'est", async () => {
+    // Essais posés : des refus (décision 0165 § 4.1). Le bon code passe dans les deux cas.
     await poserEssais(ESSAIS_PAR_HEURE, 61);
     expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "invalid_code" });
     await viderFenetre();
     await poserEssais(ESSAIS_PAR_HEURE, 59);
-    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "too_many_attempts" });
+    expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "too_many_attempts" });
     expect(await essaisDeLHeure()).toEqual({ accepte: 0, refuse: ESSAIS_PAR_HEURE });
+    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await essaisDeLHeure()).toEqual({ accepte: 1, refuse: ESSAIS_PAR_HEURE });
+  });
+
+  it("après 5 refus dans l'heure, le bon code (hexadécimal ou base64) est accepté et sa ligne « accepte » écrite ; un mauvais code reçoit too_many_attempts sans ligne", async () => {
+    for (let i = 0; i < ESSAIS_PAR_HEURE; i += 1) {
+      expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "invalid_code" });
+    }
+    expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "too_many_attempts" });
+    expect(await essaisDeLHeure()).toEqual({ accepte: 0, refuse: ESSAIS_PAR_HEURE });
+    expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await saisirCodeAcces(code.toString("base64"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+    expect(await essaisDeLHeure()).toEqual({ accepte: 2, refuse: ESSAIS_PAR_HEURE });
+  });
+
+  it(`verrou tenu par une autre session : mauvais code → indisponible après ${ATTENTE_VERROU_ESSAIS} (lock_timeout), sans ligne ; le bon code passe`, async () => {
+    // Risque 4 de l'amendement de 0165 : une mauvaise saisie ne tient pas sa connexion plus longtemps que la borne.
+    const tenant = await connect("p0");
+    await tenant.query("BEGIN");
+    try {
+      await tenant.query("SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('p0_run_attempts'))");
+      const debut = Date.now();
+      expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "indisponible" });
+      const duree = Date.now() - debut;
+      expect(duree).toBeGreaterThanOrEqual(4_500);
+      expect(duree).toBeLessThan(15_000);
+      expect(await essaisDeLHeure()).toEqual({ accepte: 0, refuse: 0 });
+      // Le bon code ne prend pas le verrou : accepté pendant qu'il est tenu.
+      expect(await saisirCodeAcces(code.toString("hex"), () => poolReel, OUVERT)).toMatchObject({ ok: true });
+      expect(await essaisDeLHeure()).toEqual({ accepte: 1, refuse: 0 });
+    } finally {
+      await tenant.query("ROLLBACK");
+      await tenant.end();
+    }
+    // Verrou libéré : le mauvais code est de nouveau compté.
+    expect(await saisirCodeAcces(randomBytes(32).toString("hex"), () => poolReel, OUVERT)).toEqual({ ok: false, code: "invalid_code" });
+    expect(await essaisDeLHeure()).toEqual({ accepte: 1, refuse: 1 });
   });
 });
 

@@ -2163,6 +2163,14 @@ const FRONTIERE_P0R3B = {
       fichier: "src/server/routes/calendrier.ts",
       admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
     },
+    // M9a (ticket 1097 ; spécification M9 § 6.2, forme T2 à confirmer par la revue) : export du compte, seul module
+    // importé par le route handler `src/app/api/v1/compte/export/route.ts` (`ligne/route-handlers`), sur le modèle du
+    // calendrier ; module `server-only` sans directive, qui lit la session (`authOperations`), le limiteur et la base.
+    // Entrée relevée par `pnpm test` : verdict Sécurité à rendre à la revue de M9a.
+    {
+      fichier: "src/server/routes/compte-export.ts",
+      admise: (f: string, source: string) => directivesDuPrologue(f, source).length === 0 && importeServerOnly(f, source),
+    },
     {
       fichier: "src/server/p0/page-acces.ts",
       admise: (f: string, source: string) => {
@@ -2423,6 +2431,7 @@ describe("p0: clé côté serveur seulement", () => {
       "src/server/routes/simulated-webhook.ts",
       "src/server/routes/stripe-webhook.ts",
       "src/server/routes/calendrier.ts",
+      "src/server/routes/compte-export.ts",
       "src/server/p0/page-acces.ts",
     ]);
     for (const entree of FRONTIERE_P0R3B.entrees) expect(entreeFrontiereAdmise(entree.fichier, lireDepot), entree.fichier).toBe(true);

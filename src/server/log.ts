@@ -82,6 +82,10 @@ export const LOG_EVENTS = [
   // répétées (réveils ou relais). Nom seul, `warn` : ni voyage, ni accord, ni adresse, ni message d'erreur.
   "rappels.relay_failed",
   "rappels.abandoned",
+  // R-B (ticket 1075 ; décision 0162 § 3 point 3) : la réclamation du relais trouve la génération suivante tenue par une
+  // autre exécution (doublon d'une même génération) ; l'exécution se termine sans relayer. Nom seul, `info` : ni voyage, ni
+  // accord, ni identifiant d'exécution. Une réclamation en panne écrit `rappels.relay_failed`.
+  "rappels.relay_duplicate",
   "auth.library_log",
   "auth.operation_failed",
   "auth.purge_failed",
@@ -182,6 +186,10 @@ export const LOG_EVENTS = [
   // courante (incohérence de la base) ; réponse 500 sans corps ; niveau `error`. **Aucun champ** (`CHAMPS_ADMIS_PAR_EVENEMENT`) :
   // jamais `tripId`, `organizationId`, un nom ni une heure.
   "calendrier.version_unavailable",
+  // M9a (ticket 1097 ; spécification M9 § 3.5 et § 6.1) : « Exporter mes données » n'a pas pu construire le fichier (base,
+  // instantané illisible, taille au-delà de la borne) ; réponse 500 sans fichier ; niveau `error`. **`errorName` seul**
+  // (`CHAMPS_ADMIS_PAR_EVENEMENT`) : jamais l'adresse, un identifiant, une destination, un récit ni un nom d'étape.
+  "compte.export_failed",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -923,6 +931,8 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   ["payment.receipt_unavailable", new Set(["eventId", "reason"])],
   // M6b (ticket 1005) : aucun champ ; tout champ passé est retiré.
   ["calendrier.version_unavailable", new Set<string>()],
+  // M9a (ticket 1097) : nom de l'erreur seulement ; tout autre champ est retiré.
+  ["compte.export_failed", new Set(["errorName"])],
   [
     "generation.programme_written",
     new Set([

@@ -99,6 +99,8 @@ export { MOCK_DEMO_TRIP_DRAFT as MOCK_DEMO_DRAFT } from "@/mocks/creation-edimbo
 export { authAdapterChoice, betterAuthAllowed, mockAuthAllowed } from "./auth-guard";
 export { assertApiAdapter } from "./api-guard";
 export { getRequestContext, SessionRequiseError } from "./context";
+// M9a (ticket 1097) : session et création de session lues par les opérations branchées (route de l'export du compte).
+export { creationDeSessionBranchee, sessionBranchee } from "./better-auth";
 export { isPrototypeAdapter, paymentAvailable, paymentDemoAllowed } from "./payment-guard";
 export { apiShareAvailable, realShareAvailable, shareAvailable, shareDemoAvailable } from "./share-guard";
 export { getSimulationScope, type SimulationScope } from "./simulation";

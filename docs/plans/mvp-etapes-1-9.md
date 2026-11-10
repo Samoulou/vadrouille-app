@@ -252,7 +252,7 @@ L'export (fichier JSON lisible de ses voyages, briefs, préférences et avis) ; 
 |---|---|---|---|
 | M9-spec | Spécification export et suppression | product-owner | M8-spec |
 | M9a | Exporter mes données | backend | M9-spec |
-| M9b | Supprimer mon compte (reprise, réauthentification, `billing` et `usage_ledger` selon Q48) | backend, data | M9-spec ; Q48 |
+| M9b | Supprimer mon compte (reprise, réauthentification, `billing` et `usage_ledger` selon Q48) | backend, data | M9-spec ; M9a ; migration 0028 (0167) ; Q48 seulement pour l'option B |
 | M9c | Écrans et textes (compte, confirmation) | frontend | M9a, M9b ; **validation juridique de Samuel** (action S6) avant toute ouverture à d'autres testeurs |
 
 ---

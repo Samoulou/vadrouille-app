@@ -1,0 +1,5 @@
+{
+  "export": {
+    "notice": "Ce fichier contient les données que {produit} garde sur toi et tes voyages, à la date indiquée. Les lieux y sont désignés par leur identifiant Google, sans autre information Google. Les codes (catégories, avis, statuts) sont ceux de l'application."
+  }
+}
