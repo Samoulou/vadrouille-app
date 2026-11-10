@@ -1,4 +1,4 @@
-# 0169 — Page de précommande : identité tenue par la ligne, sans marques de gabarit
+# 0170 — Page de précommande : identité tenue par la ligne, sans marques de gabarit
 
 Statut : **décidée par l'UX/UI** (écran non maquetté, « Qui décide quoi »), à la demande de Samuel. Amende 0168 § 6 (forme de la page). Ne change ni le prix, ni les conditions, ni le paiement, ni les textes de vente.
 

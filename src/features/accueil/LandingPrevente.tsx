@@ -29,7 +29,7 @@ const ETIQUETTES = new Map<string, TagKind>(
   ]),
 );
 
-/** Titrage : grotesque étroite, graisse maximale (décision 0169). Une seule voix pour tous les titres de la page. */
+/** Titrage : grotesque étroite, graisse maximale (décision 0170). Une seule voix pour tous les titres de la page. */
 const TITRE =
   "font-(family-name:--font-titrage) font-extrabold font-stretch-85%";
 const TITRE_SECTION = cn(
@@ -172,7 +172,7 @@ const GESTES: readonly ReactNode[] = [
 ];
 
 /**
- * Page de précommande (décisions 0168 et 0169 ; textes : `docs/commercial/page-prevente.md`). Composant serveur,
+ * Page de précommande (décisions 0168 et 0170 ; textes : `docs/commercial/page-prevente.md`). Composant serveur,
  * aucun JavaScript client. La page est elle-même une ligne : un rail part du terminus à côté du nom, passe par un
  * arrêt à chaque section et finit au terminus du dernier appel. Pas de halo, pas d'ombre, pas d'inclinaison : la
  * profondeur vient des aplats, comme dans Ligne.
