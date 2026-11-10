@@ -1,8 +1,9 @@
 -- Amorçage des rôles de la décision 0007 (spécification B1, « Amorçage des rôles »), amendée par la décision 0046
--- (D17 point 2) : 20 rôles, dont les trois du prototype de recherche (P0r2), le rôle de purge du MVP (décision 0060
+-- (D17 point 2) : 23 rôles, dont les trois du prototype de recherche (P0r2), le rôle de purge du MVP (décision 0060
 -- § 3.2, B8c), le propriétaire de la fonction des sommes de consommation (B7c, migration 0010_usage_forfait), le
 -- rôle du plafond global des e-mails (B3d, décision 0138 § 11, migration 0020_plafond_emails) et celui des compteurs
--- de la ville par autocomplétion (M1f-D, migration 0021_compteurs_autocompletion).
+-- de la ville par autocomplétion (M1f-D, migration 0021_compteurs_autocompletion), et les trois de la mesure de la
+-- prévente (C2a, migration 0029_prevente_mesure : deux propriétaires de fonctions et le rôle du relevé).
 --
 -- À exécuter UNE FOIS PAR BASE, avant les migrations, par un utilisateur qui peut créer des rôles :
 --   - en CI : le superutilisateur du conteneur postgres:17.11 (job `db`) ;
@@ -49,7 +50,16 @@ DECLARE
     ['vadrouille_coords_purge', 'true', '2'],
     -- Consommation du MVP (B7c, migration 0010_usage_forfait) : propriétaire de public.usage_forfait_totals(), seul
     -- lecteur des sommes globales de usage_ledger ; aucune connexion, aucune appartenance hors ADMIN de vadrouille_migrator.
-    ['vadrouille_fn_usage', 'false', '-1']
+    ['vadrouille_fn_usage', 'false', '-1'],
+    -- Mesure de la prévente (C2a, migration 0029_prevente_mesure ; forme confirmée par le Tech Lead, décision 0172
+    -- § 1 ; avis de la Sécurité, S1 : 0172 § 6) : propriétaire des deux fonctions d'écriture (seul rôle qui écrit prevente_visites,
+    -- prevente_reponses_jour et prevente_reponses) ; propriétaire des trois fonctions de relevé (lecture seule) ;
+    -- rôle du relevé, qui n'a que EXECUTE sur les fonctions de relevé : SANS connexion et sans appartenance tant que
+    -- le workflow du relevé (tâche C2e) n'existe pas. C2e le passe en rôle de connexion (attribut, limite de
+    -- connexions, CONNECT sur la base, mot de passe posé par Samuel) : personne ne peut le prendre d'ici là.
+    ['vadrouille_fn_prevente', 'false', '-1'],
+    ['vadrouille_fn_prevente_releve', 'false', '-1'],
+    ['vadrouille_prevente_releve', 'false', '-1']
   ];
   i int;
   v_name text;
@@ -87,7 +97,7 @@ GRANT vadrouille_share, vadrouille_webhook, vadrouille_account_admin, vadrouille
 -- Transfert de propriété (décision 0007) : vadrouille_migrator doit pouvoir accorder, le temps d'une migration,
 -- l'appartenance aux rôles vadrouille_fn_* (option ADMIN seule, sans SET ni INHERIT : décision 0036, B1-TL-2).
 GRANT vadrouille_fn_share, vadrouille_fn_share_views, vadrouille_fn_checkout, vadrouille_fn_coords, vadrouille_fn_purge,
-  vadrouille_fn_prototype_purge, vadrouille_fn_usage
+  vadrouille_fn_prototype_purge, vadrouille_fn_usage, vadrouille_fn_prevente, vadrouille_fn_prevente_releve
   TO vadrouille_migrator WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
 
 -- Schéma public : vadrouille_owner y crée les tables ; l'option de transmission sert à accorder CREATE, le temps
