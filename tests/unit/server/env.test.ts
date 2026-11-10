@@ -823,6 +823,72 @@ describe("env: lien avec la garde de base et les gardes d'interface (A10, A13)",
   });
 });
 
+describe("env: better-auth sur la préversion de mvp-essai (décision 0169 § 1, amendement de 0077 § 5.1)", () => {
+  /** Préversion Vercel de la branche `mvp-essai`, connexion réelle en `https://`, limiteur et en-tête de confiance posés. */
+  const mvp = (extra: Env = {}): Env =>
+    vercel("preview", {
+      VERCEL_GIT_COMMIT_REF: "mvp-essai",
+      ...connexionReelle({ [NOM.BETTER_AUTH_URL]: "https://mvp-essai.exemple.test", [NOM.APP_URL]: "https://mvp-essai.exemple.test" }),
+      [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(aleatoire()),
+      [NOM.TRUSTED_IP_HEADER]: "x-vercel-forwarded-for",
+      DATA_ADAPTER: "api",
+      ...extra,
+    });
+
+  it("ouverte : la préversion de mvp-essai démarre avec better-auth et api (environnement staging)", () => {
+    const lu = parseServerEnv(mvp());
+    expect(lu.environment).toBe("staging");
+    expect(lu.authAdapter).toBe("better-auth");
+    expect(lu.dataAdapter).toBe("api");
+    expect(lu.betterAuth).toMatchObject({ environment: "staging", baseUrl: "https://mvp-essai.exemple.test", appUrl: "https://mvp-essai.exemple.test" });
+    expect(lu.trustedIpHeader).toBe("x-vercel-forwarded-for");
+    expect(parseServerEnv(mvp({ VERCEL_TARGET_ENV: "preview" })).betterAuth?.environment).toBe("staging");
+    expect(betterAuthAllowed({ NODE_ENV: "test", ...mvp() } as unknown as NodeJS.ProcessEnv)).toBe(true);
+  });
+
+  it("fermée partout ailleurs : autre branche, production, cible de production, environnement personnalisé, hors de Vercel, déclaration de l'opérateur", () => {
+    const fermes: Env[] = [
+      mvp({ VERCEL_GIT_COMMIT_REF: "main" }),
+      mvp({ VERCEL_GIT_COMMIT_REF: "p0-reel" }),
+      mvp({ VERCEL_GIT_COMMIT_REF: "claude/1105-m1h-mvp-essai" }),
+      mvp({ VERCEL_GIT_COMMIT_REF: "mvp-essai " }),
+      mvp({ VERCEL_GIT_COMMIT_REF: "Mvp-Essai" }),
+      mvp({ VERCEL_GIT_COMMIT_REF: undefined }),
+      mvp({ VERCEL_ENV: "production" }),
+      mvp({ VERCEL_ENV: " Preview " }),
+      mvp({ VERCEL_ENV: "staging" }),
+      mvp({ VERCEL_TARGET_ENV: "production" }),
+      mvp({ VERCEL_TARGET_ENV: "recette" }),
+      mvp({ VERCEL_TARGET_ENV: "" }),
+      mvp({ VERCEL: undefined }),
+      mvp({ VERCEL: "0" }),
+      mvp({ VADROUILLE_ENV: "staging" }),
+      mvp({ VADROUILLE_ENV: "production" }),
+      mvp({ VADROUILLE_ENV: "" }),
+    ];
+    for (const env of fermes) {
+      refusParse(env, NOM.AUTH_ADAPTER, "forbidden");
+      expect(betterAuthAllowed({ NODE_ENV: "test", ...env } as unknown as NodeJS.ProcessEnv), JSON.stringify({ ref: env.VERCEL_GIT_COMMIT_REF, v: env.VERCEL_ENV })).toBe(false);
+    }
+  });
+
+  it("exigences de la préversion : URL en https, secret du limiteur et en-tête de confiance requis au démarrage", () => {
+    refusParse(mvp({ [NOM.BETTER_AUTH_URL]: "http://mvp-essai.exemple.test" }), NOM.BETTER_AUTH_URL, "invalid_value");
+    refusParse(mvp({ [NOM.APP_URL]: "http://mvp-essai.exemple.test" }), NOM.APP_URL, "invalid_value");
+    refusParse(mvp({ [NOM.RATE_LIMIT_HMAC_SECRET]: undefined }), NOM.RATE_LIMIT_HMAC_SECRET, "missing");
+    refusParse(mvp({ [NOM.TRUSTED_IP_HEADER]: undefined }), NOM.TRUSTED_IP_HEADER, "missing");
+    refusParse(mvp({ [NOM.BETTER_AUTH_SECRET]: undefined }), NOM.BETTER_AUTH_SECRET, "missing");
+    refusParse(mvp({ [NOM.VADROUILLE_DATABASE_URL_AUTH]: undefined }), NOM.VADROUILLE_DATABASE_URL_AUTH, "missing");
+  });
+
+  it("paiement : le paiement simulé et son webhook restent refusés sur la préversion (Q131), SMTP aussi", () => {
+    refusParse(mvp({ PAYMENT_ADAPTER: "simulated", SIMULATED_WEBHOOK_ENABLED: "true" }), NOM.SIMULATED_WEBHOOK_ENABLED, "forbidden");
+    refusParse(mvp({ PAYMENT_ADAPTER: "simulated" }), NOM.PAYMENT_ADAPTER, "forbidden");
+    refusParse(mvp({ [NOM.EMAIL_TRANSPORT]: "smtp", [NOM.SMTP_URL]: "smtp://localhost:1025" }), NOM.EMAIL_TRANSPORT, "forbidden");
+    expect(parseServerEnv(mvp()).emailTransport).toBe("disabled");
+  });
+});
+
 describe("env: gardes de configuration du paiement simulé (B4a ; critère A21 ; décision 0097 B4-TL-7)", () => {
   /** Configuration où le webhook simulé est ouvert en `ci`, plus `extra` (secrets tirés au hasard, noms en clés d'objet). */
   const simule = (extra: Env = {}): Env =>
@@ -1283,6 +1349,26 @@ describe("env: gardes de l'envoi réel (B3d, R1 ; décision 0138 § 2, § 3 et �
     refus(admis({ VERCEL_ENV: " Preview " }), NOM.AUTH_ADAPTER, "forbidden");
     refus(admis({ VERCEL_TARGET_ENV: "preview", VADROUILLE_ENV: "" }), NOM.AUTH_ADAPTER, "forbidden");
     refus(admis({ [TRANSPORT]: "  resend  " }), NOM.AUTH_ADAPTER, "forbidden");
+  });
+
+  // Décision 0169 § 1 (M1h) : sur la préversion de la seule branche `mvp-essai`, le cas admis démarre avec `better-auth`.
+  it("préversion mvp-essai (0169) : cas admis, clé valide, better-auth → démarre, transport resend", () => {
+    const mvp = (extra: Env = {}): Env =>
+      admis({
+        VERCEL_GIT_COMMIT_REF: "mvp-essai",
+        [NOM.BETTER_AUTH_URL]: "https://mvp-essai.exemple.test",
+        [NOM.APP_URL]: "https://mvp-essai.exemple.test",
+        [NOM.RATE_LIMIT_HMAC_SECRET]: base64url(aleatoire()),
+        [NOM.TRUSTED_IP_HEADER]: "x-vercel-forwarded-for",
+        ...extra,
+      });
+    const lu = parseServerEnv(mvp());
+    expect(lu.environment).toBe("staging");
+    expect(lu.emailTransport).toBe("resend");
+    expect(lu.betterAuth?.environment).toBe("staging");
+    // Une autre branche, ou la même hors du cas admis : refus inchangé.
+    for (const ref of ["main", "p0-reel", "mvp-essai-2", " mvp-essai", "MVP-ESSAI", ""]) refus(mvp({ VERCEL_GIT_COMMIT_REF: ref }), NOM.AUTH_ADAPTER, "forbidden");
+    refus(mvp({ VERCEL_GIT_COMMIT_REF: undefined }), NOM.AUTH_ADAPTER, "forbidden");
   });
 
   it("cas admis : clé absente → missing ; de forme invalide → invalid_value (jugée avant AUTH_ADAPTER)", () => {

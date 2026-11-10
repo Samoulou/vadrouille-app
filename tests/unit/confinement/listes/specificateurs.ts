@@ -402,10 +402,12 @@ const SPECIFICATEURS_NOMINATIFS_TS = [
   {
     fichier: "src/server/env/index.ts",
     specificateur: "@/dev/flags",
-    noms: ["isProductionTarget"],
+    noms: ["isProductionTarget", "previewMvpEssai"],
     motif:
       "prédicat de production partagé `isProductionTarget` (B4c, décision 0140 § 3 points 3 et 6) : `PAYMENT_ADAPTER=stripe` refusé sur cible de production ; " +
-      "module pur, sans capacité (lecture non secrète de l'objet reçu) ; verdict Sécurité à rendre à la revue de B4c",
+      "module pur, sans capacité (lecture non secrète de l'objet reçu) ; verdict Sécurité à rendre à la revue de B4c. " +
+      "M1h (ticket 1105 ; décision 0169 § 1) : prédicat `previewMvpEssai` du même module pur, partagé avec `betterAuthAllowed`, pour n'admettre " +
+      "`AUTH_ADAPTER=better-auth` en `staging` que sur la préversion Vercel de la branche `mvp-essai` ; verdict Sécurité à rendre à la revue de M1h",
   },
   {
     fichier: "src/server/env/payment.ts",
