@@ -21,14 +21,14 @@ test.describe("/dev/tokens", () => {
     }
   });
 
-  test("applique Hanken Grotesk et les tailles des tokens", async ({ page }) => {
+  test("applique la police de titrage et les tailles des tokens (décision 0171)", async ({ page }) => {
     await page.goto("/dev/tokens");
     const sample = page.locator('[data-text-style="destination"] span').nth(1);
-    await expect(sample).toHaveCSS("font-size", "36px");
-    await expect(sample).toHaveCSS("line-height", "40px");
+    await expect(sample).toHaveCSS("font-size", "44px");
+    await expect(sample).toHaveCSS("line-height", "44px");
     await expect(sample).toHaveCSS("font-weight", "800");
     const family = await sample.evaluate((el) => getComputedStyle(el).fontFamily);
-    expect(family).toMatch(/Hanken/);
+    expect(family).toMatch(/Bricolage.*Hanken/);
   });
 
   test("tient dans 390 px sans défilement horizontal", async ({ page }) => {
