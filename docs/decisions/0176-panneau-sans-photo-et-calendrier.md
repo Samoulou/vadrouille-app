@@ -1,12 +1,12 @@
 # 0176 — Carte du tri sans photo en panneau de destination ; calendrier de Ligne pour les dates
 
-Statut : **décidée par Samuel** (carte de décision du fil du projet, à reporter dans `QUESTIONS.md` par le CEO), appliquée par l'UX/UI. Modifie deux écrans maquettés : la carte du tri (`DeckCard`) et l'écran 1 de la création. Suite de 0174 (« Proposé, non fait »).
+Statut : **décidée par Samuel** (carte de décision du fil du projet, reportée dans `QUESTIONS.md`, Q892), appliquée par l'UX/UI. Modifie deux écrans maquettés : la carte du tri (`DeckCard`) et l'écran 1 de la création. Suite de 0174 (« Proposé, non fait »).
 
 Date : 2026-11-10 · Rédacteur : UX/UI · Ticket #1107.
 
 ## Choix de Samuel
 
-Fil du projet « Retirer le look IA du design ». Question posée le 2026-11-10 à 11:27 UTC, après le tour de l'application (0174) : « Refaire le bloc photo vide et les champs de date de l'app ? », options « Oui, les deux » (« Je redessine le bloc photo vide aux couleurs de la destination et un calendrier maison pour les dates, puis je te montre les captures. »), « Seulement le bloc photo », « Non, on garde ». Réponse de Samuel à 11:29 UTC : **« Oui, les deux »**. Ce choix n'est pas lisible depuis le dépôt tant que le CEO ne l'a pas reporté.
+Fil du projet « Retirer le look IA du design ». Question posée le 2026-11-10 à 11:27 UTC, après le tour de l'application (0174) : « Refaire le bloc photo vide et les champs de date de l'app ? », options « Oui, les deux » (« Je redessine le bloc photo vide aux couleurs de la destination et un calendrier maison pour les dates, puis je te montre les captures. »), « Seulement le bloc photo », « Non, on garde ». Réponse de Samuel à 11:29 UTC : **« Oui, les deux »**. Choix reporté dans `QUESTIONS.md` (Q892).
 
 ## Décision
 
