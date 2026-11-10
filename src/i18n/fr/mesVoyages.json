@@ -23,5 +23,23 @@
   "recu": "Voir le reçu",
   "recuNom": "Voir le reçu ({destination})",
   "avis": "Donner ton avis",
-  "avisNom": "Donner ton avis ({destination})"
+  "avisNom": "Donner ton avis ({destination})",
+  "gouts": {
+    "titre": "Tes goûts retenus",
+    "origine": "Retenu après {destination}",
+    "origineInconnue": "Retenu après un voyage",
+    "retirer": "Retirer",
+    "retirerNom": "Retirer : {libelle}",
+    "retire": "Goût retiré.",
+    "toutRetirer": "Retirer tous mes goûts",
+    "confirmation": "Retirer tous tes goûts retenus ? Ils ne seront plus proposés.",
+    "confirmer": "Tout retirer",
+    "garder": "Garder",
+    "tousRetires": "Tous tes goûts sont retirés.",
+    "horsLigne": "Tu es hors ligne. Retirer un goût demande une connexion.",
+    "erreurRetrait": "Impossible de retirer ce goût pour le moment.",
+    "erreurToutRetirer": "Impossible de retirer tes goûts pour le moment.",
+    "erreurAnnuler": "Impossible de rétablir ce goût pour le moment.",
+    "reessayer": "Réessayer"
+  }
 }
