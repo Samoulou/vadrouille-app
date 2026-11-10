@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { adressePaiementPrevente, getPrevente, sourcePrevente } from "@/adapters";
 import HomePage from "@/app/page";
+import PrecommandePage from "@/app/precommande/page";
+import PrecommandeMerciPage from "@/app/precommande/merci/page";
 
 const LIEN = "https://buy.stripe.com/test_abc123";
 function ouvrir(lien?: string) {
@@ -25,7 +27,7 @@ describe("précommande : configuration", () => {
     expect(ouvrir()).toEqual({ amount: 2900, currency: "CHF", lienPaiement: null });
   });
 
-  it.each(["http://buy.stripe.com/x", "https://evil.example/x", "https://buy.stripe.com.evil.example/x", "https://u@buy.stripe.com/x", "pas une adresse"])(
+  it.each(["http://buy.stripe.com/x", "https://evil.example/x", "https://buy.stripe.com.evil.example/x", "https://u@buy.stripe.com/x", "https://buy.stripe.com", "https://buy.stripe.com/", "pas une adresse"])(
     "lien refusé : %s",
     (value) => {
       expect(ouvrir(value)).toEqual({ amount: 2900, currency: "CHF", lienPaiement: null });
@@ -60,7 +62,9 @@ describe("accueil : précommande", () => {
     expect(boutons).toHaveLength(3);
     for (const bouton of boutons) expect(bouton).toHaveAttribute("href", "/precommande?src=forum");
     expect(screen.queryByRole("link", { name: "Créer un voyage" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "29 CHF pour un voyage" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: /^Ton voyage,\s*de l'hôtel à la soirée\.$/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /^29\sCHF\s*pour un voyage$/ })).toBeInTheDocument();
+    expect(screen.getByText(/1er février 2027, tu es remboursé intégralement/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Questions fréquentes" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Voir la démonstration" })).toHaveAttribute("href", "#demonstration");
     expect(screen.queryByText("Aucun lieu inventé")).not.toBeInTheDocument();
@@ -70,5 +74,46 @@ describe("accueil : précommande", () => {
     vi.stubEnv("PREVENTE", "1");
     render(await HomePage({ searchParams: Promise.resolve({ src: "a b" }) }));
     expect(screen.getAllByRole("link", { name: /Précommander/ })[0]).toHaveAttribute("href", "/precommande");
+  });
+});
+
+/** `notFound()` et `redirect()` de Next.js lèvent une erreur dont `digest` porte le statut ou l'adresse. */
+async function digest(page: () => unknown): Promise<string> {
+  try {
+    await page();
+  } catch (error) {
+    return String((error as { digest?: unknown }).digest);
+  }
+  return "aucune erreur";
+}
+
+describe("précommande : pages", () => {
+  const precommande = (src?: string) => PrecommandePage({ searchParams: Promise.resolve(src === undefined ? {} : { src }) });
+
+  it("fermée : 404 sur les deux pages", async () => {
+    expect(await digest(() => precommande("forum"))).toContain("404");
+    expect(await digest(() => PrecommandeMerciPage())).toContain("404");
+  });
+
+  it("ouverte avec lien : redirection vers le paiement, provenance en client_reference_id", async () => {
+    ouvrir(LIEN);
+    expect(await digest(() => precommande("forum"))).toContain(`;${LIEN}?client_reference_id=src-forum;`);
+    expect(await digest(() => precommande())).toContain(`;${LIEN};`);
+    expect(await digest(() => precommande("a b"))).toContain(`;${LIEN};`);
+  });
+
+  it("ouverte sans lien : « ouvre très bientôt », aucun lien de paiement", async () => {
+    ouvrir();
+    render(await precommande("forum"));
+    expect(screen.getByRole("heading", { level: 1, name: "La précommande ouvre très bientôt" })).toBeInTheDocument();
+    for (const lien of screen.getAllByRole("link")) expect(lien).toHaveAttribute("href", "/");
+  });
+
+  it("merci : n'affirme pas le paiement, ne promet aucun e-mail d'accès", () => {
+    ouvrir(LIEN);
+    render(PrecommandeMerciPage());
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.getByText(/Si ton paiement a abouti/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/sans démarche|e-mail d'accès|réponds à l'e-mail/);
   });
 });

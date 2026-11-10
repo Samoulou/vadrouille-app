@@ -1,7 +1,7 @@
 import { OFFER_CONFIG } from "@/server/config/offer";
 
 /**
- * Précommande (prévente, `docs/commercial/offre-prevente.md` ; seuils G0 de la décision 0044). Fermée par défaut.
+ * Précommande (prévente, décision 0168, `docs/commercial/page-prevente.md` ; seuils G0 de la décision 0044). Fermée par défaut.
  *
  * - `PREVENTE` vaut exactement `1` : la page d'accueil devient la page de précommande.
  * - `PREVENTE_LIEN_PAIEMENT` : lien de paiement hébergé par Stripe (`https://buy.stripe.com/…`). L'application ne lit
@@ -36,6 +36,8 @@ function lienValide(value: string | undefined): string | null {
     return null;
   }
   if (url.protocol !== "https:" || url.hostname !== HOTE_PAIEMENT || url.username !== "" || url.port !== "") return null;
+  // Un lien de paiement a toujours un chemin : la racine de l'hôte n'en est pas un.
+  if (url.pathname.length < 2) return null;
   return `${url.origin}${url.pathname}`;
 }
 

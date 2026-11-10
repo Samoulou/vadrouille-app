@@ -24,7 +24,7 @@ const INCLUS = [offre.mealsAndEvenings, offre.events, offre.replacements, offre.
  * étape n'est un lien ni ne porte d'exception (pas de jaune sur un écran sans action à faire). La ligne est celle du
  * programme (`DayLine`), pour montrer le vrai rendu.
  */
-const EXEMPLE: readonly DayLineViewItem<DayLineViewStop>[] = [
+export const EXEMPLE: readonly DayLineViewItem<DayLineViewStop>[] = [
   { type: "terminus", role: "start", time: "09:00", label: t.exemple.hotel },
   { type: "segment", segment: { mode: "walk", minutes: 15, estimated: false } },
   {

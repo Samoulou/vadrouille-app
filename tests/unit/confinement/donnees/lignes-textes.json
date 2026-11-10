@@ -1130,7 +1130,9 @@
             "https://buy.stripe.com/test_abc123",
             "http://buy.stripe.com/x",
             "https://buy.stripe.com.evil.example/x",
-            "https://u@buy.stripe.com/x"
+            "https://u@buy.stripe.com/x",
+            "https://buy.stripe.com",
+            "https://buy.stripe.com/"
           ],
           "nombre": 1
         }

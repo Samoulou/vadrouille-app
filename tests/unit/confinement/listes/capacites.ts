@@ -92,7 +92,7 @@ export const LIGNES_CAPACITE = [
     fichier: "src/app/fonts.ts",
     portee: "application",
     usage: "police téléchargée par Next au build et servie depuis le site ; aucune requête du navigateur vers Google",
-    capacites: [{ capacite: "module:next/font/google", formes: ["Hanken_Grotesk"] }],
+    capacites: [{ capacite: "module:next/font/google", formes: ["Hanken_Grotesk", "Fraunces"] }],
   },
   // --- Lignes du régime lui-même (section 3) -------------------------------------------------------------------
   {

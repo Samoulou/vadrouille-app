@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ligne/Button";
 import { DemoSection, type DemoLink } from "@/features/accueil/DemoSection";
 import { Landing } from "@/features/accueil/Landing";
+import { LandingPrevente } from "@/features/accueil/LandingPrevente";
 import { preventeRoutes } from "@/features/accueil/routes";
 import { creationRoutes } from "@/features/creation/routes";
 import { formatPrice } from "@/features/presentation/price";
@@ -63,6 +64,10 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   }
   // Site d'essai : garde explicite de la liste blanche (décision 0032 § A4.2), qui lève hors de la préversion sans rien lire.
   const essai = siteEssaiAutorise();
+  const footer = demo ? <DemoSection destination={demo.destination} links={demoLinks()} /> : null;
+  if (prevente) {
+    return <LandingPrevente href={preventeRoutes.precommander(src)} prix={formatPrice(prevente.amount, prevente.currency)} demo={footer} />;
+  }
   return (
     <Landing
       createHref={creationRoutes.nouveau({ essai })}
@@ -73,8 +78,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           </Button>
         ) : null
       }
-      footer={demo ? <DemoSection destination={demo.destination} links={demoLinks()} /> : null}
-      presale={prevente ? { href: preventeRoutes.precommander(src), prix: formatPrice(prevente.amount, prevente.currency) } : undefined}
+      footer={footer}
     />
   );
 }
