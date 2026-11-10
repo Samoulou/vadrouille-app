@@ -4,9 +4,9 @@ import "server-only";
  * Robots déclarés, pour le compteur de visites de la prévente (spécification `specs/C2-prevente-mesure.md`, § 2.2
  * point 3 ; tâche C2b, ticket 1130).
  *
- * **Liste maison, embarquée dans le code, sans appel réseau ni dépendance : proposition, à confirmer par le Tech Lead
- * (T2).** Une bibliothèque embarquée (liste tenue par d'autres, plus large) reste possible ; elle ajouterait un paquet
- * au régime de confinement.
+ * **Liste maison, embarquée dans le code, sans appel réseau ni dépendance : acceptée par la décision 0175 (§ 1, T2).**
+ * Une bibliothèque embarquée (liste tenue par d'autres, plus large) est écartée : elle ajouterait un paquet au régime
+ * de confinement ; y passer demanderait une nouvelle décision.
  *
  * Un agent utilisateur est tenu pour un robot déclaré s'il contient l'un de ces fragments, sans tenir compte de la
  * casse. La liste vise ce qui **se présente** comme un automate : moteurs de recherche, aperçus de lien des

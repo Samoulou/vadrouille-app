@@ -12,7 +12,7 @@ import { PreventeProvenanceSchema, type PreventeProvenance } from "@/contracts/p
  *   (critère A14). Ce module ne nomme aucune table et ne lit rien.
  * - **Ce qui part vers la base** : la provenance, une valeur de la liste fermée de `src/contracts/prevente-mesure.ts`
  *   (jamais `interne`), revalidée ici. Ni adresse IP, ni agent utilisateur, ni adresse de page, ni heure.
- * - **Disponible** (`disponible`, forme à confirmer par le Tech Lead, T4) : le pool gardé de `db/connection.ts` a pu
+ * - **Disponible** (`disponible`, décision 0175 § 4 point 2) : le pool gardé de `db/connection.ts` a pu
  *   être créé, c'est-à-dire que la garde de production (décision 0034) laisse passer et que la variable de connexion
  *   de `vadrouille_app` est posée. **Créer le pool n'ouvre aucune connexion** (`pg` connecte à la première requête) et
  *   n'écrit aucun journal ; aucune variable n'est lue ici (seul `db/connection.ts` les lit). Indisponible : la création

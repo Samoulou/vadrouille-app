@@ -2,8 +2,8 @@ import type { PreventeProvenance } from "@/contracts/prevente-mesure";
 
 /**
  * Mise en œuvre branchée de la mesure de la prévente (spécification `specs/C2-prevente-mesure.md`, § 2.2 point 6 et
- * § 6.2 ; tâche C2b, ticket 1130 ; même modèle que `api-share-instance.ts`, décisions 0101 § 1 et 0108). **Forme à
- * confirmer par le Tech Lead (T4).**
+ * § 6.2 ; tâche C2b, ticket 1130 ; même modèle que `api-share-instance.ts`, décisions 0101 § 1 et 0108). Forme
+ * confirmée par la décision 0175 (§ 4 point 1).
  *
  * **Branchement au démarrage** : ce module n'importe rien de `src/server/prevente` (base), de `src/server/rate-limit` ni
  * de `src/server/env`. Le régime de confinement l'exige : `@/adapters` ne doit atteindre statiquement ni `db/` ni

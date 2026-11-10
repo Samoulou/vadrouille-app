@@ -350,8 +350,8 @@ export function oublierDansLeLimiteur(personne: PersonneDuLimiteur): Promise<voi
 }
 
 /**
- * « Limiteur configuré » (spécification `specs/C2-prevente-mesure.md`, § 6.2 ; tâche C2b, ticket 1130 ; **forme à
- * confirmer par le Tech Lead, T4**) : vrai si les variables que le limiteur exige **à l'usage** sont là, c'est-à-dire si
+ * « Limiteur configuré » (spécification `specs/C2-prevente-mesure.md`, § 6.2 ; tâche C2b, ticket 1130 ; décision
+ * 0175 § 4 point 3) : vrai si les variables que le limiteur exige **à l'usage** sont là, c'est-à-dire si
  * `rateLimitSettings` ne lève pas (`RATE_LIMIT_HMAC_SECRET` présente et valide partout ; `TRUSTED_IP_HEADER` en plus en
  * `staging` et en `production`). Aucune liste de variables n'est recopiée. Sans elles le limiteur, fermé par défaut,
  * refuserait chaque envoi : c'est la seconde condition de « questionnaire disponible », pour que les liens vers le

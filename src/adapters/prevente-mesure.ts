@@ -30,7 +30,7 @@ export type { MesurePrevente } from "./prevente-mesure-instance";
  * (`src/server/prevente/visites.ts`), le prédicat du limiteur et le journal sont branchés au démarrage
  * (`./prevente-mesure-instance`, `src/instrumentation.ts`). Non branchée (tests, `next build`) : rien n'est disponible.
  *
- * Points non tranchés, codés selon la proposition de la spécification et **à confirmer** :
+ * Formes fixées par la décision 0175 (Tech Lead : T2 § 1, T3 § 2, `HEAD` § 3, T4 § 4 ; S4 : verdict Sécurité rapporté § 6) :
  * - **T3 (où compter)** : dans le rendu de `/` (`src/app/page.tsx`, rendue à chaque requête : `force-dynamic`), par un
  *   seul appel de `compterVisitePrevente`. La décision (« compter ou non ») est prise pendant le rendu, sur les en-têtes
  *   de la requête ; l'écriture est remise à `after()` de Next.js : elle part **après** l'envoi de la réponse, et la
@@ -38,7 +38,8 @@ export type { MesurePrevente } from "./prevente-mesure-instance";
  *   `Next-Router-Segment-Prefetch`, `Purpose` ou `Sec-Purpose` contenant `prefetch`) n'est pas compté ; une navigation du
  *   routeur sans préchargement affiche la page et est comptée, comme une vue partagée (décision 0161, conséquences).
  *   **Limite : une requête `HEAD` n'est pas reconnue ici.** Next.js rend la page pour `HEAD` et un composant serveur ne
- *   connaît pas la méthode ; l'exclure demande de passer par le proxy (`src/proxy.ts`), ce qui revient au Tech Lead.
+ *   connaît pas la méthode ; l'exclure demanderait de passer par le proxy (`src/proxy.ts`), ce que la décision 0175 écarte
+ *   (§ 2 point 4) : limite acceptée, critère A6 amendé (0175 § 3).
  * - **T2 (robots)** : liste maison de `src/server/config/robots.ts`.
  * - **T4 (disponibilité)** : `compteurPreventeDisponible` et `questionnairePreventeDisponible` ci-dessous.
  * - **S4 (gonflement par des requêtes fabriquées)** : aucun plafond ; le volume stocké est borné par la forme (au plus
@@ -81,7 +82,7 @@ export function creerMesurePreventeMemoire(options: { readonly now?: () => numbe
 }
 
 /**
- * **Compteur disponible** (§ 6.2 ; forme à confirmer, T4) : une mise en œuvre est branchée, et elle se dit disponible.
+ * **Compteur disponible** (§ 6.2 ; décision 0175 § 4 point 2) : une mise en œuvre est branchée, et elle se dit disponible.
  * Pour Postgres : la variable de connexion de `vadrouille_app` est posée et la garde de `db/connection.ts` admet
  * l'environnement (jamais en production aujourd'hui, décision 0034). Répond sans ouvrir de connexion, sans journal ; ne
  * lève jamais.
@@ -95,7 +96,7 @@ export function compteurPreventeDisponible(): boolean {
 }
 
 /**
- * **Questionnaire disponible** (§ 6.2 ; forme à confirmer, T4) : compteur disponible **et** limiteur configuré (les
+ * **Questionnaire disponible** (§ 6.2 ; décision 0175 § 4 point 3) : compteur disponible **et** limiteur configuré (les
  * variables que le limiteur exige à l'usage, `limiteurConfigure` de `src/server/rate-limit.ts`). C'est la condition
  * d'affichage des deux liens vers le questionnaire et du formulaire (C2d). Ne lève jamais.
  */
