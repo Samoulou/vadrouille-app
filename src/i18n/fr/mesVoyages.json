@@ -21,5 +21,7 @@
     "suitePlusieurs": "réservations à faire"
   },
   "recu": "Voir le reçu",
-  "recuNom": "Voir le reçu ({destination})"
+  "recuNom": "Voir le reçu ({destination})",
+  "avis": "Donner ton avis",
+  "avisNom": "Donner ton avis ({destination})"
 }

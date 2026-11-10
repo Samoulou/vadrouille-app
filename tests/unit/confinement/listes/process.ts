@@ -122,6 +122,11 @@ export const LECTURES_ENV = [
   // Relevé de la base de P0c1 (P0b1) : `VADROUILLE_PROTOTYPE`, `CI` dans `flags.ts`, `prototype-instance.ts`.
   // B4c, décision 0140 § 3 point 6 (§ 6 ligne 12) : prédicat de production partagé `isProductionTarget` ; lecture non secrète.
   { fichier: "src/dev/flags.ts", noms: ["VADROUILLE_DEV_PAGES", "VADROUILLE_ENV", "VERCEL_ENV", "VADROUILLE_PROTOTYPE", "CI", "VERCEL_TARGET_ENV"] },
+  // M1h (ticket 1105 ; décision 0169 § 1, qui amende 0077 § 5.1 et 0086 § 2.1) : prédicat `previewMvpEssai`, préversion Vercel de la seule
+  // branche `mvp-essai` ; `VERCEL` (exactement `1`) et `VERCEL_GIT_COMMIT_REF` (exactement `mvp-essai`), noms non secrets
+  // posés par Vercel, lus par propriété littérale, comparés à des constantes, jamais rendus. Verdict Sécurité à rendre à
+  // la revue de M1h.
+  { fichier: "src/dev/flags.ts", noms: ["VERCEL", "VERCEL_GIT_COMMIT_REF"] },
   { fichier: "src/adapters/prototype-instance.ts", noms: ["VADROUILLE_PROTOTYPE_DIR"] },
   // B1 (PR 188, après P0c1 ; spécification P0c, sections 5 et 9 ; décision 0036). Verdict Sécurité : approuvé sur le head a89d9a5 (PR 244, ticket 242).
   // Noms secrets de la base : `LECTURES_ENV_SECRETES` ci-dessous (module de connexion et outil de migration seulement).
@@ -322,6 +327,16 @@ export const ENV_ENTIER = [
     fichier: "src/adapters/auth-guard.ts",
     formes: ["defaut:betterAuthAllowed", "argument:betterAuthAllowed"],
   },
+  // M1h (ticket 1105 ; décision 0169 § 1, qui amende 0077 § 5.1 et 0086 § 2.1) : `betterAuthAllowed` devient `betterAuthLocalOuCi(env) ||
+  // previewMvpEssai(env)` ; `betterAuthLocalOuCi` garde l'ancien corps (`local` et `ci`), lu aussi par le paiement simulé et
+  // par `environnementLocalOuCi` du partage, qui ne doivent pas s'ouvrir sur la préversion (0169 § 6). Environnement entier
+  // en valeur par défaut ou passé au prédicat, jamais rendu. Verdict Sécurité à rendre à la revue de M1h.
+  { fichier: "src/adapters/auth-guard.ts", formes: ["defaut:betterAuthLocalOuCi", "argument:betterAuthLocalOuCi", "argument:previewMvpEssai"] },
+  { fichier: "src/adapters/payment-guard.ts", formes: ["argument:betterAuthLocalOuCi"] },
+  { fichier: "src/adapters/share-guard.ts", formes: ["argument:betterAuthLocalOuCi"] },
+  // M1h (ticket 1105 ; décision 0169 § 1, qui amende 0077 § 5.1 et 0086 § 2.1) : prédicat `previewMvpEssai` de `src/dev/flags.ts`, qui passe
+  // l'objet reçu à `isProductionTarget` (il ne peut que fermer). Verdict Sécurité à rendre à la revue de M1h.
+  { fichier: "src/dev/flags.ts", formes: ["defaut:previewMvpEssai", "argument:isProductionTarget"] },
   { fichier: "src/adapters/simulation.ts", formes: ["defaut:simulationEnabled", "argument:devPagesEnabled", "argument:isProductionDeployment"] },
   // B4c, décision 0140 § 3 point 6 (§ 6 ligne 12) : prédicat de production partagé `isProductionTarget` ; lecture non secrète.
   {
@@ -397,6 +412,10 @@ export const ENV_ENTIER = [
   // pour refuser `PAYMENT_ADAPTER=stripe` en production. Ligne au-delà de 0140 § 6 (relevée par `pnpm test`) : verdict
   // Sécurité à rendre à la revue de B4c.
   { fichier: "src/server/env/index.ts", formes: ["argument:isProductionTarget"] },
+  // M1h (ticket 1105 ; décision 0169 § 1, qui amende 0077 § 5.1 et 0086 § 2.1) : `parseServerEnv` passe l'objet reçu entier au prédicat
+  // `previewMvpEssai` pour n'admettre `AUTH_ADAPTER=better-auth` en `staging` que sur la préversion de `mvp-essai` ; même
+  // prédicat que `betterAuthAllowed`. Verdict Sécurité à rendre à la revue de M1h.
+  { fichier: "src/server/env/index.ts", formes: ["argument:previewMvpEssai"] },
   { fichier: "db/connection.ts", formes: ["argument:resolveServerEnvironment"] },
   // B3a (ticket 293 ; spécification B3, B3a point 3) : copie de l'environnement du lanceur, dont sont retirées
   // `VADROUILLE_DATABASE_URL_MIGRATOR` et `VADROUILLE_DB_ADMIN_URL`, passée au serveur autonome. Ligne au-delà du plafond

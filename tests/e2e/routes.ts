@@ -134,6 +134,15 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "seuil" },
   },
   {
+    // M8a (ticket 1062) : écran 16 « Après le voyage », sur le voyage simulé débloqué (la page n'existe qu'après le
+    // déblocage) ; budgets en `journal`, comme R14 et R-versions.
+    id: "R16",
+    path: `/voyages/${INVENTORY_TRIP}_debloque/retour`,
+    page: "voyages/[id]/retour/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     id: "R6",
     path: `${TRIP}/presentation`,
     page: "voyages/[id]/presentation/page.tsx",

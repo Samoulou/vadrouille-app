@@ -69,8 +69,35 @@ describe("configuration des plafonds : bornes de garde (B9e)", () => {
     expect(() => chargerPlafondsUsage(bornes)).not.toThrow();
   });
 
-  it("production : plafonds non fixés (question 4 de B9, Samuel), aucune règle donc aucun appel réel", () => {
-    expect(PLAFONDS_USAGE).toBeNull();
-    expect(reglesDeLecture(horlogeSysteme)).toBeNull();
+  // Attente modifiée par la décision 0169 § 3 (M1h) : les plafonds réels sont posés sur les montants de Samuel (Q639).
+  it("plafonds réels (0169 § 3) : montants de Samuel, 2 USD d'IA par voyage, 10 USD par organisation et par jour, 5 USD sans compte", () => {
+    expect(PLAFONDS_USAGE).not.toBeNull();
+    const p = PLAFONDS_USAGE as PlafondsUsage;
+    expect(() => chargerPlafondsUsage(p)).not.toThrow();
+    // 2 USD d'IA par voyage, révision comprise ; la vérification après le déblocage n'a aucun coût de modèle.
+    expect(p.generations.programme.coutModelesMicros + p.generations.revision.coutModelesMicros).toBe(2_000_000);
+    expect(Object.keys(p.generations.verification).sort()).toEqual(["placesDetails", "placesTextSearch"]);
+    expect(p.generations.verification).toEqual({ placesTextSearch: 60, placesDetails: 60 });
+    expect(p.parOrganisationJourMicros).toBe(10_000_000);
+    expect(p.actionsSansCompteJourMicros).toBe(5_000_000);
+    // Mois et enveloppes cités par Samuel (0027 § 2 ; 0046 D13 point 3).
+    expect(p.limites).toMatchObject({ moisGoogleMicros: 20_000_000, enveloppeGoogleMicros: 40_000_000, moisModelesMicros: 40_000_000, enveloppeModelesMicros: 80_000_000 });
+    // Aucune requête Routes à la génération de la chaîne inversée (0136 § 2.4).
+    for (const profil of [p.generations.programme, p.generations.revision]) expect([profil.routesRequetes, profil.routesElements]).toEqual([0, 0]);
+    // Aucun coût de modèle d'un profil de l'ancienne chaîne au-dessus des 2 USD par voyage.
+    for (const profil of [p.generations.apercu, p.generations.complet, p.generations.mini, p.generations.lot]) expect(profil.coutModelesMicros).toBeLessThanOrEqual(2_000_000);
+  });
+
+  it("plafonds réels : un voyage entier (programme, une révision, vérification) tient sous le plafond par organisation et par jour", () => {
+    const p = PLAFONDS_USAGE as PlafondsUsage;
+    const ficheMicros = 20_000; // fiche « enterprise », 20 USD les 1 000 (`prototype/config/prix-google.json`)
+    const voyage =
+      p.generations.programme.coutModelesMicros +
+      p.generations.revision.coutModelesMicros +
+      (p.generations.programme.placesDetails + p.generations.revision.placesDetails + p.generations.verification.placesDetails) * ficheMicros;
+    expect(voyage).toBe(5_600_000);
+    expect(voyage).toBeLessThanOrEqual(p.parOrganisationJourMicros);
+    expect(reglesDeLecture(horlogeSysteme)?.plafonds).toBe(p);
+    expect(reglesDeLecture(horlogeSysteme, null)).toBeNull();
   });
 });

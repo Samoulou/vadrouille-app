@@ -1,6 +1,6 @@
 import { isProductionDeployment, isProductionTarget, prototypeAdapterAllowed } from "@/dev/flags";
 
-import { authAdapterChoice, betterAuthAllowed } from "./auth-guard";
+import { authAdapterChoice, betterAuthAllowed, betterAuthLocalOuCi } from "./auth-guard";
 import { adapterChoice } from "./payment-guard";
 
 /**
@@ -41,11 +41,11 @@ export const EN_TETE_ADRESSE_DE_CONFIANCE = "x-vercel-forwarded-for";
 /**
  * Vrai si chaque variable déclarée parmi `VADROUILLE_ENV` et `VERCEL_ENV` désigne `local` ou `ci` (règles de
  * `resolveServerEnvironment`, recalculées sans importer `src/server/env`, que `src/adapters` ne doit pas atteindre ;
- * décision 0157 § 1.2, mineur 8 de la revue du head `217e389`). Même calcul que `betterAuthAllowed` : équivalence avec
+ * décision 0157 § 1.2, mineur 8 de la revue du head `217e389`). Même calcul que `betterAuthLocalOuCi` : équivalence avec
  * `resolveServerEnvironment` vérifiée par `tests/unit/server/env.test.ts`.
  */
 export function environnementLocalOuCi(env: NodeJS.ProcessEnv = process.env): boolean {
-  return betterAuthAllowed(env);
+  return betterAuthLocalOuCi(env);
 }
 
 /** Valeurs connues hors production de `VADROUILLE_ENV` et `VERCEL_ENV` (règles de `resolveServerEnvironment`). */
@@ -66,8 +66,8 @@ function declareHorsProduction(vadrouilleEnv: string | undefined, vercelEnv: str
  * - jamais sur une cible de production (`isProductionTarget`, qui couvre aussi `VERCEL_TARGET_ENV`), ni sans
  *   environnement déclaré, ni avec une valeur inconnue (`production` pour `resolveServerEnvironment`) ;
  * - `DATA_ADAPTER=api` **et** `AUTH_ADAPTER=better-auth` ;
- * - `betterAuthAllowed(env)` : même domaine que `assertApiAdapter` (aujourd'hui `local` et `ci` ; la préversion
- *   `mvp-essai` quand M1h l'ouvrira). `ouverte` ne sert qu'aux tests, pour simuler cette ouverture (0157 § 1.2) ;
+ * - `betterAuthAllowed(env)` : même domaine que `assertApiAdapter` (`local`, `ci` et, depuis la décision 0169, la
+ *   préversion `mvp-essai`). `ouverte` ne sert qu'aux tests, pour simuler cette ouverture (0157 § 1.2) ;
  * - hors de `local` et `ci`, en plus, `TRUSTED_IP_HEADER` posé à sa seule valeur admise (0157 § 2.1 point 3, S1) :
  *   sans elle, `/p/` reste fermé (404 commun) et le compartiment commun du limiteur n'est jamais atteint par
  *   `partage-vue` sur un déploiement.

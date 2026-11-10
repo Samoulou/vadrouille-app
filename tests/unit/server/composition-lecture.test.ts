@@ -59,9 +59,12 @@ describe("composition: creerSourceLecture refuse hors de la sélection (0100 § 
   });
 });
 
+// Attente modifiée par la décision 0169 § 3 (M1h) : `PLAFONDS_USAGE` est posé ; l'échec fermé est éprouvé sur des plafonds
+// absents injectés (`plafonds: null`).
 describe("composition: PLAFONDS_USAGE nul, échec fermé", () => {
   it("sans plafonds posés, la source réelle rend unavailable sans transaction ni client", async () => {
     const source = creerSourceLecture({
+      plafonds: null,
       env: ENV_REEL,
       transaction: () => () => Promise.reject(new Error("aucune transaction attendue")),
       clients: () => {

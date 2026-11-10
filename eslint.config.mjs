@@ -150,13 +150,17 @@ const F11C_FILES = [
  * aussi, module pur qui n'importe que des types de @/contracts. M4-suite-front (T-M4S-1 et T-M4S-2 de la spécification
  * M4-suite, § 12 ; décision 0151 § 6) : `@/domain/changement-de-ville`, dont la Journée lit le chevauchement à l'affichage
  * (chargé à la demande) et dont l'écran 1 appelle la détection du départ saisi ; il n'importe à l'exécution que des modules
- * purs de `src/domain` et `@/contracts/values`, ni `zod` ni `src/server` (`configuration` en type seulement).
+ * purs de `src/domain` et `@/contracts/values`, ni `zod` ni `src/server` (`configuration` en type seulement). M8a (décision
+ * 0160 § 1.5 point 4, ticket 1062) : `@/domain/apres-voyage`, étapes à évaluer et accès de l'écran 16, une seule
+ * implémentation pour l'écran, le serveur et `mock` (types de @/contracts seulement). M8b (décision 0160 § 1.4 point 2,
+ * ticket 1111) : `@/domain/lieu-a-soi`, prédicat unique `estLieuASoi` (lieu à soi et adresse découverte) sans copie côté
+ * navigateur (types de @/contracts et de @/contracts/values seulement).
  */
 const CLIENT_DOMAIN_PATTERN = {
   regex:
-    "^(@/domain/(?!(preferences|villes-du-voyage|changement-de-ville)$)|(\\.{1,2}/)+(.*/)?domain/(?!(preferences|villes-du-voyage|changement-de-ville)$))",
+    "^(@/domain/(?!(preferences|villes-du-voyage|changement-de-ville|apres-voyage|lieu-a-soi)$)|(\\.{1,2}/)+(.*/)?domain/(?!(preferences|villes-du-voyage|changement-de-ville|apres-voyage|lieu-a-soi)$))",
   message:
-    "Depuis le code chargé par le navigateur, seuls @/domain/preferences, @/domain/villes-du-voyage et @/domain/changement-de-ville s'importent de src/domain (décisions 0112 § 2 point 2, 0148 § 6 point 3 et 0151 § 6).",
+    "Depuis le code chargé par le navigateur, seuls @/domain/preferences, @/domain/villes-du-voyage, @/domain/changement-de-ville, @/domain/apres-voyage et @/domain/lieu-a-soi s'importent de src/domain (décisions 0112 § 2 point 2, 0148 § 6 point 3, 0151 § 6 et 0160 § 1.4 point 2 et § 1.5 point 4).",
 };
 
 /** Imports interdits : en configuration plate, le dernier bloc remplace les précédents, d'où une seule fonction. */
@@ -227,6 +231,23 @@ const MARQUES_SYNTAX = [...CANONICAL_EMAIL_SYNTAX, ...GARDES_SYNTAX];
 const GARDE_OUVERTE_EXEMPTES = ["src/server/p0/garde.ts", "tests/**"];
 
 /**
+ * M9b (décision 0007, « Suppression de compte » ; handover back-end § 3 ; revue de #1108, bloquant 2) : le nom de la
+ * fonction de purge d'une organisation n'apparaît, dans une chaîne ou un gabarit, que dans `src/server/account/delete.ts`
+ * (cas d'usage `deleteAccount`), dans `db/` (schéma et migrations) et dans les tests de `tests/` (qui éprouvent la
+ * fonction elle-même). Le nom est assemblé ici pour que ce fichier ne le contienne pas. Posée par le bloc commun, ses
+ * blocs d'exemption, un bloc pour les fichiers JavaScript, et reprise par chaque bloc plus bas qui règle
+ * `no-restricted-syntax` (tests/unit/lint/purge-lint.test.ts).
+ */
+const PURGE_NOM = ["purge", "organization", "data"].join("_");
+const PURGE_MESSAGE = `${PURGE_NOM} n'est nommée que par src/server/account/delete.ts et db/ (décision 0007) : la purge d'une organisation passe par le cas d'usage deleteAccount.`;
+const PURGE_SYNTAX = [
+  { selector: `Literal[value=/${PURGE_NOM}/]`, message: PURGE_MESSAGE },
+  { selector: `TemplateElement[value.raw=/${PURGE_NOM}/]`, message: PURGE_MESSAGE },
+];
+/** Fichiers où le nom de la fonction de purge est admis ; `tests/**` l'est aussi (bloc de `GARDE_OUVERTE_EXEMPTES`). */
+const PURGE_ADMIS = ["src/server/account/delete.ts", "db/**"];
+
+/**
  * B5a (décision 0045 § 3, B5-TL-3 ; handover § 3) : `src/domain` sans entrée-sortie. Liste blanche des imports
  * (`import`, `import type`, `export … from`) : `@/contracts` et ses sous-chemins, `zod`, fichiers de `src/domain`
  * (`@/domain/*` ou relatif sans remonter), et `vitest` pour les seuls `*.test.ts`. Constructions refusées : `process`
@@ -257,6 +278,7 @@ function domainSansEntreeSortie(avecVitest) {
       { selector: "CallExpression[callee.name='require']", message: io },
       { selector: "ImportExpression", message: io },
       ...MARQUES_SYNTAX,
+      ...PURGE_SYNTAX,
     ],
   };
 }
@@ -287,17 +309,32 @@ export default defineConfig([
     // tests compris. Repris par les blocs plus bas qui règlent `no-restricted-syntax` (src/domain, adaptateurs simulés).
     // P0r3b (décision 0055, section 1 point 2) : même règle pour `GardeOuverte`, fabriquée par `src/server/p0/garde.ts`
     // seul, tests de `tests/` exceptés (deux blocs suivants).
+    // M9b (décision 0007) : même règle, même bloc, pour le nom de la fonction de purge (`PURGE_SYNTAX`), admis dans
+    // `PURGE_ADMIS` et dans `tests/` ; les fichiers JavaScript, hors de ce bloc, ont le leur.
     files: ["**/*.{ts,tsx,mts,cts}"],
-    ignores: ["src/server/email.ts", ...GARDE_OUVERTE_EXEMPTES],
+    ignores: ["src/server/email.ts", ...GARDE_OUVERTE_EXEMPTES, ...PURGE_ADMIS],
+    rules: { "no-restricted-syntax": ["error", ...MARQUES_SYNTAX, ...PURGE_SYNTAX] },
+  },
+  {
+    files: PURGE_ADMIS.map((chemin) => (chemin.endsWith("/**") ? `${chemin}/*.{ts,tsx,mts,cts}` : chemin)),
     rules: { "no-restricted-syntax": ["error", ...MARQUES_SYNTAX] },
   },
   {
     files: ["src/server/email.ts"],
-    rules: { "no-restricted-syntax": ["error", ...GARDES_SYNTAX] },
+    rules: { "no-restricted-syntax": ["error", ...GARDES_SYNTAX, ...PURGE_SYNTAX] },
   },
   {
-    files: GARDE_OUVERTE_EXEMPTES,
+    files: ["src/server/p0/garde.ts"],
+    rules: { "no-restricted-syntax": ["error", ...CANONICAL_EMAIL_SYNTAX, ...PURGE_SYNTAX] },
+  },
+  {
+    files: ["tests/**"],
     rules: { "no-restricted-syntax": ["error", ...CANONICAL_EMAIL_SYNTAX] },
+  },
+  {
+    files: ["**/*.{js,jsx,mjs,cjs}"],
+    ignores: ["db/**", "tests/**"],
+    rules: { "no-restricted-syntax": ["error", ...PURGE_SYNTAX] },
   },
   {
     // B3a (décision 0050, B3-TL-1 point 6 ; revue Sécurité de #243, 0006 § 3) : directive "use server" refusée dans
@@ -373,6 +410,7 @@ export default defineConfig([
           message: "Service worker : seul /sw-route.js est importé ; aucun script d'une autre origine (F10-TL-5).",
         },
         { selector: "ImportExpression", message: "Service worker : aucun import dynamique (F10-TL-5)." },
+        ...PURGE_SYNTAX,
       ],
     },
   },
@@ -473,6 +511,7 @@ export default defineConfig([
           message: "Horloge de la portée seulement (option now) : pas de new Date() (décision 0020 § 2.2).",
         },
         ...MARQUES_SYNTAX,
+        ...PURGE_SYNTAX,
       ],
     },
   },
@@ -966,6 +1005,54 @@ export default defineConfig([
         "error",
         {
           paths: [{ ...CONTRACTS_PATH, message: "src/domain/preferences.ts : types seulement depuis @/contracts (décision 0112 § 2 point 2)." }],
+        },
+      ],
+    },
+  },
+  {
+    // M8a (décision 0160 § 1.5 point 4) : `src/domain/apres-voyage.ts`, chargé par le navigateur, n'importe que des types de
+    // @/contracts et de @/contracts/values (même règle que `src/domain/preferences.ts`).
+    files: ["src/domain/apres-voyage.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^(?!@/contracts(/values)?$)",
+              message: "src/domain/apres-voyage.ts : types de @/contracts et de @/contracts/values seulement (décision 0160 § 1.5 point 4).",
+            },
+          ],
+        },
+      ],
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [{ ...CONTRACTS_PATH, message: "src/domain/apres-voyage.ts : types seulement depuis @/contracts (décision 0160 § 1.5 point 4)." }],
+        },
+      ],
+    },
+  },
+  {
+    // M8b (décision 0160 § 1.4 point 2) : `src/domain/lieu-a-soi.ts`, chargé par le navigateur, n'importe que des types de
+    // @/contracts et de @/contracts/values (même règle que `src/domain/preferences.ts`).
+    files: ["src/domain/lieu-a-soi.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^(?!@/contracts(/values)?$)",
+              message: "src/domain/lieu-a-soi.ts : types de @/contracts et de @/contracts/values seulement (décision 0160 § 1.4 point 2).",
+            },
+          ],
+        },
+      ],
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [{ ...CONTRACTS_PATH, message: "src/domain/lieu-a-soi.ts : types seulement depuis @/contracts (décision 0160 § 1.4 point 2)." }],
         },
       ],
     },

@@ -13,7 +13,7 @@ import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { formatTripDates } from "@/lib/dates";
 
-import { classifyTrips, reopenTarget, tripToday, type TripSections } from "./trips";
+import { classifyTrips, reopenTarget, reviewLinkShown, tripToday, type ReviewLink, type TripSections } from "./trips";
 
 const t = messages.mesVoyages;
 
@@ -30,6 +30,11 @@ export interface TripsScreenProps {
    * absent de la liste n'a pas de lien « Voir le reçu ».
    */
   receiptHrefs?: Readonly<Record<string, string>>;
+  /**
+   * Écran 16 (M8a) : identifiant du voyage → lien « Donner ton avis », lu par la page pour les voyages qui ont cet écran ;
+   * affiché à partir du dernier jour du voyage (`reviewLinkShown`). Absent : aucun lien.
+   */
+  reviewLinks?: Readonly<Record<string, ReviewLink>>;
   /** Horloge injectable (tests) ; `Date.now` par défaut. Fonction stable. */
   now?: () => number;
   /**
@@ -64,18 +69,26 @@ function Title({ embedded }: { embedded: boolean }) {
   );
 }
 
+/**
+ * Ligne d'un voyage. **Ordre des liens** (M8a, revue de la PR 1068, mineur 15 ; à consigner dans la décision par le Tech
+ * Lead) : le lien du voyage d'abord (seul lien à nom long, celui que la tabulation atteint en premier), puis « Donner ton
+ * avis » (geste du voyage terminé, propre à l'écran 16), puis « Voir le reçu » (document, B4d). Chacun est un lien distinct,
+ * jamais imbriqué dans celui du voyage ; les tests e2e de « Mes voyages » comptent les liens dans cet ordre.
+ */
 function TripRow({
   summary,
   section,
   href,
   dates,
   receiptHref,
+  reviewHref,
 }: {
   summary: TripSummary;
   section: SectionKey;
   href: string;
   dates: string;
   receiptHref: string | undefined;
+  reviewHref: string | undefined;
 }) {
   const mention =
     section === "locked" ? t.mentions.premieresPropositions : section === "past" && !summary.unlocked ? t.mentions.nonDebloque : null;
@@ -108,6 +121,13 @@ function TripRow({
         ) : null}
       </Link>
       {/* Lien à part, jamais dans le lien du voyage (pas de lien imbriqué) ; nom accessible avec la destination. */}
+      {reviewHref ? (
+        <Button asChild variant="text" size="sm" className="mb-2 px-0">
+          <Link href={reviewHref} aria-label={format(t.avisNom, { destination: summary.destination })} data-part="avis">
+            {t.avis}
+          </Link>
+        </Button>
+      ) : null}
       {receiptHref ? (
         <Button asChild variant="text" size="sm" className="mb-2 px-0">
           <Link href={receiptHref} aria-label={format(t.recuNom, { destination: summary.destination })} data-part="recu">
@@ -140,11 +160,13 @@ function Sections({
   now,
   targetOf,
   receiptHrefs,
+  reviewLinks,
 }: {
   sections: TripSections;
   now: number;
   targetOf: (summary: TripSummary) => string;
   receiptHrefs: Readonly<Record<string, string>>;
+  reviewLinks: Readonly<Record<string, ReviewLink>>;
 }) {
   return (
     <>
@@ -175,6 +197,7 @@ function Sections({
                   href={targetOf(summary)}
                   dates={tripDates(summary, now)}
                   receiptHref={Object.hasOwn(receiptHrefs, summary.id) ? receiptHrefs[summary.id] : undefined}
+                  reviewHref={reviewHrefOf(summary, reviewLinks, now)}
                 />
               ))}
             </ul>
@@ -193,8 +216,15 @@ function Sections({
  * navigateur (mémoire du fournisseur, perdue au rechargement). Rendus et textes provisoires (UX/UI, Q154).
  */
 const AUCUN_RECU: Readonly<Record<string, string>> = {};
+const AUCUN_AVIS: Readonly<Record<string, ReviewLink>> = {};
 
-export function TripsScreen({ trips, createHref, receiptHrefs = AUCUN_RECU, now: clock, embedded = false }: TripsScreenProps) {
+/** Adresse de « Donner ton avis » pour ce voyage à cet instant, ou `undefined`. */
+function reviewHrefOf(summary: TripSummary, links: Readonly<Record<string, ReviewLink>>, now: number): string | undefined {
+  const link = Object.hasOwn(links, summary.id) ? links[summary.id] : undefined;
+  return link && reviewLinkShown(summary, now) ? link.href : undefined;
+}
+
+export function TripsScreen({ trips, createHref, receiptHrefs = AUCUN_RECU, reviewLinks = AUCUN_AVIS, now: clock, embedded = false }: TripsScreenProps) {
   const now = useClientNow(clock ? { now: clock } : undefined);
   const memory = useOptionalTripSession();
 
@@ -224,7 +254,7 @@ export function TripsScreen({ trips, createHref, receiptHrefs = AUCUN_RECU, now:
             </Button>
           </div>
         ) : null}
-        <Sections sections={classifyTrips(trips, now)} now={now} targetOf={targetOf} receiptHrefs={receiptHrefs} />
+        <Sections sections={classifyTrips(trips, now)} now={now} targetOf={targetOf} receiptHrefs={receiptHrefs} reviewLinks={reviewLinks} />
       </>
     );
   }

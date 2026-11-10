@@ -1,6 +1,6 @@
 import { isProductionDeployment, isProductionTarget, prototypeAdapterAllowed } from "@/dev/flags";
 
-import { betterAuthAllowed } from "./auth-guard";
+import { betterAuthAllowed, betterAuthLocalOuCi } from "./auth-guard";
 
 /**
  * Garde du paiement simulé (décision 0020 § 2.3), **fermée par défaut**, fonctions pures.
@@ -55,9 +55,9 @@ export function paymentAvailable(env: NodeJS.ProcessEnv = process.env): boolean 
   const donnees = adapterChoice(env.DATA_ADAPTER);
   if (paiement === "simulated") {
     // Webhook simulé ouvert : même règle que `webhookSimuleOuvert` de `src/server/env/payment.ts` (drapeau à exactement
-    // `true`, environnement `local` ou `ci` par `betterAuthAllowed`), recalculée ici sans importer `src/server/env`, que
+    // `true`, environnement `local` ou `ci` par `betterAuthLocalOuCi` : la préversion `mvp-essai` ne l'ouvre pas, 0169 § 6), recalculée ici sans importer `src/server/env`, que
     // `src/features` ne doit pas atteindre (test « p0: clé côté serveur seulement ») ; la clé n'est jamais lue.
-    const webhookOuvert = env.SIMULATED_WEBHOOK_ENABLED === "true" && betterAuthAllowed(env);
+    const webhookOuvert = env.SIMULATED_WEBHOOK_ENABLED === "true" && betterAuthLocalOuCi(env);
     return paymentDemoAllowed(env) && donnees === "api" && adapterChoice(env.AUTH_ADAPTER) === "better-auth" && webhookOuvert;
   }
   if (paiement === "stripe") {

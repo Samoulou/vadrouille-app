@@ -2,7 +2,7 @@
 
 Statut : **proposition du CEO, non tranchée, en attente de Samuel (Q357)**. Le code qu'elle décrit est livré éteint et peut être fusionné ; l'activation en production reste sous conditions (section « Conditions d'activation »).
 
-Date : 2026-11-09, amendée le 2026-11-10 après les revues de la PR #1102 (heads `280c548` et `ef5d033`) · Rédacteur : CEO · Répond **en partie** à Q357 (encaissement, conditions), qui reste ouverte. La date d'ouverture (1er février 2027) et les règles de remboursement (point 4) sont **provisoires** jusqu'à la réponse de Samuel.
+Date : 2026-11-09, amendée le 2026-11-10 après les revues de la PR #1102 (heads `280c548`, `ef5d033` et `71ccfda`) · Rédacteur : CEO · Répond **en partie** à Q357 (encaissement, conditions), qui reste ouverte. La date d'ouverture (1er février 2027) et les règles de remboursement (point 4) sont **provisoires** jusqu'à la réponse de Samuel.
 
 ## Source de la délégation
 
@@ -31,12 +31,14 @@ Ces messages ne sont pas lisibles depuis le dépôt : un relecteur ne peut pas l
 
 ## Écarts à `docs/commercial/page-prevente.md`
 
-La page livrée s'écarte de la source sur les points suivants ; chacun est une proposition, à valider par le commercial et l'UX/UI, ou à revenir en arrière :
+La page livrée s'écarte de la source sur les points suivants ; chacun est une proposition, à valider par Samuel (Q357), ou à revenir en arrière :
 
 - **Section « destinations » ajoutée** (« Toute l'Europe, jour par jour », quatre exemples : Édimbourg, Lisbonne, Rome, Zakynthos). Ce sont des exemples illustratifs, pas des programmes disponibles ; le texte de la section le dit.
 - **« Des remplacements »** au lieu de « Jusqu'à [N] remplacements » : N n'est pas tranché (Q88).
 - **Sections ajoutées** : bandeau d'ouverture, trois atouts sous le bouton, cadre de téléphone avec une journée d'exemple (étiquetée « Exemple de journée, pour illustrer »), « Trois gestes, un programme ».
 - **Sections omises** : § 2 « Un programme pensé pour être suivi » ; question « Que devient ce que je saisis ? » (elle attend le texte sur les données, condition d'activation) ; boutons « Payer avec TWINT » et « Payer par carte » (le choix se fait sur la page hébergée de Stripe) ; lien « À réserver ».
+- **Sous-titre remplacé.** La source dit « Précommande ton voyage complet pour le printemps : 29 CHF, utilisable dès le [DATE D'OUVERTURE] » ; la page affiche un texte de présentation (« Raconte ton voyage en quelques phrases… ») où la « Promesse » de la source est fusionnée. Le prix et la date figurent dans le bouton, le bandeau et le bloc prix.
+- **Remboursement sur simple demande avant l'ouverture** : la question « Et si je change d'avis avant l'ouverture ? », l'atout « Remboursé si ce n'est pas prêt » et la phrase de remboursement de la page « Merci » promettent plus que la source, qui ne prévoit pas cette règle (non tranchée). Proposition du CEO, provisoire, en attente de Samuel (Q357) ; la réponse de Samuel est une condition d'activation.
 - **Titre principal scindé** en deux lignes (« Ton voyage, » puis « de l'hôtel à la soirée. ») ; réponses des questions fréquentes raccourcies.
 - **Titre final** : « Ton printemps se prépare dès le 1er février » au lieu de « dès janvier », pour ne pas contredire la date d'ouverture.
 - **Badge du téléphone** : « Objectif : aucun trou dans ta journée », formulé en objectif tant que G0 n'est pas passé.
@@ -44,12 +46,28 @@ La page livrée s'écarte de la source sur les points suivants ; chacun est une 
 
 ## Écarts au design system Ligne (écran non maquetté)
 
-Outre la police Fraunces (point 6), cette seule page emploie : un mot d'accent en italique et en couleur `quai` dans le titre principal ; des surtitres en majuscules ; des ombres portées (cadre du téléphone, badge, plaques, ticket de prix) ; `line` et `quai` comme décor (halos, filet des étapes, badge) et non comme seule couleur d'action ; quatre plaques de destination inclinées sur un même écran ; des opacités sur du texte secondaire en fond `ink` ; des valeurs hors tokens (`clamp()` pour les titres, rayons du cadre du téléphone, flou des halos). Sur les fonds `ink`, le contour de focus est en `quai` (le contour global `line` y est sous 3:1). Validés par l'UX/UI à la revue du head `ef5d033` comme décision d'écran non maquetté, à condition d'être écrits ici. Le fil « Retirer le look IA du design » reprend ensuite cette page (décision 0170).
+**Dérogations proposées, en attente de Samuel (Q357).** Aucune n'est validée par l'UX/UI, qui ne déroge pas aux règles de Ligne : une dérogation revient à Samuel. `docs/design-system/README.md` interdit les capitales, l'italique et le mot isolé en couleur dans un titre (l. 39) et les ombres (l. 45). Le code ne se fusionne donc qu'éteint, comme le dit le statut. Origine : le refus par Samuel de la première forme (message du 2026-11-10 06:30 UTC ci-dessus), puis, sur les captures de la forme actuelle, son message du 2026-11-10 06:50 UTC dans le même fil : « C'est déjà beaucoup mieux ! » (rapporté sans identifiant, non lisible depuis le dépôt).
+
+Outre la police Fraunces (point 6), cette seule page emploie :
+
+- un mot d'accent en italique et en couleur `quai` dans le titre principal ;
+- des titres en graisse `font-black` avec `tracking-tight` ;
+- des surtitres en majuscules (cadre du téléphone, bloc prix) ;
+- des ombres portées (cadre du téléphone, badge, plaques, ticket de prix) ;
+- des rotations : cadre du téléphone (`lg:rotate-2`), badge (`-rotate-3`), quatre plaques de destination inclinées sur un même écran ;
+- `line` et `quai` comme décor (halos, filet des étapes, badge) et non comme seule couleur d'action ;
+- des opacités sur du texte secondaire en fond `ink` ;
+- des valeurs hors tokens (`clamp()` pour les titres, rayons du cadre du téléphone, flou des halos) ;
+- la section « prix » en forme de ticket (ombre, surtitre en majuscules) ;
+- sur les fonds `ink`, un contour de focus en `quai` au lieu de l'anneau `focus` (README l. 68) : `quai` #f6c744 sur `ink` #0e1b30 = 10,8:1, alors que le contour global `line` y est à 2,75:1, sous 3:1.
+
+Le fil « Retirer le look IA du design » reprend ensuite cette page (décision 0170) et peut retirer tout ou partie de ces écarts.
 
 ## Conditions d'activation (`PREVENTE=1` en production)
 
 Aucune n'est remplie par cette PR. Toutes sont requises avant de poser la variable :
 
+- **Réponse de Samuel à Q357** sur la date d'ouverture (1er février 2027), sur les règles de remboursement (point 4, y compris le remboursement sur simple demande avant l'ouverture) et sur les dérogations au design system ci-dessus. La page affiche ces conditions comme acquises : elle ne s'allume pas avant (`page-prevente.md`, marqueur « sous réserve »).
 - **Mentions du vendeur** sur la page (nom, adresse de contact), conditions de vente et information sur les données : textes à écrire, nom et adresse à fournir par Samuel.
 - **Lien de paiement Stripe** (29 CHF, TWINT et carte, adresse de retour `/precommande/merci`), créé dans le compte de Samuel, **avec les reçus par e-mail activés et une adresse de contact du vendeur sur le reçu** : la page « Merci » et les questions fréquentes y renvoient. Le lien n'est contrôlé que sur son hôte et un chemin non vide : tout compte Stripe passerait, la variable est posée par Samuel ou le CEO seulement.
 - **Offre Vercel** : l'offre gratuite interdit l'usage commercial (0163) ; offre payante avant le premier paiement réel, avec l'accord explicite de Samuel pour la dépense.

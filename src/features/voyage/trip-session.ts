@@ -1,4 +1,4 @@
-import type { PaymentMethod } from "@/contracts/values";
+import type { PaymentMethod, StopRating } from "@/contracts/values";
 
 /**
  * Session de l'onglet, rangée par voyage (décision 0020 § 8). Réducteur pur, sans React ni stockage.
@@ -28,6 +28,8 @@ export interface TripSessionEntry {
   checkouts: ReadonlyMap<string, StartedCheckout>;
   /** Dernier onglet consulté dans cet onglet du navigateur (F11a). */
   lastTab?: LastTab;
+  /** Avis rapides de l'écran 16 sur `mock` (M8a ; 0021 § 4) : identifiant d'étape → valeur ; perdus au rechargement. */
+  reviews?: ReadonlyMap<string, StopRating>;
 }
 
 export type TripSessionState = ReadonlyMap<string, TripSessionEntry>;
@@ -87,4 +89,22 @@ export function recordLastTab(state: TripSessionState, tripId: string, tab: Last
 /** Dernier onglet consulté du voyage, ou `undefined`. */
 export function lastTabOf(state: TripSessionState, tripId: string): LastTab | undefined {
   return state.get(tripId)?.lastTab;
+}
+
+/** Avis de l'onglet pour le voyage (M8a, `mock`) ; vide s'il n'y en a aucun. */
+export function reviewsOf(state: TripSessionState, tripId: string): ReadonlyMap<string, StopRating> {
+  return state.get(tripId)?.reviews ?? new Map();
+}
+
+/** Enregistre (ou efface, `null`) l'avis sur une étape ; état inchangé (même référence) s'il l'était déjà. */
+export function recordReview(state: TripSessionState, tripId: string, stopId: string, rating: StopRating | null): TripSessionState {
+  const entry = entryOf(state, tripId);
+  const current = entry.reviews?.get(stopId) ?? null;
+  if (current === rating) return state;
+  const reviews = new Map(entry.reviews);
+  if (rating === null) reviews.delete(stopId);
+  else reviews.set(stopId, rating);
+  const next = new Map(state);
+  next.set(tripId, { ...entry, reviews });
+  return next;
 }
