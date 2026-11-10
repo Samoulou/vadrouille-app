@@ -293,6 +293,32 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // Pages légales de la précommande (ticket 1125) : absentes (404) tant que `PREVENTE` ne vaut pas `1` ou que
+    // l'identité du vendeur manque, ce qui est le cas de tout build mesuré (CI, poste).
+    id: "R-precommande-mentions",
+    path: "/precommande/mentions-legales",
+    page: "precommande/mentions-legales/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    id: "R-precommande-conditions",
+    path: "/precommande/conditions-de-vente",
+    page: "precommande/conditions-de-vente/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    id: "R-precommande-donnees",
+    path: "/precommande/donnees",
+    page: "precommande/donnees/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     id: "R-introuvable",
     path: "/voyages/inconnu",
     status: 404,
