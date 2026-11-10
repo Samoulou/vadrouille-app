@@ -112,7 +112,7 @@ export type AccountDeleted = CompteSupprime;
  * l'organisation et la personne viennent de la session seule. Tout est dans `supprimerMonCompte`
  * (`src/server/account/delete.ts`), qui fixe l'ordre des contrôles ; erreurs : `not_found` (hors de `api` avec la connexion
  * réelle : la suppression n'est pas proposée sur `mock`), `unauthenticated`, `forbidden` (conseiller, organisation
- * partagée ; avec `field: "payment"` : paiement en attente, forme T6 à confirmer), `reauthentication_required`,
+ * partagée), `payment_pending` (paiement en attente, `retryable: true`), `reauthentication_required`,
  * `rate_limited`, `internal`. Après la réussite, plus aucune session n'existe ; le cookie est effacé si possible.
  */
 export async function deleteAccount(): Promise<Result<AccountDeleted>> {

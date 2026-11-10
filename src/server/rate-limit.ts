@@ -172,7 +172,7 @@ export function clesDeLaPersonne(secret: Buffer, config: RateLimitConfig, person
   return cles;
 }
 
-const ESTIMATION ="SELECT reltuples::bigint AS n FROM pg_catalog.pg_class WHERE oid = 'public.action_rate_limits'::regclass";
+const ESTIMATION = "SELECT reltuples::bigint AS n FROM pg_catalog.pg_class WHERE oid = 'public.action_rate_limits'::regclass";
 
 /** Pool de `vadrouille_app` de `db/` (fabrique gardée de `db/connection.ts`, environnement lu à l'appel). */
 const poolParDefaut = (): RateLimitPool => createDatabase("vadrouille_app").$client;

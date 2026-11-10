@@ -2125,7 +2125,7 @@ const FRONTIERE_P0R3B = {
     // entrées : décision 0055, section 1 point 2 ; suppression : décisions 0007 et 0167) : `deleteAccount` lit le limiteur
     // et la base (`src/server/account/delete.ts`), à côté de `requestCode`, `verifyCode`, `signOut` et `hasSession`. Même
     // propriété que les autres actions : `"use server"`, ses exports ne sont que des références vues du navigateur.
-    // Entrée relevée par `pnpm test` : verdict Sécurité à rendre à la revue de M9b.
+    // Entrée relevée par `pnpm test`. Verdict Sécurité et Tech Lead : acceptée, revue consolidée du head b601197 (PR 1108).
     { fichier: "src/server/actions/compte.ts", admise: (f: string, source: string) => directivesDuPrologue(f, source).includes("use server") },
     // B4a (ticket 531 ; décision 0097 B4-TL-3 point 5 et B4-TL-11) : webhook simulé, seul module importé par le route
     // handler `src/app/api/v1/webhooks/simulated/route.ts` (`ligne/route-handlers`) ; module `server-only` sans directive,

@@ -4,7 +4,7 @@ import type { AdapterContext, MemberRole } from "@/adapters/types";
 import type { Result } from "@/contracts";
 import { parseEmailAddress } from "@/server/email";
 import { errorNameOf, logEvent } from "@/server/log";
-import { oublierDansLeLimiteur, type PersonneDuLimiteur } from "@/server/rate-limit";
+import { oublierDansLeLimiteur, type PersonneDuLimiteur, type RateLimitClient, type RateLimitPool } from "@/server/rate-limit";
 import { executeurSql, withOrg } from "@/server/with-org";
 
 import { createDatabase } from "../../../db/index.ts";
@@ -20,7 +20,7 @@ import { createDatabase } from "../../../db/index.ts";
  *
  * Étapes, toutes rejouables :
  * 1. **Marque et purge métier**, une transaction `withOrg` (rôle `vadrouille_app`, contexte de la session) : refus si un
- *    paiement est en attente (§ 4.3 point 4, proposition ; forme T6 à confirmer), puis `SET LOCAL ROLE
+ *    paiement est en attente (§ 4.3 point 4 ; code `payment_pending`, revue de #1108, décision M9-TL à écrire), puis `SET LOCAL ROLE
  *    vadrouille_account_admin` et `purge_organization_data`, qui pose `deletion_requested_at` et supprime les données
  *    métier, `place_coordinates` comprise depuis la migration 0028 (décision 0167). Dès la validation de cette transaction,
  *    toute session de l'organisation est refusée (`readSession`) et aucune nouvelle session ne peut être créée.
@@ -58,7 +58,6 @@ export type EtatCompte =
       /** Autres organisations dont la personne est propriétaire (hors MVP : aucune). */
       readonly autresProprietes: number;
       readonly personnelle: boolean;
-      readonly enSuppression: boolean;
     };
 
 /** Suite donnée à un état : rien à faire, refus, retrait de la seule adhésion, ou suppression du compte. */
@@ -108,8 +107,8 @@ export const TENTATIVES_SUPPRESSION = 2;
 export function creerSuppressionCompte(ports: PortsSuppression): SuppressionCompte {
   async function tentative(ctx: Contexte): Promise<ResultatSuppression> {
     const etat = await ports.etat(ctx);
+    if (!etat.existe) return { ok: true, issue: "deja_supprime" };
     const decision = deciderSuppression(etat);
-    if (!etat.existe || decision === "absent") return { ok: true, issue: "deja_supprime" };
     if (decision === "forbidden") return { ok: false, code: "forbidden" };
     if (decision === "retrait") {
       await ports.retirerAdhesion(ctx);
@@ -153,6 +152,12 @@ export function creerSuppressionCompte(ports: PortsSuppression): SuppressionComp
  * Durée pendant laquelle un paiement `pending` est tenu pour « en attente » : celle de la session de paiement chez
  * Stripe (`EXPIRATION_SESSION_S` de `src/server/payment/stripe.ts` : 30 minutes de vie et 120 secondes de marge ; égalité
  * testée). Au-delà, il est lu `expired` (B4-PO-4), sauf paiement asynchrone en cours.
+ *
+ * **Écart voulu avec l'écran** (revue de #1108, point 5 ; à reprendre par M9c) : `dureeVieDe` de
+ * `src/server/payment/paiements.ts` lit le paiement `expired` dès 30 minutes, alors que la session Stripe peut encore
+ * être payée pendant la marge de 120 secondes. Entre la 30e et la 32e minute, l'écran affiche donc un paiement expiré et
+ * la suppression reste refusée (`payment_pending`, à réessayer) : le refus suit ce que Stripe peut encore encaisser, pas
+ * ce que l'écran affiche.
  */
 export const PAIEMENT_EN_ATTENTE_S = 30 * 60 + 120;
 
@@ -172,9 +177,8 @@ const SQL_PURGE = "SELECT public.purge_organization_data($1)";
 /** Identifiant de vérification de Better Auth 1.7.7 pour une adresse (`identifiantCode` de `src/server/auth`). */
 export const identifiantDeVerification = (email: string): string => `sign-in-otp-${email}`;
 
-/** Client et pool minimaux (`pg.PoolClient`, `pg.Pool`), comme ceux du limiteur. */
-export type ClientAuth = { query(texte: string, valeurs?: unknown[]): Promise<{ rows: unknown[] }>; release(erreur?: Error | boolean): void };
-export type PoolAuth = { query(texte: string, valeurs?: unknown[]): Promise<{ rows: unknown[] }>; connect(): Promise<ClientAuth> };
+/** Pool minimal (`pg.Pool`) : celui du limiteur (`RateLimitPool`), avec la requête directe sur le pool. */
+export type PoolAuth = RateLimitPool & Pick<RateLimitClient, "query">;
 
 export type BaseSuppression = {
   /** Pool du rôle `vadrouille_auth` (`createDatabase("vadrouille_auth").$client`). */
@@ -185,14 +189,13 @@ export type BaseSuppression = {
   readonly oublier: (personne: PersonneDuLimiteur) => Promise<void>;
 };
 
-type LigneEtat = { email: string; role: string | null; autres_membres: number; autres_proprietes: number; kind: string | null; en_suppression: boolean | null };
+type LigneEtat = { email: string; role: string | null; autres_membres: number; autres_proprietes: number; kind: string | null };
 
 const SQL_ETAT = `SELECT u.email,
   (SELECT m.role FROM memberships m WHERE m.user_id = u.id AND m.organization_id = $2::uuid LIMIT 1) AS role,
   (SELECT count(*)::int FROM memberships m WHERE m.organization_id = $2::uuid AND m.user_id <> u.id) AS autres_membres,
   (SELECT count(*)::int FROM memberships m WHERE m.user_id = u.id AND m.role = 'owner' AND m.organization_id <> $2::uuid) AS autres_proprietes,
-  (SELECT o.kind FROM organizations o WHERE o.id = $2::uuid) AS kind,
-  (SELECT o.deletion_requested_at IS NOT NULL FROM organizations o WHERE o.id = $2::uuid) AS en_suppression
+  (SELECT o.kind FROM organizations o WHERE o.id = $2::uuid) AS kind
   FROM users u WHERE u.id = $1::uuid`;
 
 const SQL_ORGANISATION_EN_SUPPRESSION = `SELECT o.id::text AS id FROM memberships m JOIN organizations o ON o.id = m.organization_id
@@ -224,7 +227,6 @@ export function portsSuppressionSur(base: BaseSuppression): PortsSuppression {
         autresMembres: Number(ligne.autres_membres),
         autresProprietes: Number(ligne.autres_proprietes),
         personnelle: ligne.kind === "personal",
-        enSuppression: ligne.en_suppression === true,
       };
     },
     async organisationEnSuppression(userId) {
@@ -275,7 +277,11 @@ export function portsSuppressionSur(base: BaseSuppression): PortsSuppression {
   };
 }
 
-/** Bornes du pool `vadrouille_auth` de la suppression (mêmes garde-fous que les pools de `src/server/auth`). */
+/**
+ * Bornes du pool `vadrouille_auth` de la suppression (mêmes garde-fous que les pools de `src/server/auth`). Exploitation :
+ * ce pool s'ajoute aux deux de `src/server/auth/index.ts`, soit au plus 2 connexions de plus par instance, ouvertes
+ * seulement à la première suppression ou reprise (revue de #1108, point 8).
+ */
 const POOL_SUPPRESSION = { max: 2, connectionTimeoutMillis: 5_000, query_timeout: 10_000 } as const;
 
 let parDefaut: SuppressionCompte | undefined;
@@ -292,9 +298,6 @@ export function suppressionCompte(): SuppressionCompte {
 
 /** Nom d'action du limiteur (`src/server/config/limites.ts`). */
 export const ACTION_LIMITEUR_SUPPRESSION = "suppression";
-
-/** Champ de l'erreur `forbidden` d'un paiement en attente (forme T6 proposée : « `forbidden` avec une raison »). */
-export const CHAMP_PAIEMENT_EN_ATTENTE = "payment";
 
 export type CompteSupprime = { deleted: true };
 
@@ -333,7 +336,8 @@ function echec(erreur: unknown): Result<never> {
  * 4. organisation personnelle à un seul membre (M9-PO-2), sinon `forbidden` ;
  * 5. connexion récente (`reauthentification.ts`, moins de 10 minutes), sinon `reauthentication_required` ;
  * 6. limite `suppression` par personne, sinon `rate_limited` : seul refus qui débite ;
- * 7. paiement en attente : `forbidden`, `field: "payment"`, `retryable: true` (forme T6 à confirmer), rien supprimé.
+ * 7. paiement en attente : `payment_pending` (`retryable: true`), rien supprimé.
+ * Une exception de l'un de ces contrôles (session, base, connexion récente, limiteur) donne `internal`, rien supprimé.
  * Échec de la base après la relance interne : `internal` (`retryable: true`) et une ligne `compte.suppression_failed`.
  */
 export async function supprimerMonCompte(d: DependancesActionSuppression): Promise<Result<CompteSupprime>> {
@@ -352,8 +356,12 @@ export async function supprimerMonCompte(d: DependancesActionSuppression): Promi
   } catch (erreur) {
     return echec(erreur);
   }
-  if (!(await d.connexionRecente(session.sessionId, d.maintenant()))) return refus("reauthentication_required");
-  if (!(await d.limiteur(ctx.userId)).ok) return { ok: false, error: { code: "rate_limited", retryable: true } };
+  try {
+    if (!(await d.connexionRecente(session.sessionId, d.maintenant()))) return refus("reauthentication_required");
+    if (!(await d.limiteur(ctx.userId)).ok) return { ok: false, error: { code: "rate_limited", retryable: true } };
+  } catch (erreur) {
+    return echec(erreur);
+  }
   let resultat: ResultatSuppression;
   try {
     resultat = await d.compte.supprimer(ctx);
@@ -361,7 +369,7 @@ export async function supprimerMonCompte(d: DependancesActionSuppression): Promi
     return echec(erreur);
   }
   if (!resultat.ok) {
-    if (resultat.code === "paiement_en_attente") return { ok: false, error: { code: "forbidden", field: CHAMP_PAIEMENT_EN_ATTENTE, retryable: true } };
+    if (resultat.code === "paiement_en_attente") return { ok: false, error: { code: "payment_pending", retryable: true } };
     return refus("forbidden");
   }
   await d.effacerCookie().catch(() => undefined);

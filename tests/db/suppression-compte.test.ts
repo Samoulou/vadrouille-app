@@ -16,21 +16,28 @@ import {
 import { creerControleConnexionRecente } from "@/server/account/reauthentification";
 import { RATE_LIMITS } from "@/server/config/limites";
 import { type CanonicalEmail } from "@/server/email";
+import type { NotificationMailer } from "@/server/mail/port";
+import { reveillerRappel } from "@/server/rappels/envoi";
+import type { EtatRappel } from "@/server/rappels/etat";
+import { reclamerRelais } from "@/server/rappels/relais";
 import { clesDeLaPersonne, createRateLimiter } from "@/server/rate-limit";
 import { creerContexteServeur } from "@/server/session";
 import { creerWithOrg } from "@/server/with-org";
 
 import { createDatabase } from "../../db/index";
-import { adresse, type Banc, canonique, connecter, demanderCode, preparerBanc } from "./auth-outils";
-import { closeAll, connect, createOrg, type DbClient, inTx } from "./helpers";
+import { adresse, type Banc, canonique, connecter, demanderCode, preparerBanc, URL_APPLICATION } from "./auth-outils";
+import { closeAll, connect, createOrg, type DbClient, insertSql, inTx, SNAPSHOT } from "./helpers";
 
 /**
- * « Supprimer mon compte » en base (spécification M9 § 6.3, critères 1 à 6, 8 à 11 ; handover § 12 ; ticket 1106, M9b) :
+ * « Supprimer mon compte » en base (spécification M9 § 6.3, critères 1 à 11 ; handover § 12 ; ticket 1106, M9b) :
  * le cas d'usage réel de `src/server/account/delete.ts` sur les rôles prévus (`vadrouille_app` puis
  * `vadrouille_account_admin` pour la purge, `vadrouille_auth` pour l'authentification, `vadrouille_limiter` pour le
  * limiteur), le cœur réel de l'action avec la session de Better Auth, et la reprise réelle de `verifyCode`
  * (`src/server/auth/reprise.ts`, branchée sur le cas d'usage du banc). Seuls l'horloge du contrôle de connexion récente
- * (critère 1) et les pannes (critère 4) sont injectés. Option A de Q48 : `billing` et `usage_ledger` restent.
+ * (critère 1) et les pannes (critère 4) sont injectés. Option A de Q48 : `billing` et `usage_ledger` restent. Critère 7
+ * (rappels) : le vrai code de réclamation du relais et du réveil (`src/server/rappels`, décision 0162) sur la base, avec
+ * un transport de capture ; la partie Mailpit de bout en bout (exécution durable réelle) est le ticket de suite 1118
+ * (dépendance M9c).
  *
  * Exemple commun (§ 6) : Samuel, connecté par un vrai code, organisation personnelle ; voyage d'Édimbourg débloqué, trois
  * versions, tri avec gestes, deux avis, un goût retenu, un accord aux rappels, un lien privé, un paiement `succeeded`, une
@@ -414,10 +421,10 @@ describe("compte: reprise (M9b, critère 4)", () => {
 });
 
 describe("compte: refus (M9b, critères 8, 9 et 10)", () => {
-  it("critère 8 : paiement en attente → refus (forbidden, champ payment), rien supprimé ; paiement expiré → suppression faite", async () => {
+  it("critère 8 : paiement en attente → refus (payment_pending), rien supprimé ; paiement expiré → suppression faite", async () => {
     const samuel = await ouvrirCompte("pending");
     const avant = await empreinte(samuel);
-    expect(await action(samuel)).toEqual({ ok: false, error: { code: "forbidden", field: "payment", retryable: true } });
+    expect(await action(samuel)).toEqual({ ok: false, error: { code: "payment_pending", retryable: true } });
     expect(await empreinte(samuel)).toEqual(avant);
     expect(await organisation(samuel.org)).toEqual({ existe: true, enSuppression: false, adhesions: 1 });
 
@@ -487,5 +494,76 @@ describe("compte: refus (M9b, critères 8, 9 et 10)", () => {
     expect(await action(samuel)).toEqual({ ok: false, error: { code: "rate_limited", retryable: true } });
     expect(await empreinte(samuel)).toEqual(avant);
     expect(await organisation(samuel.org)).toEqual({ existe: true, enSuppression: false, adhesions: 1 });
+  });
+});
+
+describe("compte: rappels après la suppression (M9b, critère 7 ; décision 0162)", () => {
+  // Identifiants d'exécution du Workflow SDK relevés par R-D (`tests/db/rappels-relais-reclamation.test.ts`).
+  const RUN_AVANT = "wrun_01M6ZWVHNG68KA5EAJ41PT0PCP";
+  const RUN_APRES = "wrun_01M6ZWVHNH0GN4PJ1KMK7TM95T";
+  // Voyage du 2027-05-01, `Europe/London` (heure d'été) : veille de J1 à 18:00 = 2027-04-30T17:00Z.
+  const VEILLE_J1 = Date.parse("2027-04-30T17:00:00.500Z");
+  const TABLES_RAPPELS = ["reminder_consents", "reminder_sends", "reminder_relays"];
+  const AUCUN_RAPPEL = { reminder_consents: 0, reminder_sends: 0, reminder_relays: 0 };
+
+  /** Voyage débloqué à venir avec un accord **actif** aux rappels, écrit par `vadrouille_app` : état de son exécution. */
+  async function accordActif(p: Personne): Promise<EtatRappel> {
+    const { tripId, consentId } = await inTx(client, { org: p.org, user: p.user }, async (c) => {
+      const t = insertSql("trips", { org: p.org, owner: p.user } as Parameters<typeof insertSql>[1]);
+      const trip = (await c.query(t.sql, t.params)).rows[0].id as string;
+      await c.query("INSERT INTO trip_versions (organization_id, trip_id, version, request_id, snapshot, author_kind) VALUES ($1, $2, 1, $3, $4, 'engine')", [p.org, trip, randomUUID(), JSON.stringify(SNAPSHOT)]);
+      await c.query("UPDATE trips SET current_version = 1 WHERE id = $1", [trip]);
+      const consent = (await c.query("INSERT INTO reminder_consents (organization_id, trip_id, user_id) VALUES ($1, $2, $3) RETURNING id", [p.org, trip, p.user])).rows[0].id as string;
+      return { tripId: trip, consentId: consent };
+    });
+    await admin.query("INSERT INTO entitlements (organization_id, trip_id, kind) VALUES ($1, $2, 'tripUnlocked')", [p.org, tripId]);
+    return { organizationId: p.org, tripId, userId: p.user, consentId };
+  }
+
+  it("compte: aucun rappel n'est préparé après la suppression (réclamation du relais et réveil réels)", async () => {
+    const withOrg = creerWithOrg(app);
+    const envois = vi.fn(async (message: Parameters<NotificationMailer["sendRappelVeille"]>[0]) => void message);
+    const mailer: NotificationMailer = { sendApercuPret: vi.fn(async () => undefined), sendRappelVeille: envois };
+    const deps = { composer: () => ({ mailer, origine: URL_APPLICATION }), maintenant: () => VEILLE_J1, withOrg };
+
+    // Deux comptes préparés de même : Samuel sera supprimé, le témoin non.
+    const samuel = await ouvrirCompte();
+    const temoin = await ouvrirCompte();
+    const etatSamuel = await accordActif(samuel);
+    const etatTemoin = await accordActif(temoin);
+
+    // Avant la suppression, l'accord de Samuel est actif : son exécution de relais réclame bien son rang.
+    expect(await reclamerRelais(etatSamuel, { relayN: 1, runId: RUN_AVANT }, { withOrg })).toBe("acquise");
+    expect(await comptes(samuel.org, TABLES_RAPPELS)).toEqual({ reminder_consents: 2, reminder_sends: 0, reminder_relays: 1 });
+
+    expect(await action(samuel)).toEqual({ ok: true, value: { deleted: true } });
+    expect(await authentification(samuel)).toEqual(AUCUNE);
+    expect(await comptes(samuel.org, TABLES_RAPPELS)).toEqual(AUCUN_RAPPEL);
+
+    const lignes: string[] = [];
+    for (const methode of ["log", "info", "warn", "error", "debug"] as const) {
+      vi.spyOn(console, methode).mockImplementation((...args: unknown[]) => void lignes.push(args.map(String).join(" ")));
+    }
+    // L'exécution déjà en cours (même rang, même identifiant) comme une exécution de relais suivante ne trouvent plus
+    // d'accord : « fin », ni « acquise », ni « doublon », ni « panne » (une panne ferait réessayer l'étape).
+    expect(await reclamerRelais({ ...etatSamuel, relayN: 1 }, { relayN: 1, runId: RUN_AVANT }, { withOrg })).toBe("fin");
+    expect(await reclamerRelais(etatSamuel, { relayN: 1, runId: RUN_APRES }, { withOrg })).toBe("fin");
+    expect(await reclamerRelais({ ...etatSamuel, relayN: 1 }, { relayN: 2, runId: RUN_APRES }, { withOrg })).toBe("fin");
+    // Le réveil du soir, la veille du premier jour : rien n'est réclamé, aucun envoi n'est préparé, et la suite est
+    // « fin » (pas « attendre ») : l'exécution se termine, elle ne boucle pas.
+    expect(await reveillerRappel(etatSamuel, deps)).toEqual({ suite: "fin" });
+    expect(await reveillerRappel({ ...etatSamuel, relayN: 1 }, deps)).toEqual({ suite: "fin" });
+    expect(envois).not.toHaveBeenCalled();
+    expect(await comptes(samuel.org, TABLES_RAPPELS)).toEqual(AUCUN_RAPPEL);
+    vi.restoreAllMocks();
+    expect(lignes.join("\n")).not.toMatch(/rappels\.relay_failed|email\.notification_failed/);
+    for (const ligne of lignes) for (const interdit of [samuel.email, samuel.user, samuel.org]) expect(ligne).not.toContain(interdit);
+
+    // Témoin non supprimé, même préparation, même réveil : le rappel part, à son adresse seule. Le contrôle ci-dessus
+    // n'est donc pas vide : seule la suppression explique l'absence d'envoi pour Samuel.
+    expect(await reveillerRappel(etatTemoin, deps)).toEqual({ suite: "attendre", attenteMs: 24 * 3_600_000 - 500 });
+    expect(envois).toHaveBeenCalledTimes(1);
+    expect(envois.mock.calls[0]?.[0]).toEqual({ to: temoin.email, origine: URL_APPLICATION, tripId: etatTemoin.tripId, dayIndex: 1 });
+    expect((await comptes(temoin.org, TABLES_RAPPELS)).reminder_sends).toBe(1);
   });
 });

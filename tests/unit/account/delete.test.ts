@@ -7,7 +7,6 @@ import { ApiErrorSchema } from "@/contracts";
 import * as messages from "@/i18n/messages";
 import {
   ACTION_LIMITEUR_SUPPRESSION,
-  CHAMP_PAIEMENT_EN_ATTENTE,
   creerSuppressionCompte,
   deciderSuppression,
   type DependancesActionSuppression,
@@ -38,16 +37,18 @@ const SESSION = "0d000000-0000-4000-8000-0000000000c2";
 const CTX = { organizationId: ORG, userId: MOI };
 const EMAIL = "samuel-m9b@exemple.test";
 
-const SEUL: EtatCompte = { existe: true, email: EMAIL, role: "owner", autresMembres: 0, autresProprietes: 0, personnelle: true, enSuppression: false };
+const SEUL: EtatCompte = { existe: true, email: EMAIL, role: "owner", autresMembres: 0, autresProprietes: 0, personnelle: true };
 
 type NomPort = keyof PortsSuppression;
 
 /** Ports simulés : journal des appels, état minimal, panne programmable par port. */
-function portsSimules(depart: EtatCompte = SEUL) {
+function portsSimules(depart: EtatCompte = SEUL, dejaEnSuppression = false) {
   const journal: string[] = [];
   const pannes = new Map<NomPort, number>();
   let etat: EtatCompte = depart;
   let paiement = false;
+  // Marque « suppression en cours » de l'organisation : hors de `EtatCompte`, lue par la seule reprise.
+  let enSuppression = dejaEnSuppression;
   const passer = (nom: NomPort) => {
     journal.push(nom);
     const restantes = pannes.get(nom) ?? 0;
@@ -63,12 +64,12 @@ function portsSimules(depart: EtatCompte = SEUL) {
     },
     async organisationEnSuppression() {
       passer("organisationEnSuppression");
-      return etat.existe && etat.enSuppression ? ORG : null;
+      return etat.existe && enSuppression ? ORG : null;
     },
     async purger() {
       passer("purger");
       if (paiement) return "paiement_en_attente";
-      if (etat.existe) etat = { ...etat, enSuppression: true };
+      enSuppression = true;
       return "purge";
     },
     async supprimerSessions() {
@@ -101,6 +102,7 @@ function portsSimules(depart: EtatCompte = SEUL) {
       paiement = valeur;
     },
     etat: () => etat,
+    enSuppression: () => enSuppression,
   };
 }
 
@@ -114,7 +116,6 @@ describe("deciderSuppression (M9-PO-2 ; handover § 12)", () => {
   it.each([
     ["personne absente", { existe: false }, "absent"],
     ["propriétaire seul d'une organisation personnelle", SEUL, "suppression"],
-    ["même état, organisation déjà en suppression", { ...SEUL, enSuppression: true }, "suppression"],
     ["aucune adhésion à l'organisation du contexte", { ...SEUL, role: null }, "forbidden"],
     ["propriétaire d'une organisation à deux membres", { ...SEUL, autresMembres: 1 }, "forbidden"],
     ["conseiller d'une organisation partagée", { ...SEUL, role: "member", autresMembres: 1 }, "retrait"],
@@ -193,7 +194,8 @@ describe("supprimer : reprise et idempotence (§ 4.3)", () => {
     const avant = ETAPES.slice(0, ETAPES.indexOf("supprimerComptes") + 1);
     expect(simule.journal).toEqual([...avant, ...avant]);
     // L'organisation est en suppression, la personne existe encore : rien n'est perdu pour la reprise.
-    expect(simule.etat()).toMatchObject({ existe: true, enSuppression: true });
+    expect(simule.etat()).toMatchObject({ existe: true });
+    expect(simule.enSuppression()).toBe(true);
     simule.journal.length = 0;
     expect(await compte.supprimer(CTX)).toEqual({ ok: true, issue: "supprime" });
     expect(simule.journal).toEqual(ETAPES);
@@ -204,7 +206,7 @@ describe("supprimer : reprise et idempotence (§ 4.3)", () => {
     await creerSuppressionCompte(calme.ports).reprendre(MOI);
     expect(calme.journal).toEqual(["organisationEnSuppression"]);
 
-    const enCours = portsSimules({ ...SEUL, enSuppression: true });
+    const enCours = portsSimules(SEUL, true);
     await creerSuppressionCompte(enCours.ports).reprendre(MOI);
     expect(enCours.journal).toEqual(["organisationEnSuppression", ...ETAPES]);
     expect(enCours.etat()).toEqual({ existe: false });
@@ -314,14 +316,33 @@ describe("supprimerMonCompte : ordre des contrôles (§ 6.3, critères 1 et 10)"
     expect(supprimer).not.toHaveBeenCalled();
   });
 
-  it("paiement en attente : forbidden avec le champ `payment`, cookie gardé ; erreur valide pour le contrat", async () => {
+  it("paiement en attente : payment_pending (retryable), cookie gardé ; erreur valide pour le contrat", async () => {
     const { d, appels, supprimer } = dependances();
     supprimer.mockResolvedValueOnce({ ok: false, code: "paiement_en_attente" });
     const resultat = await supprimerMonCompte(d);
-    expect(resultat).toEqual({ ok: false, error: { code: "forbidden", field: CHAMP_PAIEMENT_EN_ATTENTE, retryable: true } });
+    expect(resultat).toEqual({ ok: false, error: { code: "payment_pending", retryable: true } });
     expect(appels).not.toContain("effacerCookie");
     expect(ApiErrorSchema.safeParse(resultat.ok ? null : resultat.error).success).toBe(true);
     expect(messages.compte.suppression.paiementEnAttente).toBe("Un paiement est en cours. Réessaie quand il sera terminé.");
+  });
+
+  it.each(["connexionRecente", "limiteur"] as const)("exception de `%s` : internal (retryable), une ligne de journal, rien supprimé", async (controle) => {
+    const lignes: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => void lignes.push(args.map(String).join(" ")));
+    class PanneDeControleError extends Error {
+      override name = "PanneDeControleError";
+    }
+    const panne = async (): Promise<never> => {
+      throw new PanneDeControleError(`échec pour ${EMAIL} ${MOI}`);
+    };
+    const { d, appels, supprimer } = dependances({ [controle]: panne });
+    expect(await supprimerMonCompte(d)).toEqual({ ok: false, error: { code: "internal", retryable: true } });
+    expect(supprimer).not.toHaveBeenCalled();
+    expect(appels).not.toContain("supprimer");
+    expect(appels).not.toContain("effacerCookie");
+    expect(lignes).toHaveLength(1);
+    expect(JSON.parse(lignes[0] ?? "")).toMatchObject({ event: "compte.suppression_failed", errorName: "PanneDeControleError", level: "error" });
+    for (const interdit of [EMAIL, MOI, ORG, SESSION]) expect(lignes[0]).not.toContain(interdit);
   });
 
   it("organisation devenue partagée entre le contrôle et la suppression : forbidden", async () => {
