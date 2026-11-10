@@ -9,7 +9,7 @@ import {
   type Ref,
 } from "react";
 
-import type { Exception, Proposal } from "@/contracts";
+import type { Exception, Proposal, Trip } from "@/contracts";
 import type { PlacePhoto } from "@/contracts/photo";
 import { DETOUR_THRESHOLD_MINUTES } from "@/contracts/values";
 import {
@@ -27,7 +27,8 @@ import { releaseVelocity, type PointerSample } from "@/lib/pointer";
 import { cn } from "@/lib/utils";
 
 import { segmentLabel } from "./DayLine";
-import { IconCoeur, IconCroix, IconPhoto } from "./icons";
+import { DEST_COLORS } from "./DestinationPlate";
+import { IconCoeur, IconCroix } from "./icons";
 import { Tag } from "./Tag";
 
 const t = messages.presentation;
@@ -79,8 +80,13 @@ export interface DeckCardProps {
    * `null` : l'emplacement « photo » reste. Affichée avec ses auteurs et « Google Maps » (conditions de Places API).
    */
   photo?: PlacePhoto | null;
-  /** Photo demandée, pas encore arrivée : l'emplacement reste, sans icône ni libellé (aucun clignotement d'une carte à l'autre). */
+  /** Photo demandée, pas encore arrivée : l'emplacement reste, neutre et vide (aucun clignotement d'une carte à l'autre). */
   photoEnAttente?: boolean;
+  /**
+   * Couleur de la destination du voyage (`Trip.destinationColor`) : sans photo, l'emplacement devient un panneau de
+   * cette couleur portant le secteur du lieu (décision 0176). Absente : aplat `ink`.
+   */
+  couleur?: Trip["destinationColor"];
   /** « J'aime » ou « Je choisis ». */
   onLike: (gesture: Gesture) => void;
   /** « Pas pour moi » ou « Option suivante ». */
@@ -103,6 +109,7 @@ export function DeckCard({
   isLastOption = false,
   photo = null,
   photoEnAttente = false,
+  couleur,
   onLike,
   onDislike,
   onOpen,
@@ -119,6 +126,7 @@ export function DeckCard({
         ville={ville}
         photo={photo}
         photoEnAttente={photoEnAttente}
+        couleur={couleur}
         labels={labels}
         onDecide={(decision) => (decision === "like" ? onLike("swipe") : onDislike("swipe"))}
         onOpen={onOpen}
@@ -183,6 +191,7 @@ function SwipeCard({
   ville,
   photo,
   photoEnAttente,
+  couleur,
   labels,
   onDecide,
   onOpen,
@@ -193,6 +202,7 @@ function SwipeCard({
   ville: string | null;
   photo: PlacePhoto | null;
   photoEnAttente: boolean;
+  couleur?: Trip["destinationColor"];
   labels: Record<Decision, string>;
   onDecide: (decision: Decision) => void;
   onOpen: () => void;
@@ -370,15 +380,31 @@ function SwipeCard({
           </span>
         </span>
       ) : (
+        // Sans photo (décision 0176) : un panneau de la couleur de la destination, avec le secteur du lieu sur un bout de
+        // ligne, comme un nom de station. Décoratif : le secteur est déjà dans la ligne de faits. En attente : neutre et vide.
         <span
           aria-hidden="true"
           data-part="emplacement-photo"
-          className="flex h-(--ligne-deck-photo) min-h-(--ligne-deck-photo-min) shrink flex-col items-center justify-center gap-1 self-stretch bg-muted text-legende text-ink-soft"
+          data-etat={photoEnAttente ? "attente" : "sans-photo"}
+          className={cn(
+            "flex h-(--ligne-deck-photo) min-h-(--ligne-deck-photo-min) shrink flex-col justify-end gap-3 self-stretch overflow-hidden p-4",
+            photoEnAttente ? "bg-muted" : cn(couleur ? DEST_COLORS[couleur] : "bg-ink", "text-on-line"),
+          )}
         >
           {photoEnAttente ? null : (
             <>
-              <IconPhoto className="size-(--ligne-deck-icone-photo)" />
-              {t.carte.photo}
+              <span className="flex items-center">
+                <span className="size-(--ligne-stop) shrink-0 rounded-(--ligne-rayon-rond) border-(length:--ligne-stop-ring) border-on-line" />
+                <span className="h-(--ligne-rail) w-full bg-on-line" />
+              </span>
+              {stop.facts.area ? (
+                <span
+                  data-part="secteur"
+                  className="line-clamp-2 [font-family:var(--font-titrage),var(--font-sans)] text-titre-fiche font-semibold font-stretch-85% break-words"
+                >
+                  {stop.facts.area}
+                </span>
+              ) : null}
             </>
           )}
         </span>

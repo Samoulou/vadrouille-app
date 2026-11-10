@@ -226,6 +226,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
 
   const ranges = trip.otherCities.length > 0 ? cityRanges(trip) : null;
   const today = useAujourdhui();
+  // Séjour déjà saisi, teinté dans le calendrier de chaque champ de date (décision 0176).
+  const sejour = nightsOf(trip) === null ? null : { debut: trip.start, fin: trip.end };
   const bounds = today === null ? { start: {}, end: {}, city: {}, commitment: {} } : tripDateBounds(trip, today, essai);
   const nights = nightsOf(trip);
 
@@ -359,6 +361,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
             <TextField
               field="start"
               type="date"
+              sejour={sejour}
+              aujourdhui={today}
               label={e1.arrivee}
               value={trip.start}
               {...bounds.start}
@@ -368,6 +372,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
             <TextField
               field="end"
               type="date"
+              sejour={sejour}
+              aujourdhui={today}
               label={e1.depart}
               value={trip.end}
               {...bounds.end}
@@ -455,6 +461,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
                   <TextField
                     field={`${base}.arrival`}
                     type="date"
+                    sejour={sejour}
+                    aujourdhui={today}
                     label={e1.villes.arrivee}
                     value={city.arrival}
                     {...bounds.city}
@@ -571,6 +579,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
                 <TextField
                   field={`${base}.date`}
                   type="date"
+                  sejour={sejour}
+                  aujourdhui={today}
                   label={e1.engagements.date}
                   value={commitment.date}
                   {...bounds.commitment}

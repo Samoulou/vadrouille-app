@@ -85,6 +85,16 @@ export function IconPhoto(props: IconProps) {
   );
 }
 
+/** Calendrier : ouvre le calendrier de Ligne depuis un champ de date (décision 0176). */
+export function IconCalendrier(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M4 10h16M9 3v4M15 3v4" />
+    </Icon>
+  );
+}
+
 /** Coche de la case cochée de `ChecklistRow` (ChecklistRow/preview.html, trait 3). */
 export function IconCoche(props: IconProps) {
   return (
