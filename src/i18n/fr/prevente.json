@@ -1,6 +1,6 @@
 {
   "ouverture": "1er février 2027",
-  "bandeau": "Précommande ouverte · printemps 2027",
+  "bandeau": "Précommande · ouverture le 1er février 2027",
   "titre": {
     "avant": "Ton voyage,",
     "accent": "de l'hôtel à la soirée."
@@ -12,11 +12,11 @@
   "telephone": {
     "etiquette": "Exemple de journée, pour illustrer",
     "jour": "Jour 2",
-    "badge": "Aucun trou dans ta journée"
+    "badge": "Objectif : aucun trou dans ta journée"
   },
   "destinations": {
     "titre": "Toute l'Europe, jour par jour",
-    "texte": "Villes et régions d'Europe, pour un voyage de 5 à 10 jours. Quelques exemples de voyages.",
+    "texte": "Villes et régions d'Europe, pour un voyage de 5 à 10 jours. Quelques exemples de voyages, pour illustrer : ce ne sont pas des programmes déjà prêts.",
     "liste": [
       { "nom": "Édimbourg", "infos": "6 jours · fin août", "couleur": "bruyere" },
       { "nom": "Lisbonne", "infos": "5 jours · Pâques", "couleur": "azulejo" },
@@ -101,13 +101,13 @@
     ]
   },
   "final": {
-    "titre": "Ton printemps se prépare dès janvier",
-    "texte": "Pâques, l'Ascension, la Pentecôte : les voyages de printemps se préparent de janvier à mars. Précommande dès aujourd'hui, prépare ton voyage dès l'ouverture."
+    "titre": "Ton printemps se prépare dès le 1er février",
+    "texte": "Pâques, l'Ascension, la Pentecôte : précommande aujourd'hui, prépare ton voyage dès l'ouverture, le 1er février 2027."
   },
   "bientot": {
     "titreDocument": "Précommande · {produit}",
     "titre": "La précommande ouvre très bientôt",
-    "texte": "Le paiement n'est pas encore ouvert. Reviens dans quelques jours.",
+    "texte": "Le paiement n'est pas encore ouvert. Reviens bientôt.",
     "retour": "Revenir à l'accueil"
   },
   "merci": {

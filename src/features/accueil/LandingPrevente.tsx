@@ -58,8 +58,9 @@ function Precommander({
     <a
       href={href}
       className={cn(
-        "inline-flex min-h-14 items-center justify-center rounded-full px-8 text-arret font-extrabold whitespace-nowrap",
-        ton === "quai" ? "bg-quai text-ink" : "bg-ink text-on-line",
+        "inline-flex min-h-14 items-center justify-center rounded-full px-6 text-center text-arret font-extrabold sm:px-8",
+        // Sur fond `ink`, le contour de focus global (`line`) est illisible : contour `quai`.
+        ton === "quai" ? "bg-quai text-ink focus-visible:outline-quai" : "bg-ink text-on-line",
         className,
       )}
     >
@@ -119,7 +120,7 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
                 {demo ? (
                   <a
                     href="#demonstration"
-                    className="inline-flex min-h-14 items-center justify-center rounded-full border-2 border-on-line px-8 text-arret font-bold"
+                    className="inline-flex min-h-14 items-center justify-center rounded-full border-2 border-on-line px-8 text-arret font-bold focus-visible:outline-quai"
                   >
                     {t.demo}
                   </a>
@@ -227,14 +228,15 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
           >
             {t.etapes.titre}
           </h2>
-          <ol
-            role="list"
-            className="relative grid gap-8 lg:grid-cols-3 lg:gap-6"
-          >
+          <div className="relative">
             <span
               aria-hidden="true"
               className="absolute top-7 right-0 left-0 hidden h-1 bg-line lg:block"
             />
+          <ol
+            role="list"
+            className="relative grid gap-8 lg:grid-cols-3 lg:gap-6"
+          >
             {t.etapes.liste.map((etape, index) => (
               <li key={etape.titre} className="relative flex flex-col gap-4">
                 <span
@@ -255,6 +257,7 @@ export function LandingPrevente({ href, prix, demo }: LandingPreventeProps) {
               </li>
             ))}
           </ol>
+          </div>
         </div>
       </section>
 
