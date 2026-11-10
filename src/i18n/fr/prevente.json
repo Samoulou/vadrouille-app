@@ -8,37 +8,91 @@
   "sousTitre": "Raconte ton voyage en quelques phrases. {produit} te rend chaque journée prête à suivre : quoi faire, où manger, ce qui se passe pendant ton séjour.",
   "precommander": "Précommander pour {prix}",
   "demo": "Voir la démonstration",
-  "atouts": ["Paiement unique", "Remboursé si ce n'est pas prêt", "TWINT ou carte"],
+  "atouts": [
+    "Paiement unique",
+    "Remboursé si ce n'est pas prêt",
+    "TWINT ou carte"
+  ],
   "telephone": {
     "etiquette": "Exemple de journée, pour illustrer",
-    "jour": "Jour 2",
-    "badge": "Aucun trou dans ta journée"
+    "jour": "Jour 2"
   },
   "destinations": {
     "titre": "Toute l'Europe, jour par jour",
-    "texte": "Villes et régions d'Europe, pour un voyage de 5 à 10 jours. Quelques exemples de voyages.",
+    "texte": "Villes et régions d'Europe, pour un voyage de 5 à 10 jours.",
     "liste": [
-      { "nom": "Édimbourg", "infos": "6 jours · fin août", "couleur": "bruyere" },
-      { "nom": "Lisbonne", "infos": "5 jours · Pâques", "couleur": "azulejo" },
-      { "nom": "Rome", "infos": "7 jours · Ascension", "couleur": "ocre" },
-      { "nom": "Zakynthos", "infos": "8 jours · Pentecôte", "couleur": "granit" }
-    ]
+      {
+        "nom": "Lisbonne",
+        "quand": "Pâques",
+        "duree": "5 jours",
+        "couleur": "azulejo"
+      },
+      {
+        "nom": "Rome",
+        "quand": "Ascension",
+        "duree": "7 jours",
+        "couleur": "ocre"
+      },
+      {
+        "nom": "Zakynthos",
+        "quand": "Pentecôte",
+        "duree": "8 jours",
+        "couleur": "granit"
+      },
+      {
+        "nom": "Édimbourg",
+        "quand": "Fin août",
+        "duree": "6 jours",
+        "couleur": "bruyere"
+      }
+    ],
+    "colonnes": {
+      "quand": "Départ",
+      "ou": "Destination",
+      "duree": "Durée"
+    },
+    "legende": "Quelques exemples de voyages"
   },
   "etapes": {
     "titre": "Trois gestes, un programme",
     "liste": [
-      { "titre": "Raconte ton voyage", "texte": "Tes dates, ton logement, tes envies, ton rythme. En quelques phrases." },
-      { "titre": "Trie les propositions", "texte": "J'aime ou Pas pour moi. Le programme s'ajuste à ce qui te ressemble." },
-      { "titre": "Pars avec ton programme", "texte": "Chaque jour, de l'hôtel à la soirée, avec les trajets et ce qu'il faut réserver." }
-    ]
+      {
+        "titre": "Raconte ton voyage",
+        "texte": "Tes dates, ton logement, tes envies, ton rythme. En quelques phrases."
+      },
+      {
+        "titre": "Trie les propositions",
+        "texte": "J'aime ou Pas pour moi. Le programme s'ajuste à ce qui te ressemble."
+      },
+      {
+        "titre": "Pars avec ton programme",
+        "texte": "Chaque jour, de l'hôtel à la soirée, avec les trajets et ce qu'il faut réserver."
+      }
+    ],
+    "exemple": {
+      "recit": "Lisbonne à Pâques, cinq jours à deux. On aime marcher et bien manger. Pas de musées.",
+      "heure": "20:00"
+    }
   },
   "vise": {
     "titre": "Ce que {produit} cherche à garantir",
     "liste": [
-      { "titre": "Fiable", "texte": "Chaque lieu contrôlé avant d'apparaître. Horaires et dates avec leur source. Ce qui reste incertain marqué « À confirmer »." },
-      { "titre": "Choisi", "texte": "Pour chaque adresse, la raison pour laquelle elle est là pour toi, avec sa source." },
-      { "titre": "D'actualité", "texte": "Les événements réellement prévus pendant tes dates. Un événement sans source relue marqué « Non confirmé »." },
-      { "titre": "Adaptable", "texte": "Une étape changée en quelques gestes, sans casser tes réservations ni tes horaires fixes." }
+      {
+        "titre": "Fiable",
+        "texte": "Chaque lieu contrôlé avant d'apparaître. Horaires et dates avec leur source. Ce qui reste incertain marqué « À confirmer »."
+      },
+      {
+        "titre": "Choisi",
+        "texte": "Pour chaque adresse, la raison pour laquelle elle est là pour toi, avec sa source."
+      },
+      {
+        "titre": "D'actualité",
+        "texte": "Les événements réellement prévus pendant tes dates. Un événement sans source relue marqué « Non confirmé »."
+      },
+      {
+        "titre": "Adaptable",
+        "texte": "Une étape changée en quelques gestes, sans casser tes réservations ni tes horaires fixes."
+      }
     ]
   },
   "prix": {

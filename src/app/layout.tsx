@@ -5,7 +5,7 @@ import { PRODUCT_NAME } from "@/config/site";
 import * as messages from "@/i18n/messages";
 import "@/styles/globals.css";
 
-import { fraunces, hankenGrotesk } from "./fonts";
+import { hankenGrotesk, titrage } from "./fonts";
 import { colorToken, MANIFEST_ICONS } from "./manifest";
 
 export const metadata: Metadata = {
@@ -24,7 +24,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr" className={`${hankenGrotesk.variable} ${fraunces.variable}`}>
+    <html lang="fr" className={`${hankenGrotesk.variable} ${titrage.variable}`}>
       <body className="bg-page font-sans text-ink antialiased">{children}</body>
     </html>
   );

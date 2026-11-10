@@ -1,4 +1,4 @@
-import { Fraunces, Hanken_Grotesk } from "next/font/google";
+import { Bricolage_Grotesque, Hanken_Grotesk } from "next/font/google";
 
 /**
  * Police de l'application (handover § 2), partagée par le layout racine et `global-error.tsx`, qui remplace
@@ -12,14 +12,14 @@ export const hankenGrotesk = Hanken_Grotesk({
 });
 
 /**
- * Police de titrage de la page de précommande (décision 0168) : sérif à fort caractère, pour les grands titres
- * seulement. Jamais préchargée : seules les pages qui l'emploient la téléchargent.
+ * Police de titrage de la page de précommande (décisions 0168 et 0169) : grotesque étroite à fort caractère, pour
+ * les grands titres seulement, dans la même famille de formes que la police de Ligne. Variable (graisse, largeur,
+ * taille optique). Jamais préchargée : seules les pages qui l'emploient la téléchargent.
  */
-export const fraunces = Fraunces({
+export const titrage = Bricolage_Grotesque({
   subsets: ["latin"],
-  weight: ["600", "900"],
-  style: ["normal", "italic"],
+  axes: ["opsz", "wdth"],
   display: "swap",
   preload: false,
-  variable: "--font-fraunces",
+  variable: "--font-titrage",
 });
