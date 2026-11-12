@@ -322,7 +322,7 @@ test.describe("Séjour", () => {
     await expect(plate.getByRole("heading", { level: 1 })).toHaveText("Édimbourg");
     await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
     await expect(plate).toContainText("sam. 29.08 – jeu. 03.09 · 2 adultes");
-    // Aplat dest-bruyere, style destination (36 px, 800).
+    // Aplat dest-bruyere, style destination (44 px, 600 ; décisions 0171 et 0173).
     const style = await plate.evaluate((el) => {
       const probe = document.createElement("span");
       probe.style.color = "var(--color-dest-bruyere)";
@@ -333,7 +333,7 @@ test.describe("Séjour", () => {
       return { background: getComputedStyle(el).backgroundColor, bruyere, size: title.fontSize, weight: title.fontWeight };
     });
     expect(style.background).toBe(style.bruyere);
-    expect(style).toMatchObject({ size: "36px", weight: "800" });
+    expect(style).toMatchObject({ size: "44px", weight: "600" });
     await expect(sheet(page).locator("[data-part='budget']")).toHaveText("Budget estimé : environ 640 CHF par personne");
     // Carte d'ensemble : sans clé en CI, l'état « configuration absente » de F4 ; avec la carte simulée, la vue d'ensemble.
     await expect(page.getByRole("region", { name: "Carte du séjour" })).toBeVisible();

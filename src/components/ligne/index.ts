@@ -26,7 +26,7 @@ export { DeckCard, deckCardLabels, deckCardTag, type DeckCardProps } from "./Dec
 export { DeckProgress, type DeckProgressProps } from "./DeckProgress";
 export { DestinationPlate, type DestinationPlateProps } from "./DestinationPlate";
 export { IconButton, iconButtonClassName, type IconButtonProps } from "./IconButton";
-export { IconCoche, IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconPlus, IconRetour } from "./icons";
+export { IconCalendrier, IconCoche, IconCoeur, IconCroix, IconMaison, IconPartager, IconPhoto, IconPlus, IconRetour } from "./icons";
 export { OtpInput, type OtpInputProps } from "./OtpInput";
 export { PracticalNotes, practicalNotesRows, type PracticalNotesProps } from "./PracticalNotes";
 export { DateConsultation, LienSource, type LienSourceProps } from "./LienSource";

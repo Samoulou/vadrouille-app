@@ -164,7 +164,7 @@ describe("accueil : « Créer un voyage » (ticket 259)", () => {
     if (demo) expect(link.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Bouton Ligne principal (classes du composant, tokens Ligne), sans valeur arbitraire entre crochets.
     expect(link.className).toMatch(/\bw-full\b/);
-    expect(link.className).toMatch(/\bbg-line\b/);
+    expect(link.className).toMatch(/\bbg-ink\b/);
     expect(link.className).not.toMatch(/\[/);
   });
 });

@@ -48,11 +48,11 @@
   --radius-sheet: 22px;
 
   /* Styles de texte */
-  --text-destination: 36px;   --text-destination--line-height: 40px;
-  --text-titre-fiche: 30px;   --text-titre-fiche--line-height: 34px;
-  --text-titre-jour: 28px;    --text-titre-jour--line-height: 32px;
+  --text-destination: 44px;   --text-destination--line-height: 44px;
+  --text-titre-fiche: 34px;   --text-titre-fiche--line-height: 36px;
+  --text-titre-jour: 34px;    --text-titre-jour--line-height: 36px;
   --text-montant: 24px;       --text-montant--line-height: 30px;
-  --text-section: 20px;       --text-section--line-height: 26px;
+  --text-section: 22px;       --text-section--line-height: 26px;
   --text-arret: 18px;         --text-arret--line-height: 22px;
   --text-heure-l: 17px;       --text-heure-l--line-height: 22px;
   --text-corps: 15px;         --text-corps--line-height: 22px;
@@ -139,4 +139,22 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/*
+ * Titrage (décisions 0171 et 0173, choix de Samuel du 2026-11-10) : les titres d'écran et de section, et les trois
+ * styles d'affichage, sont en grotesque étroite (`--font-titrage`, posée par le layout racine), graisse 600 : la
+ * hiérarchie vient de la taille, pas de la graisse. Règle hors couche, pour primer sur les utilitaires de graisse
+ * et d'interlettrage posés par les écrans. Un petit intertitre (`h2` de la taille du texte) s'en exclut par la classe
+ * `font-sans` et garde la police de lecture. Sans la variable (`global-error.tsx`), la police de Ligne prend le relais.
+ */
+h1:not(.font-sans),
+h2:not(.font-sans),
+.text-destination,
+.text-titre-fiche,
+.text-titre-jour {
+  font-family: var(--font-titrage), var(--font-sans);
+  font-stretch: 85%;
+  font-weight: 600;
+  letter-spacing: 0;
 }

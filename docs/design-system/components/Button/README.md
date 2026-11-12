@@ -4,8 +4,8 @@ Bouton d'action en quatre variantes : principal, secondaire, texte et icône.
 
 ## Variantes
 
-- **Principal** : aplat `line`, texte `on-line` en 800, hauteur 52 px, coins `radius-control`. Une seule action principale par zone d'écran (« Garder », « Appliquer », « Débloquer »).
-- **Secondaire** : fond `raised`, contour 1,5 px `ink`, texte `ink` en 700. Pour l'alternative directe (« Remplacer », « Annuler », « Ajouter »).
+- **Principal** : aplat `ink` (décision 0171), texte `on-line` en 600 (décision 0173), hauteur 52 px, coins `radius-control`. Une seule action principale par zone d'écran (« Garder », « Appliquer », « Débloquer »).
+- **Secondaire** : fond `raised`, contour 1,5 px `ink`, texte `ink` en 600. Pour l'alternative directe (« Remplacer », « Annuler », « Ajouter »).
 - **Texte** : souligné, `ink` ou `ink-soft`, au moins 44 px de haut. Pour les sorties discrètes (« Passer », « Plus tard »).
 - **Icône** : carré de 44 px, fond `raised`, contour `outline`, icône `ink`, `aria-label` obligatoire. Pour les contrôles posés sur la carte.
 

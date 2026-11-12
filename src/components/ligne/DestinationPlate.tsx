@@ -23,7 +23,8 @@ export interface DestinationPlateProps {
   className?: string;
 }
 
-const COLORS: Record<Trip["destinationColor"], string> = {
+/** Aplat de chaque couleur de la palette fermée `dest-*` (texte `on-line` dessus). */
+export const DEST_COLORS: Record<Trip["destinationColor"], string> = {
   bruyere: "bg-dest-bruyere",
   azulejo: "bg-dest-azulejo",
   ocre: "bg-dest-ocre",
@@ -37,7 +38,7 @@ const COLORS: Record<Trip["destinationColor"], string> = {
  * F5c la réutilise ; F11a ajoute `href`.
  */
 export function DestinationPlate({ name, meta, color, as: Name = "h1", href, className }: DestinationPlateProps) {
-  const classes = cn("flex flex-col gap-1.5 rounded-plate p-5 text-on-line", COLORS[color], className);
+  const classes = cn("flex flex-col gap-1.5 rounded-plate p-5 text-on-line", DEST_COLORS[color], className);
   const content = (
     <>
       <Name className="text-destination font-extrabold tracking-(--ligne-destination-approche)">{name}</Name>

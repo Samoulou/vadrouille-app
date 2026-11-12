@@ -28,6 +28,7 @@ import { CreationShell, stepTotal, TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
 import { DestinationVille, type ActionsVilles, type MotifIndisponible } from "./DestinationVille";
 import { LODGING_ANSWERS, type LodgingAnswer, type LodgingForm } from "./draft";
+import { DateField } from "./DateField";
 import {
   describedBy,
   EMPTY_LIVE_REGION_CLASS,
@@ -226,6 +227,8 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
 
   const ranges = trip.otherCities.length > 0 ? cityRanges(trip) : null;
   const today = useAujourdhui();
+  // Séjour déjà saisi, teinté dans le calendrier de chaque champ de date (décision 0176).
+  const sejour = nightsOf(trip) === null ? null : { debut: trip.start, fin: trip.end };
   const bounds = today === null ? { start: {}, end: {}, city: {}, commitment: {} } : tripDateBounds(trip, today, essai);
   const nights = nightsOf(trip);
 
@@ -356,18 +359,20 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
         )}
         <div className="flex flex-col gap-2">
           <FieldRow>
-            <TextField
+            <DateField
               field="start"
-              type="date"
+              sejour={sejour}
+              aujourdhui={today}
               label={e1.arrivee}
               value={trip.start}
               {...bounds.start}
               onChange={(start) => dispatch({ type: "trip", patch: { start } })}
               error={errorOf("start")}
             />
-            <TextField
+            <DateField
               field="end"
-              type="date"
+              sejour={sejour}
+              aujourdhui={today}
               label={e1.depart}
               value={trip.end}
               {...bounds.end}
@@ -452,9 +457,10 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
                       error={errorOf(`${base}.name`)}
                     />
                   )}
-                  <TextField
+                  <DateField
                     field={`${base}.arrival`}
-                    type="date"
+                    sejour={sejour}
+                    aujourdhui={today}
                     label={e1.villes.arrivee}
                     value={city.arrival}
                     {...bounds.city}
@@ -568,9 +574,10 @@ export function CreateTripForm({ essai: essaiProp, recherche, villes, controleVi
                   onChange={(label) => dispatch({ type: "commitment", index, patch: { label } })}
                   error={errorOf(`${base}.label`)}
                 />
-                <TextField
+                <DateField
                   field={`${base}.date`}
-                  type="date"
+                  sejour={sejour}
+                  aujourdhui={today}
                   label={e1.engagements.date}
                   value={commitment.date}
                   {...bounds.commitment}

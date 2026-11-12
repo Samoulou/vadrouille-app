@@ -184,7 +184,7 @@ export function StopSheet({
 
       {path ? (
         <section aria-labelledby={`${titleId}-pour-y-aller`} data-part="pour-y-aller" className="flex flex-col gap-1">
-          <h2 id={`${titleId}-pour-y-aller`} className="text-corps-s font-bold text-ink-2">
+          <h2 id={`${titleId}-pour-y-aller`} className="font-sans text-corps-s font-bold text-ink-2">
             {t.pourYAller}
           </h2>
           <p className="text-corps text-ink">{pathToLabel(path)}</p>
@@ -201,7 +201,7 @@ export function StopSheet({
         // Ticket 800 : le site vérifié s'affiche aussi sans raison (lien seul ; date seulement si `verifiedAt` existe,
         // jamais pour un site du prototype, PPI-PO-8).
         <section aria-labelledby={`${titleId}-site`} data-part="site" className="flex flex-col gap-1">
-          <h2 id={`${titleId}-site`} className="text-corps-s font-bold text-ink-2">
+          <h2 id={`${titleId}-site`} className="font-sans text-corps-s font-bold text-ink-2">
             {t.siteOfficiel}
           </h2>
           <LienSource href={stop.source.url} nouvelOnglet={messages.presentation.detail.nouvelOnglet}>

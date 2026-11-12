@@ -120,7 +120,7 @@ export function CarteDemo({ days, maps, renderer, config, vue }: CarteDemoProps)
               <DayMap mode="overview" days={days} maps={maps} placesFromGoogle={false} />
             </div>
             <div className="px-4">
-              <h2 className="text-corps font-bold text-ink">{t.sejour}</h2>
+              <h2 className="font-sans text-corps font-bold text-ink">{t.sejour}</h2>
               <ol className="text-corps text-ink-2">
                 {days.map((candidate) => (
                   <li key={candidate.index}>{formatTitreJour(candidate.date)}</li>
@@ -131,7 +131,7 @@ export function CarteDemo({ days, maps, renderer, config, vue }: CarteDemoProps)
         ) : null}
 
         <section aria-labelledby="attribution-titre" className="flex flex-col gap-2 px-4">
-          <h2 id="attribution-titre" className="text-corps font-bold text-ink">
+          <h2 id="attribution-titre" className="font-sans text-corps font-bold text-ink">
             {t.attribution.titre}
           </h2>
           <p className="text-corps-s text-ink-2">{t.attribution.avec}</p>

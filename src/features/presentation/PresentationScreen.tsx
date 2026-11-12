@@ -23,7 +23,7 @@ import { DeckCard } from "@/components/ligne/DeckCard";
 import { DeckProgress } from "@/components/ligne/DeckProgress";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { UndoToast, UndoToastRegion } from "@/components/ligne/UndoToast";
-import type { DeckSession, PreferenceAnswer, PreferencePrompt, Proposal, TrialRevisionResult, TripCity } from "@/contracts";
+import type { DeckSession, PreferenceAnswer, PreferencePrompt, Proposal, TrialRevisionResult, Trip, TripCity } from "@/contracts";
 import { aPlusieursVilles, dateDuJour, texteDeVille, villeDeLaDate } from "@/features/voyage/villes";
 import { weekdayOf } from "@/contracts/values";
 import { SaisieCodeAcces } from "@/features/prototype/SaisieCodeAcces";
@@ -79,6 +79,8 @@ export function villeDeLaCarte(cities: readonly TripCity[] | undefined, day: num
 
 export interface PresentationScreenProps {
   tripId: string;
+  /** Couleur de la destination : panneau de la carte quand le lieu n'a pas de photo (décision 0176). */
+  destinationColor?: Trip["destinationColor"];
   /** Écran 6 (faux) ou 6b « Suite du tri » (vrai). */
   unlocked: boolean;
   /** Jours encore en préparation (`Day.generating`), pour le `StatusBanner` (F6-PO-13). */
@@ -181,6 +183,7 @@ type DeckProps = Omit<PresentationScreenProps, "recorder" | "recorderKind"> & { 
 
 function Deck({
   tripId,
+  destinationColor,
   unlocked,
   generatingDays,
   proposals,
@@ -496,6 +499,7 @@ function Deck({
             proposal={card}
             photo={photoCarte.photo}
             photoEnAttente={photoCarte.attente}
+            couleur={destinationColor}
             context={formatContexte(card.neighbours, dayOf(card.day)?.stops ?? [])}
             ville={villeDeLaCarte(cities, card.day)}
             isLastOption={isLastOption(state)}

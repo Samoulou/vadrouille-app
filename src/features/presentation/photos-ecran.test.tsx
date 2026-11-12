@@ -54,7 +54,7 @@ describe("écran du tri : photos (décision 0128)", () => {
     const { unmount } = setup({ demanderPhoto, photos: false, tripId: "0b6f2c1e-8a2d-4c1b-9d2e-3f4a5b6c7d8e" });
     await flush();
     expect(demanderPhoto).not.toHaveBeenCalled();
-    expect(carte()).toHaveTextContent("Photo du lieu");
+    expect(carte().querySelector("[data-part=emplacement-photo]")).toHaveAttribute("data-etat", "sans-photo");
     expect(carte().querySelector("img")).toBeNull();
     unmount();
     setup({ demanderPhoto, photos: true, tripId: "0b6f2c1e-8a2d-4c1b-9d2e-3f4a5b6c7d8e" });
@@ -96,7 +96,7 @@ describe("écran du tri : photos (décision 0128)", () => {
     setup({ demanderPhoto, placesFromGoogle: true, proposals: [{ ...AVEC_LIEU[0]!, stop: sansLieu }, ...AVEC_LIEU.slice(1)] });
     await flush();
     expect(demanderPhoto).not.toHaveBeenCalled();
-    expect(carte()).toHaveTextContent("Photo du lieu");
+    expect(carte().querySelector("[data-part=emplacement-photo]")).toHaveAttribute("data-etat", "sans-photo");
   });
 
   it("une seule demande partagée par la carte et sa feuille de détail, photo affichée dans les deux dès l'ouverture", async () => {
@@ -105,7 +105,7 @@ describe("écran du tri : photos (décision 0128)", () => {
     setup({ demanderPhoto, placesFromGoogle: true });
     await flush();
     // En attente : l'emplacement reste, sans libellé.
-    expect(carte()).not.toHaveTextContent("Photo du lieu");
+    expect(carte().querySelector("[data-part=emplacement-photo][data-etat=sans-photo]")).toBeNull();
     fireEvent.click(carte());
     const detail = await screen.findByRole("dialog");
     expect(detail.querySelector("[data-part=boite-photo]")).not.toBeNull();

@@ -10,6 +10,23 @@
     "lancement": "Nouveau voyage · Création",
     "preparation": "{destination} · Préparation"
   },
+  "calendrier": {
+    "ouvrir": "{champ} : choisir dans le calendrier",
+    "titre": "{champ}",
+    "fermer": "Fermer",
+    "precedent": "Mois précédent",
+    "suivant": "Mois suivant",
+    "mois": "{mois} {annee}",
+    "jours": [
+      { "court": "lu", "long": "lundi" },
+      { "court": "ma", "long": "mardi" },
+      { "court": "me", "long": "mercredi" },
+      { "court": "je", "long": "jeudi" },
+      { "court": "ve", "long": "vendredi" },
+      { "court": "sa", "long": "samedi" },
+      { "court": "di", "long": "dimanche" }
+    ]
+  },
   "ecran1": {
     "titre": "Ton voyage",
     "destination": "Destination",

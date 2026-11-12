@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { adressePaiementPrevente, getPrevente, sourcePrevente } from "@/adapters";
@@ -12,6 +12,22 @@ function ouvrir(lien?: string) {
   vi.stubEnv("PREVENTE_LIEN_PAIEMENT", lien);
   return getPrevente();
 }
+
+/** Les six valeurs qui rendent les pages légales disponibles (`src/adapters/pages-legales.ts`). */
+function vendeur() {
+  vi.stubEnv("VENDEUR_NOM", "Vendeur d'essai");
+  vi.stubEnv("VENDEUR_STATUT", "statut d'essai");
+  vi.stubEnv("VENDEUR_ADRESSE", "Rue de l'Essai 1, 0000 Ville d'essai");
+  vi.stubEnv("VENDEUR_CONTACT", "contact@vendeur-essai.example");
+  vi.stubEnv("VENDEUR_CONSERVATION", "durée d'essai");
+  vi.stubEnv("TEXTES_LEGAUX_DATE", "2026-11-10");
+}
+/** Adresse de chaque page légale, et nombre de liens attendus vers elle sur la page d'accueil. */
+const LIENS_LEGAUX = {
+  "/precommande/mentions-legales": 2,
+  "/precommande/conditions-de-vente": 2,
+  "/precommande/donnees": 2,
+} as const;
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -62,12 +78,89 @@ describe("accueil : précommande", () => {
     expect(boutons).toHaveLength(3);
     for (const bouton of boutons) expect(bouton).toHaveAttribute("href", "/precommande?src=forum");
     expect(screen.queryByRole("link", { name: "Créer un voyage" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: /^Ton voyage,\s*de l'hôtel à la soirée\.$/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: /^29\sCHF\s*pour un voyage$/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: /^Ton voyage,\s*de l'hôtel à la soirée$/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /^Le voyage complet\s*29\sCHF\s*pour un voyage$/ })).toBeInTheDocument();
     expect(screen.getByText(/1er février 2027, tu es remboursé intégralement/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Questions fréquentes" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Voir la démonstration" })).toHaveAttribute("href", "#demonstration");
     expect(screen.queryByText("Aucun lieu inventé")).not.toBeInTheDocument();
+  });
+
+  it("ouverte, pages légales non configurées : aucun lien vers elles", async () => {
+    vi.stubEnv("PREVENTE", "1");
+    render(await HomePage({ searchParams: Promise.resolve({}) }));
+    expect(screen.queryByRole("navigation", { name: "Informations légales" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Mentions légales" })).not.toBeInTheDocument();
+  });
+
+  it("ouverte, pages légales configurées : liens près du bouton du prix et au pied de la page", async () => {
+    vi.stubEnv("PREVENTE", "1");
+    vendeur();
+    render(await HomePage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getAllByRole("navigation", { name: "Informations légales" })).toHaveLength(1);
+    for (const [href, attendus] of Object.entries(LIENS_LEGAUX)) {
+      const liens = screen.getAllByRole("link").filter((lien) => lien.getAttribute("href") === href);
+      expect(liens, href).toHaveLength(attendus);
+    }
+  });
+
+  it("ouverte : un seul h1, un h2 par section, le prix nommé par son surtitre", async () => {
+    vi.stubEnv("PREVENTE", "1");
+    render(await HomePage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    for (const id of ["destinations-titre", "etapes-titre", "vise-titre", "prix-titre", "faq-titre", "final-titre"]) {
+      const section = document.querySelector(`main section[aria-labelledby="${id}"]`);
+      expect(section, id).not.toBeNull();
+      const titre = document.getElementById(id);
+      expect(titre?.tagName, id).toBe("H2");
+      expect(section!.contains(titre)).toBe(true);
+    }
+    expect(screen.getByRole("heading", { level: 2, name: /^Le voyage complet\s*29\sCHF\s*pour un voyage$/ })).toBeInTheDocument();
+  });
+
+  it("ouverte : tableau des départs à trois colonnes et quatre destinations, nommées en tête de ligne", async () => {
+    vi.stubEnv("PREVENTE", "1");
+    render(await HomePage({ searchParams: Promise.resolve({}) }));
+    const tableau = screen.getByRole("table", { name: /ce ne sont pas des programmes déjà prêts/ });
+    const colonnes = within(tableau).getAllByRole("columnheader");
+    expect(colonnes.map((colonne) => colonne.textContent)).toEqual(["Départ", "Destination", "Durée"]);
+    for (const colonne of colonnes) expect(colonne).toHaveAttribute("scope", "col");
+    const lignes = within(tableau).getAllByRole("rowheader");
+    expect(lignes.map((ligne) => ligne.textContent)).toEqual(["Lisbonne", "Rome", "Zakynthos", "Édimbourg"]);
+    for (const ligne of lignes) expect(ligne).toHaveAttribute("scope", "row");
+    expect(within(tableau).getAllByRole("row")).toHaveLength(5);
+  });
+
+  it("ouverte : « À confirmer » et « Non confirmé » sont l'étiquette de l'application, sans guillemets autour", async () => {
+    vi.stubEnv("PREVENTE", "1");
+    render(await HomePage({ searchParams: Promise.resolve({}) }));
+    const garanties = document.querySelector('section[aria-labelledby="vise-titre"]');
+    expect(garanties).not.toBeNull();
+    const etiquettes = Array.from(garanties!.querySelectorAll("[data-kind]"));
+    expect(etiquettes.map((etiquette) => etiquette.getAttribute("data-kind"))).toEqual(["toConfirm", "unconfirmed"]);
+    expect(etiquettes.map((etiquette) => etiquette.textContent)).toEqual(["À confirmer", "Non confirmé"]);
+    expect(garanties!.textContent).not.toMatch(/[«»]/);
+    // Le texte autour de l'étiquette est gardé entier.
+    expect(garanties!.textContent).toContain("Ce qui reste incertain marqué");
+    expect(garanties!.textContent).toContain("Un événement sans source relue marqué");
+  });
+
+  it("ouverte : les trois fragments de l'application sont décoratifs, sans contrôle ni lien", async () => {
+    vi.stubEnv("PREVENTE", "1");
+    render(await HomePage({ searchParams: Promise.resolve({}) }));
+    const gestes = document.querySelector('section[aria-labelledby="etapes-titre"]');
+    const etapes = Array.from(gestes!.querySelectorAll("ol > li"));
+    expect(etapes).toHaveLength(3);
+    for (const etape of etapes) {
+      expect(within(etape as HTMLElement).getByRole("heading", { level: 3 })).toBeInTheDocument();
+      const fragment = etape.querySelector(':scope > [aria-hidden="true"]');
+      expect(fragment).not.toBeNull();
+      expect(fragment!.querySelectorAll("a, button, input, textarea, select, [tabindex]")).toHaveLength(0);
+    }
+    // Rien d'autre que du décor n'est caché aux lecteurs d'écran : titres, textes et liens restent hors de `aria-hidden`.
+    for (const cache of Array.from(document.querySelectorAll('main [aria-hidden="true"]'))) {
+      expect(cache.querySelectorAll("a, button, h1, h2, h3")).toHaveLength(0);
+    }
   });
 
   it("ouverte, provenance invalide : bouton sans provenance", async () => {
@@ -115,5 +208,17 @@ describe("précommande : pages", () => {
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     expect(screen.getByText(/Si ton paiement a abouti/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/sans démarche|e-mail d'accès|réponds à l'e-mail/);
+  });
+
+  it("merci : liens vers les pages légales seulement quand elles sont configurées", () => {
+    ouvrir(LIEN);
+    const { unmount } = render(PrecommandeMerciPage());
+    expect(screen.queryByRole("navigation", { name: "Informations légales" })).not.toBeInTheDocument();
+    unmount();
+    vendeur();
+    render(PrecommandeMerciPage());
+    for (const href of Object.keys(LIENS_LEGAUX)) {
+      expect(screen.getAllByRole("link").filter((lien) => lien.getAttribute("href") === href)).toHaveLength(1);
+    }
   });
 });

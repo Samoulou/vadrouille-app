@@ -2,11 +2,11 @@
 
 Ligne est le système de design du planificateur de voyages IA. Chaque journée s'y lit comme une ligne de transport : l'hôtel est le terminus, les étapes sont des arrêts, les trajets sont les segments entre eux. L'interface promet ce que le produit promet : un programme fiable, lisible d'un coup d'œil, dehors, sur un téléphone. La couleur et l'émotion viennent de la destination, pas de l'interface.
 
-Le produit n'a pas encore de nom ni de logo. En attendant, le nom s'écrit en Hanken Grotesk 800, en ink.
+Le produit n'a pas encore de nom ni de logo. En attendant, le nom s'écrit dans la police de titrage (Bricolage Grotesque étroite, 600 ; décisions 0171 et 0173), en ink.
 
 ## Principes
 
-1. **La ligne est la signature.** Le tracé, les arrêts et le terminus portent l'identité. Le bleu `line` ne sert qu'à la ligne, à la sélection et à l'action principale : jamais à décorer.
+1. **La ligne est la signature.** Le tracé, les arrêts et le terminus portent l'identité. Le bleu `line` ne sert qu'à la ligne, à la sélection et aux liens d'action : jamais à décorer. Le bouton principal est un aplat `ink` (décision 0171).
 2. **Le jaune veut dire « agis ».** `quai` marque uniquement ce qui demande une action de la personne : réserver, compléter. Un écran sans action requise n'a pas de jaune.
 3. **Seules les exceptions ont un badge.** Pas de badge « vérifié » : l'absence de badge vaut vérification. On signale « À réserver », « À confirmer », « Non confirmé ».
 4. **Les chiffres s'alignent.** Heures, dates, durées et montants sont en chiffres tabulaires, alignés à droite dans leur colonne.
@@ -21,7 +21,7 @@ Thème clair uniquement pour l'instant.
 |---|---|---|
 | Fond | `page` | Fond de page et panneaux. `raised` pour ce qui est posé sur la carte. `muted` pour les blocs secondaires. |
 | Texte | `ink`, `ink-2`, `ink-soft` | `ink` pour le texte principal, `ink-2` sur `muted`, `ink-soft` pour le secondaire. Pas de noir pur, pas de gris plus clair. |
-| Ligne | `line`, `on-line` | Tracé, arrêts, pastille active, bouton principal, liens d'action. Texte blanc dessus. |
+| Ligne | `line`, `on-line` | Tracé, arrêts, pastille active, sélection, liens d'action. Texte blanc dessus. Le bouton principal est un aplat `ink` (décision 0171). |
 | Action requise | `quai`, `on-quai` | Tags « À réserver » et compteurs. Toujours avec du texte `ink`. |
 | Contours | `hairline`, `outline`, `outline-strong`, `border-control` | Les trois premiers sont décoratifs. Un contour qui seul identifie un contrôle (champ de saisie) utilise `border-control` (3,2:1). |
 | Destination | `dest-bruyere`, `dest-azulejo`, `dest-ocre`, `dest-granit` | Plaque destination uniquement, texte `on-line`. Palette fermée : on n'en génère pas d'autres sans vérifier le contraste. |
@@ -31,9 +31,9 @@ Exemple : un tag « À réserver » est un aplat `quai` avec du texte `ink` en s
 
 ## Typographie
 
-Une seule famille, **Hanken Grotesk**, servie par Google Fonts en 400, 600, 700 et 800. Elle est nette, lisible en petit et dehors, sans effet. La personnalité vient de la graisse 800 des titres, légèrement resserrés, et de l'alignement des chiffres.
+Deux voix (décision 0171). **Hanken Grotesk** (400, 600, 700, 800) pour tout ce qui se lit : nette, lisible en petit et dehors. **Bricolage Grotesque**, étroite (largeur 85 %) et en 600 (décision 0173 : la hiérarchie vient de la taille), pour les titres d'écran et de section et pour les styles `destination`, `titre-fiche`, `titre-jour` : c'est elle qui donne le caractère. Les chiffres restent alignés.
 
-- Titres : `destination`, `titre-fiche`, `titre-jour` en 800 ; `section`, `arret`, `bloc` pour structurer un écran.
+- Titres : `destination`, `titre-fiche`, `titre-jour` en 600, police de titrage ; `section`, `arret`, `bloc` pour structurer un écran.
 - Texte : `corps` pour expliquer, `corps-s` pour les métadonnées, `legende` pour les trajets et les aides.
 - Données : `heure`, `heure-l`, `montant`, `pastille`, `etiquette`, toujours en chiffres tabulaires.
 - Ni capitales pour les libellés, ni italique, ni mot isolé mis en couleur dans un titre.

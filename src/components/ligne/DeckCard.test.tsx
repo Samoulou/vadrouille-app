@@ -54,7 +54,7 @@ describe("DeckCard", () => {
     const { container, card } = renderCard({ ...chateau, photoUrl: "https://example.org/photo.jpg" });
     expect(container.querySelector("img")).toBeNull();
     expect(container.innerHTML).not.toContain("example.org/photo.jpg");
-    expect(within(card).getByText("Photo du lieu")).toBeInTheDocument();
+    expect(card.querySelector("[data-part=emplacement-photo]")).toHaveAttribute("data-etat", "sans-photo");
   });
 
   // Décision 0128 : photo du lieu (voyage d'essai), chargée à la demande par l'écran et passée à la carte.
@@ -80,7 +80,7 @@ describe("DeckCard", () => {
     // Au plus deux lignes, quel que soit le nombre d'auteurs (mineur 9).
     expect(credit.className).toContain("line-clamp-2");
     expect(card.getAttribute("aria-describedby")?.split(" ")).toContain(credit.id);
-    expect(within(card).queryByText("Photo du lieu")).toBeNull();
+    expect(card.querySelector("[data-part=emplacement-photo]")).toBeNull();
     expect(card.querySelector("a")).toBeNull();
     // Même boîte que l'emplacement (hauteur fixe du jeton) : aucun saut de mise en page.
     expect(container.querySelector("[data-part=photo]")?.className).toContain("h-(--ligne-deck-photo)");
@@ -105,15 +105,34 @@ describe("DeckCard", () => {
     expect(photo.className.split(" ").filter((c) => c.startsWith("h-") || c.startsWith("min-h-"))).toEqual(boite);
     avec.unmount();
     const sans = render(<DeckCard proposal={chateau} {...handlers} />);
-    expect(sans.getByText("Photo du lieu")).toBeInTheDocument();
+    expect(sans.container.querySelector("[data-part=emplacement-photo]")).toHaveAttribute("data-etat", "sans-photo");
   });
 
-  it("DeckCard: image en échec : l'emplacement « Photo du lieu » revient, sans message", () => {
+  it("DeckCard: sans photo (décision 0176) : panneau décoratif de la couleur de la destination, avec le secteur ; sans couleur : ink", async () => {
+    const handlers = { onLike: vi.fn(), onDislike: vi.fn(), onOpen: vi.fn() };
+    const { container, unmount } = render(<DeckCard proposal={chateau} couleur="bruyere" {...handlers} />);
+    const panneau = container.querySelector<HTMLElement>("[data-part=emplacement-photo]")!;
+    expect(panneau).toHaveAttribute("aria-hidden", "true");
+    expect(panneau.className).toContain("bg-dest-bruyere");
+    expect(panneau.className).toContain("text-on-line");
+    expect(panneau.querySelector("[data-part=secteur]")?.textContent).toBe(chateau.stop.facts.area);
+    expect(panneau.querySelector("svg")).toBeNull();
+    expect(panneau.textContent).not.toContain("Photo du lieu");
+    expect(await axeViolations(container)).toEqual([]);
+    unmount();
+    const sansCouleur = render(<DeckCard proposal={chateau} {...handlers} />);
+    expect(sansCouleur.container.querySelector("[data-part=emplacement-photo]")?.className).toContain("bg-ink");
+    sansCouleur.unmount();
+    const sansSecteur = render(<DeckCard proposal={{ ...chateau, stop: { ...chateau.stop, facts: {} } }} {...handlers} />);
+    expect(sansSecteur.container.querySelector("[data-part=secteur]")).toBeNull();
+  });
+
+  it("DeckCard: image en échec : le panneau sans photo revient, sans message", () => {
     const handlers = { onLike: vi.fn(), onDislike: vi.fn(), onOpen: vi.fn() };
     const { container } = render(<DeckCard proposal={chateau} photo={PHOTO} {...handlers} />);
     fireEvent.error(container.querySelector("img")!);
     expect(container.querySelector("img")).toBeNull();
-    expect(screen.getByText("Photo du lieu")).toBeInTheDocument();
+    expect(container.querySelector("[data-part=emplacement-photo]")).toHaveAttribute("data-etat", "sans-photo");
   });
 
   it("DeckCard: trajet sans durée (minutes: null, décisions 0092 et 0095 § 4) : ni trajet ni détour, ni dans le rendu ni dans aria-describedby", () => {

@@ -6,11 +6,11 @@ import { axeViolations } from "../../../tests/unit/axe";
 import { Button } from "./Button";
 
 describe("Button", () => {
-  it("rend un bouton principal en aplat line, 52 px par défaut", () => {
+  it("rend un bouton principal en aplat ink, 52 px par défaut", () => {
     render(<Button>Garder</Button>);
     const button = screen.getByRole("button", { name: "Garder" });
     expect(button).toHaveAttribute("type", "button");
-    expect(button).toHaveClass("bg-line", "text-on-line", "font-extrabold", "h-13", "rounded-control");
+    expect(button).toHaveClass("bg-ink", "text-on-line", "font-semibold", "h-13", "rounded-control");
   });
 
   it("applique les variantes secondaire et texte, et la taille sm", () => {
@@ -25,7 +25,7 @@ describe("Button", () => {
       </>,
     );
     const secondary = screen.getByRole("button", { name: "Remplacer" });
-    expect(secondary).toHaveClass("bg-raised", "border-ink", "text-ink", "font-bold", "h-11");
+    expect(secondary).toHaveClass("bg-raised", "border-ink", "text-ink", "font-semibold", "h-11");
     const text = screen.getByRole("button", { name: "Plus tard" });
     expect(text).toHaveClass("underline", "text-ink-soft");
     expect(text).not.toHaveClass("text-ink");

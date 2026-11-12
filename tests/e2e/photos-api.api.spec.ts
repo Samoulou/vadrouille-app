@@ -80,7 +80,7 @@ test("photos api: barrière fermée, emplacement « Photo du lieu » sans image 
 
   await page.goto(`/voyages/${ids[0]}/presentation`);
   await expect(card(page)).toBeVisible();
-  await expect(card(page).locator("[data-part='emplacement-photo']")).toHaveText("Photo du lieu");
+  await expect(card(page).locator("[data-part='emplacement-photo']")).toHaveAttribute("data-etat", "sans-photo");
   await expect(card(page).locator("[data-part='photo']")).toHaveCount(0);
   await expect(card(page).locator("img")).toHaveCount(0);
   // Le détail de la carte (feuille) ne demande rien non plus.
@@ -89,7 +89,7 @@ test("photos api: barrière fermée, emplacement « Photo du lieu » sans image 
   await expect(page.getByRole("dialog").locator("img")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(card(page).locator("[data-part='emplacement-photo']")).toHaveText("Photo du lieu");
+  await expect(card(page).locator("[data-part='emplacement-photo']")).toHaveAttribute("data-etat", "sans-photo");
   expect(actions).toEqual([]);
   expect(externes).toEqual([]);
 });

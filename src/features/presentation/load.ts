@@ -21,6 +21,8 @@ export interface NoOptionSlot {
 
 export interface PresentationData {
   tripId: string;
+  /** Couleur de la destination (panneau des cartes sans photo, décision 0176). */
+  destinationColor: Trip["destinationColor"];
   unlocked: boolean;
   /** Jours encore en préparation (`Day.generating`). */
   generatingDays: number[];
@@ -93,6 +95,7 @@ export async function loadPresentation(adapter: TripAdapter, ctx: AdapterContext
   const parId = new Map(proposals.map((proposal) => [proposal.id, proposal]));
   return {
     tripId: trip.id,
+    destinationColor: trip.destinationColor,
     unlocked: trip.unlocked,
     generatingDays: trip.days.filter((day) => day.generating).map((day) => day.index),
     proposals: deck === null ? proposals : deck.proposalIds.flatMap((id) => parId.get(id) ?? []),
