@@ -7,10 +7,12 @@ import { CAS_PRODUCTION_COMMUNS } from "../../../tests/support/cas-production-co
 
 import {
   CAUSES_SORTIE,
+  chiffrementDuProfilSeul,
   CODE_CLE_ABSENTE,
   CODES_REFUS_SORTIE,
   DIRECTIVES_SORTIE,
   EXCEPTIONS_SORTIE,
+  nodeOptionsLisible,
   OPTIONS_TLS,
   optionsDeNode,
   VERDICTS_SORTIE,
@@ -19,7 +21,12 @@ import {
   type DiagnosticSortie,
   type EnvSortie,
 } from "./egress";
-import { CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24, type SystemeFichiersOpenssl } from "./openssl-conf";
+import {
+  CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24,
+  CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025,
+  OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025,
+  type SystemeFichiersOpenssl,
+} from "./openssl-conf";
 
 /**
  * `p0: aucun client réel hors préversion ou développement`, `… derrière un proxy d'environnement`, `… avec un TLS
@@ -579,6 +586,267 @@ describe("p0: diagnostic de la barrière, des noms seulement (décisions 0058 et
   });
   it("le proxy l'emporte sur le TLS, comme le code", () => {
     expect(diagnostiquer({ ...PREVIEW, https_proxy: "http://p", SSL_CERT_FILE: "/x" })).toEqual({ cause: "https_proxy" });
+  });
+});
+
+describe("p0: profil TLS commercial-2025 du runtime Lambda nodejs26.x (décision 0178, ticket 1141)", () => {
+  const CHEMIN = "/var/runtime/tls-profiles/commercial-2025.conf";
+  const OPTION = OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025;
+  const ENV: EnvSortie = { ...RUNTIME, OPENSSL_CONF: CHEMIN };
+  /** Ce que le bootstrap laisse dans l'environnement : le profil et son option de chiffrement, après d'autres options. */
+  const ENV_BOOTSTRAP: EnvSortie = { ...ENV, NODE_OPTIONS: `--max-old-space-size=4096 ${OPTION}` };
+  const fsProfil = () => fauxFs({ [CHEMIN]: CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025 });
+  const ADMIS = { exception: "vercel_runtime_openssl_conf", openssl_conf_zone: "var_runtime", openssl_conf_verdict: "contenu_audite" };
+  const REFUS_OPTION = { ok: false, code: "tls_env_refused" };
+
+  beforeEach(() => {
+    poserRuntime(CHEMIN);
+  });
+
+  it("profil audité et son option de chiffrement exacte, en préversion de Vercel : sortie ouverte", () => {
+    expect(verifierSortie(ENV_BOOTSTRAP, [], undefined, fsProfil())).toEqual({ ok: true });
+    expect(diagnostiquer(ENV_BOOTSTRAP, [], fsProfil())).toEqual(ADMIS);
+    expect(verifierSortie({ ...ENV, NODE_OPTIONS: OPTION }, [], undefined, fsProfil())).toEqual({ ok: true });
+  });
+
+  it("profil audité sans option de chiffrement : sortie ouverte (rien à tolérer)", () => {
+    expect(verifierSortie(ENV, [], undefined, fsProfil())).toEqual({ ok: true });
+    expect(diagnostiquer(ENV, [], fsProfil())).toEqual(ADMIS);
+  });
+
+  it.each<[string, string]>([
+    ["autre liste", "--tls-cipher-list=DEFAULT"],
+    ["liste du profil à un caractère près", OPTION.replace("@SECLEVEL=2", "@SECLEVEL=1")],
+    ["liste du profil suivie d'un ajout", `${OPTION}:aNULL`],
+    ["liste du profil tronquée", OPTION.slice(0, -1)],
+    ["sans valeur", "--tls-cipher-list"],
+    ["graphie avec _", OPTION.replace("--tls-cipher-list", "--tls_cipher_list")],
+    ["entre guillemets doubles", `"${OPTION}"`],
+    ["entre guillemets simples", `'${OPTION}'`],
+    ["forme niée", "--no-tls-cipher-list"],
+    ["option exacte, puis une seconde occurrence différente", `${OPTION} --tls-cipher-list=DEFAULT`],
+    ["une occurrence différente, puis l'option exacte", `--tls-cipher-list=DEFAULT ${OPTION}`],
+    ["option exacte, et un guillemet ailleurs dans NODE_OPTIONS", `--title="x" ${OPTION}`],
+    ["option exacte, et un \\ ailleurs dans NODE_OPTIONS", `--title=a\\b ${OPTION}`],
+  ])("profil audité, %s : refus, cause --tls-cipher-list", (_nom, nodeOptions) => {
+    const env = { ...ENV, NODE_OPTIONS: nodeOptions };
+    expect(verifierSortie(env, [], undefined, fsProfil())).toEqual(REFUS_OPTION);
+    expect(diagnostiquer(env, [], fsProfil())).toEqual({ cause: "--tls-cipher-list", ...ADMIS });
+  });
+
+  it("option exacte dans execArgv (le bootstrap ne l'y met pas), seule ou en plus de NODE_OPTIONS : refus", () => {
+    expect(verifierSortie(ENV, [OPTION], undefined, fsProfil())).toEqual(REFUS_OPTION);
+    expect(verifierSortie(ENV_BOOTSTRAP, [OPTION], undefined, fsProfil())).toEqual(REFUS_OPTION);
+    expect(verifierSortie(ENV_BOOTSTRAP, ["--tls-cipher-list=DEFAULT"], undefined, fsProfil())).toEqual(REFUS_OPTION);
+  });
+
+  it("l'option exacte n'est tolérée qu'avec ce profil : sans OPENSSL_CONF, avec /dev/null, avec le fichier de nodejs24.x, refus", () => {
+    expect(sortie({ ...PREVIEW, NODE_OPTIONS: OPTION })).toEqual(REFUS_OPTION);
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: OPTION })).toEqual({ cause: "--tls-cipher-list" });
+    poserRuntime("/dev/null");
+    expect(verifierSortie({ ...RUNTIME, OPENSSL_CONF: "/dev/null", NODE_OPTIONS: OPTION }, [], undefined, fauxFs({}))).toEqual(REFUS_OPTION);
+    poserRuntime(CHEMIN);
+    const fs24 = () => fauxFs({ [CHEMIN]: CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24 });
+    expect(verifierSortie(ENV_BOOTSTRAP, [], undefined, fs24())).toEqual(REFUS_OPTION);
+    expect(diagnostiquer(ENV_BOOTSTRAP, [], fs24())).toEqual({ cause: "--tls-cipher-list", ...ADMIS });
+    poserRuntime(CONF);
+    expect(verifierSortie({ ...RUNTIME, NODE_OPTIONS: OPTION }, [], undefined, FS_SANS_NODE())).toEqual(REFUS_OPTION);
+  });
+
+  it("profil à un octet près : section_nodejs, barrière fermée, cause OPENSSL_CONF, directives du journal du 2026-11-16", () => {
+    const fs = () => fauxFs({ [CHEMIN]: CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025.replace("@SECLEVEL=2", "@SECLEVEL=1") });
+    expect(verifierSortie(ENV_BOOTSTRAP, [], undefined, fs())).toEqual(REFUS_OPTION);
+    expect(diagnostiquer(ENV_BOOTSTRAP, [], fs())).toEqual({
+      cause: "OPENSSL_CONF",
+      openssl_conf_zone: "var_runtime",
+      openssl_conf_verdict: "section_nodejs",
+      openssl_conf_directives:
+        "activate,alg_section,autre,cipherstring,ciphersuites,groups_autres,nodejs_conf,openssl_conf,providers,signaturealgorithms,ssl_conf,system_default",
+    });
+  });
+
+  it("hors préversion de Vercel : ni le profil ni son option n'ouvrent rien, et le fichier n'est pas lu", () => {
+    for (const env of [
+      { ...ENV_BOOTSTRAP, VERCEL: undefined },
+      { ...ENV_BOOTSTRAP, VERCEL_ENV: "development" },
+    ]) {
+      const fs = fsProfil();
+      expect(verifierSortie(env, [], undefined, fs)).toEqual(REFUS_OPTION);
+      expect(diagnostiquer(env, [], fs)).toEqual({ cause: "OPENSSL_CONF", openssl_conf_zone: "var_runtime", openssl_conf_verdict: "hors_preview" });
+      expect(fs.appels).toEqual([]);
+    }
+    expect(verifierSortie({ ...ENV_BOOTSTRAP, VERCEL_ENV: "production" }, [], undefined, fsProfil())).toEqual({ ok: false, code: "production_refused" });
+    poserReel({ VERCEL_ENV: "production" });
+    expect(verifierSortie(ENV_BOOTSTRAP, [], undefined, fsProfil())).toEqual({ ok: false, code: "production_refused" });
+  });
+
+  it("env_differente ou nom_section_refuse : barrière fermée, fichier non lu, option non tolérée", () => {
+    vi.stubEnv("OPENSSL_CONF", "/var/runtime/tls-profiles/autre.conf");
+    let fs = fsProfil();
+    expect(verifierSortie(ENV_BOOTSTRAP, [], undefined, fs)).toEqual(REFUS_OPTION);
+    expect(diagnostiquer(ENV_BOOTSTRAP, [], fs)?.openssl_conf_verdict).toBe("env_differente");
+    expect(fs.appels).toEqual([]);
+    poserRuntime(CHEMIN);
+    fs = fsProfil();
+    const configNode = { target_defaults: { defines: ["NODE_OPENSSL_CONF_NAME=openssl_conf"] } };
+    expect(verifierSortie(ENV_BOOTSTRAP, [], undefined, fs, configNode)).toEqual(REFUS_OPTION);
+    expect(fs.appels).toEqual([]);
+  });
+
+  it("le profil et son option ne masquent ni un proxy, ni une autre variable TLS, ni une autre option TLS", () => {
+    const fs = fsProfil();
+    expect(verifierSortie({ ...ENV_BOOTSTRAP, HTTPS_PROXY: "http://p" }, [], undefined, fs)).toEqual({ ok: false, code: "proxy_env_refused" });
+    expect(fs.appels).toEqual([]);
+    for (const nom of ["NODE_TLS_REJECT_UNAUTHORIZED", "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR", "SSLKEYLOGFILE"]) {
+      const env = { ...ENV_BOOTSTRAP, [nom]: "/etc/x" };
+      expect(verifierSortie(env, [], undefined, fsProfil())).toEqual(REFUS_OPTION);
+      expect(diagnostiquer(env, [], fsProfil())).toEqual({ cause: nom, ...ADMIS });
+    }
+    for (const option of OPTIONS_TLS.filter((nom) => nom !== "--tls-cipher-list")) {
+      const env = { ...ENV, NODE_OPTIONS: `${OPTION} ${option}` };
+      expect(verifierSortie(env, [], undefined, fsProfil())).toEqual(REFUS_OPTION);
+      expect(diagnostiquer(env, [], fsProfil())).toEqual({ cause: option, ...ADMIS });
+      expect(verifierSortie(ENV_BOOTSTRAP, [option], undefined, fsProfil())).toEqual(REFUS_OPTION);
+    }
+    expect(verifierSortie({ ...ENV, NODE_OPTIONS: `${OPTION} --use-env-proxy` }, [], undefined, fsProfil())).toEqual({ ok: false, code: "proxy_env_refused" });
+  });
+
+  it("sentinelle : ni la liste de chiffrement, ni le chemin, ni un nom de section dans le diagnostic", () => {
+    for (const env of [ENV_BOOTSTRAP, { ...ENV, NODE_OPTIONS: `${OPTION}:SENTINELLE` }]) {
+      const texte = JSON.stringify(diagnostiquer(env, [], fsProfil()));
+      for (const interdit of ["SECLEVEL", "kEECDH", "TLS_AES", "tls-profiles", "commercial", "crypto_policy", "SENTINELLE"]) {
+        expect(texte).not.toContain(interdit);
+      }
+    }
+  });
+
+  const BLANCS_REFUSES: [string, string][] = [
+    ["tabulation", "\t"],
+    ["retour à la ligne \\n", "\n"],
+    ["retour chariot \\r", "\r"],
+    ["tabulation verticale \\v", "\v"],
+    ["saut de page \\f", "\f"],
+    ["espace insécable U+00A0", "\u00A0"],
+    ["séparateur de ligne U+2028", "\u2028"],
+    ["U+FEFF", "\uFEFF"],
+  ];
+
+  describe.each(BLANCS_REFUSES)("blanc autre que l'espace U+0020 dans NODE_OPTIONS (%s) : Node ne découpe pas dessus", (_nom, blanc) => {
+    it.each<[string, string]>([
+      ["après la constante, puis une suite ajoutée", `${OPTION}${blanc}:CAMELLIA`],
+      ["après la constante, puis un niveau abaissé", `${OPTION}${blanc}:@SECLEVEL=0`],
+      ["après la constante, seul", `${OPTION}${blanc}`],
+      ["avant la constante", `${blanc}${OPTION}`],
+      ["entre une autre option et la constante", `--no-warnings${blanc}${OPTION}`],
+      ["ailleurs, la constante étant séparée par des espaces", `--title=a${blanc}b ${OPTION} --no-warnings`],
+    ])("%s : refus, cause --tls-cipher-list", (_cas, nodeOptions) => {
+      const env = { ...ENV, NODE_OPTIONS: nodeOptions };
+      expect(chiffrementDuProfilSeul(nodeOptions, [], OPTION)).toBe(false);
+      expect(verifierSortie(env, [], undefined, fsProfil())).toEqual(REFUS_OPTION);
+      expect(diagnostiquer(env, [], fsProfil())).toEqual({ cause: "--tls-cipher-list", ...ADMIS });
+    });
+  });
+
+  it("caractère de contrôle ou non ASCII ailleurs dans NODE_OPTIONS : refus ; espaces U+0020 seuls, même répétés : admis", () => {
+    for (const intrus of ["\0", "\u001B", "\u007F", "é", "\u200B", "\u3000"]) {
+      expect(chiffrementDuProfilSeul(`--title=a${intrus}b ${OPTION}`, [], OPTION)).toBe(false);
+      expect(chiffrementDuProfilSeul(`${OPTION}${intrus}`, [], OPTION)).toBe(false);
+    }
+    expect(chiffrementDuProfilSeul(`   --no-warnings   ${OPTION}   --max-old-space-size=4096 `, [], OPTION)).toBe(true);
+    expect(verifierSortie({ ...ENV, NODE_OPTIONS: `  ${OPTION}  ` }, [], undefined, fsProfil())).toEqual({ ok: true });
+  });
+
+  it("chiffrementDuProfilSeul : chaque occurrence doit être le jeton exact de NODE_OPTIONS", () => {
+    expect(chiffrementDuProfilSeul(OPTION, [], OPTION)).toBe(true);
+    // Attendu corrigé (revue du Tech Lead, head 5031421) : une tabulation ou un retour à la ligne n'est pas un séparateur
+    // pour Node ; ce cas, qui attendait `true`, est un refus.
+    expect(chiffrementDuProfilSeul(`  --no-warnings\t${OPTION}\n`, ["--expose-gc"], OPTION)).toBe(false);
+    expect(chiffrementDuProfilSeul(`  --no-warnings ${OPTION} `, ["--expose-gc"], OPTION)).toBe(true);
+    expect(chiffrementDuProfilSeul(`${OPTION} ${OPTION}`, [], OPTION)).toBe(true);
+    expect(chiffrementDuProfilSeul(undefined, [], OPTION)).toBe(true);
+    expect(chiffrementDuProfilSeul("", [], OPTION)).toBe(true);
+    expect(chiffrementDuProfilSeul(OPTION, [OPTION], OPTION)).toBe(false);
+    expect(chiffrementDuProfilSeul(`${OPTION} --no-no-tls_cipher_list`, [], OPTION)).toBe(false);
+    expect(chiffrementDuProfilSeul(`${OPTION}=x`, [], OPTION)).toBe(false);
+    expect(chiffrementDuProfilSeul(`${OPTION} '`, [], OPTION)).toBe(false);
+  });
+});
+
+describe("p0: NODE_OPTIONS illisible sans ambiguïté, refus fermé pour toute la barrière (ticket 1143, 0178 § 4 point 8)", () => {
+  const REFUS = { ok: false, code: "tls_env_refused" };
+
+  // Node retire les guillemets et interprète `\` où qu'ils soient : chacune de ces graphies est, pour Node, l'option
+  // interdite. La barrière n'y lit aucun nom connu ; elle refuse parce que la valeur sort de la classe admise.
+  it.each<[string, string]>([
+    ["TLS 1.0, guillemets au milieu du nom", '--tls-m"in-v1".0'],
+    ["proxy d'environnement, guillemets au milieu du nom", '--use-env-pr"oxy"'],
+    ["autorités d'OpenSSL, guillemets au milieu du nom", '--use-open"ssl"-ca'],
+    ["TLS 1.1, guillemets autour de la fin du nom", '--tls-min-v1."1"'],
+    ["clés de session, guillemets au milieu du nom", '--tls-key"log"=/tmp/k'],
+    ["configuration OpenSSL, guillemets au milieu du nom", '--openssl-con"fig"=/tmp/c'],
+    ["autorités du système, guillemets au milieu du nom", '--use-sys"tem"-ca'],
+    ["analyseur HTTP non sûr, guillemets au milieu du nom", '--insecure-http-pa"rser"'],
+    ["chiffrement, guillemets autour du nom", '"--tls-cipher-list"=DEFAULT'],
+    ["\\ dans un nom d'option TLS", "--tls-m\\in-v1.0"],
+    ["\\ dans le nom de l'option de proxy", "--use-env-pr\\oxy"],
+    ["guillemet simple au milieu d'un nom", "--tls-m'in-v1'.0"],
+    ["tabulation dans NODE_OPTIONS, aucune option interdite lisible", "--no-warnings\t--title=x"],
+    ["retour à la ligne à la fin", "--no-warnings\n"],
+    ["espace insécable U+00A0", "--no-warnings\u00A0--title=x"],
+    ["caractère non ASCII dans une valeur", "--title=é"],
+    ["guillemets autour d'une option sans danger", '"--no-warnings"'],
+  ])("%s : tls_env_refused, sans cause, hors de toute exception", (_nom, nodeOptions) => {
+    const env = { ...PREVIEW, NODE_OPTIONS: nodeOptions };
+    expect(nodeOptionsLisible(nodeOptions)).toBe(false);
+    expect(sortie(env)).toEqual(REFUS);
+    expect(JSON.stringify(diagnostiquer(env) ?? {})).not.toContain("SENTINELLE");
+    expect(sortie({ ...env, VERCEL_ENV: "development" })).toEqual(REFUS);
+  });
+
+  it("aucune cause n'est inventée : le diagnostic d'un refus sans option lisible est vide", () => {
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: '--tls-m"in-v1".0' })).toEqual({});
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: '--use-env-pr"oxy"' })).toEqual({});
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: "--title=é" })).toEqual({});
+  });
+
+  it("une cause lisible reste nommée, et le proxy garde sa priorité", () => {
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: '"--use-openssl-ca"' })).toEqual({ cause: "--use-openssl-ca" });
+    expect(sortie({ ...PREVIEW, NODE_OPTIONS: '--tls-m"in-v1".0 --use-env-proxy' })).toEqual({ ok: false, code: "proxy_env_refused" });
+    expect(sortie({ ...PREVIEW, HTTPS_PROXY: "http://p", NODE_OPTIONS: '--tls-m"in-v1".0' })).toEqual({ ok: false, code: "proxy_env_refused" });
+    expect(sortie({ VERCEL_ENV: "production", NODE_OPTIONS: '--tls-m"in-v1".0' })).toEqual({ ok: false, code: "production_refused" });
+  });
+
+  it("les exceptions de 0062, 0065 et 0178 ne masquent pas un NODE_OPTIONS illisible", () => {
+    poserRuntime("/dev/null");
+    const devNull = { ...RUNTIME, OPENSSL_CONF: "/dev/null", NODE_OPTIONS: '--tls-m"in-v1".0' };
+    expect(verifierSortie(devNull, [], undefined, fauxFs({}))).toEqual(REFUS);
+    expect(diagnostiquer(devNull, [], fauxFs({}))).toEqual({
+      exception: "vercel_runtime_openssl_conf",
+      openssl_conf_zone: "dev_null",
+      openssl_conf_verdict: "admis",
+    });
+    const chemin = "/var/runtime/tls-profiles/commercial-2025.conf";
+    poserRuntime(chemin);
+    const fs = () => fauxFs({ [chemin]: CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025 });
+    const option = OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025;
+    for (const cachee of ['--tls-m"in-v1".0', '--use-env-pr"oxy"', '--use-open"ssl"-ca', "--tls-m\\in-v1.0"]) {
+      const env = { ...RUNTIME, OPENSSL_CONF: chemin, NODE_OPTIONS: `${option} ${cachee}` };
+      expect(verifierSortie(env, [], undefined, fs())).toEqual(REFUS);
+    }
+  });
+
+  it("NODE_OPTIONS lisible : absente, vide, espaces seuls, options ordinaires, et celle que le bootstrap du runtime ajoute", () => {
+    for (const valeur of [undefined, "", "   ", "--max-old-space-size=4096 --no-warnings", "--require=./a_b-c.js --title=[x]~#%&(y)"]) {
+      expect(nodeOptionsLisible(valeur)).toBe(true);
+      expect(sortie({ ...PREVIEW, NODE_OPTIONS: valeur })).toEqual({ ok: true });
+    }
+    // La constante du profil audité (`@`, `=`, `:`, `!`, `-`, `_`) est dans la classe : le cas réel du runtime reste admis.
+    expect(nodeOptionsLisible(`--max-old-space-size=4096 ${OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025}`)).toBe(true);
+  });
+
+  it("execArgv n'est pas soumis à la classe (jetons déjà découpés par le système) ; une option interdite y reste refusée", () => {
+    expect(sortie(PREVIEW, ["--title=é"])).toEqual({ ok: true });
+    expect(sortie(PREVIEW, ["--tls-min-v1.0"])).toEqual(REFUS);
   });
 });
 

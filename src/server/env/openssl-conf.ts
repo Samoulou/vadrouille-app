@@ -31,6 +31,12 @@ import { posix } from "node:path";
  * (`CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24`) vaut `contenu_audite` : admission, comme `admis`. Avec le verdict
  * `section_nodejs` seulement, l'examen rend aussi `directives` (`directivesOpensslConf`) : des jetons d'une liste fermée
  * (0065 § 4 point 3), jamais une valeur. Le diagnostic n'admet jamais rien.
+ *
+ * **Décision 0178** (ticket 1141) : second fichier audité, celui du profil TLS `commercial-2025` du runtime Lambda
+ * `nodejs26.x` (`CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025`), admis de la même façon (égalité d'octets,
+ * niveau 0 seulement, verdict `contenu_audite`). L'examen rend alors aussi `optionChiffrementAdmise` : la seule graphie
+ * de `--tls-cipher-list` que le `bootstrap` du runtime ajoute à `NODE_OPTIONS` avec ce profil, que `./egress.ts` tolère
+ * à l'identique et refuse sous toute autre forme.
  */
 
 /** Classes de racine du chemin déclaré (0062 § 5.1, liste fermée de 7 valeurs). */
@@ -230,11 +236,69 @@ export const CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24 = [
 ].join("\n");
 
 /**
- * Égalité octet à octet avec le contenu audité (0065 § 4 point 1) : ni décodage, ni normalisation des fins de ligne,
- * ni `trim()`. Le contenu audité est en ASCII : un caractère, un octet.
+ * Fichier `OPENSSL_CONF` audité du profil TLS `commercial-2025` du runtime Lambda `nodejs26.x` (décision 0178 § 2) :
+ * 1370 octets, ASCII, fins de ligne `\n`, SHA-256 `e8bdc8a280cfe1bad166d268112faeda61b0143316f5b261c750f22f520196a2`
+ * (vérifié par le test du module). Source : image publique `aws/aws-lambda-base-images`, branche `nodejs26.x`, couche
+ * `x86_64/e5336ef794b4283239094b3f0e4f93b0434d9f0fab3817be27f6e4d3b8240d82.tar.xz`, fichier
+ * `var/runtime/tls-profiles/commercial-2025.conf`, runtime `26.13.1-6af4e1d0` (`var/runtime/runtime-release`). Ce que
+ * chaque directive fait, et pourquoi aucune n'affaiblit la vérification des certificats ni ne détourne la sortie : 0178
+ * § 3. **À relire** à chaque changement de version du runtime ou de version majeure de Node : un autre fichier, même
+ * d'un octet, ferme la barrière (échec fermé voulu).
  */
-function egalAuContenuAudite(octets: Uint8Array): boolean {
-  const audite = CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24;
+export const CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025 = [
+  "# TLS profile: commercial-2025 (crypto-policy DEFAULT). Generated at build time, do not edit.",
+  "",
+  "# Scaffolding template, not a shippable profile. The generator replaces",
+  "# @CRYPTO_POLICY@ with the composed crypto-policies backend per profile.",
+  "# Node reads nodejs_conf, or openssl_conf with --openssl-shared-config.",
+  "openssl_conf = openssl_init",
+  "nodejs_conf = openssl_init",
+  "config_diagnostics = 1",
+  "",
+  "[openssl_init]",
+  "providers = provider_sect",
+  "ssl_conf = ssl_module",
+  "alg_section = evp_properties",
+  "",
+  "[evp_properties]",
+  "",
+  "[provider_sect]",
+  "default = default_sect",
+  "",
+  "[default_sect]",
+  "activate = 1",
+  "",
+  "[ssl_module]",
+  "system_default = crypto_policy",
+  "",
+  "[crypto_policy]",
+  "CipherString = @SECLEVEL=2:kEECDH:kRSA:kEDH:kPSK:kDHEPSK:kECDHEPSK:kRSAPSK:-aDSS:-3DES:!DES:!RC4:!RC2:!IDEA:-SEED:!eNULL:!aNULL:!MD5:-SHA384:-CAMELLIA:-ARIA:-AESCCM8",
+  "Ciphersuites = TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:TLS_AES_128_CCM_SHA256",
+  "TLS.MinProtocol = TLSv1.2",
+  "TLS.MaxProtocol = TLSv1.3",
+  "DTLS.MinProtocol = DTLSv1.2",
+  "DTLS.MaxProtocol = DTLSv1.2",
+  "SignatureAlgorithms = ECDSA+SHA256:ECDSA+SHA384:ECDSA+SHA512:ed25519:ed448:rsa_pss_pss_sha256:rsa_pss_pss_sha384:rsa_pss_pss_sha512:rsa_pss_rsae_sha256:rsa_pss_rsae_sha384:rsa_pss_rsae_sha512:RSA+SHA256:RSA+SHA384:RSA+SHA512:ECDSA+SHA224:RSA+SHA224",
+  "Groups = *X25519:secp256r1:X448:secp521r1:secp384r1:ffdhe2048:ffdhe3072:ffdhe4096:ffdhe6144:ffdhe8192",
+  "",
+].join("\n");
+
+/**
+ * Option que le `bootstrap` du runtime `nodejs26.x` ajoute à `NODE_OPTIONS` quand il applique le profil
+ * `commercial-2025` (`var/runtime/resolve-tls-profile.sh` de la même couche, fonction `tls_profile_node_options` :
+ * `--tls-cipher-list=` suivi de la valeur de `CipherString`, de `:` et de la valeur de `Ciphersuites` ; les bornes de
+ * protocole du profil, égales aux défauts de Node, ne donnent aucune option). Le test du module vérifie que cette
+ * constante se déduit ainsi du contenu audité. `./egress.ts` ne tolère `--tls-cipher-list` que sous cette graphie
+ * exacte, et seulement quand le fichier examiné est ce profil (0178 § 4 point 2).
+ */
+export const OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025 =
+  "--tls-cipher-list=@SECLEVEL=2:kEECDH:kRSA:kEDH:kPSK:kDHEPSK:kECDHEPSK:kRSAPSK:-aDSS:-3DES:!DES:!RC4:!RC2:!IDEA:-SEED:!eNULL:!aNULL:!MD5:-SHA384:-CAMELLIA:-ARIA:-AESCCM8:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:TLS_AES_128_CCM_SHA256";
+
+/**
+ * Égalité octet à octet avec un contenu audité (0065 § 4 point 1) : ni décodage, ni normalisation des fins de ligne,
+ * ni `trim()`. Les contenus audités sont en ASCII : un caractère, un octet.
+ */
+function egalAuContenu(octets: Uint8Array, audite: string): boolean {
   if (octets.byteLength !== audite.length) return false;
   for (const [i, octet] of octets.entries()) {
     if (octet !== audite.charCodeAt(i)) return false;
@@ -340,7 +404,7 @@ export function directivesOpensslConf(texte: string): string {
   return [...jetons].sort().join(",");
 }
 
-type Etat = { fichiers: number; texteNodejs?: string };
+type Etat = { fichiers: number; texteNodejs?: string; optionChiffrementAdmise?: string };
 
 /**
  * Cible d'un chemin admis par la condition 1.3 : `/dev/null` (rien à lire), sinon chemin réel sous les racines, puis
@@ -361,7 +425,12 @@ function examinerCible(chemin: string, niveau: number, etat: Etat, fs: SystemeFi
   // Octet nul : OpenSSL lit des chaînes C, et le texte qu'il verrait n'est plus celui examiné. Échec fermé.
   if (texte.includes("\0")) return "fichier_refuse";
   // 0065 § 4 point 1 : le fichier désigné par `OPENSSL_CONF` (niveau 0 seulement), égal octet à octet au fichier audité.
-  if (niveau === 0 && egalAuContenuAudite(octets)) return "contenu_audite";
+  if (niveau === 0 && egalAuContenu(octets, CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24)) return "contenu_audite";
+  // 0178 § 4 : même règle pour le profil `commercial-2025` de `nodejs26.x`, avec la seule option de chiffrement admise.
+  if (niveau === 0 && egalAuContenu(octets, CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025)) {
+    etat.optionChiffrementAdmise = OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025;
+    return "contenu_audite";
+  }
   const analyse = analyserTexteOpensslConf(texte);
   if (analyse === "inclusion_refusee") return analyse;
   if (analyse.nodejs) {
@@ -393,10 +462,15 @@ export type ExamenOpensslConf = {
   readonly verdict: VerdictExamen;
   /** Jetons de `directivesOpensslConf` pour le fichier qui a donné `section_nodejs` (0065 § 4 point 3), seulement là. */
   readonly directives?: string;
+  /**
+   * Avec `contenu_audite` du profil `commercial-2025` de `nodejs26.x` seulement (0178 § 4 point 2) : la seule graphie de
+   * `--tls-cipher-list` que la barrière tolère dans `NODE_OPTIONS`. Constante du module, jamais une valeur lue.
+   */
+  readonly optionChiffrementAdmise?: string;
 };
 
 /**
- * Conditions 1.3 à 1.6 de 0062 § 4 sur le chemin déclaré, et admission par contenu audité de 0065 § 4 : verdict fermé
+ * Conditions 1.3 à 1.6 de 0062 § 4 sur le chemin déclaré, et admission par contenu audité de 0065 § 4 et de 0178 § 4 : verdict fermé
  * et classe de racine ; avec `section_nodejs`, les directives du fichier en cause. Ne lève jamais : une erreur du calcul
  * des directives laisse `section_nodejs`, sans `directives` (0065 § 5 point 6).
  */
@@ -411,6 +485,9 @@ export function examinerOpensslConf(chemin: string, fs: SystemeFichiersOpenssl =
     issue = "fichier_refuse";
   }
   const verdict = issue ?? "admis";
+  if (verdict === "contenu_audite" && etat.optionChiffrementAdmise !== undefined) {
+    return { zone, verdict, optionChiffrementAdmise: etat.optionChiffrementAdmise };
+  }
   if (verdict !== "section_nodejs" || etat.texteNodejs === undefined) return { zone, verdict };
   try {
     return { zone, verdict, directives: directivesOpensslConf(etat.texteNodejs) };
