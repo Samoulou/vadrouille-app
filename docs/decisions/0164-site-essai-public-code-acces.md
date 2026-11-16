@@ -1,5 +1,7 @@
 # 0164 — Avis de la Sécurité : site d'essai public, sans protection Vercel ; le code d'accès suffit-il à bloquer tout appel payant ?
 
+**Amendée par 0179** (décideur : Tech Lead, en réponse à la « proposition facultative » ci-dessous) : dans la procédure E2, la preuve (c) peut être réunie sous une seconde forme, sans décompte ni offre payante ; le reste de la procédure est inchangé, et le relevé « garde fermée » n'est pas ouvert.
+
 Statut : **avis de l'agent securite, relu par le Tech Lead à la fusion**. Ce n'est **pas** une décision déléguée : la Sécurité n'a pas de domaine délégué dans « Qui décide quoi » (`docs/CONTEXT.md`, l. 33-44), et 0093 ne s'applique donc pas. Le document porte un numéro de la série des décisions, mais ne tranche rien. La répartition ci-dessous suit ce même passage de `docs/CONTEXT.md` :
 - **Tech Lead** : l'outillage et l'architecture (T1, T2, correctifs E1 à E3).
 - **Samuel** : le redéploiement de `p0-reel`, l'exposition publique (compte externe) et la reprise des risques acceptés (S1 à S4).
