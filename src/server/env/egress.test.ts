@@ -719,9 +719,48 @@ describe("p0: profil TLS commercial-2025 du runtime Lambda nodejs26.x (décision
     }
   });
 
+  const BLANCS_REFUSES: [string, string][] = [
+    ["tabulation", "\t"],
+    ["retour à la ligne \\n", "\n"],
+    ["retour chariot \\r", "\r"],
+    ["tabulation verticale \\v", "\v"],
+    ["saut de page \\f", "\f"],
+    ["espace insécable U+00A0", "\u00A0"],
+    ["séparateur de ligne U+2028", "\u2028"],
+    ["U+FEFF", "\uFEFF"],
+  ];
+
+  describe.each(BLANCS_REFUSES)("blanc autre que l'espace U+0020 dans NODE_OPTIONS (%s) : Node ne découpe pas dessus", (_nom, blanc) => {
+    it.each<[string, string]>([
+      ["après la constante, puis une suite ajoutée", `${OPTION}${blanc}:CAMELLIA`],
+      ["après la constante, puis un niveau abaissé", `${OPTION}${blanc}:@SECLEVEL=0`],
+      ["après la constante, seul", `${OPTION}${blanc}`],
+      ["avant la constante", `${blanc}${OPTION}`],
+      ["entre une autre option et la constante", `--no-warnings${blanc}${OPTION}`],
+      ["ailleurs, la constante étant séparée par des espaces", `--title=a${blanc}b ${OPTION} --no-warnings`],
+    ])("%s : refus, cause --tls-cipher-list", (_cas, nodeOptions) => {
+      const env = { ...ENV, NODE_OPTIONS: nodeOptions };
+      expect(chiffrementDuProfilSeul(nodeOptions, [], OPTION)).toBe(false);
+      expect(verifierSortie(env, [], undefined, fsProfil())).toEqual(REFUS_OPTION);
+      expect(diagnostiquer(env, [], fsProfil())).toEqual({ cause: "--tls-cipher-list", ...ADMIS });
+    });
+  });
+
+  it("caractère de contrôle ou non ASCII ailleurs dans NODE_OPTIONS : refus ; espaces U+0020 seuls, même répétés : admis", () => {
+    for (const intrus of ["\0", "\u001B", "\u007F", "é", "\u200B", "\u3000"]) {
+      expect(chiffrementDuProfilSeul(`--title=a${intrus}b ${OPTION}`, [], OPTION)).toBe(false);
+      expect(chiffrementDuProfilSeul(`${OPTION}${intrus}`, [], OPTION)).toBe(false);
+    }
+    expect(chiffrementDuProfilSeul(`   --no-warnings   ${OPTION}   --max-old-space-size=4096 `, [], OPTION)).toBe(true);
+    expect(verifierSortie({ ...ENV, NODE_OPTIONS: `  ${OPTION}  ` }, [], undefined, fsProfil())).toEqual({ ok: true });
+  });
+
   it("chiffrementDuProfilSeul : chaque occurrence doit être le jeton exact de NODE_OPTIONS", () => {
     expect(chiffrementDuProfilSeul(OPTION, [], OPTION)).toBe(true);
-    expect(chiffrementDuProfilSeul(`  --no-warnings\t${OPTION}\n`, ["--expose-gc"], OPTION)).toBe(true);
+    // Attendu corrigé (revue du Tech Lead, head 5031421) : une tabulation ou un retour à la ligne n'est pas un séparateur
+    // pour Node ; ce cas, qui attendait `true`, est un refus.
+    expect(chiffrementDuProfilSeul(`  --no-warnings\t${OPTION}\n`, ["--expose-gc"], OPTION)).toBe(false);
+    expect(chiffrementDuProfilSeul(`  --no-warnings ${OPTION} `, ["--expose-gc"], OPTION)).toBe(true);
     expect(chiffrementDuProfilSeul(`${OPTION} ${OPTION}`, [], OPTION)).toBe(true);
     expect(chiffrementDuProfilSeul(undefined, [], OPTION)).toBe(true);
     expect(chiffrementDuProfilSeul("", [], OPTION)).toBe(true);

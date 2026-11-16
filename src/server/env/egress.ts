@@ -18,8 +18,8 @@ import {
 /**
  * Barrière de sortie des clients réels (spécification `specs/P0-suite-executions-reelles.md`, « Modules
  * d'environnement étroits » ; décisions 0031 et 0034). Lit **seulement** les variables de déploiement, de proxy et de
- * TLS nommées ci-dessous, `process.execArgv` et, pour 0062, `process.config` ; ne rend **jamais** leur valeur : `{ ok: true }` ou un seul code
- * fermé, contrôlés dans cet ordre (le premier refus l'emporte) :
+ * TLS nommées ci-dessous, `process.execArgv` et, pour 0062, `process.config` ; ne rend **jamais** leur valeur :
+ * `{ ok: true }` ou un seul code fermé, contrôlés dans cet ordre (le premier refus l'emporte) :
  * 1. `production_refused` : liste d'autorisation de `VERCEL_ENV` (`preview` ou `development`, comparaison exacte),
  *    `VERCEL_TARGET_ENV` égale si présente (même vide), `VADROUILLE_ENV` différente de `production` (comparaison
  *    normalisée : casse, espaces, NFKC) ;
@@ -115,20 +115,31 @@ function nomsDOption(brut: string): string[] {
 const OPTION_CHIFFREMENT = "--tls-cipher-list";
 
 /**
+ * Seuls caractères admis dans `NODE_OPTIONS` pour la tolérance de 0178 : l'espace U+0020 et l'ASCII imprimable (U+0021
+ * à U+007E), sauf `"`, `'` et `\`. Node ne découpe `NODE_OPTIONS` que sur l'espace U+0020 et interprète `"` et `\` :
+ * tout autre blanc (tabulation, retour à la ligne, U+00A0, U+2028, U+FEFF…) resterait, pour Node, **dans** la valeur
+ * d'une option. Tout caractère hors de cette classe ferme la tolérance.
+ */
+const NODE_OPTIONS_SIMPLE = /^[ !#-&(-[\]-~]*$/;
+
+/**
  * Décision 0178 § 4 point 2 : vrai si **chaque** jeton qui nomme `--tls-cipher-list` (au sens d'`optionsDeNode` : `_`
- * pour `-`, guillemets aux bords, formes niées) est un jeton de `NODE_OPTIONS` **exactement égal** à `attendue`, la
- * constante du profil audité. Faux, donc cause `--tls-cipher-list` comme avant, dès que : l'option figure dans
- * `execArgv` (le `bootstrap` ne l'y met pas) ; un jeton diffère d'un seul caractère (autre liste, `_`, guillemet, forme
- * niée, option sans `=valeur`) ; ou `NODE_OPTIONS` contient un guillemet ou un `\` où que ce soit (Node les interprète
- * et pourrait regrouper les jetons autrement que ce découpage sur les blancs : échec fermé). La valeur n'est que
+ * pour `-`, formes niées) est un jeton de `NODE_OPTIONS` **exactement égal** à `attendue`, la constante du profil
+ * audité. Faux, donc cause `--tls-cipher-list` comme avant, dès que :
+ * - l'option figure dans `execArgv` (le `bootstrap` ne l'y met pas) ;
+ * - `NODE_OPTIONS` contient un caractère hors de `NODE_OPTIONS_SIMPLE` : guillemet, `\`, **tout blanc autre que
+ *   l'espace U+0020**, caractère de contrôle ou caractère non ASCII, où que ce soit (échec fermé) ;
+ * - un jeton, découpé **sur l'espace U+0020 seul, comme Node**, nomme l'option et diffère de `attendue` d'un seul
+ *   caractère (autre liste, suffixe, `_`, forme niée, option sans `=valeur`).
+ * Sous ces conditions, le découpage de la barrière et celui de Node rendent les mêmes jetons. La valeur n'est que
  * comparée, jamais rendue.
  */
 export function chiffrementDuProfilSeul(nodeOptions: string | undefined, execArgv: readonly string[], attendue: string): boolean {
   const nomme = (brut: string) => nomsDOption(brut).includes(OPTION_CHIFFREMENT);
   if (execArgv.some(nomme)) return false;
   const texte = nodeOptions ?? "";
-  if (/["'\\]/.test(texte)) return false;
-  return texte.split(/\s+/).every((brut) => !nomme(brut) || brut === attendue);
+  if (!NODE_OPTIONS_SIMPLE.test(texte)) return false;
+  return texte.split(" ").every((brut) => !nomme(brut) || brut === attendue);
 }
 
 /** Valeurs lues, jamais rendues : seulement comparées. Les noms des variables sont les clés des objets. */
@@ -183,13 +194,18 @@ const normaliserEnv = (valeur: string) => valeur.normalize("NFKC").trim().toLowe
  * Le fichier n'est lu que si 1.1, 1.2, 1.7 et 1.3 passent. Rend la classe de racine et le verdict fermé et, avec
  * `section_nodejs`, les directives en jetons (0065 § 4 point 3) ; jamais une valeur.
  */
+type ExamenSortie = {
+  readonly zone: ZoneOpensslConf;
+  readonly verdict: VerdictOpensslConf;
+  readonly directives?: string;
+  readonly optionChiffrementAdmise?: string;
+};
+
 function examenOpensslConf(
   lu: Lecture,
   fs: SystemeFichiersOpenssl,
   configNode: unknown,
-):
-  | { readonly zone: ZoneOpensslConf; readonly verdict: VerdictOpensslConf; readonly directives?: string; readonly optionChiffrementAdmise?: string }
-  | undefined {
+): ExamenSortie | undefined {
   const valeur = lu.tls.OPENSSL_CONF;
   if (valeur === undefined || !posee(valeur)) return undefined;
   const reel = deploiementReel();
@@ -325,8 +341,8 @@ export function verifierSortie(
   const examen = examenOpensslConf(lu, fs, configNode);
   const exception = examen !== undefined && VERDICTS_EXCEPTION.has(examen.verdict);
   // 0178 § 4 point 2 : seulement avec l'exception ouverte par le profil audité, et sous sa seule graphie.
-  const chiffrementTolere =
-    exception && examen.optionChiffrementAdmise !== undefined && chiffrementDuProfilSeul(env.NODE_OPTIONS, execArgv, examen.optionChiffrementAdmise);
+  const optionAdmise = exception ? examen.optionChiffrementAdmise : undefined;
+  const chiffrementTolere = optionAdmise !== undefined && chiffrementDuProfilSeul(env.NODE_OPTIONS, execArgv, optionAdmise);
   const tls = causeTls(lu, exception, chiffrementTolere ? OPTION_CHIFFREMENT : undefined);
   diagnostic?.({
     ...(tls === undefined ? {} : { cause: tls }),

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { getAuthAdapter, isPrototypeAdapter } from "@/adapters";
+import { authAdapterChoice, betterAuthAllowed, getAuthAdapter, isPrototypeAdapter, mockAuthAllowed } from "@/adapters";
 import { SignInForm } from "@/features/compte/SignInForm";
 import { normaliserSuite } from "@/features/compte/suite";
 import { creationRoutes } from "@/features/creation/routes";
@@ -32,23 +32,29 @@ type SearchParams = Record<string, string | string[] | undefined>;
  * demandé par `R-lancer` lui-même ; appelée par la création, la page mène à `R-lancer` sans lire l'adaptateur `auth`.
  * Appelée autrement (adresse saisie à la main), sur un site d'essai dont la garde de l'adaptateur `auth` est fermée, la
  * page est introuvable plutôt qu'en erreur (ticket 1141) : aucun compte n'existe sur ce site, et la garde reste fermée.
+ * Seul le refus de la garde (`gardeAuthFermee`, ci-dessous) donne la page introuvable : aucune erreur n'est rattrapée
+ * ici, et une panne de l'adaptateur lève comme avant. Pas de ligne de journal : hors de `src/server`, seul
+ * `@/server/actions/*` s'importe (décision 0020 § 11), et le refus de la garde n'est pas une panne.
  * Hors site d'essai, rien ne change : la garde fermée lève, et l'erreur générique s'affiche.
  */
 export default async function ConnexionPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const raw = (await searchParams).suite;
   const suite = normaliserSuite(Array.isArray(raw) ? raw[0] : raw);
   if (suite === creationRoutes.lancer() && isPrototypeAdapter()) redirect(suite);
-  const adapter = adaptateurAuth();
+  if (isPrototypeAdapter() && gardeAuthFermee()) notFound();
+  const adapter = getAuthAdapter();
   if (suite === creationRoutes.lancer() && (await hasSession())) redirect(suite);
   return <SignInForm suite={suite} codeTtlMs={adapter.config.codeTtlMs} authMode={adapter.mode} />;
 }
 
-/** Adaptateur `auth` ; sur le site d'essai (adaptateur `prototype`), garde fermée = page introuvable (ticket 1141). */
-function adaptateurAuth() {
-  try {
-    return getAuthAdapter();
-  } catch (erreur) {
-    if (isPrototypeAdapter()) notFound();
-    throw erreur;
-  }
+/**
+ * Vrai si la garde de l'adaptateur `auth` refuserait la connexion : les trois cas d'`assertAuthAdapter`
+ * (`src/adapters/auth-guard.ts`), lus par ses prédicats exportés, sans lever. Si cette lecture s'écartait un jour de la
+ * garde, `getAuthAdapter()` lèverait ensuite comme avant : l'écart ne peut pas ouvrir la connexion.
+ */
+function gardeAuthFermee(): boolean {
+  const choix = authAdapterChoice();
+  if (choix === "mock") return !mockAuthAllowed();
+  if (choix === "better-auth") return !betterAuthAllowed();
+  return true;
 }
