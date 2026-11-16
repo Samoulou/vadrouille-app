@@ -1,5 +1,7 @@
 # 0164 — Avis de la Sécurité : site d'essai public, sans protection Vercel ; le code d'accès suffit-il à bloquer tout appel payant ?
 
+**Amendée par 0179** (décideur : Tech Lead, en réponse à la « proposition facultative » ci-dessous ; avis favorable de la Sécurité exigé avant la fusion) : dans la procédure E2, relevé sans cookie, la preuve (c) admet une seconde forme, sans décompte ni offre payante ; l'une ou l'autre forme suffit, mais un décompte lisible qui montre une invocation rend le relevé non conforme. Le reste de la procédure est inchangé, et le relevé « garde fermée » n'est pas ouvert.
+
 Statut : **avis de l'agent securite, relu par le Tech Lead à la fusion**. Ce n'est **pas** une décision déléguée : la Sécurité n'a pas de domaine délégué dans « Qui décide quoi » (`docs/CONTEXT.md`, l. 33-44), et 0093 ne s'applique donc pas. Le document porte un numéro de la série des décisions, mais ne tranche rien. La répartition ci-dessous suit ce même passage de `docs/CONTEXT.md` :
 - **Tech Lead** : l'outillage et l'architecture (T1, T2, correctifs E1 à E3).
 - **Samuel** : le redéploiement de `p0-reel`, l'exposition publique (compte externe) et la reprise des risques acceptés (S1 à S4).
@@ -37,7 +39,7 @@ Constat, dans le code de `main` (`f9adc17`) :
    - Un inconnu ne peut pas réserver d'exécution sans le code (§ 1.2).
 4. **Relevé non conforme** : rien n'est lancé. Samuel ferme la garde, par un redéploiement avec `P0_REAL_RUNS` différent de `enabled` (`src/server/env/p0.ts:92`), ou supprime le déploiement, en attendant la décision de la Sécurité (0069 point 3).
 
-**Proposition facultative au Tech Lead :** amender 0069 pour qu'un relevé puisse se faire garde fermée (témoin 404 de l'application distinct du 404 de la plateforme, autre forme de la preuve c). Ce n'est pas nécessaire avec la procédure ci-dessus, et c'est à lui de le décider.
+**Proposition facultative au Tech Lead :** amender 0069 pour qu'un relevé puisse se faire garde fermée (témoin 404 de l'application distinct du 404 de la plateforme, autre forme de la preuve c). Ce n'est pas nécessaire avec la procédure ci-dessus, et c'est à lui de le décider. *(Traitée en partie par 0179 : autre forme de la preuve (c) ; le relevé garde fermée n'est pas ouvert.)*
 
 Autre réserve, hors code d'accès : le seul appel Google payant qui ne dépend pas du code est le chargement de la carte dans le navigateur (Maps JavaScript API, clé publique `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`). Ce n'est pas nouveau : la clé est déjà publique sur la production de `main` depuis le 2026-10-12. Mais aucun plafond n'est consigné pour elle (écart E4, question S2).
 
