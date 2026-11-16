@@ -13,7 +13,12 @@ const redirect = vi.hoisted(() =>
     throw new Error(`redirect:${to}`);
   }),
 );
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), redirect }));
+const notFound = vi.hoisted(() =>
+  vi.fn(() => {
+    throw new Error("notFound");
+  }),
+);
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), redirect, notFound }));
 vi.mock("@/server/actions/compte", () => ({ requestCode: vi.fn(), verifyCode: vi.fn(), hasSession: vi.fn(async () => false) }));
 vi.mock("@/adapters", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/adapters")>();
@@ -33,6 +38,7 @@ async function renderPage(suite?: string | string[]) {
 afterEach(() => {
   vi.unstubAllEnvs();
   redirect.mockClear();
+  notFound.mockClear();
   vi.mocked(adapters.getAuthAdapter).mockClear();
 });
 
@@ -95,6 +101,35 @@ describe("/connexion", () => {
   it("garde fermée (déploiement de production) : la page lève, l'erreur générique s'affiche", async () => {
     vi.stubEnv("VADROUILLE_ENV", "production");
     await expect(ConnexionPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(/connexion simulée refusée/);
+    expect(notFound).not.toHaveBeenCalled();
+  });
+
+  it.each([[undefined], ["/voyages"], ["/compte"]])(
+    "site d'essai, garde fermée, suite %j (ticket 1141) : page introuvable plutôt qu'erreur, la garde reste fermée",
+    async (suite) => {
+      vi.stubEnv("DATA_ADAPTER", "prototype");
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("VERCEL_ENV", "preview");
+      await expect(ConnexionPage({ searchParams: Promise.resolve(suite === undefined ? {} : { suite }) })).rejects.toThrow("notFound");
+      expect(notFound).toHaveBeenCalledTimes(1);
+      expect(adapters.getAuthAdapter).toHaveBeenCalledTimes(1);
+      expect(redirect).not.toHaveBeenCalled();
+      expect(hasSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it("site d'essai, garde ouverte (développement) : l'écran s'affiche comme avant, aucune page introuvable", async () => {
+    vi.stubEnv("DATA_ADAPTER", "prototype");
+    const element = await renderPage("/voyages");
+    expect(element.props).toMatchObject({ suite: "/voyages", authMode: "simulated" });
+    expect(notFound).not.toHaveBeenCalled();
+  });
+
+  it("hors site d'essai, garde fermée en préversion : la page lève toujours, jamais introuvable", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    await expect(ConnexionPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(/connexion simulée refusée/);
+    expect(notFound).not.toHaveBeenCalled();
   });
 
   it("site d'essai (E2E-essai, lot 2, D3) : appelée par la création, R-lancer sans lire l'adaptateur auth ni la session", async () => {
