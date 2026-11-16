@@ -1,8 +1,8 @@
 # 0178 — Barrière de sortie sur le runtime `nodejs26.x` de Vercel : le profil TLS `commercial-2025`, admis si le fichier est exactement celui, audité, du runtime Lambda, avec la seule option de chiffrement que ce runtime ajoute
 
-Statut : **proposée par le rôle `backend`** (ticket #1141, à la demande de Samuel, qui ne peut plus rien lancer sur le site d'essai). La décision est **déléguée au Tech Lead** (architecture, outillage et tests : « Qui décide quoi » de `docs/CONTEXT.md`) : elle n'est la sienne qu'à sa validation de la PR. **L'admission de la section 4 n'est effective qu'après l'avis de la Sécurité** (0055 S-1 point 4 : une garde toujours fermée n'est pas corrigée par l'assouplissement d'une condition sans nouvel avis ; même forme que 0058, 0062 et 0065). La section 5 est une analyse de l'auteur, **pas** un avis de la Sécurité ; cet avis est rendu à la revue de la PR, qui ne peut pas être fusionnée sans lui. À lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Aucune dépense, aucun compte externe, aucune donnée personnelle, aucun réglage Vercel, aucun secret.
+Statut : **décidée par le Tech Lead le 2026-11-16** (décision déléguée : architecture, outillage et tests, « Qui décide quoi » de `docs/CONTEXT.md`), sur proposition du rôle `backend` (ticket #1141, à la demande de Samuel, qui ne peut plus rien lancer sur le site d'essai). **Définitive dès la fusion de la PR #1142, sans délai de veto** (décision 0093). **Avis de la Sécurité (0055 S-1 point 4 : une garde toujours fermée n'est pas corrigée par l'assouplissement d'une condition sans nouvel avis ; même forme que 0058, 0062 et 0065) : favorable, sous conditions, rendu à la revue du head `5031421` ; le risque (f) est à reconfirmer par la Sécurité sur le head corrigé `1053069`**, à la revue de la PR, qui ne peut pas être fusionnée sans cette reconfirmation (section 5 bis). L'admission de la section 4 est effective à la fusion. La section 5 reste l'analyse de l'auteur, pas l'avis. À lister dans la note de version suivante (rubrique « Décisions prises par le studio »). Aucune dépense, aucun compte externe, aucune donnée personnelle, aucun réglage Vercel, aucun secret.
 
-Date : 2026-11-16 · Auteur : backend · Décideur : Tech Lead (à la revue) · Avis de la Sécurité : à rendre (section 5) · Ticket #1141 · `main` relu : `cdfa2db` · Complète 0065 (section 4, second contenu audité) et 0062 (règle des options TLS, section 4 point 2 : une exception, bornée).
+Date : 2026-11-16 · Auteur : backend · Décideur : Tech Lead (validation : section 5 bis) · Avis de la Sécurité : favorable sous conditions sur `5031421`, risque (f) à reconfirmer sur `1053069` (section 5 bis) · Ticket #1141 · Ticket de suite #1143 · `main` relu : `cdfa2db` · Complète 0065 (section 4, second contenu audité) et 0062 (règle des options TLS, section 4 point 2 : une exception, bornée).
 
 ## 1. Constat
 
@@ -93,7 +93,7 @@ Critère : celui de 0065 § 3 (authentification du serveur : chaîne, autorités
 
 Absents du fichier, et donc toujours refusés s'ils apparaissent (un octet de plus ferme la barrière) : `VerifyMode`, `VerifyCAFile`, `VerifyCAPath`, `VerifyCAStore`, `ChainCA*`, `RequestCAFile`, `Options`, `.include`, `.pragma`, `engines`, `module`, `default_properties`, tout autre fournisseur.
 
-**L'option `--tls-cipher-list` que le runtime ajoute.** Sa valeur est `CipherString`, `:`, `Ciphersuites` du fichier ci-dessus (constante `OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025` ; son test vérifie qu'elle se déduit ainsi du contenu audité). Ce que cette liste admet, mesuré par l'auteur avec `openssl ciphers -v` (**OpenSSL 3.0.13 local**, pas le 3.5.9 du runtime : à rejouer par la Sécurité) et comparé à la liste par défaut de Node (`crypto.constants.defaultCoreCipherList`) :
+**L'option `--tls-cipher-list` que le runtime ajoute.** Sa valeur est `CipherString`, `:`, `Ciphersuites` du fichier ci-dessus (constante `OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025` ; son test vérifie qu'elle se déduit ainsi du contenu audité). Ce que cette liste admet, mesuré par l'auteur **le 2026-11-16** avec `openssl ciphers -v` (**OpenSSL 3.0.13 local**, pas le 3.5.9 du runtime : les décomptes ci-dessous valent pour 3.0.13 et sont **à rejouer avec OpenSSL 3.5.x**) et comparé à la liste par défaut de Node (`crypto.constants.defaultCoreCipherList`) :
 
 - niveau de sécurité `@SECLEVEL=2` (112 bits au moins : pas de RSA ni de DH sous 2048 bits, pas de SHA-1 dans les signatures) ; `!eNULL` et `!aNULL` : **aucune suite sans chiffrement, aucune suite sans authentification du serveur** ; ni RC4, ni DES, ni 3DES, ni MD5, ni IDEA, ni SEED, ni Camellia, ni ARIA ;
 - TLS 1.2, sans clé prépartagée : **34 suites, toutes comprises dans les 58 de la liste par défaut de Node**. La liste du profil est donc un sous-ensemble strict : elle retire DSS, ARIA, CCM8 et les suites CBC à HMAC-SHA384, et n'ajoute rien ;
@@ -102,9 +102,9 @@ Absents du fichier, et donc toujours refusés s'ils apparaissent (un octet de pl
 
 Ce qui est **moins bon que le défaut de Node**, et soumis en section 5 : l'ordre de préférence du client (les suites à échange RSA statique, sans confidentialité persistante, précèdent les suites `DHE` ; la liste par défaut de Node les admet aussi, par `HIGH`, mais en dernier). Le serveur choisit ; OpenRouter et Google négocient TLS 1.3, où cet ordre ne joue pas.
 
-## 4. Décision proposée : admission par contenu audité, option de chiffrement à la graphie près
+## 4. Décision : admission par contenu audité, option de chiffrement à la graphie près
 
-**Effective seulement après l'avis de la Sécurité** (statut).
+**Validée par le Tech Lead le 2026-11-16 (section 5 bis). Effective à la fusion de la PR #1142, qui attend la reconfirmation du risque (f) par la Sécurité** (statut).
 
 1. **Second contenu audité** (même règle que 0065 § 4 point 1, rien d'autre) : quand toutes les conditions de 0062 § 4 tiennent sauf 1.5, le fichier **désigné par `OPENSSL_CONF`** (niveau 0, jamais une inclusion) est admis si ses octets sont **exactement** les 1370 octets de la section 2 point 1. Verdict `contenu_audite`, marque `vercel_runtime_openssl_conf` : **aucune valeur nouvelle** dans les listes fermées du journal. Toute différence, même d'un octet, laisse `section_nodejs` et la barrière fermée.
 2. **Option de chiffrement, une seule exception à la règle des options TLS** (0062 § 4 point 2). `--tls-cipher-list` reste dans `OPTIONS_TLS` et reste refusée, **sauf** si toutes ces conditions tiennent (`chiffrementDuProfilSeul`, `src/server/env/egress.ts`) :
@@ -134,7 +134,24 @@ _Rédigée par le rôle `backend`, auteur de cette proposition. **Ce n'est pas u
 5. **Risques résiduels (a), (b) et (c) de 0062 § 6** : inchangés (fichier par défaut d'OpenSSL non contrôlé ; le fichier examiné peut ne pas être celui que Node a chargé ; dépendance au nom `nodejs_conf`).
 6. **Journal** : aucune valeur nouvelle ; ni la liste de chiffrement, ni le chemin, ni un nom de section ne sortent (test sentinelle).
 7. **Dépendances, confinement** : aucun import nouveau, aucune ligne nouvelle du régime de confinement ; `env.NODE_OPTIONS` était déjà lue par `egress.ts`.
-8. **Constat hors de cette décision, non corrigé ici** : `optionsDeNode` ne retire les guillemets qu'aux bords d'un jeton. Une graphie comme `"--tls-cipher-list"=x`, que Node lit comme `--tls-cipher-list=x`, donne aujourd'hui un nom qui n'est dans aucune liste, donc aucun refus. Cela vaut pour toute option interdite, avant comme après 0178, et ne peut venir que d'une valeur de `NODE_OPTIONS` écrite ainsi par la plateforme ou le projet. Un ticket séparé est proposé (question ouverte 3).
+8. **Constat hors de cette décision, non corrigé ici** : `optionsDeNode` ne retire les guillemets qu'aux bords d'un jeton. Une graphie comme `"--tls-cipher-list"=x`, que Node lit comme `--tls-cipher-list=x`, donne aujourd'hui un nom qui n'est dans aucune liste, donc aucun refus. Cela vaut pour toute option interdite, avant comme après 0178, et ne peut venir que d'une valeur de `NODE_OPTIONS` écrite ainsi par la plateforme ou le projet. **Ticket #1143**, ouvert par le Tech Lead le 2026-11-16 (question ouverte 3).
+
+## 5 bis. Validation du Tech Lead et avis de la Sécurité (2026-11-16)
+
+_Rédigée par le Tech Lead. Ne vaut que pour ce qu'il a relu lui-même : le diff de code des heads `5031421` puis `1053069` (`src/server/env/openssl-conf.ts`, `src/server/env/egress.ts`, leurs tests, `src/app/(creation)/connexion/page.tsx` et son test)._
+
+1. **Première relecture (head `5031421`) : validation refusée.** `chiffrementDuProfilSeul` découpait `NODE_OPTIONS` sur tous les blancs ; la constante suivie d'une tabulation ou d'un retour à la ligne, puis de `:CAMELLIA`, était tolérée alors que Node appliquait une autre liste. Mesuré par le Tech Lead : sonde sur la fonction, et poignée de main TLS locale (Node 22.23.4, OpenSSL 3.5.9) refusée avec la constante exacte, acceptée avec le blanc et le suffixe.
+2. **Seconde relecture (head `1053069`) : la section 4 est validée**, points 1 à 7. Le correctif tient la garantie du point 2 : `NODE_OPTIONS_SIMPLE` n'admet que l'espace U+0020 et l'ASCII imprimable sans `"`, `'` ni `\`, et le découpage se fait sur l'espace seul. Sonde rejouée : tabulation et retour à la ligne refusés, constante exacte admise. Tests de `openssl-conf`, d'`egress` et de `/connexion` passés en local (429, avec la sonde), aucun supprimé. Cas restant de la section 5 point 4 (la constante placée après une option qui attend sa valeur) : mesuré par le Tech Lead sur **Node 22.23.4 seulement**, avec `--title` : Node refuse de démarrer (« requires an argument »), il ne prend pas la constante pour une valeur. **Non mesuré sur Node 26 ni pour les autres options à valeur : à confirmer par la Sécurité.**
+3. **Avis de la Sécurité** (0055 S-1 point 4), tel que rendu dans la revue consolidée du head `5031421` : **favorable, aucun bloquant** ; couche, fichier et script rejoués ; risques (d), (e) et (f) acceptés aux conditions suivantes, qui font partie de la décision :
+   - en **préversion de Vercel seulement** ;
+   - **réouverture à chaque changement de version du runtime ou de version majeure de Node** ;
+   - les profils `commercial-2026` et `cnsa-1.0` **restent fermés** ;
+   - pas d'acceptation de risque requise de Samuel, selon la Sécurité.
+
+   **Réserve, dite honnêtement** : cet avis a été rendu sur un texte de la section 5 point 4 qui était faux (point 1 ci-dessus). L'acceptation du risque (f) est donc **à reconfirmer par la Sécurité sur le head `1053069`**, à la revue de la PR ; l'admission n'est pas effective et la PR n'est pas fusionnable sans cette reconfirmation. Les avis sur (d) et (e) ne dépendent pas du correctif.
+4. **`engines.node` : ne pas borner.** La barrière échoue fermée à chaque changement de runtime (un octet de différence dans le fichier, ou une autre graphie de l'option, la referme) : le runtime ne peut donc pas changer « sans décision », il ferme le site d'essai jusqu'à une nouvelle décision du type de celle-ci, avec avis de la Sécurité. Un changement de runtime ou de version majeure de Node impose cette nouvelle décision. Figer la version de Node toucherait tous les déploiements, production comprise : ce serait une décision distincte, à prendre avec Samuel.
+5. **Ticket de la section 5 point 8 : acté**, #1143 (`optionsDeNode` et les guillemets à l'intérieur d'un jeton). Antérieur à cette décision, il ne la bloque pas.
+6. **`/connexion`** : la forme du head `1053069` suffit. La page ne rattrape plus aucune erreur et lit les prédicats de la garde ; un écart avec `assertAuthAdapter` ferait lever `getAuthAdapter()` comme avant, il ne peut pas ouvrir la connexion. L'absence de ligne de journal est acceptée (0020 § 11 : pas d'import de `@/server/log` hors de `src/server`), puisque plus rien n'est masqué.
 
 ## 6. Code livré (PR du ticket #1141)
 
@@ -155,13 +172,13 @@ _Rédigée par le rôle `backend`, auteur de cette proposition. **Ce n'est pas u
 
 ## Ce qui revient à qui
 
-- **Sécurité** : l'avis de la section 5 (0055 S-1 point 4), dont les risques (d), (e) et (f). Bloque la fusion.
-- **Tech Lead** : la décision elle-même (section 4), le choix entre cette voie et celles du point 7, la revue du code.
+- **Sécurité** : l'avis de la section 5 (0055 S-1 point 4), rendu sur le head `5031421` (section 5 bis point 3) ; reste la reconfirmation du risque (f) sur le head `1053069`. Bloque la fusion.
+- **Tech Lead** : la décision elle-même (section 4), le choix entre cette voie et celles du point 7, la revue du code. Fait : section 5 bis.
 - **Samuel** : rien à trancher si la Sécurité et le Tech Lead acceptent dans le cadre déjà posé par 0065 (préversion, clés révocables). Lui reviendraient : la mise à jour de `p0-reel` (section 7) ; tout réglage Vercel (section 4 point 7) ; et **l'acceptation du risque** si la Sécurité juge que (d), (e) ou (f) dépasse ce cadre, par exemple parce que le site d'essai est public. Cette acceptation ne se tranche pas ici.
 
 ## Questions ouvertes
 
-1. **Sécurité** — Rendre l'avis de la section 5. Bloque l'effet de l'admission et la fusion de la PR, donc la réouverture du site d'essai.
-2. **Tech Lead** — Valider ou refuser la section 4, et dire si `engines.node` doit être borné pour que le runtime ne change plus sans décision. Bloque la fusion.
-3. **Tech Lead, Sécurité** — Ouvrir un ticket pour le constat de la section 5 point 8 (guillemets à l'intérieur d'un jeton de `NODE_OPTIONS`) ? Ne bloque rien ici.
+1. **Sécurité** — Avis de la section 5 : rendu, favorable sous conditions, sur le head `5031421` (section 5 bis point 3). **Reste ouvert** : reconfirmer le risque (f) sur le head `1053069`, dont le cas restant de la section 5 point 4, et rejouer la mesure des chiffrements avec OpenSSL 3.5.x (section 3). Bloque l'effet de l'admission et la fusion de la PR, donc la réouverture du site d'essai.
+2. **Tech Lead** — _Close le 2026-11-16_ : section 4 validée, `engines.node` non borné (section 5 bis points 2 et 4).
+3. **Tech Lead, Sécurité** — _Close le 2026-11-16_ : ticket #1143 ouvert (section 5 bis point 5). Ne bloque rien ici.
 4. **Samuel** — Après la fusion : mettre `p0-reel` à jour depuis `main` (et `mvp-essai` quand elle sera déployée). Bloque le test grandeur nature.
