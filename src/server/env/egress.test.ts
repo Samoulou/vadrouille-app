@@ -12,6 +12,7 @@ import {
   CODES_REFUS_SORTIE,
   DIRECTIVES_SORTIE,
   EXCEPTIONS_SORTIE,
+  nodeOptionsLisible,
   OPTIONS_TLS,
   optionsDeNode,
   VERDICTS_SORTIE,
@@ -768,6 +769,84 @@ describe("p0: profil TLS commercial-2025 du runtime Lambda nodejs26.x (décision
     expect(chiffrementDuProfilSeul(`${OPTION} --no-no-tls_cipher_list`, [], OPTION)).toBe(false);
     expect(chiffrementDuProfilSeul(`${OPTION}=x`, [], OPTION)).toBe(false);
     expect(chiffrementDuProfilSeul(`${OPTION} '`, [], OPTION)).toBe(false);
+  });
+});
+
+describe("p0: NODE_OPTIONS illisible sans ambiguïté, refus fermé pour toute la barrière (ticket 1143, 0178 § 4 point 8)", () => {
+  const REFUS = { ok: false, code: "tls_env_refused" };
+
+  // Node retire les guillemets et interprète `\` où qu'ils soient : chacune de ces graphies est, pour Node, l'option
+  // interdite. La barrière n'y lit aucun nom connu ; elle refuse parce que la valeur sort de la classe admise.
+  it.each<[string, string]>([
+    ["TLS 1.0, guillemets au milieu du nom", '--tls-m"in-v1".0'],
+    ["proxy d'environnement, guillemets au milieu du nom", '--use-env-pr"oxy"'],
+    ["autorités d'OpenSSL, guillemets au milieu du nom", '--use-open"ssl"-ca'],
+    ["TLS 1.1, guillemets autour de la fin du nom", '--tls-min-v1."1"'],
+    ["clés de session, guillemets au milieu du nom", '--tls-key"log"=/tmp/k'],
+    ["configuration OpenSSL, guillemets au milieu du nom", '--openssl-con"fig"=/tmp/c'],
+    ["autorités du système, guillemets au milieu du nom", '--use-sys"tem"-ca'],
+    ["analyseur HTTP non sûr, guillemets au milieu du nom", '--insecure-http-pa"rser"'],
+    ["chiffrement, guillemets autour du nom", '"--tls-cipher-list"=DEFAULT'],
+    ["\\ dans un nom d'option TLS", "--tls-m\\in-v1.0"],
+    ["\\ dans le nom de l'option de proxy", "--use-env-pr\\oxy"],
+    ["guillemet simple au milieu d'un nom", "--tls-m'in-v1'.0"],
+    ["tabulation dans NODE_OPTIONS, aucune option interdite lisible", "--no-warnings\t--title=x"],
+    ["retour à la ligne à la fin", "--no-warnings\n"],
+    ["espace insécable U+00A0", "--no-warnings\u00A0--title=x"],
+    ["caractère non ASCII dans une valeur", "--title=é"],
+    ["guillemets autour d'une option sans danger", '"--no-warnings"'],
+  ])("%s : tls_env_refused, sans cause, hors de toute exception", (_nom, nodeOptions) => {
+    const env = { ...PREVIEW, NODE_OPTIONS: nodeOptions };
+    expect(nodeOptionsLisible(nodeOptions)).toBe(false);
+    expect(sortie(env)).toEqual(REFUS);
+    expect(JSON.stringify(diagnostiquer(env) ?? {})).not.toContain("SENTINELLE");
+    expect(sortie({ ...env, VERCEL_ENV: "development" })).toEqual(REFUS);
+  });
+
+  it("aucune cause n'est inventée : le diagnostic d'un refus sans option lisible est vide", () => {
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: '--tls-m"in-v1".0' })).toEqual({});
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: '--use-env-pr"oxy"' })).toEqual({});
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: "--title=é" })).toEqual({});
+  });
+
+  it("une cause lisible reste nommée, et le proxy garde sa priorité", () => {
+    expect(diagnostiquer({ ...PREVIEW, NODE_OPTIONS: '"--use-openssl-ca"' })).toEqual({ cause: "--use-openssl-ca" });
+    expect(sortie({ ...PREVIEW, NODE_OPTIONS: '--tls-m"in-v1".0 --use-env-proxy' })).toEqual({ ok: false, code: "proxy_env_refused" });
+    expect(sortie({ ...PREVIEW, HTTPS_PROXY: "http://p", NODE_OPTIONS: '--tls-m"in-v1".0' })).toEqual({ ok: false, code: "proxy_env_refused" });
+    expect(sortie({ VERCEL_ENV: "production", NODE_OPTIONS: '--tls-m"in-v1".0' })).toEqual({ ok: false, code: "production_refused" });
+  });
+
+  it("les exceptions de 0062, 0065 et 0178 ne masquent pas un NODE_OPTIONS illisible", () => {
+    poserRuntime("/dev/null");
+    const devNull = { ...RUNTIME, OPENSSL_CONF: "/dev/null", NODE_OPTIONS: '--tls-m"in-v1".0' };
+    expect(verifierSortie(devNull, [], undefined, fauxFs({}))).toEqual(REFUS);
+    expect(diagnostiquer(devNull, [], fauxFs({}))).toEqual({
+      exception: "vercel_runtime_openssl_conf",
+      openssl_conf_zone: "dev_null",
+      openssl_conf_verdict: "admis",
+    });
+    const chemin = "/var/runtime/tls-profiles/commercial-2025.conf";
+    poserRuntime(chemin);
+    const fs = () => fauxFs({ [chemin]: CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025 });
+    const option = OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025;
+    for (const cachee of ['--tls-m"in-v1".0', '--use-env-pr"oxy"', '--use-open"ssl"-ca', "--tls-m\\in-v1.0"]) {
+      const env = { ...RUNTIME, OPENSSL_CONF: chemin, NODE_OPTIONS: `${option} ${cachee}` };
+      expect(verifierSortie(env, [], undefined, fs())).toEqual(REFUS);
+    }
+  });
+
+  it("NODE_OPTIONS lisible : absente, vide, espaces seuls, options ordinaires, et celle que le bootstrap du runtime ajoute", () => {
+    for (const valeur of [undefined, "", "   ", "--max-old-space-size=4096 --no-warnings", "--require=./a_b-c.js --title=[x]~#%&(y)"]) {
+      expect(nodeOptionsLisible(valeur)).toBe(true);
+      expect(sortie({ ...PREVIEW, NODE_OPTIONS: valeur })).toEqual({ ok: true });
+    }
+    // La constante du profil audité (`@`, `=`, `:`, `!`, `-`, `_`) est dans la classe : le cas réel du runtime reste admis.
+    expect(nodeOptionsLisible(`--max-old-space-size=4096 ${OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025}`)).toBe(true);
+  });
+
+  it("execArgv n'est pas soumis à la classe (jetons déjà découpés par le système) ; une option interdite y reste refusée", () => {
+    expect(sortie(PREVIEW, ["--title=é"])).toEqual({ ok: true });
+    expect(sortie(PREVIEW, ["--tls-min-v1.0"])).toEqual(REFUS);
   });
 });
 
