@@ -27,7 +27,10 @@ import {
  * 3. `tls_env_refused` : une variable de TLS affaibli posée ou une option TLS interdite de Node ; seule exception,
  *    étroite : `OPENSSL_CONF` dont le fichier n'a aucun effet sur Node, en préversion de Vercel (décision 0062,
  *    ci-dessous ; elle remplace l'exception de `NODE_EXTRA_CA_CERTS` de 0058 § 4, retirée), ou dont le fichier est
- *    exactement celui, audité, du runtime Lambda `nodejs24.x` (décision 0065, verdict `contenu_audite`).
+ *    exactement celui, audité, du runtime Lambda `nodejs24.x` (décision 0065, verdict `contenu_audite`) ou du profil
+ *    TLS `commercial-2025` du runtime Lambda `nodejs26.x` (décision 0178, même verdict). Avec ce profil seulement,
+ *    `--tls-cipher-list` est tolérée dans `NODE_OPTIONS` sous la seule graphie que le `bootstrap` du runtime y ajoute
+ *    (`chiffrementDuProfilSeul`, 0178 § 4 point 2) ; toute autre graphie reste refusée.
  * Diagnostic facultatif (décisions 0058 et 0062) : un rappel reçoit le **nom** de la variable ou de l'option en cause
  * (liste fermée `CAUSES_SORTIE`), la marque de l'exception appliquée et, pour `OPENSSL_CONF`, une classe de racine et un
  * verdict pris dans des listes fermées et, avec le verdict `section_nodejs`, les directives du fichier en jetons d'une
@@ -91,19 +94,41 @@ const posee = (valeur: string | undefined) => valeur !== undefined && valeur !==
  */
 export function optionsDeNode(nodeOptions: string | undefined, execArgv: readonly string[]): ReadonlySet<string> {
   const jetons = [...(nodeOptions ?? "").split(/\s+/), ...execArgv];
-  const options = new Set<string>();
-  for (const brut of jetons) {
-    const jeton = brut.replace(/^["']+|["']+$/g, "");
-    if (!jeton.startsWith("--")) continue;
-    const nom = `--${(jeton.split("=")[0] ?? "").slice(2).replaceAll("_", "-")}`;
-    options.add(nom);
-    let base = nom;
-    while (base.startsWith("--no-")) {
-      base = `--${base.slice("--no-".length)}`;
-      options.add(base);
-    }
+  return new Set(jetons.flatMap(nomsDOption));
+}
+
+/** Noms d'un jeton brut selon les règles d'`optionsDeNode` : le nom de l'option, puis ses formes dé-niées ; rien sinon. */
+function nomsDOption(brut: string): string[] {
+  const jeton = brut.replace(/^["']+|["']+$/g, "");
+  if (!jeton.startsWith("--")) return [];
+  const nom = `--${(jeton.split("=")[0] ?? "").slice(2).replaceAll("_", "-")}`;
+  const noms = [nom];
+  let base = nom;
+  while (base.startsWith("--no-")) {
+    base = `--${base.slice("--no-".length)}`;
+    noms.push(base);
   }
-  return options;
+  return noms;
+}
+
+/** Option de chiffrement de Node : refusée (`OPTIONS_TLS`), sauf sous la seule graphie d'un profil audité (0178). */
+const OPTION_CHIFFREMENT = "--tls-cipher-list";
+
+/**
+ * Décision 0178 § 4 point 2 : vrai si **chaque** jeton qui nomme `--tls-cipher-list` (au sens d'`optionsDeNode` : `_`
+ * pour `-`, guillemets aux bords, formes niées) est un jeton de `NODE_OPTIONS` **exactement égal** à `attendue`, la
+ * constante du profil audité. Faux, donc cause `--tls-cipher-list` comme avant, dès que : l'option figure dans
+ * `execArgv` (le `bootstrap` ne l'y met pas) ; un jeton diffère d'un seul caractère (autre liste, `_`, guillemet, forme
+ * niée, option sans `=valeur`) ; ou `NODE_OPTIONS` contient un guillemet ou un `\` où que ce soit (Node les interprète
+ * et pourrait regrouper les jetons autrement que ce découpage sur les blancs : échec fermé). La valeur n'est que
+ * comparée, jamais rendue.
+ */
+export function chiffrementDuProfilSeul(nodeOptions: string | undefined, execArgv: readonly string[], attendue: string): boolean {
+  const nomme = (brut: string) => nomsDOption(brut).includes(OPTION_CHIFFREMENT);
+  if (execArgv.some(nomme)) return false;
+  const texte = nodeOptions ?? "";
+  if (/["'\\]/.test(texte)) return false;
+  return texte.split(/\s+/).every((brut) => !nomme(brut) || brut === attendue);
 }
 
 /** Valeurs lues, jamais rendues : seulement comparées. Les noms des variables sont les clés des objets. */
@@ -162,7 +187,9 @@ function examenOpensslConf(
   lu: Lecture,
   fs: SystemeFichiersOpenssl,
   configNode: unknown,
-): { readonly zone: ZoneOpensslConf; readonly verdict: VerdictOpensslConf; readonly directives?: string } | undefined {
+):
+  | { readonly zone: ZoneOpensslConf; readonly verdict: VerdictOpensslConf; readonly directives?: string; readonly optionChiffrementAdmise?: string }
+  | undefined {
   const valeur = lu.tls.OPENSSL_CONF;
   if (valeur === undefined || !posee(valeur)) return undefined;
   const reel = deploiementReel();
@@ -181,8 +208,10 @@ const premierePosee = (famille: Readonly<Record<string, string | undefined>>, ig
 
 const causeProxy = (lu: Lecture): string | undefined =>
   premierePosee(lu.proxy) ?? OPTIONS_PROXY.find((option) => lu.options.has(option));
-const causeTls = (lu: Lecture, exception: boolean): string | undefined =>
-  premierePosee(lu.tls, exception ? "OPENSSL_CONF" : undefined) ?? OPTIONS_TLS.find((option) => lu.options.has(option));
+/** `optionToleree` : `--tls-cipher-list` sous la seule graphie du profil audité (0178 § 4 point 2), sinon rien. */
+const causeTls = (lu: Lecture, exception: boolean, optionToleree?: string): string | undefined =>
+  premierePosee(lu.tls, exception ? "OPENSSL_CONF" : undefined) ??
+  OPTIONS_TLS.find((option) => option !== optionToleree && lu.options.has(option));
 
 /**
  * Marque de l'exception bornée de 0062, quand elle a été appliquée (remplace `vercel_runtime_ca` de 0058) : verdict
@@ -295,7 +324,10 @@ export function verifierSortie(
   }
   const examen = examenOpensslConf(lu, fs, configNode);
   const exception = examen !== undefined && VERDICTS_EXCEPTION.has(examen.verdict);
-  const tls = causeTls(lu, exception);
+  // 0178 § 4 point 2 : seulement avec l'exception ouverte par le profil audité, et sous sa seule graphie.
+  const chiffrementTolere =
+    exception && examen.optionChiffrementAdmise !== undefined && chiffrementDuProfilSeul(env.NODE_OPTIONS, execArgv, examen.optionChiffrementAdmise);
+  const tls = causeTls(lu, exception, chiffrementTolere ? OPTION_CHIFFREMENT : undefined);
   diagnostic?.({
     ...(tls === undefined ? {} : { cause: tls }),
     ...(exception ? { exception: EXCEPTION_OPENSSL_CONF } : {}),
