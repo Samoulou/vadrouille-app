@@ -99,6 +99,8 @@ B6a élargit le type du paramètre `day` de `validateDayMap` (`src/contracts/map
 ### 2. Préalables de B6b (tranchés ici pour que son ticket ne les attende pas)
 
 #### 2.1 B6-TL-7 — Garde de l'adaptateur `api` : **retenue**
+
+**Voir 0169** (ticket #1105, M1h, 2026-11-10) : la garde s'ouvre aussi sur la préversion Vercel de la seule branche `mvp-essai` (réponse de Samuel à Q634).
 `getTripAdapter("api")` lève **à l'appel**, jamais à l'import, sauf si l'environnement résolu (`resolveServerEnvironment`) est `local` ou `ci`, que `AUTH_ADAPTER=better-auth` et qu'une source de relectures est configurée. Dans B6b, la seule source est le double de § 1.2 point 4. Aucun repli vers `mock`. B8 et la levée de Q25 amendent cette garde, par décision écrite. Verdict de la Sécurité : question 3 (§ 4).
 
 #### 2.2 B6-TL-8 — Cadre des actions et `ChecklistUpdate` : **retenue**, emplacement précisé (question 1)

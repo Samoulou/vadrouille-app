@@ -51,6 +51,7 @@
     "avant": "Ton voyage commence le {date}.",
     "veille": "Ton voyage commence demain.",
     "apres": "Ton voyage est terminé.",
+    "avis": "Donner ton avis",
     "annonce": {
       "enCeMoment": "En ce moment : {name}.",
       "prochaine": "Prochaine étape : {name} à {start}."

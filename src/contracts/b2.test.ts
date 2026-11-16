@@ -269,7 +269,7 @@ describe("ApiError.cause (E16, décision 0155 § 1.1)", () => {
     // Avec tout autre code, la cause est refusée (provider_error compris : échec des fiches).
     for (const code of API_ERROR_CODES.filter((c) => c !== "no_option")) {
       const autres = code === "version_conflict" ? { currentVersion: 2, retryable: true } : code === "active_preview_exists" ? { activeTripId: "mock_trip_edimbourg" } : {};
-      const retryable = code === "generation_in_progress" ? { retryable: true } : code === "email_cap_reached" || code === "not_unlocked" ? { retryable: false } : {};
+      const retryable = code === "generation_in_progress" || code === "payment_pending" ? { retryable: true } : code === "email_cap_reached" || code === "not_unlocked" ? { retryable: false } : {};
       expect(ApiErrorSchema.safeParse({ code, ...autres, ...retryable }).success, code).toBe(true);
       expect(ApiErrorSchema.safeParse({ code, ...autres, ...retryable, cause: "no_room" }).success, code).toBe(false);
     }

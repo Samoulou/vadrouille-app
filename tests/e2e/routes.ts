@@ -84,6 +84,15 @@ export const ROUTES: readonly RouteEntry[] = [
     budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
+    // M9c (spécification M9 § 6.4, T7) : « Ton compte », sur le jeu simulé (export simulé, suppression non proposée) ;
+    // les étapes (code, confirmation) n'existent que sur `api` : aucun état de plus ici. Budgets journalisés, comme R17.
+    id: "R-compte",
+    path: "/compte",
+    page: "compte/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
     id: "R11",
     path: TRIP,
     page: "voyages/[id]/(programme)/page.tsx",
@@ -132,6 +141,15 @@ export const ROUTES: readonly RouteEntry[] = [
     page: "voyages/[id]/aujourdhui/page.tsx",
     states: [],
     budgets: { lighthouse: "journal", javascript: "seuil" },
+  },
+  {
+    // M8a (ticket 1062) : écran 16 « Après le voyage », sur le voyage simulé débloqué (la page n'existe qu'après le
+    // déblocage) ; budgets en `journal`, comme R14 et R-versions.
+    id: "R16",
+    path: `/voyages/${INVENTORY_TRIP}_debloque/retour`,
+    page: "voyages/[id]/retour/page.tsx",
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
   },
   {
     id: "R6",
@@ -261,6 +279,50 @@ export const ROUTES: readonly RouteEntry[] = [
     id: "R-p0-acces",
     path: "/prototype/executions",
     page: "prototype/executions/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    // Précommande (décision 0168) : pages absentes (404) tant que `PREVENTE` ne vaut pas `1`, ce qui est le cas de
+    // tout build mesuré (CI, poste). Elles servent alors la page introuvable.
+    id: "R-precommande",
+    path: "/precommande",
+    page: "precommande/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    id: "R-precommande-merci",
+    path: "/precommande/merci",
+    page: "precommande/merci/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    // Pages légales de la précommande (ticket 1125) : absentes (404) tant que `PREVENTE` ne vaut pas `1` ou que
+    // l'identité du vendeur manque, ce qui est le cas de tout build mesuré (CI, poste).
+    id: "R-precommande-mentions",
+    path: "/precommande/mentions-legales",
+    page: "precommande/mentions-legales/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    id: "R-precommande-conditions",
+    path: "/precommande/conditions-de-vente",
+    page: "precommande/conditions-de-vente/page.tsx",
+    status: 404,
+    states: [],
+    budgets: { lighthouse: "journal", javascript: "journal" },
+  },
+  {
+    id: "R-precommande-donnees",
+    path: "/precommande/donnees",
+    page: "precommande/donnees/page.tsx",
     status: 404,
     states: [],
     budgets: { lighthouse: "journal", javascript: "journal" },

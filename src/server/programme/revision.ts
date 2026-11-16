@@ -1,5 +1,7 @@
 import "server-only";
 
+import { estLieuASoi } from "@/domain/lieu-a-soi";
+
 import type { EntreeProgramme } from "./entree";
 
 /**
@@ -15,7 +17,8 @@ import type { EntreeProgramme } from "./entree";
  *   `placeId`, une position, un segment (temps de trajet), `exceptions` (badges), `source` (site vérifié), `locked`,
  *   `facts.durationMinutes`, les événements (engagements, déjà dans le brief), le terminus ni les propositions : ni donnée
  *   Google, ni verdict d'ancrage (0011 § 1, 0117 § 3). Les étapes sans `placeId` sont rendues exactement comme les autres.
- *   **Lieu à soi** (décision 0147 § 12 S4 ; M5d-1, ticket 939) : une étape ajoutée par la personne (`addedBy: "person"`)
+ *   **Lieu à soi** (décision 0147 § 12 S4 ; M5d-1, ticket 939) : une étape ajoutée par la personne (`Stop.addedBy` : lieu à soi `person` ou
+ *   adresse découverte `discovered`, M8b)
  *   n'entre **jamais** dans l'entrée (ni son nom saisi, ni son identifiant `ajout-…`, que `ID_ETAPE_REVISION` refuserait) :
  *   elle reste dans le programme : la version révisée la reçoit de la version de base, inchangée et verrouillée
  *   (`lieuxASoiReinjectes` de `src/server/generation/etapes-revision.ts`, avant le contrôle R3) ; un choix qui la viserait est
@@ -53,7 +56,7 @@ export type EtapeRevisable = {
   readonly end?: string;
   readonly facts: { readonly area?: string };
   readonly reason?: string;
-  /** Lieu à soi (`Stop.addedBy`, décision 0147 § 6.1) : jamais transmis au modèle (§ 12 S4). */
+  /** Lieu à soi ou adresse découverte (`Stop.addedBy`, décisions 0147 § 6.1 et 0160 § 1.4) : jamais transmis au modèle (§ 12 S4). */
   readonly addedBy?: string;
 };
 
@@ -73,9 +76,12 @@ function etapesDuJour(jour: JourRevisable): EtapeRevisable[] {
   return jour.items.flatMap((ligne) => (ligne.type === "stop" && ligne.stop !== undefined ? [ligne.stop] : []));
 }
 
-/** Étapes d'une journée qu'une entrée de modèle peut lire : jamais un lieu à soi (`addedBy: "person"`, 0147 § 12 S4). */
+/**
+ * Étapes d'une journée qu'une entrée de modèle peut lire : jamais un lieu à soi ni une adresse découverte (`estLieuASoi`,
+ * toute marque `addedBy` ; 0147 § 12 S4, M8b et décision 0160 § 1.4 point 3) : leur nom est saisi par la personne.
+ */
 export function etapesPourLeModele(jour: JourRevisable): EtapeRevisable[] {
-  return etapesDuJour(jour).filter((etape) => etape.addedBy !== "person");
+  return etapesDuJour(jour).filter((etape) => !estLieuASoi(etape));
 }
 
 /**

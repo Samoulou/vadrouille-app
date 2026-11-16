@@ -811,3 +811,24 @@ export async function lireJoursSignalables(
   const lisibles = lisiblesAvantDeblocage(etat, chaine);
   return lisibles === null ? etat.snapshot.days : servisAvantDeblocage(etat.snapshot.days, [], lisibles).jours;
 }
+
+// --- Après le voyage (M8a, ticket 1062 ; décision 0160 § 1.1 point 5 et § 1.5) ----------------------------------------
+
+/**
+ * Ce que l'écran 16 lit du voyage (`src/server/avis/`) : dernier jour, fuseau, déblocage et jours de la **version
+ * courante** (étapes à évaluer, `etapesAEvaluer` de `@/domain/apres-voyage`). Mêmes requêtes et mêmes erreurs fermées que
+ * `lireEtat`, dans la transaction de l'appelant ; aucun appel du port de relectures. `null` : voyage inconnu, d'une autre
+ * organisation ou sans version courante.
+ */
+export type EtatApresVoyage = {
+  readonly end: string;
+  readonly timeZone: string;
+  readonly debloque: boolean;
+  readonly jours: readonly DaySnapshot[];
+};
+
+export async function lireEtatApresVoyage(executeur: ExecuteurLecture, ctx: AdapterContext, tripId: string): Promise<EtatApresVoyage | null> {
+  const etat = await lireEtat(executeur, ctx, tripId, { debloque: true });
+  if (etat === null) return null;
+  return { end: etat.enTete.end, timeZone: etat.enTete.timeZone, debloque: etat.debloque, jours: etat.snapshot.days };
+}

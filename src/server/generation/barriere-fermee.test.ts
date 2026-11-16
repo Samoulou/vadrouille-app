@@ -105,28 +105,51 @@ describe("génération réelle: barrière fermée, aucun appel", () => {
     expect(fetchInterdit).not.toHaveBeenCalled();
   });
 
-  it("configuration du dépôt : branche non posée et plafonds absents, donc la barrière par défaut reste fermée", async () => {
-    expect(BRANCHE_APPELS_REELS).toBeNull();
-    expect(PLAFONDS_USAGE).toBeNull();
-    // Dépendances de production (aucun remplacement), conditions d'environnement réunies : simulée.
+  // Attente modifiée par la décision 0169 § 2 et § 3 (M1h) : la branche et les plafonds sont posés ; la barrière par défaut
+  // reste fermée partout où l'environnement n'est pas la préversion de `mvp-essai` avec son drapeau.
+  it("configuration du dépôt (0169) : branche mvp-essai et plafonds posés ; hors de cette branche, la barrière par défaut reste fermée", async () => {
+    expect(BRANCHE_APPELS_REELS).toBe("mvp-essai");
+    expect(PLAFONDS_USAGE).not.toBeNull();
+    // Dépendances de production (aucun remplacement), conditions d'environnement réunies sur une autre branche : simulée.
+    expect(OUVERTE.VERCEL_GIT_COMMIT_REF).not.toBe("mvp-essai");
     const dep = resoudre({ programmesReelsAutorises: true, barriere: { env: OUVERTE, cookieValide } });
     expect(await dep.barriere()).toBe("simulee");
     expect((await dep.composer(await dep.barriere())).variante).toBe("simulee");
+    // Sur la branche, sans le drapeau serveur ou sans préversion : simulée ; production : refus.
+    const surBranche = { ...OUVERTE, VERCEL_GIT_COMMIT_REF: "mvp-essai" };
+    for (const env of [{ ...surBranche, GENERATION_APPELS_REELS: undefined }, { ...surBranche, GENERATION_APPELS_REELS: "true" }, { ...surBranche, VERCEL_ENV: "development" }, { ...surBranche, VADROUILLE_ENV: "ci" }]) {
+      expect(await resoudre({ barriere: { env, cookieValide } }).barriere(), JSON.stringify(env)).toBe("simulee");
+    }
+    expect(await resoudre({ barriere: { env: { ...surBranche, VERCEL_ENV: "production" }, cookieValide } }).barriere()).toBe("production");
+    // Toutes les conditions réunies sur la branche : réelle (c'est l'ouverture décidée par 0169).
+    expect(await resoudre({ barriere: { env: surBranche, cookieValide } }).barriere()).toBe("reelle");
+  });
+
+  it("crochet par défaut de la génération (0169 § 5) : fermé hors de la garde api, donc simulée même sur la branche", async () => {
+    // L'environnement du processus de test n'ouvre pas `assertApiAdapter` : le crochet par défaut rend `false`.
+    const dep = resoudre({ barriere: { env: { ...OUVERTE, VERCEL_GIT_COMMIT_REF: "mvp-essai" } } });
+    expect(await dep.barriere()).toBe("simulee");
   });
 });
 
 describe("génération: les valeurs de test de la variante simulée n'autorisent aucun appel réel (B9-PO-10)", () => {
-  it("la barrière lit PLAFONDS_USAGE seul : avec les valeurs simulées posées, elle reste simulée", async () => {
-    const dep = resoudre({ programmesReelsAutorises: true, barriere: { env: OUVERTE, branche: BRANCHE, cookieValide } });
+  // Attente modifiée par la décision 0169 § 3 : `PLAFONDS_USAGE` est posé ; la règle éprouvée reste la même (la barrière ne
+  // lit jamais les valeurs de la variante simulée), sur des plafonds absents injectés.
+  it("la barrière lit PLAFONDS_USAGE seul : plafonds absents, elle reste simulée, quelles que soient les valeurs simulées", async () => {
+    const dep = resoudre({ plafonds: null, programmesReelsAutorises: true, barriere: { env: OUVERTE, branche: BRANCHE, cookieValide } });
     expect(dep.plafonds).toBeNull();
     expect(await dep.barriere()).toBe("simulee");
+    expect(resoudre().plafonds).toBe(PLAFONDS_USAGE);
+    expect(resoudre().plafonds).not.toBe(PLAFONDS_VARIANTE_SIMULEE);
   });
 
-  it("règles du forfait par variante : simulée sur les valeurs de test, réelle sur PLAFONDS_USAGE (aucune), production aucune", () => {
+  // Attente modifiée par la décision 0169 § 3 : la variante réelle lit `PLAFONDS_USAGE`, désormais posé.
+  it("règles du forfait par variante : simulée sur les valeurs de test, réelle sur PLAFONDS_USAGE, production aucune", () => {
     const dep = resoudre();
     expect(dep.reglesPour("simulee")?.plafonds).toBe(PLAFONDS_VARIANTE_SIMULEE);
-    expect(dep.reglesPour("reelle")).toBeNull();
+    expect(dep.reglesPour("reelle")?.plafonds).toBe(PLAFONDS_USAGE);
     expect(dep.reglesPour("production")).toBeNull();
+    expect(resoudre({ plafonds: null }).reglesPour("reelle")).toBeNull();
   });
 
   it("des plafonds passés par un test valent pour les deux variantes", () => {

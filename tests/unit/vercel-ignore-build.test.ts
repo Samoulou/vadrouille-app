@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 
 /**
  * `scripts/vercel/ignore-build.sh` (décision 0163, ticket #1050) : convention de Vercel, sortie 0 = construction
- * ignorée, sortie 1 = construction lancée. Seules `main` et `p0-reel` sont construites.
+ * ignorée, sortie 1 = construction lancée. Seules `main`, `p0-reel` et `mvp-essai` (décision 0169 § 8, qui amende 0163)
+ * sont construites.
  */
 const script = join(process.cwd(), "scripts/vercel/ignore-build.sh");
 
@@ -20,14 +21,17 @@ function sortie(ref: string | undefined): number | null {
   return spawnSync("/bin/sh", [script], { env, encoding: "utf8" }).status;
 }
 
-describe("vercel ignore-build : seules main et p0-reel sont construites (décision 0163)", () => {
-  it.each(["main", "p0-reel"])("construit %s (sortie 1)", (ref) => {
+describe("vercel ignore-build : seules main, p0-reel et mvp-essai sont construites (décisions 0163 et 0169)", () => {
+  it.each(["main", "p0-reel", "mvp-essai"])("construit %s (sortie 1)", (ref) => {
     expect(sortie(ref)).toBe(1);
   });
 
   it.each([
     "claude/1050-vercel-offre-gratuite",
-    "mvp-essai",
+    "mvp-essai-2",
+    "MVP-essai",
+    " mvp-essai",
+    "claude/mvp-essai",
     "Main",
     "main ",
     " p0-reel",

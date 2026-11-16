@@ -263,8 +263,10 @@ Les textes de F11 (écran 16, « Tes goûts retenus ») restent, sauf ceux de ce
 **Écran 16 (M8a)** :
 - Lecture seule : « Ton voyage est terminé depuis plus de 30 jours. Tes avis restent visibles, mais ne se modifient plus. »
 - Erreur d'écriture : « Impossible d'enregistrer ton avis pour le moment. » avec « Réessayer ».
-- Hors ligne : « Tu es hors ligne. Ton avis sera possible dès le retour du réseau. » (F11).
+- Hors ligne : « Tu es hors ligne. Ton avis sera possible dès le retour du réseau. » (F11). Variante proposée par la revue UX/UI de la PR 1068 et reprise par M8a, **à valider par l'UX/UI** : « Tu es hors ligne. Tu pourras donner ton avis dès que le réseau revient. »
 - Lien : « Donner ton avis » (F11).
+
+**Choix de l'avis rapide : écart à la décision 0018** (« Choix exclusif et action ») — *proposé par l'agent frontend (M8a, ticket 1062, revue de la PR 1068), définitif à la fusion (0093)*. Pour ce seul cas, le choix « J'ai aimé », « Pas pour moi », « Pas fait » d'une étape est un **groupe de trois boutons `aria-pressed`** (`role="group"`, nom « Ton avis sur {nom} »), **effaçable par un second appui** sur le choix actif, et non un groupe de boutons radio. Raison : un radio natif ne se décoche pas, alors que l'avis est facultatif et doit pouvoir être retiré (M8-PO-3, § 3.2 point 3). Au plus un bouton est pressé par groupe, et chaque bouton est un arrêt de tabulation. La règle de 0018 reste valable pour tous les autres choix exclusifs (`SegmentedControl`).
 
 **Adresse découverte (M8b)** :
 - Fiche : « Découvert sur place. »

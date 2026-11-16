@@ -29,7 +29,13 @@ export type Banc = {
 export const URL_APPLICATION = "http://127.0.0.1:3999";
 
 export function preparerBanc(
-  options: { trustedIpHeader?: "x-vercel-forwarded-for" | null; secret?: Buffer | null; port?: CodeMailer } = {},
+  options: {
+    trustedIpHeader?: "x-vercel-forwarded-for" | null;
+    secret?: Buffer | null;
+    port?: CodeMailer;
+    /** Reprise de la suppression du compte par `verifyCode` (M9b) ; absente : celle du serveur (`reprendreSuppression`). */
+    reprise?: (userId: string) => Promise<void>;
+  } = {},
 ): Banc {
   const mailer = createCaptureCodeMailer();
   const cookies = new Map<string, string>();
@@ -45,6 +51,7 @@ export function preparerBanc(
     database,
     verrous,
     mailer: options.port ?? mailer,
+    ...(options.reprise === undefined ? {} : { reprise: options.reprise }),
     onSetCookie(valeur) {
       setCookies.push(valeur);
       const [paire = "", ...attributs] = valeur.split(";");

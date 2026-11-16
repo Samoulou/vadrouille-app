@@ -69,7 +69,11 @@ export type NomAction =
   // Ticket 947 : déplacer une étape sur `api` (`src/server/versions/deplacement.ts`).
   | "move-options"
   | "preview-move"
-  | "apply-move";
+  | "apply-move"
+  // M8a (ticket 1062) : avis rapide après le voyage sur `api` (`src/server/avis/avis.ts`).
+  | "rate-stop"
+  // M8c-1 (ticket 1121) : retenir des goûts après le voyage sur `api` (`src/server/gouts/gouts.ts`).
+  | "retain-tastes";
 
 type EntreeVoyage = { readonly tripId: string };
 

@@ -4,9 +4,12 @@ import { randomUUID } from "node:crypto";
 
 import {
   ADRESSE_A,
+  ADRESSE_AVIS,
   ADRESSE_B,
   ADRESSE_DEBLOQUER,
   ADRESSE_DEBLOQUER_REFUS,
+  ADRESSE_GOUTS,
+  ADRESSE_GOUTS_CREATION,
   ADRESSE_PARTAGE,
   ADRESSE_PARTAGE_CREATION,
   ADRESSE_RAPPELS,
@@ -227,5 +230,51 @@ describe("données de bout en bout de la création d'un lien sur api (M6a)", () 
     expect(await nombreDeVoyages(id)).toBe(1);
     const accords = await admin.query("SELECT count(*)::int AS n FROM public.reminder_consents c JOIN public.trips t ON t.id = c.trip_id WHERE t.organization_id = $1 AND c.withdrawn_at IS NULL", [id.org]);
     expect(accords.rows[0].n).toBe(0);
+  });
+
+  it(`${ADRESSE_AVIS} : un voyage débloqué terminé depuis 2 jours, sans avis (M8a)`, async () => {
+    const id = await identite(ADRESSE_AVIS);
+    if ((await nombreDeVoyages(id)) === 0) {
+      const converti = convertirVoyagesSimules().find((v) => v.mockId === EDIMBOURG_DEBLOQUE_TRIP_ID);
+      expect(converti).toBeDefined();
+      const donnees = converti!.donnees;
+      const fin = new Date(Date.now() - 2 * JOUR_MS).toISOString().slice(0, 10);
+      const ecart = Math.round((Date.parse(`${fin}T00:00:00Z`) - Date.parse(`${donnees.end}T00:00:00Z`)) / JOUR_MS);
+      const decale: DonneesVoyage = decaler(donnees, ecart);
+      expect(decale.end).toBe(fin);
+      expect(decale.entitlements).toEqual(["tripUnlocked"]);
+      await ecrireVoyage(app, id, decale);
+    }
+    expect(await nombreDeVoyages(id)).toBe(1);
+  });
+
+  // `ADRESSE_GOUTS_CREATION` (M8c-2, ticket 1131) : mêmes données, dans sa propre organisation.
+  it.each([ADRESSE_GOUTS, ADRESSE_GOUTS_CREATION])("%s : un voyage débloqué terminé depuis 2 jours, deux réponses « éviter » actives (M8c-1)", async (adresse) => {
+    const id = await identite(adresse);
+    if ((await nombreDeVoyages(id)) === 0) {
+      const converti = convertirVoyagesSimules().find((v) => v.mockId === EDIMBOURG_DEBLOQUE_TRIP_ID);
+      expect(converti).toBeDefined();
+      const donnees = converti!.donnees;
+      const fin = new Date(Date.now() - 2 * JOUR_MS).toISOString().slice(0, 10);
+      const ecart = Math.round((Date.parse(`${fin}T00:00:00Z`) - Date.parse(`${donnees.end}T00:00:00Z`)) / JOUR_MS);
+      const decale: DonneesVoyage = decaler(donnees, ecart);
+      expect(decale.end).toBe(fin);
+      expect(decale.entitlements).toEqual(["tripUnlocked"]);
+      const tripId = await ecrireVoyage(app, id, decale);
+      // Signaux maison de la présentation (codes de catégories seulement) : forme `answerYes` de 0014, sans proposition.
+      await inTx(app, { org: id.org, user: id.owner }, async (c) => {
+        for (const category of ["museum", "nature"]) {
+          await c.query(
+            "INSERT INTO public.preference_signals (organization_id, trip_id, request_id, signal, origin, category) VALUES ($1, $2, gen_random_uuid(), 'answerYes', 'question', $3)",
+            [id.org, tripId, category],
+          );
+        }
+      });
+    }
+    expect(await nombreDeVoyages(id)).toBe(1);
+    const signaux = await inTx(app, { org: id.org, user: id.owner }, async (c) =>
+      (await c.query("SELECT category FROM public.preference_signals WHERE organization_id = $1 AND signal = 'answerYes' AND status <> 'cancelled' ORDER BY category", [id.org])).rows.map((r) => r.category),
+    );
+    expect(signaux).toEqual(["museum", "nature"]);
   });
 });

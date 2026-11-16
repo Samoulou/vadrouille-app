@@ -227,6 +227,34 @@ describe("StopSheet (écran 13, F5-PO-9 à F5-PO-11)", () => {
   });
 });
 
+/**
+ * M8b (ticket 1111 ; spécification M8 § 4.2 point 1 et § 6.4, critère M8b-4) : la marque d'un lieu ajouté par la personne
+ * s'affiche pour tout lieu à soi (`estLieuASoi`), le texte selon la valeur de `addedBy`.
+ */
+describe("StopSheet : marque d'un lieu ajouté par la personne (M5d-2, M8b)", () => {
+  it("lieu à soi (person) : « Ajouté par toi. », sans « Découvert sur place. »", () => {
+    const { container } = renderFiche(2, "j2-dean-village", { addedBy: "person" });
+    expect(container.querySelector("[data-part='ajoute-par-toi']")).toHaveTextContent("Ajouté par toi.");
+    expect(container.querySelector("[data-part='decouvert-sur-place']")).toBeNull();
+    expect(screen.queryByText("Découvert sur place.")).toBeNull();
+  });
+
+  it("adresse découverte (discovered) : « Découvert sur place. », sans « Ajouté par toi. »", async () => {
+    const { container } = renderFiche(2, "j2-dean-village", { addedBy: "discovered" });
+    expect(container.querySelector("[data-part='decouvert-sur-place']")).toHaveTextContent(messages.sejour.fiche.decouvertSurPlace);
+    expect(messages.sejour.fiche.decouvertSurPlace).toBe("Découvert sur place.");
+    expect(container.querySelector("[data-part='ajoute-par-toi']")).toBeNull();
+    expect(screen.queryByText("Ajouté par toi.")).toBeNull();
+    expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("étape de l'IA (sans marque) : ni l'une ni l'autre", () => {
+    const { container } = renderFiche(2, "j2-dean-village");
+    expect(container.querySelector("[data-part='ajoute-par-toi']")).toBeNull();
+    expect(container.querySelector("[data-part='decouvert-sur-place']")).toBeNull();
+  });
+});
+
 describe("StopSheet : « Déplacer » (F7b, F7-PO-15, C19)", () => {
   it("Jardin botanique : « Déplacer » juste après « Remplacer », bouton qui ouvre une feuille", () => {
     const { onMove } = renderFiche(2, "j2-jardin-botanique");

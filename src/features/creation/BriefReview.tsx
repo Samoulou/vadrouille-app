@@ -19,7 +19,7 @@ import {
   type MobilityMode,
   type Pace,
 } from "@/contracts/values";
-import type { Category } from "@/contracts";
+import type { Category, RetainedPreference } from "@/contracts";
 import { connexionRoute } from "@/features/compte/suite";
 import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 
 import { TITLE_CLASS } from "./CreationShell";
 import { useDraft } from "./DraftProvider";
+import { GoutsRetenus } from "./GoutsRetenus";
 import { IconMoinsProvisoire, NumberField } from "./NumberField";
 import { briefCompletedProperties } from "./brief-fields";
 import { pendingLodgingCities, type BriefValues, type ChipField } from "./draft";
@@ -76,8 +77,11 @@ function listSummary(labels: string[]): string | null {
  * ouverts ; déplacements, à limiter et budget par repas repliés, sauf s'ils contiennent une déduction. Une valeur
  * déduite est en pointillé et décrite par « déduit de ton récit » ; la toucher retire la marque. « Continuer »
  * valide, envoie `brief_completed` et mène à l'écran 3 (une ville « Pas encore ») ou à l'écran 4.
+ *
+ * « Tes goûts retenus » (M8c-2, ticket 1131) : sous les envies, seulement si la page a lu au moins un goût de la personne
+ * connectée (`retainedTastes`) ; une case cochée bascule la catégorie comme une `Chip` du champ (saisie de la personne).
  */
-export function BriefReview({ focusTitle, onStageChange }: StageProps) {
+export function BriefReview({ focusTitle, onStageChange, retainedTastes }: StageProps & { retainedTastes?: readonly RetainedPreference[] }) {
   const router = useRouter();
   const track = useTrack();
   const { state, dispatch } = useDraft();
@@ -203,6 +207,10 @@ export function BriefReview({ focusTitle, onStageChange }: StageProps) {
           onToggle={(value) => dispatch({ type: "toggle", field: "wishes", value })}
         />
       </section>
+
+      {retainedTastes === undefined ? null : (
+        <GoutsRetenus tastes={retainedTastes} values={values} onToggle={(field, value) => dispatch({ type: "toggle", field, value })} />
+      )}
 
       <OptionalSection
         id="deplacements"

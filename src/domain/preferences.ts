@@ -77,7 +77,13 @@ export function estDerniereOption(carte: CarteTriable, paquet: readonly CarteTri
  */
 export type SignalLu = PreferenceSignal & { readonly kind?: "activity" | "meal" };
 
-const actif = (signal: PreferenceSignal) => signal.status !== "cancelled";
+/**
+ * Champs d'un signal lus par la règle « on arrête » (décision 0160 § 1.8 point 2, voie (a) ; M8c-1, ticket 1121) : ni
+ * origine, ni `placeId`, ni identifiant de carte. Un `PreferenceSignal` complet y reste assignable.
+ */
+export type SignalDeCategorie = Pick<PreferenceSignal, "signal" | "category" | "status">;
+
+const actif = (signal: Pick<PreferenceSignal, "status">) => signal.status !== "cancelled";
 
 /** Refus actif d'une activité (« Pas pour moi ») : seuls ceux-là comptent pour la question de catégorie. */
 const refusDActivite = (signal: SignalLu) => actif(signal) && signal.signal === "dislike" && signal.kind === "activity";
@@ -112,7 +118,7 @@ export function questionDeDistance(raisons: readonly (PreferenceReason | undefin
 export type EtatDesTris = { readonly closes: ReadonlySet<string> };
 
 /** Catégories confirmées « on arrête » : `answerYes` actifs. */
-export function categoriesArretees(signaux: readonly PreferenceSignal[]): Set<Category> {
+export function categoriesArretees(signaux: readonly SignalDeCategorie[]): Set<Category> {
   const categories = new Set<Category>();
   for (const signal of signaux) if (actif(signal) && signal.signal === "answerYes" && signal.category !== null) categories.add(signal.category);
   return categories;

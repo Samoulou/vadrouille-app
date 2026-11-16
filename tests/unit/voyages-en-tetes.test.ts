@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
+import { pagesLegalesRoutes } from "@/features/accueil/routes";
+
 import { nextConfig, RESPONSE_HEADERS } from "../../next.config";
 
 /**
@@ -38,3 +40,33 @@ describe("en-têtes du reçu R9-recu (B4e)", () => {
   });
 });
 
+
+// Précommande (décision 0168) : redirection vers le paiement hébergé et page de retour.
+describe("en-têtes de `/precommande`", () => {
+  it("ni cache ni indexation, seule l'origine en référent", () => {
+    expect(RESPONSE_HEADERS.find((entry) => entry.source === "/precommande/:path*")?.headers).toEqual([
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ]);
+  });
+
+  // Ticket 1125 : les trois pages légales dépendent de variables lues à chaque requête ; elles restent sous la règle
+  // de la précommande (ni cache ni indexation), sans règle à elles.
+  it("pages légales : sous `/precommande/`, couvertes par la même règle", () => {
+    const adresses = Object.values(pagesLegalesRoutes);
+    expect(adresses).toHaveLength(3);
+    for (const adresse of adresses) expect(adresse).toMatch(/^\/precommande\/[a-z-]+$/);
+    expect(RESPONSE_HEADERS.filter((entry) => entry.source.startsWith("/precommande"))).toHaveLength(1);
+  });
+});
+
+// « Ton compte » (M9c ; revue consolidée de la PR 1127, mineur 3) : la page rend l'adresse e-mail de la session.
+describe("en-têtes de `/compte`", () => {
+  it("ni cache partagé ni cache du navigateur, seule l'origine en référent", () => {
+    expect(RESPONSE_HEADERS.find((entry) => entry.source === "/compte/:path*")?.headers).toEqual([
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+    ]);
+  });
+});

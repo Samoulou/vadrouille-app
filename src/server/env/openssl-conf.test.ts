@@ -4,11 +4,13 @@ import { describe, expect, it } from "vitest";
 import {
   analyserTexteOpensslConf,
   CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24,
+  CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025,
   DIRECTIVES_OPENSSL_CONF,
   directivesOpensslConf,
   examinerOpensslConf,
   nomSectionOpensslAdmis,
   OPENSSL_CONF_MAX_OCTETS,
+  OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025,
   VERDICTS_OPENSSL_CONF,
   ZONES_OPENSSL_CONF,
   type SystemeFichiersOpenssl,
@@ -358,7 +360,7 @@ describe("openssl-conf: contenu audité du runtime Lambda nodejs24.x (0065 § 4 
   // SHA-256 par Web Crypto (`crypto.subtle`, global) : le régime de confinement refuse l'**import** de `node:crypto`
   // dans `src/server/env/` (pas la capacité de calculer un condensat), et 0065 § 5 point 5 n'ajoute aucune ligne.
   it("la constante est le fichier audité : 505 caractères ASCII, 505 octets, SHA-256 d95efaf0…2a88", async () => {
-    // `egalAuContenuAudite` compare octet à charCodeAt : la constante doit être en ASCII (mineur 6).
+    // `egalAuContenu` compare octet à charCodeAt : la constante doit être en ASCII (mineur 6).
     expect(AUDITE.length).toBe(505);
     expect([...AUDITE].every((caractere) => caractere.charCodeAt(0) < 0x80)).toBe(true);
     const octets = new TextEncoder().encode(AUDITE);
@@ -421,6 +423,138 @@ describe("openssl-conf: contenu audité du runtime Lambda nodejs24.x (0065 § 4 
 
   it("taille annoncée trop grande : fichier_refuse avant la comparaison", () => {
     expect(verdict(RUNTIME, { [RUNTIME]: { taille: OPENSSL_CONF_MAX_OCTETS + 1, texte: AUDITE } })).toBe("fichier_refuse");
+  });
+});
+
+describe("openssl-conf: profil TLS commercial-2025 du runtime Lambda nodejs26.x (0178 § 4)", () => {
+  const PROFIL = "/var/runtime/tls-profiles/commercial-2025.conf";
+  const AUDITE = CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS26_COMMERCIAL_2025;
+  const OPTION = OPTION_CHIFFREMENT_LAMBDA_NODEJS26_COMMERCIAL_2025;
+  const ADMIS = { zone: "var_runtime", verdict: "contenu_audite", optionChiffrementAdmise: OPTION };
+
+  it("la constante est le fichier audité : 1370 caractères ASCII, 1370 octets, SHA-256 e8bdc8a2…96a2", async () => {
+    expect(AUDITE.length).toBe(1370);
+    expect([...AUDITE].every((caractere) => caractere.charCodeAt(0) < 0x80)).toBe(true);
+    const octets = new TextEncoder().encode(AUDITE);
+    expect(octets.byteLength).toBe(1370);
+    const condensat = Buffer.from(await crypto.subtle.digest("SHA-256", octets)).toString("hex");
+    expect(condensat).toBe("e8bdc8a280cfe1bad166d268112faeda61b0143316f5b261c750f22f520196a2");
+  });
+
+  it("ses jetons sont exactement ceux du journal du 2026-11-16 (ticket 1141) : le fichier relevé a cette forme", () => {
+    expect(directivesOpensslConf(AUDITE)).toBe(
+      "activate,alg_section,autre,cipherstring,ciphersuites,groups_autres,nodejs_conf,openssl_conf,providers,signaturealgorithms,ssl_conf,system_default",
+    );
+  });
+
+  it("l'option de chiffrement se déduit du contenu audité, comme le fait le bootstrap : CipherString, « : », Ciphersuites", () => {
+    const valeur = (cle: string) => {
+      const lignes = AUDITE.split("\n").filter((ligne) => ligne.startsWith(`${cle} = `));
+      expect(lignes).toHaveLength(1);
+      return (lignes[0] ?? "").slice(`${cle} = `.length);
+    };
+    expect(OPTION).toBe(`--tls-cipher-list=${valeur("CipherString")}:${valeur("Ciphersuites")}`);
+    expect(OPTION).not.toMatch(/[\s"'\\]/);
+    // Bornes de protocole égales aux défauts de Node : le bootstrap n'ajoute ni --tls-min-v… ni --tls-max-v….
+    expect(valeur("TLS.MinProtocol")).toBe("TLSv1.2");
+    expect(valeur("TLS.MaxProtocol")).toBe("TLSv1.3");
+  });
+
+  it("clés du contenu audité, toutes jugées par 0178 § 3 : ni vérification, ni autorité, ni Options, ni module, ni inclusion", () => {
+    const cles = AUDITE.split("\n")
+      .filter((ligne) => ligne !== "" && !ligne.startsWith("#") && !ligne.startsWith("["))
+      .map((ligne) => ligne.slice(0, ligne.indexOf(" = ")));
+    expect(cles).toEqual([
+      "openssl_conf",
+      "nodejs_conf",
+      "config_diagnostics",
+      "providers",
+      "ssl_conf",
+      "alg_section",
+      "default",
+      "activate",
+      "system_default",
+      "CipherString",
+      "Ciphersuites",
+      "TLS.MinProtocol",
+      "TLS.MaxProtocol",
+      "DTLS.MinProtocol",
+      "DTLS.MaxProtocol",
+      "SignatureAlgorithms",
+      "Groups",
+    ]);
+    // Section `[evp_properties]` (cible d'`alg_section`) vide : aucune propriété d'algorithme par défaut.
+    expect(AUDITE).toContain("[evp_properties]\n\n[provider_sect]\n");
+    // Un seul fournisseur, `default`, activé ; aucun chemin de module.
+    expect(AUDITE).toContain("[provider_sect]\ndefault = default_sect\n\n[default_sect]\nactivate = 1\n\n[ssl_module]\n");
+    expect(AUDITE).toContain("@SECLEVEL=2:");
+    expect(AUDITE).toContain(":!eNULL:!aNULL:");
+    expect(AUDITE).not.toMatch(/sha1|\.include|\.pragma/i);
+  });
+
+  it("contenu audité sous /var/runtime/ : contenu_audite, avec la seule option de chiffrement admise, sans directives", () => {
+    expect(examinerOpensslConf(PROFIL, fauxFs({ [PROFIL]: AUDITE }))).toEqual(ADMIS);
+  });
+
+  it("le fichier audité de nodejs24.x ne rend aucune option de chiffrement admise", () => {
+    expect(examinerOpensslConf(PROFIL, fauxFs({ [PROFIL]: CONTENU_OPENSSL_AUDITE_LAMBDA_NODEJS24 }))).toEqual({ zone: "var_runtime", verdict: "contenu_audite" });
+  });
+
+  it.each([
+    ["fins de ligne \\r\\n", AUDITE.replaceAll("\n", "\r\n")],
+    ["un espace final ajouté", `${AUDITE} `],
+    ["sans le dernier \\n", AUDITE.slice(0, -1)],
+    ["un commentaire de plus", `${AUDITE}# commentaire\n`],
+    ["@SECLEVEL abaissé", AUDITE.replace("@SECLEVEL=2", "@SECLEVEL=0")],
+    ["!aNULL retiré", AUDITE.replace(":!aNULL", "")],
+    ["!eNULL retiré", AUDITE.replace(":!eNULL", "")],
+    ["TLS.MinProtocol abaissé", AUDITE.replace("TLS.MinProtocol = TLSv1.2", "TLS.MinProtocol = TLSv1.1")],
+    ["SHA-1 ajouté aux signatures", AUDITE.replace("RSA+SHA224", "RSA+SHA224:RSA+SHA1")],
+    ["un groupe changé", AUDITE.replace("ffdhe8192", "ffdhe1536")],
+    ["fournisseur legacy ajouté", AUDITE.replace("default = default_sect\n", "default = default_sect\nlegacy = default_sect\n")],
+    ["default_properties ajouté", AUDITE.replace("[evp_properties]\n", "[evp_properties]\ndefault_properties = x\n")],
+    ["VerifyCAFile ajouté", `${AUDITE}VerifyCAFile = /etc/x.pem\n`],
+    ["VerifyMode ajouté", `${AUDITE}VerifyMode = None\n`],
+    ["Options ajouté", `${AUDITE}Options = UnsafeLegacyRenegotiation\n`],
+    ["module de fournisseur ajouté", AUDITE.replace("activate = 1\n", "activate = 1\nmodule = /etc/x.so\n")],
+    ["profil commercial-2026 (autre fichier de la même couche) simulé par un titre changé", AUDITE.replace("commercial-2025", "commercial-2026")],
+  ])("%s : section_nodejs, aucune option de chiffrement admise", (_nom, texte) => {
+    expect(texte).not.toBe(AUDITE);
+    const examen = examinerOpensslConf(PROFIL, fauxFs({ [PROFIL]: texte }));
+    expect(examen.verdict).toBe("section_nodejs");
+    expect(examen).not.toHaveProperty("optionChiffrementAdmise");
+  });
+
+  it(".include ajouté : inclusion suivie, puis section_nodejs ; jamais contenu_audite", () => {
+    const examen = examinerOpensslConf(PROFIL, fauxFs({ [PROFIL]: `${AUDITE}.include /etc/x.cnf\n`, "/etc/x.cnf": "" }));
+    expect(examen.verdict).toBe("section_nodejs");
+    expect(examen).not.toHaveProperty("optionChiffrementAdmise");
+  });
+
+  it("octet 0x80 à la place d'un caractère, ou ajouté : section_nodejs", () => {
+    const audite = new TextEncoder().encode(AUDITE);
+    const remplace = Uint8Array.from(audite);
+    remplace[2] = 0x80;
+    const ajoute = Uint8Array.from([...audite, 0x80]);
+    for (const octets of [remplace, ajoute]) {
+      const fs = { ...fauxFs({ [PROFIL]: AUDITE }), readFileSync: () => octets };
+      expect(examinerOpensslConf(PROFIL, fs).verdict).toBe("section_nodejs");
+    }
+  });
+
+  it("contenu audité comme inclusion d'un autre fichier : section_nodejs (niveau 0 seulement), aucune option admise", () => {
+    const examen = examinerOpensslConf("/etc/a.cnf", fauxFs({ "/etc/a.cnf": `.include ${PROFIL}\n`, [PROFIL]: AUDITE }));
+    expect(examen.verdict).toBe("section_nodejs");
+    expect(examen).not.toHaveProperty("optionChiffrementAdmise");
+  });
+
+  it("chemin réel sous /tmp (lien), chemin déclaré hors racines, octet nul, taille trop grande : refus avant la comparaison", () => {
+    expect(verdict(PROFIL, { [PROFIL]: { lien: "/tmp/p.conf" }, "/tmp/p.conf": AUDITE })).toBe("fichier_refuse");
+    const fs = fauxFs({ "/tmp/p.conf": AUDITE });
+    expect(examinerOpensslConf("/tmp/p.conf", fs).verdict).toBe("chemin_refuse");
+    expect(fs.appels).toEqual([]);
+    expect(verdict(PROFIL, { [PROFIL]: `${AUDITE}\0` })).toBe("fichier_refuse");
+    expect(verdict(PROFIL, { [PROFIL]: { taille: OPENSSL_CONF_MAX_OCTETS + 1, texte: AUDITE } })).toBe("fichier_refuse");
   });
 });
 

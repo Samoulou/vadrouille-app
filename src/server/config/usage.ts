@@ -12,10 +12,9 @@ import { QUOTA_ROUTES_ELEMENTS_PAR_MINUTE } from "@/server/usage/forfait";
  * `reserverForfait` et `reserverAction` (`src/server/usage/reservation.ts`). `src/ai` et `src/research` ne
  * l'importent jamais.
  *
- * **Aucun montant réel ici.** Les montants sont réservés à Samuel (argent : Q39, Q45, Q465, question 5 de la
- * spécification B7) : tant qu'ils ne sont pas écrits, `PLAFONDS_USAGE` vaut `null` et la composition ne peut réserver
- * aucun forfait (échec fermé : aucun appel payant du MVP). Les tests utilisent des **valeurs de test**
- * (`tests/support/plafonds-usage.ts`).
+ * **Montants réels : `PLAFONDS_USAGE`** (décision 0169 § 3), posés sur les réponses de Samuel (argent : Q639 du
+ * 2026-11-09 ; 0027 § 2 pour les mois). Remise à `null`, la composition ne peut réserver aucun forfait (échec fermé :
+ * aucun appel payant du MVP). Les tests utilisent des **valeurs de test** (`tests/support/plafonds-usage.ts`).
  *
  * Module distinct de `src/server/config/ia.ts` (B7b, B7-TL-8 : modèles, routage, profils de bornes), livré en
  * parallèle : les deux sous-tâches ne touchent pas les mêmes fichiers (décision 0054 § 2).
@@ -141,12 +140,65 @@ export function chargerPlafondsUsage(valeur: unknown): PlafondsUsage {
 }
 
 /**
- * Plafonds de production : **non fixés** (Q39, Q45, Q465 à Samuel ; questions 4 et 5 de la spécification B9). `null` : aucune
- * réservation possible, donc aucun appel payant du MVP, jusqu'à ce qu'une PR écrive les montants qu'il aura validés. C'est la
- * forme des « 0 USD partout » de B9-PO-10 : la barrière de B9-TL-8 (`plafondsDeGenerationPoses`) ne lit **que** cette
- * constante, si bien qu'aucun appel réel ne peut être autorisé, même barrière ouverte par ailleurs.
+ * Plafonds réels de la préversion `mvp-essai` (décision 0169 § 3). La barrière de B9-TL-8 (`plafondsDeGenerationPoses`) ne
+ * lit **que** cette constante ; `null` la refermerait (« 0 USD partout » de B9-PO-10).
+ *
+ * **Montants de Samuel** (Q639, « Je suis tes reco », 2026-11-09 06:07 UTC) :
+ * - **2 USD d'IA par voyage**, révision comprise (0136, question 6) : `programme` 1,20 USD + `revision` 0,80 USD ; la
+ *   vérification après le déblocage (`verification`) n'a aucun coût de modèle ;
+ * - **10 USD par organisation et par jour** (`parOrganisationJourMicros`), tous fournisseurs, forfaits compris ;
+ * - **5 USD par jour sans compte** (`actionsSansCompteJourMicros`).
+ * **Mois et enveloppes** : montants déjà cités par Samuel pour le prototype (0027 § 2 ; 0046 D13 point 3), repris tels
+ * quels : Google 20 USD par mois et 40 USD jusqu'à G0, modèles 40 USD par mois et 80 USD jusqu'à G0. Ce sont les seuls
+ * plafonds **globaux** (toutes organisations) : ils bornent la dépense totale de la préversion, qui est publique (0163).
+ *
+ * **Valeurs techniques du studio, sous ces montants** (nombres de requêtes, pas des montants ; à juger par le Tech Lead à
+ * la revue, 0169 § 3) :
+ * - `programme` et `revision` : 60 Text Search (prix 0) et 60 fiches (1,20 USD au prix plein) ; `verification` : 60 et 60
+ *   (recommandation de Q843, tranchée par le CEO sur mandat). Un voyage entier (programme, une révision, vérification) réserve
+ *   au plus 2,40 + 2,00 + 1,20 = 5,60 USD, sous les 10 USD par organisation et par jour ;
+ * - quota du jour par méthode : 400 requêtes (deux voyages entiers par jour, toutes organisations) ; le mois Google borne le reste ;
+ * - `relecture` : valeurs de départ de 0100 § 1.4, **non servies sur la préversion** (la source réelle de relectures reste
+ *   réservée à `local`, 0100 § 5.3 ; 0169 § 7) ;
+ * - `apercu`, `complet`, `lot` (ancienne chaîne, non sélectionnée : `CHAINE_APERCU` vaut `inversee`) et `mini` (B11, non
+ *   livrée) : le schéma les exige et la barrière exige un profil `apercu` non nul ; valeurs de la variante simulée, coût de
+ *   modèles ramené sous les 2 USD par voyage. Aucun workflow de la chaîne inversée ne les réserve.
  */
-export const PLAFONDS_USAGE: PlafondsUsage | null = null;
+export const PLAFONDS_USAGE: PlafondsUsage | null = chargerPlafondsUsage({
+  schema: 1,
+  generations: {
+    apercu: { coutModelesMicros: 600_000, placesTextSearch: 30, placesDetails: 30, routesRequetes: 10, routesElements: 300 },
+    complet: { coutModelesMicros: 600_000, placesTextSearch: 60, placesDetails: 40, routesRequetes: 8, routesElements: 400 },
+    mini: { coutModelesMicros: 20_000, placesTextSearch: 6, placesDetails: 6, routesRequetes: 0, routesElements: 0 },
+    lot: { coutModelesMicros: 20_000, placesTextSearch: 4, placesDetails: 40, routesRequetes: 4, routesElements: 200 },
+    programme: { coutModelesMicros: 1_200_000, placesTextSearch: 60, placesDetails: 60, routesRequetes: 0, routesElements: 0 },
+    revision: { coutModelesMicros: 800_000, placesTextSearch: 60, placesDetails: 60, routesRequetes: 0, routesElements: 0 },
+    verification: { placesTextSearch: 60, placesDetails: 60 },
+  },
+  relecture: {
+    jour: { placesTextSearch: 2, placesDetails: 20, routesRequetes: 24, routesElements: 24 },
+    voyage: { placesTextSearch: 20, placesDetails: 100, routesRequetes: 240, routesElements: 240 },
+  },
+  actions: {
+    structureBrief: { coutModelesMicros: 10_000 },
+    suggestLodging: { coutModelesMicros: 20_000, placesTextSearch: 3 },
+  },
+  parOrganisationJourMicros: 10_000_000,
+  actionsSansCompteJourMicros: 5_000_000,
+  limites: {
+    quotaJourParMethode: 400,
+    moisGoogleMicros: 20_000_000,
+    enveloppeGoogleMicros: 40_000_000,
+    moisModelesMicros: 40_000_000,
+    enveloppeModelesMicros: 80_000_000,
+  },
+  skus: {
+    textSearch: "places_text_search_essentials_ids_only",
+    details: "places_details_enterprise",
+    matrice: "routes_matrix_essentials",
+    modeles: "modeles_forfait",
+  },
+});
 
 /**
  * **Valeurs de test de la variante simulée** (spécification B9, B9e points 2 et 3 ; B9-PO-10) : forfait des générations dont

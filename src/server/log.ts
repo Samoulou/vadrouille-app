@@ -190,6 +190,24 @@ export const LOG_EVENTS = [
   // instantané illisible, taille au-delà de la borne) ; réponse 500 sans fichier ; niveau `error`. **`errorName` seul**
   // (`CHAMPS_ADMIS_PAR_EVENEMENT`) : jamais l'adresse, un identifiant, une destination, un récit ni un nom d'étape.
   "compte.export_failed",
+  // M9b (ticket 1106 ; spécification M9 § 4.3 et § 6.1) : « Supprimer mon compte » n'a pas pu finir (base, limiteur), après
+  // la relance interne de l'action ou pendant la reprise de `verifyCode` ; l'organisation reste en « suppression en
+  // cours » et une prochaine vérification de code reprend ; niveau `error`. **`errorName` seul** : jamais l'adresse ni un
+  // identifiant.
+  "compte.suppression_failed",
+  // C2b (ticket 1130 ; spécification C2 § 2.2 point 6) : visite de la page de prévente non écrite (base en panne, trop
+  // lente, garde de connexion, refus de rôle, fonction absente) ; la page a déjà répondu, la visite est perdue, sans
+  // nouvelle tentative ; niveau `warn`. **`errorName` seul** (`CHAMPS_ADMIS_PAR_EVENEMENT`) : jamais la chaîne de
+  // connexion, l'hôte, l'agent utilisateur, l'adresse IP, la provenance ni le message de l'erreur (décision 0172 § 6).
+  "prevente.visite_perdue",
+  // C2c (ticket 1137 ; spécification C2 § 3.3 point 6 ; décision 0177 § 8) : réponse au questionnaire de la prévente non
+  // écrite (base en panne, trop lente, garde de connexion, contrainte, fonction absente, verdict illisible) ; la personne
+  // a revu son formulaire avec ses réponses ; niveau `warn`. **`errorName` seul** : jamais le message ni le détail de
+  // l'erreur (0172 § 6), la provenance, le parcours, une réponse, le texte de la question 1, une adresse IP ni un en-tête.
+  "prevente.reponse_perdue",
+  // C2c (ticket 1137 ; spécification C2 § 3.4 point 3 ; décision 0177 § 8) : la fonction d'écriture a rendu « plafond
+  // atteint » (plafond global du jour, tenu dans la base) ; niveau `warn`. **Aucun champ.**
+  "prevente.plafond_atteint",
   "log.unknown_event",
 ] as const;
 export type LogEvent = (typeof LOG_EVENTS)[number];
@@ -933,6 +951,14 @@ export const CHAMPS_ADMIS_PAR_EVENEMENT: ReadonlyMap<string, ReadonlySet<string>
   ["calendrier.version_unavailable", new Set<string>()],
   // M9a (ticket 1097) : nom de l'erreur seulement ; tout autre champ est retiré.
   ["compte.export_failed", new Set(["errorName"])],
+  // M9b (ticket 1106) : nom de l'erreur seulement ; tout autre champ est retiré.
+  ["compte.suppression_failed", new Set(["errorName"])],
+  // C2b (ticket 1130) : nom de l'erreur seulement ; tout autre champ est retiré.
+  ["prevente.visite_perdue", new Set(["errorName"])],
+  // C2c (ticket 1137 ; décision 0177 § 8) : nom de l'erreur seulement ; tout autre champ est retiré.
+  ["prevente.reponse_perdue", new Set(["errorName"])],
+  // C2c (ticket 1137 ; décision 0177 § 8) : aucun champ ; tout champ passé est retiré.
+  ["prevente.plafond_atteint", new Set<string>()],
   [
     "generation.programme_written",
     new Set([

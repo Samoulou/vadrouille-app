@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Category, PreferenceSignal } from "@/contracts";
 
 import {
+  categoriesArretees,
   compteursDuTri,
   estDerniereOption,
   ordreDuPaquet,
@@ -11,6 +12,7 @@ import {
   questionApres,
   questionDeDistance,
   type CarteTriable,
+  type SignalDeCategorie,
   type SignalLu,
 } from "./preferences";
 
@@ -126,5 +128,24 @@ describe("présentation: paquet de reprise (règle pure, B10-PO-4)", () => {
     expect(estDerniereOption(cartes[4]!, paquet.filter((c) => c.id !== "r3"))).toBe(true);
     // Carte absente du paquet : jamais la dernière option.
     expect(estDerniereOption(cartes[5]!, paquet.filter((c) => c.id !== "r3"))).toBe(false);
+  });
+});
+
+/**
+ * M8c-1 (ticket 1121 ; décision 0160 § 1.8 point 2, voie (a)) : le paramètre de `categoriesArretees` est élargi aux trois
+ * champs lus par la règle. Les appelants existants passent des signaux complets, toujours assignables.
+ */
+describe("categoriesArretees : signaux projetés sur trois champs (0160 § 1.8)", () => {
+  it("même résultat avec un signal complet et avec sa projection { signal, category, status }", () => {
+    const complets: PreferenceSignal[] = [oui("museum"), oui("nature", "cancelled"), { signal: "answerNo", category: "walk", origin: "question", status: "confirmed" }];
+    const projetes: SignalDeCategorie[] = complets.map((signal) => ({ signal: signal.signal, category: signal.category, status: signal.status }));
+    expect(projetes.every((signal) => Object.keys(signal).sort().join() === "category,signal,status")).toBe(true);
+    expect([...categoriesArretees(projetes)]).toEqual(["museum"]);
+    expect([...categoriesArretees(complets)]).toEqual(["museum"]);
+  });
+
+  it("un answerYes annulé ou sans catégorie n'arrête rien", () => {
+    expect(categoriesArretees([{ signal: "answerYes", category: null, status: "confirmed" }]).size).toBe(0);
+    expect(categoriesArretees([{ signal: "answerYes", category: "market", status: "cancelled" }]).size).toBe(0);
   });
 });

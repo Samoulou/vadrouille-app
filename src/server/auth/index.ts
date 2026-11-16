@@ -94,6 +94,11 @@ export type AuthOperationsConfig = {
   readonly mailer: CodeMailer;
   /** Reçoit chaque `Set-Cookie` de la bibliothèque (tests ; hors requête Next.js, `nextCookies` ne pose rien). */
   readonly onSetCookie?: (setCookie: string) => void;
+  /**
+   * Reprise de la suppression du compte (étape (d) de `verifyCode`, handover § 12 ; M9b) ; défaut : `reprendreSuppression`
+   * du serveur. Les tests de base passent la leur (limiteur et pools de leur banc). Ne doit jamais lever.
+   */
+  readonly reprise?: (userId: string) => Promise<void>;
 };
 
 /** Lignes purgées au plus par table et par appel (purge technique par lot borné, handover § 12). */
@@ -304,8 +309,8 @@ export function createAuthOperations(config: AuthOperationsConfig): AuthOperatio
       reponse = await avecAdresse(email, () => a.api.signInEmailOTP({ body: { email, otp: code }, headers, returnHeaders: true }));
     } catch (erreur) {
       if (erreur instanceof OrganisationEnSuppressionError) {
-        // Handover § 12 : (c) aucune session ni cookie ; (d) reprise de la suppression (B11) ; (e) `unauthenticated`.
-        await reprendreSuppression(erreur.userId);
+        // Handover § 12 : (c) aucune session ni cookie ; (d) reprise de la suppression (M9b) ; (e) `unauthenticated`.
+        await (config.reprise ?? reprendreSuppression)(erreur.userId).catch(() => undefined);
         return echec("unauthenticated");
       }
       // Seul tableau de correspondance (B3c point 3, `./erreurs.ts`) ; tout autre cas : `provider_error`.

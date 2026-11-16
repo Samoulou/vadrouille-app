@@ -74,11 +74,14 @@ test("mes-voyages: sections pendant et après", async ({ page }) => {
   expect(await sectionTitles(page)).toEqual(["À venir", "Passés"]);
   await expect(plate(page)).toHaveAttribute("data-destination-plate", "granit");
   await expect(plate(page)).toHaveAccessibleName("Porto sam. 08.05 – mar. 11.05.2027 · 2 adultes");
+  // M8a (revue de la PR 1068, bloquant 2) : « Donner ton avis » sous chaque voyage débloqué terminé, sans borne haute.
   const past = section(page, "Passés").getByRole("link");
-  await expect(past).toHaveCount(3);
+  await expect(past).toHaveCount(5);
   await expect(past.nth(0)).toHaveAccessibleName("Édimbourg sam. 29.08 – jeu. 03.09 · 2 adultes Non débloqué");
   await expect(past.nth(1)).toHaveAccessibleName("Édimbourg sam. 29.08 – jeu. 03.09 · 2 adultes");
-  await expect(past.nth(2)).toHaveAccessibleName(/^Lisbonne /);
+  await expect(past.nth(2)).toHaveAccessibleName("Donner ton avis (Édimbourg)");
+  await expect(past.nth(3)).toHaveAccessibleName(/^Lisbonne /);
+  await expect(past.nth(4)).toHaveAccessibleName("Donner ton avis (Lisbonne)");
 });
 
 test.describe("date de la destination, appareil à Zurich (C8)", () => {

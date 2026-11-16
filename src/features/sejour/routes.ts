@@ -49,6 +49,11 @@ export interface TripRoutes {
    * `/dev/voyages`, qui n'a pas de page des versions : aucun lien ne mène alors à une 404.
    */
   versions(): string | null;
+  /**
+   * Écran 16 « Après le voyage » (`R16`, M8a ; décision 0160 § 1.5 point 1, qui amende 0021 § 6) ; `null` hors de la base
+   * `/voyages` (ni `/dev/voyages` ni `/dev/carte/villes` n'ont cette page) : aucun lien ne mène alors à une 404.
+   */
+  apresVoyage(): string | null;
 }
 
 /** `R17` « Mes voyages » : seul endroit qui écrit cette adresse (décision 0021 § 6). */
@@ -81,5 +86,6 @@ export function tripRoutes(base: TripRoutesBase, tripId: string): TripRoutes {
     mesVoyages: mesVoyagesRoute,
     aujourdhui: () => (base === "/voyages" ? `${trip}/aujourdhui` : null),
     versions: () => (base === "/voyages" ? `${trip}/versions` : null),
+    apresVoyage: () => (base === "/voyages" ? `${trip}/retour` : null),
   };
 }

@@ -8,6 +8,7 @@ import type { ReglesUsage } from "@/server/usage/reservation";
 import { withSystemOrg } from "@/server/with-system-org";
 import type { OrgTransaction } from "@/server/with-org";
 
+import { accesGenerationReelle } from "./acces-reel";
 import { chaineDe } from "./chaine";
 import { ArretEtape } from "./codes";
 import { declarationsDeploiement, ecriturePositionsPermise, evaluerBarriere, plafondsDeGenerationPoses, type EtatBarriere } from "./barriere";
@@ -116,7 +117,8 @@ export function resoudre(injectees?: DependancesGeneration): DependancesResolues
     reglesPour: (etat) => (etat === "reelle" ? regles : etat === "simulee" ? reglesSimulees : null),
     reserverEnSimulee: dependances.reserverEnSimulee === true,
     maintenant: () => horloge.maintenant(),
-    barriere: () => evaluerBarriere({ ...dependances.barriere, plafondsNonNuls: plafondsDeGenerationPoses(plafonds) }),
+    // Crochet d'accès par défaut de la génération de `api` (décision 0169 § 5) ; un jeu injecté peut le remplacer (tests).
+    barriere: () => evaluerBarriere({ cookieValide: accesGenerationReelle, ...dependances.barriere, plafondsNonNuls: plafondsDeGenerationPoses(plafonds) }),
     async composer(etat, voyage) {
       if (etat === "production") throw new ArretEtape("production_refused");
       return voyage === undefined ? composition(etat) : composition(etat, voyage);

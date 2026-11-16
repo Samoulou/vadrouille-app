@@ -111,9 +111,11 @@ const regles = (plafonds = PLAFONDS_USAGE_TEST, horloge = horlogeSysteme): Regle
 const demandeApercu = { organisationId: ORG, tripId: null, generationRunId: RUN, profil: "apercu" as const };
 
 describe("usage: configuration des plafonds (B7c point 3)", () => {
-  it("valeurs de test admises ; aucun montant réel en production (Q39, Q45, Q465)", () => {
+  // Attente modifiée par la décision 0169 § 3 (M1h) : les montants réels sont posés ; ils passent le même schéma.
+  it("valeurs de test admises ; montants réels posés par la décision 0169 (Q639), admis par le même schéma", () => {
     expect(PlafondsUsageSchema.parse(PLAFONDS_USAGE_TEST)).toEqual(PLAFONDS_USAGE_TEST);
-    expect(PLAFONDS_USAGE).toBeNull();
+    expect(PLAFONDS_USAGE).not.toBeNull();
+    expect(PlafondsUsageSchema.parse(PLAFONDS_USAGE)).toEqual(PLAFONDS_USAGE);
   });
 
   it("valeur absente, inconnue ou hors bornes refusée au chargement", () => {

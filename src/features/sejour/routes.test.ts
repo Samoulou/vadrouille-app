@@ -33,6 +33,13 @@ describe("tripRoutes (décision 0015 § 1)", () => {
     expect(tripRoutes("/dev/voyages", "mock_trip_edimbourg").versions()).toBeNull();
   });
 
+  it("écran 16 « Après le voyage » (M8a ; décision 0160 § 1.5 point 1) : `/voyages/{id}/retour` ; aucune adresse hors de `/voyages`", () => {
+    expect(routes.apresVoyage()).toBe("/voyages/mock_trip_edimbourg/retour");
+    expect(tripRoutes("/voyages", "a b/c").apresVoyage()).toBe("/voyages/a%20b%2Fc/retour");
+    expect(tripRoutes("/dev/voyages", "mock_trip_edimbourg").apresVoyage()).toBeNull();
+    expect(tripRoutes("/dev/carte/villes", "mock_trip_edimbourg").apresVoyage()).toBeNull();
+  });
+
   it("« Mes voyages » : une seule adresse, `/voyages` (décision 0021 § 6)", () => {
     expect(mesVoyagesRoute()).toBe("/voyages");
     expect(tripRoutes("/voyages", "a b").mesVoyages()).toBe(mesVoyagesRoute());

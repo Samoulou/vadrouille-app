@@ -178,6 +178,20 @@ describe("lint: importateurs nommés de la création et de la génération (0101
     }
   });
 
+  // Décision 0160 § 1.8 point 1 (M8c-1, ticket 1121) : candidats de goûts, lecture unique des signaux actifs.
+  it("gouts/lecture.ts n'importe que signaux de src/server/generation (0160 § 1.8) ; ses voisins et tout autre module de la génération sont refusés", async () => {
+    const LECTURE = "src/server/gouts/lecture.ts";
+    for (const source of ["@/server/generation/signaux", "../generation/signaux"]) {
+      for (const code of formes(source)) expect(await signalements(code, LECTURE), `${source} ${code}`).toEqual([]);
+    }
+    for (const source of [GENERATION, REPRISE, "@/server/generation/signaux-autre", "@/server/generation/signaux/x", "@/server/generation/barriere", CREATION, COMPOSITION, SYSTEME]) {
+      for (const code of formes(source)) expect(await signalements(code, LECTURE), `${source} ${code}`).not.toHaveLength(0);
+    }
+    for (const fichier of ["src/server/gouts/gouts.ts", "src/server/actions/gouts.ts", "src/server/avis/avis.ts", "src/server/gouts/lecture.ts/x.ts"]) {
+      expect(await signalements(imp("@/server/generation/signaux"), fichier), fichier).not.toHaveLength(0);
+    }
+  });
+
   it("le module feuille de reprise est le seul de src/server/generation que la commande du studio charge (0087 § 1.6)", async () => {
     expect(await signalements(imp(REPRISE), "scripts/reprise-studio.ts")).toEqual([]);
     expect(await signalements(imp("@/server/generation/codes"), "scripts/reprise-studio.ts")).not.toHaveLength(0);

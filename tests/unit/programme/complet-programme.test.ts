@@ -120,6 +120,16 @@ describe("voyage complet (chaîne inversée) : lieux restants après le débloca
       })),
     };
     expect(etapesRestantes(marque).map((r) => r.stopId)).toEqual(restantes.slice(3).map((r) => r.stopId));
+    // M8b (ticket 1111 ; critère M8b-3) : une adresse découverte (`discovered`) est écartée comme un lieu à soi ; son nom
+    // saisi n'atteint ni la vérification ni une requête du voyage complet.
+    const decouverte: TripSnapshot = {
+      days: marque.days.map((jour) => ({
+        ...jour,
+        items: jour.items.map((l) => (l.type === "stop" && l.stop.id === deuxieme!.stopId ? { ...l, stop: { ...l.stop, name: "SENTINELLE-NOM-DECOUVERT-M8B", addedBy: "discovered" as const } } : l)),
+      })),
+    };
+    expect(etapesRestantes(decouverte).map((r) => r.stopId)).toEqual(restantes.slice(3).map((r) => r.stopId));
+    expect(JSON.stringify(etapesRestantes(decouverte))).not.toContain("SENTINELLE-NOM-DECOUVERT-M8B");
     // Tout vérifié : rien ne reste.
     expect(etapesRestantes(instantaneDeRome(() => true))).toEqual([]);
   });

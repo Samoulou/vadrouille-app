@@ -1,0 +1,121 @@
+{
+  "ouverture": "1er février 2027",
+  "bandeau": "Précommande · ouverture le 1er février 2027",
+  "titre": {
+    "avant": "Ton voyage,",
+    "accent": "de l'hôtel à la soirée."
+  },
+  "sousTitre": "Raconte ton voyage en quelques phrases. {produit} te rend chaque journée prête à suivre : quoi faire, où manger, ce qui se passe pendant ton séjour.",
+  "precommander": "Précommander pour {prix}",
+  "demo": "Voir la démonstration",
+  "atouts": ["Paiement unique", "Remboursé si ce n'est pas prêt", "TWINT ou carte"],
+  "telephone": {
+    "etiquette": "Exemple de journée, pour illustrer",
+    "jour": "Jour 2",
+    "badge": "Objectif : aucun trou dans ta journée"
+  },
+  "destinations": {
+    "titre": "Toute l'Europe, jour par jour",
+    "texte": "Villes et régions d'Europe, pour un voyage de 5 à 10 jours. Quelques exemples de voyages, pour illustrer : ce ne sont pas des programmes déjà prêts.",
+    "liste": [
+      { "nom": "Édimbourg", "infos": "6 jours · fin août", "couleur": "bruyere" },
+      { "nom": "Lisbonne", "infos": "5 jours · Pâques", "couleur": "azulejo" },
+      { "nom": "Rome", "infos": "7 jours · Ascension", "couleur": "ocre" },
+      { "nom": "Zakynthos", "infos": "8 jours · Pentecôte", "couleur": "granit" }
+    ]
+  },
+  "etapes": {
+    "titre": "Trois gestes, un programme",
+    "liste": [
+      { "titre": "Raconte ton voyage", "texte": "Tes dates, ton logement, tes envies, ton rythme. En quelques phrases." },
+      { "titre": "Trie les propositions", "texte": "J'aime ou Pas pour moi. Le programme s'ajuste à ce qui te ressemble." },
+      { "titre": "Pars avec ton programme", "texte": "Chaque jour, de l'hôtel à la soirée, avec les trajets et ce qu'il faut réserver." }
+    ]
+  },
+  "vise": {
+    "titre": "Ce que {produit} cherche à garantir",
+    "liste": [
+      { "titre": "Fiable", "texte": "Chaque lieu contrôlé avant d'apparaître. Horaires et dates avec leur source et leur date. Ce qui reste incertain marqué « À confirmer »." },
+      { "titre": "Choisi", "texte": "Pour chaque adresse, la raison pour laquelle elle est là pour toi, avec sa source." },
+      { "titre": "D'actualité", "texte": "Les événements réellement prévus pendant tes dates. Un événement sans source relue marqué « Non confirmé »." },
+      { "titre": "Adaptable", "texte": "Une étape changée en quelques gestes, sans casser tes réservations ni tes horaires fixes." }
+    ]
+  },
+  "prix": {
+    "surtitre": "Le voyage complet",
+    "unite": "pour un voyage",
+    "paiementUnique": "Paiement unique pour ce voyage, sans abonnement.",
+    "utilisable": "Utilisable dès le {date}, pour un voyage de 5 à 10 jours en Europe.",
+    "rembourse": "Si le voyage complet n'est pas prêt le {date}, tu es remboursé intégralement.",
+    "inclusTitre": "Ce qui est inclus",
+    "inclus": [
+      "Toutes les journées de ton voyage, repas et soirées compris",
+      "Les événements pendant ton séjour",
+      "Des remplacements pour ajuster ton programme",
+      "La liste à réserver avant de partir",
+      "Le calendrier et le partage avec tes proches",
+      "L'accès jusqu'à 30 jours après ton retour"
+    ],
+    "moyens": "Paiement par TWINT ou par carte, sur la page sécurisée de Stripe.",
+    "sansAide": "Tout se fait dans l'application, quand tu veux. Pas de rendez-vous, pas d'appel."
+  },
+  "faq": {
+    "titre": "Questions fréquentes",
+    "liste": [
+      {
+        "question": "Qu'est-ce que j'achète exactement ?",
+        "reponse": "Le voyage complet pour un voyage : toutes les journées, repas, soirées, événements, la liste à réserver et l'accès jusqu'à 30 jours après ton retour."
+      },
+      {
+        "question": "Quand pourrai-je l'utiliser ?",
+        "reponse": "À partir du {date}. Tu prépares alors ton voyage dans l'application, au moment qui te convient."
+      },
+      {
+        "question": "Et si ce n'est pas prêt à temps ?",
+        "reponse": "Tu es remboursé intégralement."
+      },
+      {
+        "question": "Et si je change d'avis avant l'ouverture ?",
+        "reponse": "Écris à l'adresse de contact indiquée sur ton reçu : tu es remboursé intégralement."
+      },
+      {
+        "question": "Pour quelles destinations ?",
+        "reponse": "Les villes et régions d'Europe."
+      },
+      {
+        "question": "Est-ce un abonnement ?",
+        "reponse": "Non. Un paiement, un voyage."
+      },
+      {
+        "question": "{produit} réserve-t-il à ma place ?",
+        "reponse": "Non. {produit} te dit ce qui est « À réserver », et tu réserves toi-même."
+      },
+      {
+        "question": "Comment les adresses sont-elles choisies ?",
+        "reponse": "C'est notre objectif : contrôler chaque lieu à partir de ses sources avant de l'afficher dans ton programme, et marquer « À confirmer » ce qui reste incertain."
+      },
+      {
+        "question": "Quelqu'un relit-il mon programme ?",
+        "reponse": "Non. {produit} est entièrement en libre-service : tout se fait dans l'application."
+      }
+    ]
+  },
+  "final": {
+    "titre": "Ton printemps se prépare dès le 1er février",
+    "texte": "Pâques, l'Ascension, la Pentecôte : précommande aujourd'hui, prépare ton voyage dès l'ouverture, le 1er février 2027."
+  },
+  "bientot": {
+    "titreDocument": "Précommande · {produit}",
+    "titre": "La précommande ouvre très bientôt",
+    "texte": "Le paiement n'est pas encore ouvert. Reviens bientôt.",
+    "retour": "Revenir à l'accueil"
+  },
+  "merci": {
+    "titreDocument": "Merci · {produit}",
+    "titre": "Merci",
+    "texte": "Si ton paiement a abouti, le reçu arrive par e-mail.",
+    "suite": "Ton voyage complet est utilisable dès le {date}.",
+    "remboursement": "Un changement d'avis avant cette date ? Écris à l'adresse de contact indiquée sur ton reçu.",
+    "retour": "Revenir à l'accueil"
+  }
+}

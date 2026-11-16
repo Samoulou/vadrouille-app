@@ -55,3 +55,30 @@ export function prototypeAdapterAllowed(env: NodeJS.ProcessEnv = process.env): b
   if (env.NODE_ENV === "development" || env.NODE_ENV === "test") return true;
   return env.VADROUILLE_PROTOTYPE === "1" && env.CI === "true";
 }
+
+/**
+ * Branche de la préversion de la vraie app (décision 0169 ; réponses de Samuel à Q634 et Q635 du 2026-11-09). Seule
+ * définition du nom : lue par `previewMvpEssai` et par `BRANCHE_APPELS_REELS` (`src/server/config/generation.ts`).
+ */
+export const BRANCHE_MVP_ESSAI = "mvp-essai";
+
+/**
+ * Préversion Vercel de la branche `mvp-essai` (décision 0169 § 1) : **seul** déploiement, hors `local` et `ci`, où les
+ * gardes `better-auth` (0077 § 5.1) et `api` (0086 § 2.1) s'ouvrent. Fonction pure de l'environnement reçu, **stricte,
+ * sans normalisation** (elle ouvre : comparaisons exactes, sans `trim()` ni changement de casse) ; vraie seulement si
+ * toutes ces conditions tiennent :
+ * 1. `isProductionTarget(env)` est fausse (ni `VADROUILLE_ENV`, ni `VERCEL_ENV`, ni `VERCEL_TARGET_ENV` à `production`) ;
+ * 2. `VERCEL` vaut exactement `1` et `VERCEL_ENV` exactement `preview` (déploiement de préversion de Vercel) ;
+ * 3. `VERCEL_TARGET_ENV` est absente ou vaut exactement `preview` (un environnement personnalisé de Vercel refuse,
+ *    comme la barrière de sortie et le cas admis de Resend, 0138 § 3 condition 4) ;
+ * 4. `VADROUILLE_ENV` est absente (toute déclaration de l'opérateur refuse, vide comprise) ;
+ * 5. `VERCEL_GIT_COMMIT_REF` (branche du déploiement, posée par Vercel) vaut exactement `mvp-essai`.
+ * Jamais la production, jamais une autre branche, jamais un déploiement sans Git. Lecture non secrète.
+ */
+export function previewMvpEssai(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (isProductionTarget(env)) return false;
+  if (env.VERCEL !== "1" || env.VERCEL_ENV !== "preview") return false;
+  if (env.VERCEL_TARGET_ENV !== undefined && env.VERCEL_TARGET_ENV !== "preview") return false;
+  if (env.VADROUILLE_ENV !== undefined) return false;
+  return env.VERCEL_GIT_COMMIT_REF === BRANCHE_MVP_ESSAI;
+}

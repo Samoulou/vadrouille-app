@@ -5,7 +5,8 @@ import "server-only";
  * lue côté serveur seulement, sur le modèle de `offer.ts`. Seuils et durées ne sont jamais codés dans une action.
  *
  * Valeurs de départ : **reprises** de la décision 0008 (B3-PO-6), aucune n'est fixée par le studio ; seuils réels :
- * Q86 (Tech Lead, Sécurité). Compartiment commun (`no-trusted-ip`) : seuils d'une seule adresse IP de l'action.
+ * Q86 (Tech Lead, Sécurité). Compartiment commun (`no-trusted-ip`) : seuils d'une seule adresse IP de l'action,
+ * sauf `noTrustedIpThreshold` (décision 0177 § 1).
  */
 
 /**
@@ -17,7 +18,13 @@ import "server-only";
 export type RateLimitKind = "ip" | "email" | "trip" | "user";
 
 /** Une règle : au plus `threshold` appels admis par fenêtre fixe de `windowSeconds` secondes (horloge de la base). */
-export type RateLimitRule = { readonly kind: RateLimitKind; readonly windowSeconds: number; readonly threshold: number };
+export type RateLimitRule = {
+  readonly kind: RateLimitKind;
+  readonly windowSeconds: number;
+  readonly threshold: number;
+  /** Seuil du compartiment commun `no-trusted-ip`, à la place de `threshold`. Lu pour l'espèce `ip` seulement. */
+  readonly noTrustedIpThreshold?: number;
+};
 
 /**
  * Règles par nom d'action (`^[a-z][a-z0-9-]{0,47}$`), dans l'ordre fixe d'évaluation : adresse IP, puis e-mail, puis voyage
@@ -90,11 +97,32 @@ export const RATE_LIMITS: RateLimitConfig = {
     { kind: "ip", windowSeconds: 3600, threshold: 20 },
     { kind: "trip", windowSeconds: 86_400, threshold: 6 },
   ],
+  // M8a (ticket 1062 ; décision 0160 § 2.3, S3, **proposition à confirmer par la Sécurité**) : avis rapide de l'écran 16
+  // (`rateStop`), 120 gestes par heure et par adresse IP, effacement compris. Vérifié après le contrôle du voyage, de la
+  // personne propriétaire, du déblocage et de l'accès `open`, avant le contrôle de l'étape et toute écriture ; `api`
+  // seulement (sur `mock`, les avis vivent dans la mémoire de l'onglet).
+  avis: [{ kind: "ip", windowSeconds: 3600, threshold: 120 }],
+  // M8c-1 (ticket 1121 ; décision 0160 § 2.3, S3, confirmé par la Sécurité en revue de la PR 1124) : goûts retenus, 20 gestes
+  // par heure et par adresse IP. « Retenir ces goûts » et « Annuler » un retrait sont refusés au-delà ; « Retirer » et
+  // « Retirer tous mes goûts » sont comptés (verdict ignoré, panne comprise) et **jamais refusés** (RGPD art. 7 (3), comme
+  // 0157 § 1.7 point 5). Vérifié après le contrôle du voyage, de la personne et de l'accès, avant toute écriture ; `api`
+  // seulement (sur `mock`, les goûts vivent dans la mémoire de l'onglet).
+  gouts: [{ kind: "ip", windowSeconds: 3600, threshold: 20 }],
   // M9a (ticket 1097 ; spécification M9 § 5 point 7, S7 à confirmer par la Sécurité) : « Exporter mes données », 5 par heure
   // et par personne (proposition). Espèce `user` : identifiant de la personne de la session, sans dépendre de l'en-tête
   // d'adresse. Vérifié après la session, le rôle, l'organisation personnelle et la connexion récente (refus gratuits), avant
   // toute lecture de l'export ; `api` seulement (limiteur en base).
   export: [{ kind: "user", windowSeconds: 3600, threshold: 5 }],
+  // M9b (ticket 1106 ; spécification M9 § 5 point 7, S7 à confirmer par la Sécurité) : « Supprimer mon compte », 5 par
+  // heure et par personne (proposition). Espèce `user`, comme l'export. Vérifié après la session, le rôle, l'organisation
+  // personnelle et la connexion récente (refus gratuits), avant toute suppression. La reprise par `verifyCode`
+  // (`src/server/auth/reprise.ts`) ne passe pas par cette règle : elle n'est jamais refusée par elle.
+  suppression: [{ kind: "user", windowSeconds: 3600, threshold: 5 }],
+  // C2c (ticket 1137 ; spécification C2 § 3.4 ; décision 0177 § 1 ; S2, proposition à confirmer par la Sécurité) : envoi du
+  // questionnaire de la prévente, 5 par heure et par adresse IP ; 30 par heure pour le compartiment commun `no-trusted-ip`
+  // (sans adresse lisible, tous les envois partagent une clé : 5 bloquerait tout le monde au sixième). Vérifié après le
+  // schéma (un envoi refusé par la validation ne consomme rien), avant la fonction d'écriture, qui porte le plafond du jour.
+  "questionnaire-prevente": [{ kind: "ip", windowSeconds: 3600, threshold: 5, noTrustedIpThreshold: 30 }],
 };
 
 /** Lignes supprimées au plus par purge, les plus anciennes `expires_at` d'abord (B3-TL-6). */

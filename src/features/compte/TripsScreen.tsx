@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 
+import type { EventRecorder, RecorderKind } from "@/analytics/track";
 import { Button } from "@/components/ligne/Button";
 import { Counter } from "@/components/ligne/Counter";
 import { DestinationPlate } from "@/components/ligne/DestinationPlate";
-import type { TripSummary } from "@/contracts";
+import type { RetainedTaste, TripSummary } from "@/contracts";
 import { yearOf } from "@/features/voyage/today";
 import { useOptionalTripSession } from "@/features/voyage/TripSessionProvider";
 import { useClientNow } from "@/features/voyage/use-client-now";
@@ -13,7 +15,8 @@ import { format } from "@/i18n";
 import * as messages from "@/i18n/messages";
 import { formatTripDates } from "@/lib/dates";
 
-import { classifyTrips, reopenTarget, tripToday, type TripSections } from "./trips";
+import { RetainedTastes } from "./RetainedTastes";
+import { classifyTrips, reopenTarget, reviewLinkShown, tripToday, type ReviewLink, type TripSections } from "./trips";
 
 const t = messages.mesVoyages;
 
@@ -25,11 +28,26 @@ export interface TripsScreenProps {
    * « Créer un voyage » (aucun lien ne mène à une page 404).
    */
   createHref?: string;
+  /** Adresse de « Ton compte » (M9c), lue par la page ; absente (site d'essai, catalogue des états) : aucun lien. */
+  accountHref?: string;
   /**
    * Reçus de la personne (B4d) : identifiant du voyage → adresse de son reçu (`R9-recu`), lue par la page ; un voyage
    * absent de la liste n'a pas de lien « Voir le reçu ».
    */
   receiptHrefs?: Readonly<Record<string, string>>;
+  /**
+   * Écran 16 (M8a) : identifiant du voyage → lien « Donner ton avis », lu par la page pour les voyages qui ont cet écran ;
+   * affiché à partir du dernier jour du voyage (`reviewLinkShown`). Absent : aucun lien.
+   */
+  reviewLinks?: Readonly<Record<string, ReviewLink>>;
+  /**
+   * « Tes goûts retenus » (M8c-1) : goûts de la personne lus par la page sur `api` ; absent (`mock`), ceux de la mémoire de
+   * l'onglet. La section n'est rendue que s'il y en a au moins un.
+   */
+  retainedTastes?: readonly RetainedTaste[];
+  /** Enregistreur des mesures choisi par la page (aucun envoi réseau, décision 0013 § 3.3) ; injecté dans les tests. */
+  recorderKind?: RecorderKind;
+  recorder?: EventRecorder;
   /** Horloge injectable (tests) ; `Date.now` par défaut. Fonction stable. */
   now?: () => number;
   /**
@@ -58,24 +76,33 @@ function tripDates(summary: TripSummary, now: number): string {
 function Title({ embedded }: { embedded: boolean }) {
   const Heading = embedded ? "h3" : "h1";
   return (
-    <Heading id="mes-voyages-titre" className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
+    // `tabIndex={-1}` : cible du focus quand le dernier goût retenu est retiré (F11-PO-13).
+    <Heading id="mes-voyages-titre" tabIndex={-1} className="text-titre-jour font-extrabold tracking-(--ligne-titre-jour-approche) text-ink">
       {t.titre}
     </Heading>
   );
 }
 
+/**
+ * Ligne d'un voyage. **Ordre des liens** (M8a, revue de la PR 1068, mineur 15 ; à consigner dans la décision par le Tech
+ * Lead) : le lien du voyage d'abord (seul lien à nom long, celui que la tabulation atteint en premier), puis « Donner ton
+ * avis » (geste du voyage terminé, propre à l'écran 16), puis « Voir le reçu » (document, B4d). Chacun est un lien distinct,
+ * jamais imbriqué dans celui du voyage ; les tests e2e de « Mes voyages » comptent les liens dans cet ordre.
+ */
 function TripRow({
   summary,
   section,
   href,
   dates,
   receiptHref,
+  reviewHref,
 }: {
   summary: TripSummary;
   section: SectionKey;
   href: string;
   dates: string;
   receiptHref: string | undefined;
+  reviewHref: string | undefined;
 }) {
   const mention =
     section === "locked" ? t.mentions.premieresPropositions : section === "past" && !summary.unlocked ? t.mentions.nonDebloque : null;
@@ -108,6 +135,13 @@ function TripRow({
         ) : null}
       </Link>
       {/* Lien à part, jamais dans le lien du voyage (pas de lien imbriqué) ; nom accessible avec la destination. */}
+      {reviewHref ? (
+        <Button asChild variant="text" size="sm" className="mb-2 px-0">
+          <Link href={reviewHref} aria-label={format(t.avisNom, { destination: summary.destination })} data-part="avis">
+            {t.avis}
+          </Link>
+        </Button>
+      ) : null}
       {receiptHref ? (
         <Button asChild variant="text" size="sm" className="mb-2 px-0">
           <Link href={receiptHref} aria-label={format(t.recuNom, { destination: summary.destination })} data-part="recu">
@@ -140,11 +174,13 @@ function Sections({
   now,
   targetOf,
   receiptHrefs,
+  reviewLinks,
 }: {
   sections: TripSections;
   now: number;
   targetOf: (summary: TripSummary) => string;
   receiptHrefs: Readonly<Record<string, string>>;
+  reviewLinks: Readonly<Record<string, ReviewLink>>;
 }) {
   return (
     <>
@@ -175,6 +211,7 @@ function Sections({
                   href={targetOf(summary)}
                   dates={tripDates(summary, now)}
                   receiptHref={Object.hasOwn(receiptHrefs, summary.id) ? receiptHrefs[summary.id] : undefined}
+                  reviewHref={reviewHrefOf(summary, reviewLinks, now)}
                 />
               ))}
             </ul>
@@ -193,10 +230,40 @@ function Sections({
  * navigateur (mémoire du fournisseur, perdue au rechargement). Rendus et textes provisoires (UX/UI, Q154).
  */
 const AUCUN_RECU: Readonly<Record<string, string>> = {};
+const AUCUN_AVIS: Readonly<Record<string, ReviewLink>> = {};
 
-export function TripsScreen({ trips, createHref, receiptHrefs = AUCUN_RECU, now: clock, embedded = false }: TripsScreenProps) {
+/** Adresse de « Donner ton avis » pour ce voyage à cet instant, ou `undefined`. */
+function reviewHrefOf(summary: TripSummary, links: Readonly<Record<string, ReviewLink>>, now: number): string | undefined {
+  const link = Object.hasOwn(links, summary.id) ? links[summary.id] : undefined;
+  return link && reviewLinkShown(summary, now) ? link.href : undefined;
+}
+
+export function TripsScreen({
+  trips,
+  createHref,
+  accountHref,
+  receiptHrefs = AUCUN_RECU,
+  reviewLinks = AUCUN_AVIS,
+  retainedTastes,
+  recorderKind,
+  recorder,
+  now: clock,
+  embedded = false,
+}: TripsScreenProps) {
   const now = useClientNow(clock ? { now: clock } : undefined);
   const memory = useOptionalTripSession();
+  const destinations = useMemo(() => new Map(trips.map((summary) => [summary.id, summary.destination])), [trips]);
+  // Après les sections de voyages, quel que soit leur état : un goût doit toujours pouvoir être retiré (M8 § 5.3 point 4).
+  const tastes = (
+    <RetainedTastes
+      {...(retainedTastes === undefined ? {} : { tastes: retainedTastes })}
+      destinations={destinations}
+      focusFallbackId="mes-voyages-titre"
+      headingLevel={embedded ? "h4" : "h2"}
+      {...(recorderKind === undefined ? {} : { recorderKind })}
+      {...(recorder === undefined ? {} : { recorder })}
+    />
+  );
 
   let body;
   if (trips.length === 0) {
@@ -224,7 +291,7 @@ export function TripsScreen({ trips, createHref, receiptHrefs = AUCUN_RECU, now:
             </Button>
           </div>
         ) : null}
-        <Sections sections={classifyTrips(trips, now)} now={now} targetOf={targetOf} receiptHrefs={receiptHrefs} />
+        <Sections sections={classifyTrips(trips, now)} now={now} targetOf={targetOf} receiptHrefs={receiptHrefs} reviewLinks={reviewLinks} />
       </>
     );
   }
@@ -234,6 +301,7 @@ export function TripsScreen({ trips, createHref, receiptHrefs = AUCUN_RECU, now:
       <div data-part="mes-voyages" className="flex flex-col gap-6 rounded-block border border-hairline p-4">
         <Title embedded />
         {body}
+        {tastes}
       </div>
     );
   }
@@ -241,6 +309,15 @@ export function TripsScreen({ trips, createHref, receiptHrefs = AUCUN_RECU, now:
     <main aria-labelledby="mes-voyages-titre" className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-4 pt-6 pb-10">
       <Title embedded={false} />
       {body}
+      {tastes}
+      {/* M9c (spécification M9 § 6.4, critère 1) : après les voyages, pour ne pas changer l'ordre de leurs liens. */}
+      {accountHref ? (
+        <Button asChild variant="text" size="sm" className="self-start px-0">
+          <Link href={accountHref} data-part="compte">
+            {messages.compte.lien}
+          </Link>
+        </Button>
+      ) : null}
     </main>
   );
 }

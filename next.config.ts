@@ -51,6 +51,26 @@ export const RESPONSE_HEADERS = [
     ],
   },
   {
+    // Précommande (décision 0168) : `/precommande` redirige vers le paiement hébergé avec la provenance, `/precommande/merci`
+    // est l'adresse de retour. Ni cache partagé ni cache du navigateur (l'interrupteur et le lien sont lus à chaque
+    // requête), aucune indexation, et seule l'origine part dans `Referer`.
+    source: "/precommande/:path*",
+    headers: [
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+      { key: "X-Robots-Tag", value: "noindex, nofollow" },
+    ],
+  },
+  {
+    // « Ton compte » (M9c ; revue consolidée de la PR 1127, mineur 3) : la page rend l'adresse e-mail de la session. Ni
+    // cache partagé ni cache du navigateur, et seule l'origine part dans `Referer`.
+    source: "/compte/:path*",
+    headers: [
+      { key: "Cache-Control", value: "private, no-store" },
+      { key: "Referrer-Policy", value: "strict-origin" },
+    ],
+  },
+  {
     source: "/sw.js",
     headers: [{ key: "Cache-Control", value: "no-cache" }],
   },

@@ -346,6 +346,9 @@ export const API_ERROR_CODES = [
   // renommer ni réordonner.
   "reauthentication_required",
   "forbidden",
+  // M9b (spécification M9 § 4.3 point 4 ; revue de #1108, point 3) : suppression du compte refusée tant qu'un paiement est
+  // en attente ; `retryable: true`, la personne réessaie une fois le paiement terminé ou expiré.
+  "payment_pending",
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 

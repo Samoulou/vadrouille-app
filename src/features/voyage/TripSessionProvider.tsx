@@ -2,14 +2,17 @@
 
 import { createContext, useContext, useMemo, useRef, type ReactNode } from "react";
 
-import type { PaymentMethod } from "@/contracts/values";
+import type { RetainedTaste } from "@/contracts";
+import type { PaymentMethod, StopRating } from "@/contracts/values";
 
 import {
   EMPTY_SESSION,
   lastTabOf,
   recordCheckout,
   recordLastTab,
+  recordReview,
   reportCheckout,
+  reviewsOf,
   type LastTab,
   type ReportKind,
   type StartedCheckout,
@@ -29,7 +32,12 @@ export interface TripSession {
 interface TripSessionStore {
   get(): TripSessionState;
   set(state: TripSessionState): void;
+  /** Goûts retenus de l'onglet (`mock`, M8c-1 ; 0021 § 4) : au niveau de l'onglet, pas d'un voyage. */
+  tastes(): readonly RetainedTaste[];
+  setTastes(tastes: readonly RetainedTaste[]): void;
 }
+
+const AUCUN_GOUT: readonly RetainedTaste[] = [];
 
 const TripSessionContext = createContext<TripSessionStore | null>(null);
 
@@ -41,11 +49,16 @@ const TripSessionContext = createContext<TripSessionStore | null>(null);
  */
 export function TripSessionProvider({ children }: { children: ReactNode }) {
   const ref = useRef<TripSessionState>(EMPTY_SESSION);
+  const tastesRef = useRef<readonly RetainedTaste[]>(AUCUN_GOUT);
   const store = useMemo<TripSessionStore>(
     () => ({
       get: () => ref.current,
       set: (state) => {
         ref.current = state;
+      },
+      tastes: () => tastesRef.current,
+      setTastes: (tastes) => {
+        tastesRef.current = tastes;
       },
     }),
     [],
@@ -82,6 +95,12 @@ export interface TabMemory {
   recordLastTab(tripId: string, tab: LastTab): void;
   /** Dernier onglet consulté du voyage, ou `undefined`. */
   lastTab(tripId: string): LastTab | undefined;
+  /** Avis de l'écran 16 sur `mock` (M8a) : lus et écrits dans la mémoire de l'onglet seulement. */
+  reviews(tripId: string): ReadonlyMap<string, StopRating>;
+  recordReview(tripId: string, stopId: string, rating: StopRating | null): void;
+  /** Goûts retenus sur `mock` (M8c-1) : liste ordonnée de l'onglet, lue par l'écran 16 et par « Mes voyages ». */
+  tastes(): readonly RetainedTaste[];
+  setTastes(tastes: readonly RetainedTaste[]): void;
 }
 
 /**
@@ -100,6 +119,14 @@ export function useOptionalTripSession(): TabMemory | null {
             lastTab(tripId) {
               return lastTabOf(provided.get(), tripId);
             },
+            reviews(tripId) {
+              return reviewsOf(provided.get(), tripId);
+            },
+            recordReview(tripId, stopId, rating) {
+              provided.set(recordReview(provided.get(), tripId, stopId, rating));
+            },
+            tastes: () => provided.tastes(),
+            setTastes: (tastes) => provided.setTastes(tastes),
           }
         : null,
     [provided],

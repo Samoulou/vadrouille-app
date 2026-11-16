@@ -19,6 +19,8 @@ import { cibleDe, importateurDe, visiteurs } from "./ia-recherche-imports.mjs";
  *   l'écran 1 n'en est pas importatrice : elle passe par `rechercheVilleApiOuverte`) ; de même le seul fichier
  *   `src/server/composition/lieux-api.ts` (recherche d'un lieu à soi, décision 0147 § 3 et § 13 ligne 4) ;
  *   le seul fichier `src/server/photos/api.ts` pour le seul module `barriere` (photos du tri sur `api`, décision 0143 § 6) ;
+ *   le seul fichier `src/server/gouts/lecture.ts` pour le seul module `signaux` (candidats de goûts de l'écran 16 : lecture
+ *   unique des signaux actifs, décision 0160 § 1.8 point 1 ; M8c-1) ;
  *   `@/server/generation/reprise` seul : aussi `scripts/reprise-studio.ts` (commande de reprise du studio, 0087 § 1.6 point 3) ;
  * - `@/server/creation/*` : `src/server/creation/`, `src/server/actions/creation.ts` et, par dérogation (0101 § 1), le seul
  *   `src/adapters/api-creation.ts` ;
@@ -66,6 +68,9 @@ export const IMPORTATEURS_GENERATION_PAR_MODULE = [
   // Décision 0147 § 3 (§ 13 ligne 4 ; M5d-1) : recherche d'un lieu à soi sur `api`, barrière B9-TL-8 et crochet d'accès
   // seulement (modèle de 0141 § 6.2).
   { importateur: "src/server/composition/lieux-api.ts", modules: ["src/server/generation/barriere", "src/server/generation/acces-reel"] },
+  // Décision 0160 § 1.8 point 1 (M8c-1, ticket 1121) : candidats de goûts de l'écran 16, lecture unique des signaux actifs
+  // (`lireSignauxActifs`) seulement ; aucun autre module de la génération.
+  { importateur: "src/server/gouts/lecture.ts", modules: ["src/server/generation/signaux"] },
 ];
 const admisParModule = (importateur, chemin) =>
   IMPORTATEURS_GENERATION_PAR_MODULE.some((entree) => entree.importateur === importateur && entree.modules.includes(chemin));
@@ -96,7 +101,7 @@ export const creationImports = {
     schema: [],
     messages: {
       forbidden:
-        "Importateurs nommés (décisions 0081 B9-TL-1 point 3, 0101 § 4, 0136 § 2.1, 0141 § 6.2 et 0147 § 3) : @/server/creation/* depuis src/server/actions/creation.ts, src/adapters/api-creation.ts ou src/server/creation ; @/server/generation/* depuis src/workflows/{apercu,voyage-complet,recalcul,programme,index}.ts, src/server/presentation/tri.ts (lot, expiration, demarrage), src/server/composition/{villes-api,lieux-api}.ts (barriere, acces-reel), src/server/{creation,generation,payment} ; @/server/composition/generation depuis src/server/{creation,generation} ({{source}}).",
+        "Importateurs nommés (décisions 0081 B9-TL-1 point 3, 0101 § 4, 0136 § 2.1, 0141 § 6.2, 0147 § 3 et 0160 § 1.8) : @/server/creation/* depuis src/server/actions/creation.ts, src/adapters/api-creation.ts ou src/server/creation ; @/server/generation/* depuis src/workflows/{apercu,voyage-complet,recalcul,programme,index}.ts, src/server/presentation/tri.ts (lot, expiration, demarrage), src/server/composition/{villes-api,lieux-api}.ts (barriere, acces-reel), src/server/gouts/lecture.ts (signaux), src/server/{creation,generation,payment} ; @/server/composition/generation depuis src/server/{creation,generation} ({{source}}).",
     },
   },
   create(context) {

@@ -150,6 +150,12 @@ describe("lieu à soi: ordre des premiers refus (0147 § 8 point 2, § 6.4 point
       { address: "SENTINELLE" },
       { query: "SENTINELLE" },
       { organizationId: CTX.organizationId },
+      // M8b (ticket 1111 ; critère M8b-2 ; décision 0160 § 2.6) : la marque est calculée par le serveur, la demande n'a
+      // aucun champ pour elle.
+      { addedBy: "discovered" },
+      { addedBy: "person" },
+      { marqueAjout: "discovered" },
+      { discovered: true },
       { name: "" },
       { name: "x".repeat(500) },
       { kind: "hotel" },
@@ -165,6 +171,13 @@ describe("lieu à soi: ordre des premiers refus (0147 § 8 point 2, § 6.4 point
     const b = banc();
     const sans = await appliquerAjout(b.dependances, apercu());
     expect(sans.ok ? null : sans.error.code).toBe("validation_failed");
+    // Application : la marque fournie est refusée de même, avant toute lecture.
+    for (const extra of [{ addedBy: "discovered" }, { marqueAjout: "discovered" }]) {
+      const c = banc();
+      const resultat = await appliquerAjout(c.dependances, application(extra));
+      expect(resultat.ok ? null : resultat.error.code, JSON.stringify(extra)).toBe("validation_failed");
+      expect(c.withOrg).not.toHaveBeenCalled();
+    }
   });
 
   it("voyage hors de l'organisation : not_found, ni déblocage ni débit", async () => {

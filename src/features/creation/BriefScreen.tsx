@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AnalyticsProvider } from "@/analytics/context";
 import { recorderFor, type EventRecorder, type RecorderKind } from "@/analytics/track";
+import type { RetainedPreference } from "@/contracts";
 
 import { BriefReview } from "./BriefReview";
 import { BriefStory } from "./BriefStory";
@@ -22,6 +23,11 @@ export interface BriefScreenProps {
   recorder?: EventRecorder;
   /** Site d'essai (adaptateur `prototype`, valeur serveur ; E2E-essai, lot 2) : récit sans structuration (D2). */
   essai?: boolean;
+  /**
+   * Goûts retenus de la personne connectée, lus par la page sur `api` (M8c-2, décision 0160 § 1.6) : proposés à la
+   * vérification. Absents sans session, sans goût, sur `mock` et sur le site d'essai : aucun bloc.
+   */
+  retainedTastes?: readonly RetainedPreference[];
 }
 
 /**
@@ -29,16 +35,16 @@ export interface BriefScreenProps {
  * brouillon validé à l'écran 1 (rechargement, accès direct), l'adresse est remplacée par `R1`, qui annonce
  * « Ton brouillon n'a pas été conservé. ». « Retour » mène à l'écran 1, saisies conservées.
  */
-export function BriefScreen({ recorderKind = "none", recorder, essai = false }: BriefScreenProps) {
+export function BriefScreen({ recorderKind = "none", recorder, essai = false, retainedTastes }: BriefScreenProps) {
   const chosen = useMemo(() => recorder ?? recorderFor(recorderKind), [recorder, recorderKind]);
   return (
     <AnalyticsProvider recorder={chosen}>
-      <BriefContent essai={essai} />
+      <BriefContent essai={essai} {...(retainedTastes === undefined ? {} : { retainedTastes })} />
     </AnalyticsProvider>
   );
 }
 
-function BriefContent({ essai }: { essai: boolean }) {
+function BriefContent({ essai, retainedTastes }: { essai: boolean; retainedTastes?: readonly RetainedPreference[] }) {
   const router = useRouter();
   const { state, dispatch } = useDraft();
   // Le titre de l'état affiché reçoit le focus après un changement d'état, jamais au premier affichage.
@@ -64,7 +70,7 @@ function BriefContent({ essai }: { essai: boolean }) {
 
   return (
     <CreationShell backHref={creationRoutes.nouveau({ essai })} step={{ current: 2, total: stepTotal(state.trip) }}>
-      {state.stage === "story" ? <BriefStory {...stage} essai={essai} /> : <BriefReview {...stage} />}
+      {state.stage === "story" ? <BriefStory {...stage} essai={essai} /> : <BriefReview {...stage} {...(retainedTastes === undefined ? {} : { retainedTastes })} />}
     </CreationShell>
   );
 }

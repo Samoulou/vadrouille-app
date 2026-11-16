@@ -194,6 +194,21 @@
       "ecart": "ligne ordinaire de portée application (B4b, ticket 831 ; spécification B4, B4b point 1), modèle accepté par 0040 D4 ; verdict Sécurité : approuvé (revue de la PR #836, a1a61d7)"
     },
     {
+      "fichier": "src/adapters/prevente-mesure-instance.ts",
+      "portee": "application",
+      "usage": "portée application, justification (0040 D4, modèle de `api-share-instance.ts`) : alias de `globalThis` affecté à la constante `holder`, lu et écrit par la seule clé constante `MESURE_KEY` (`Symbol.for(\"vadrouille.prevente-mesure\")`) ; garde la mise en œuvre de la mesure de la prévente (compteur de visites `visitesPrevente` de `src/server/prevente/visites.ts` et prédicat `limiteurConfigure` de `src/server/rate-limit.ts`) branchée une fois au démarrage par `src/instrumentation.ts`, quel que soit l'adaptateur, entre les copies du module que Next charge par route ; n'atteint aucune capacité (ni `fetch`, ni module à capacité, ni `process`) ; non branchée, rien n'est compté et le questionnaire est tenu pour indisponible (échec fermé). Garde-fou : `brancherMesurePrevente` lève à un second branchement",
+      "capacites": [
+        {
+          "capacite": "global:globalThis",
+          "formes": [
+            "alias:holder",
+            "holder[MESURE_KEY]"
+          ]
+        }
+      ],
+      "ecart": "ligne ordinaire de portée application (C2b, ticket 1130 ; spécification C2 § 2.2 point 6 et § 6.2), modèle accepté par 0040 D4 et par la ligne de `api-share-instance.ts` ; verdict Sécurité : approuvé (revue de la PR #1133, 4bda87f)"
+    },
+    {
       "fichier": "src/adapters/prototype.test.ts",
       "portee": "test",
       "usage": "vérifie que P0b1 n'appelle jamais Google",
@@ -1103,6 +1118,56 @@
         }
       ],
       "ecart": "B4e partie back (décision 0144 § 5.4) ; ligne relevée par `pnpm test`, verdict Sécurité à rendre à la revue de la PR (chemin gardé)"
+    },
+    {
+      "fichier": "src/adapters/prevente.ts",
+      "portee": "application",
+      "usage": "seul hôte admis pour le lien de paiement de la précommande (PREVENTE_LIEN_PAIEMENT), comparé à l'hôte de l'adresse avant toute redirection ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:buy.stripe.com",
+          "formes": [
+            "buy.stripe.com"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "précommande (décision 0168) : lien de paiement hébergé, sans clé ni appel sortant ; verdict Sécurité à rendre à la revue de la PR"
+    },
+    {
+      "fichier": "tests/unit/prevente.test.tsx",
+      "portee": "test",
+      "usage": "liens de paiement de test admis et refusés par getPrevente ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:buy.stripe.com",
+          "formes": [
+            "https://buy.stripe.com/test_abc123",
+            "http://buy.stripe.com/x",
+            "https://buy.stripe.com.evil.example/x",
+            "https://u@buy.stripe.com/x",
+            "https://buy.stripe.com",
+            "https://buy.stripe.com/"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "précommande (décision 0168) : lien de paiement hébergé, sans clé ni appel sortant ; verdict Sécurité à rendre à la revue de la PR"
+    },
+    {
+      "fichier": "src/features/accueil/PageLegale.tsx",
+      "portee": "application",
+      "usage": "lien sortant vers la politique de confidentialité de Stripe, sur la page « Tes données et la précommande » (nouvel onglet, noopener noreferrer) ; aucun appel",
+      "capacites": [
+        {
+          "capacite": "hote:stripe.com",
+          "formes": [
+            "https://stripe.com/fr-ch/privacy"
+          ],
+          "nombre": 1
+        }
+      ],
+      "ecart": "pages légales de la précommande (décision 0168, « Conditions d'activation » ; ticket 1125 ; note d'intégration de docs/commercial/textes-legaux-prevente.md) : lien affiché, sans clé ni appel sortant ; verdict Sécurité à rendre à la revue de la PR"
     }
   ]
 }

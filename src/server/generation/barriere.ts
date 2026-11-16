@@ -11,15 +11,16 @@ import { ecriturePositionsSuspendue, lireEnvGeneration } from "@/server/env/gene
  *   l'étape s'arrête sur `production_refused` ;
  * - `reelle` : **toutes** les conditions tiennent : déploiement `preview` (`VERCEL_ENV` vaut `preview` **et** `VADROUILLE_ENV`
  *   est absent ou vaut `preview` : jamais local, CI ni production, même quand Vercel déclare une préversion), branche égale à
- *   la valeur de configuration posée par Samuel (`BRANCHE_APPELS_REELS`, `null` aujourd'hui), drapeau serveur d'activation,
+ *   la valeur de configuration (`BRANCHE_APPELS_REELS` : `mvp-essai` depuis la décision 0169 § 2), drapeau serveur d'activation,
  *   cookie d'accès valide (crochet fourni par l'appelant), plafonds posés et non nuls (`plafondsNonNuls`, calculé par
  *   `plafondsDeGenerationPoses`) ;
  * - `simulee` : tout le reste (local, CI, préversion sans l'une des conditions) : doubles, jamais un appel réel.
  *
  * Le cookie d'accès (D19 de 0055, 0074 § 5) n'est pas lisible dans une étape de workflow : l'appelant injecte un crochet
- * qui le vérifie par le module de P0 ; **fermé par défaut**, et aucun appelant ne le fournit encore : B9e ne branche pas
- * de crochet réel, la façon de vérifier l'accès dans une étape reste à décider (question de la PR #588 au Tech Lead et à la
- * Sécurité ; session de démonstration, question 6 de Samuel). L'environnement est un paramètre (lu par `@/server/env/generation` par défaut), jamais une clé ni un secret.
+ * qui le vérifie ; **fermé par défaut** quand aucun n'est fourni. Depuis la décision 0169 § 5 (M1h), la génération de `api`
+ * fournit `accesGenerationReelle` (`./acces-reel.ts` : l'accès est contrôlé avant l'étape par la session qui crée le voyage ;
+ * le crochet vérifie la garde `api` du processus) ; les recherches de `api` gardent leur crochet propre, fermé, et les photos n'en
+ * fournissent aucun. L'environnement est un paramètre (lu par `@/server/env/generation` par défaut), jamais une clé ni un secret.
  */
 
 export type EtatBarriere = "production" | "reelle" | "simulee";

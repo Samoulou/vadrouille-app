@@ -2,6 +2,8 @@
 
 Statut : **proposée par l'agent release, définitive à la fusion (0093)**. Elle applique une décision de Samuel (offre gratuite, argent : réservé à Samuel, « Qui décide quoi » de `docs/CONTEXT.md`) ; la forme technique (`ignoreCommand`) relève de l'outillage et passe par la revue du Tech Lead. À lister dans la prochaine note de version (rubrique « Décisions prises par le studio »). Samuel peut la remettre en cause à tout moment.
 
+**Voir 0169** (ticket #1105, M1h, 2026-11-10) : `mvp-essai` est ajoutée aux branches construites (« Quand revoir », deuxième point).
+
 Date : 2026-11-09 · Rédacteur : agent release · Ticket : #1050 · Amende, sans la réécrire : 0002 (hébergement Vercel, « préversion par PR ») ; pointeurs ajoutés dans 0138 § 8 et 0140 (« Questions nouvelles », point 1).
 
 **Ce que cette décision n'engage pas.** Aucun réglage du compte ni du projet Vercel (tableau de bord, protection, variables), aucune dépense, aucun changement de `.github/`. Rien de ce qui revient à Samuel n'est tranché : le passage à une offre payante reste à lui.

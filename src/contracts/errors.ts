@@ -56,6 +56,10 @@ export const ApiErrorSchema = z
     if (error.code === "not_unlocked" && error.retryable !== false) {
       ctx.addIssue({ code: "custom", message: "not_unlocked : retryable vaut false", path: ["retryable"] });
     }
+    // M9b (spécification M9 § 4.3 point 4) : la personne réessaie une fois le paiement terminé ou expiré.
+    if (error.code === "payment_pending" && error.retryable !== true) {
+      ctx.addIssue({ code: "custom", message: "payment_pending : retryable vaut true", path: ["retryable"] });
+    }
     if ((error.code === "active_preview_exists") !== (error.activeTripId !== undefined)) {
       ctx.addIssue({
         code: "custom",

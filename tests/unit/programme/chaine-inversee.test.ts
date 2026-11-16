@@ -524,12 +524,20 @@ describe("journal: generation.programme_written (0139 § 2)", () => {
     // Spécification M6 § 4 (M6b, ticket 1005) : `calendrier.version_unavailable`, aucun champ.
     // Décision 0144 § 5.3 point 4 (B4e, ticket 887) : `payment.receipt_unavailable`, `eventId` et raison fermée.
     // Spécification M9 § 6.1 (M9a, ticket 1097) : `compte.export_failed`, nom de l'erreur seulement.
+    // Spécification M9 § 6.1 (M9b, ticket 1106) : `compte.suppression_failed`, nom de l'erreur seulement.
+    // Spécification C2 § 2.2 point 6 (C2b, ticket 1130) : `prevente.visite_perdue`, nom de l'erreur seulement.
+    // Décision 0177 § 8 (C2c, ticket 1137) : `prevente.reponse_perdue`, nom de l'erreur seulement ; `prevente.plafond_atteint`,
+    // aucun champ.
     expect([...CHAMPS_ADMIS_PAR_EVENEMENT.keys()].sort()).toEqual([
       "calendrier.version_unavailable",
       "compte.export_failed",
+      "compte.suppression_failed",
       "generation.programme_written",
       "lieu.recherche",
       "payment.receipt_unavailable",
+      "prevente.plafond_atteint",
+      "prevente.reponse_perdue",
+      "prevente.visite_perdue",
       "recalcul.lieux_a_soi",
       "ville.purge_failed",
       "ville.refusee",

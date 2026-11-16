@@ -34,6 +34,9 @@ import { createDatabase } from "../../db/index.ts";
  *   l'appelant **avant** le limiteur ; message `rl/v1/<action>/<fenêtre>s/trip/<tripId>`, clé HMAC comme les autres.
  * - Purge à l'écriture, dans une transaction distincte ouverte après la validation de l'incrément, par lot de 100,
  *   les plus anciennes `expires_at` d'abord ; un échec de la purge ne change ni l'incrément ni la décision.
+ * - Compartiment commun `no-trusted-ip` (aucune adresse lisible) : seuil d'une adresse de la règle `ip`, ou son
+ *   `noTrustedIpThreshold` s'il est défini (décision 0177 § 1) ; même clé, même fenêtre, même verdict (`kind: "ip"`).
+ *   Seuil effectif qui n'est pas un entier sûr supérieur ou égal à 1 : refus fermé (`InvalidRule`), aucun incrément.
  * - Échec fermé : variable du limiteur absente ou invalide, erreur de base, adresse non canonique → `rate_limited`
  *   avec `retryable: true`, jamais une absence de limite ; aucune erreur ne remonte non rattrapée (0051 point 6.1.2).
  * - Compteurs durables : rien en mémoire du processus, hors de l'étouffement de l'alerte du plafond de lignes.
@@ -91,7 +94,26 @@ export type RateLimiter = {
   check(request: RateLimitRequest): Promise<Result<void>>;
   /** Même contrôle, mêmes écritures que `check` ; rend l'espèce de la règle qui refuse. */
   verdict(request: RateLimitRequest): Promise<RateLimitVerdict>;
+  /**
+   * Supprime les entrées rattachées à une personne (M9b, suppression du compte : handover § 12, étape 2) : clés des règles
+   * par e-mail de son adresse et des règles par personne de son identifiant, pour toutes les actions de la configuration.
+   * Sans effet si elles manquent déjà. **Lève** (sans valeur) si la configuration, l'entrée ou la base refuse : l'appelant
+   * reprend l'étape.
+   */
+  oublier(personne: PersonneDuLimiteur): Promise<void>;
 };
+
+/** Personne dont les entrées sont supprimées : adresse canonique et identifiant `uuid`, lus en base par l'appelant. */
+export type PersonneDuLimiteur = { readonly email: CanonicalEmail; readonly userId: string };
+
+/** Les entrées d'une personne n'ont pas pu être supprimées ; ne porte aucune valeur. */
+export class OubliLimiteurError extends Error {
+  override name = "OubliLimiteurError";
+
+  constructor() {
+    super("Entrées du limiteur non supprimées.");
+  }
+}
 
 const ACTION = /^[a-z][a-z0-9-]{0,47}$/;
 /** Identifiant de voyage admis dans une espèce `trip` : `uuid` (36 caractères, tirets aux places fixes). */
@@ -133,6 +155,25 @@ RETURNING count`;
 const PURGE = `DELETE FROM action_rate_limits WHERE key IN (
   SELECT key FROM action_rate_limits WHERE expires_at <= now() ORDER BY expires_at LIMIT $1 FOR UPDATE SKIP LOCKED
 )`;
+
+const OUBLI = "DELETE FROM action_rate_limits WHERE key = ANY($1::text[])";
+
+/**
+ * Clés des entrées rattachées à une personne (M9b) : une par règle `email` (adresse) ou `user` (identifiant) de chaque
+ * action de la configuration. Les clés par adresse IP ne sont rattachées à aucun compte (handover § 12, étape 2).
+ */
+export function clesDeLaPersonne(secret: Buffer, config: RateLimitConfig, personne: PersonneDuLimiteur): string[] {
+  const cleEmail = rateLimitEmailKey(personne.email);
+  const identifiant = personne.userId.toLowerCase();
+  const cles: string[] = [];
+  for (const [action, regles] of Object.entries(config)) {
+    for (const regle of regles) {
+      if (regle.kind === "email") cles.push(rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, `email/${cleEmail}`)));
+      else if (regle.kind === "user") cles.push(rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, `user/${identifiant}`)));
+    }
+  }
+  return cles;
+}
 
 const ESTIMATION = "SELECT reltuples::bigint AS n FROM pg_catalog.pg_class WHERE oid = 'public.action_rate_limits'::regclass";
 
@@ -237,8 +278,15 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
             : regle.kind === "trip"
               ? `trip/${voyage}`
               : `user/${personne}`;
-      return { cle: rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, espece)), regle };
+      // Seuil à part du compartiment commun (décision 0177 § 1 point 2) : une clé, un seuil.
+      const seuil = regle.kind === "ip" && ip === null && regle.noTrustedIpThreshold !== undefined ? regle.noTrustedIpThreshold : regle.threshold;
+      return { cle: rateLimitKey(secret, rateLimitMessage(action, regle.windowSeconds, espece)), regle, seuil };
     });
+    // Garde (0177 § 1 point 5) : un seuil `NaN` ne refuserait jamais (`compte > NaN` est faux). Refus fermé, aucune écriture.
+    if (cles.some(({ seuil }) => !Number.isSafeInteger(seuil) || seuil < 1)) {
+      logEvent("rate_limit.failed", { action, errorName: "InvalidRule" }, "error");
+      return REFUS_FERME;
+    }
 
     let refusee: RateLimitKind | undefined;
     let client: RateLimitClient | undefined;
@@ -246,11 +294,11 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
       client = await (pool ??= poolParDefaut()).connect();
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE vadrouille_limiter");
-      for (const { cle, regle } of cles) {
+      for (const { cle, regle, seuil } of cles) {
         const ligne = (await client.query(INCREMENT, [cle, regle.windowSeconds])).rows[0] as { count?: unknown } | undefined;
         const compte = Number(ligne?.count);
         // Au-delà du seuil (ou compteur illisible) : refus, et les clés suivantes ne sont ni lues ni incrémentées.
-        if (!Number.isSafeInteger(compte) || compte > regle.threshold) {
+        if (!Number.isSafeInteger(compte) || compte > seuil) {
           refusee = regle.kind;
           break;
         }
@@ -273,7 +321,30 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter
     return (await verdict(request)).ok ? ADMIS : REFUS;
   }
 
-  return { check, verdict };
+  async function oublier(personne: PersonneDuLimiteur): Promise<void> {
+    const env = reglages("oubli");
+    if (env === null || !isCanonicalEmail(personne.email) || typeof personne.userId !== "string" || !UUID.test(personne.userId)) throw new OubliLimiteurError();
+    const cles = clesDeLaPersonne(env.secret, config, personne);
+    if (cles.length === 0) return;
+    let client: RateLimitClient | undefined;
+    try {
+      client = await (pool ??= poolParDefaut()).connect();
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE vadrouille_limiter");
+      await client.query(OUBLI, [cles]);
+      await client.query("COMMIT");
+      client.release();
+    } catch (error) {
+      if (client) {
+        await rollback(client);
+        client.release(error instanceof Error ? error : true);
+      }
+      logEvent("rate_limit.failed", { action: "oubli", errorName: errorNameOf(error) }, "error");
+      throw new OubliLimiteurError();
+    }
+  }
+
+  return { check, verdict, oublier };
 }
 
 let limiteurParDefaut: RateLimiter | undefined;
@@ -281,6 +352,32 @@ let limiteurParDefaut: RateLimiter | undefined;
 /** Limiteur du serveur (configuration de `src/server/config/limites.ts`, `serverEnv()`, pool de `vadrouille_app`). */
 export function checkRateLimit(request: RateLimitRequest): Promise<Result<void>> {
   return (limiteurParDefaut ??= createRateLimiter()).check(request);
+}
+
+/** Même limiteur : suppression des entrées d'une personne (M9b, `src/server/account/delete.ts`). */
+export function oublierDansLeLimiteur(personne: PersonneDuLimiteur): Promise<void> {
+  return (limiteurParDefaut ??= createRateLimiter()).oublier(personne);
+}
+
+/**
+ * « Limiteur configuré » (spécification `specs/C2-prevente-mesure.md`, § 6.2 ; tâche C2b, ticket 1130 ; décision
+ * 0175 § 4 point 3) : vrai si les variables que le limiteur exige **à l'usage** sont là, c'est-à-dire si
+ * `rateLimitSettings` ne lève pas (`RATE_LIMIT_HMAC_SECRET` présente et valide partout ; `TRUSTED_IP_HEADER` en plus en
+ * `staging` et en `production`). Aucune liste de variables n'est recopiée. Sans elles le limiteur, fermé par défaut,
+ * refuserait chaque envoi : c'est la seconde condition de « questionnaire disponible », pour que les liens vers le
+ * questionnaire ne mènent pas à un formulaire qui refuse tout.
+ *
+ * Ne lève jamais, n'ouvre aucune connexion, n'écrit aucun journal (à la différence d'un appel du limiteur). `env` : tests
+ * seulement (sinon `serverEnv()`). Branché au démarrage sur `src/adapters/prevente-mesure-instance.ts` par
+ * `src/instrumentation.ts`.
+ */
+export function limiteurConfigure(env?: Readonly<Record<string, string | undefined>>): boolean {
+  try {
+    rateLimitSettings(env === undefined ? serverEnv() : parseServerEnv(env));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Même limiteur, verdict détaillé (espèce de la règle qui refuse ; M5d-1, `lieu.recherche`). */

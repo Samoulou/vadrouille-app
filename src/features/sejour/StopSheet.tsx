@@ -13,6 +13,7 @@ import { ReasonBlock } from "@/components/ligne/ReasonBlock";
 import { StatusBanner } from "@/components/ligne/StatusBanner";
 import { Tag } from "@/components/ligne/Tag";
 import type { Day } from "@/contracts";
+import { estAdresseDecouverte, estLieuASoi } from "@/domain/lieu-a-soi";
 import { EMPTY_LIVE_REGION_CLASS } from "@/features/creation/fields";
 import * as messages from "@/i18n/messages";
 import { formatFaits } from "@/lib/faits";
@@ -144,11 +145,18 @@ export function StopSheet({
           {t.evenement}
         </p>
       )}
-      {/* Lieu à soi (décision 0147 § 6.1, M5d-2) : marque stockée dans l'instantané, jamais dans la vue partagée. */}
-      {stop.addedBy === "person" ? (
-        <p data-part="ajoute-par-toi" className="text-corps-s text-ink-2">
-          {t.ajouteParToi}
-        </p>
+      {/* Lieu à soi (décision 0147 § 6.1, M5d-2) ou adresse découverte (M8b, décision 0160 § 1.4) : marque stockée dans
+          l'instantané, jamais dans la vue partagée ; le texte dépend de la valeur. */}
+      {estLieuASoi(stop) ? (
+        estAdresseDecouverte(stop) ? (
+          <p data-part="decouvert-sur-place" className="text-corps-s text-ink-2">
+            {t.decouvertSurPlace}
+          </p>
+        ) : (
+          <p data-part="ajoute-par-toi" className="text-corps-s text-ink-2">
+            {t.ajouteParToi}
+          </p>
+        )
       ) : null}
 
       <div className="flex flex-col gap-1">

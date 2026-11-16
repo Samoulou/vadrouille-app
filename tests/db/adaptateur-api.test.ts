@@ -930,8 +930,12 @@ const P0 = "test_place_incoherent";
  * Écarts nommés entre les fabriques `api` et `mock` (seules clés tolérées). `places` (M5d-1, ticket 939) : l'ajout d'un lieu
  * à soi est propre à `api` dans `TripAdapter` ; `mock` le tient hors de l'adaptateur, dans la portée de simulation
  * (`lieuxSimules` et `ajoutDeLieu` de `@/adapters`), comme la recherche. Arbitrage du CEO, correction 2 de la PR 943.
+ * `reviews` (M8a, ticket 1062) : les avis de l'écran 16 sont propres à `api` ; `mock` les garde dans la mémoire de l'onglet
+ * (0021 § 4) et calcule l'accès dans `getTripReview` de `@/adapters`, hors de l'adaptateur. `tastes` (M8c-1, ticket 1121) :
+ * les goûts retenus sont propres à `api` (`goutsEnregistres()` de `@/adapters` rend `null` sur `mock`) ; `mock` les garde
+ * dans la mémoire de l'onglet (0021 § 4), hors de l'adaptateur, comme les avis.
  */
-const PROPRES_A_API = ["places"] as const;
+const PROPRES_A_API = ["places", "reviews", "tastes"] as const;
 
 describe("adaptateur mock inchangé", () => {
   it("la fabrique de mock reste celle de la suite (aucun cas propre à un adaptateur dans la suite, sauf les écarts nommés)", () => {
@@ -939,6 +943,8 @@ describe("adaptateur mock inchangé", () => {
     const api = Object.keys(banc().adapter);
     for (const cle of PROPRES_A_API) expect(api).toContain(cle);
     expect(Object.keys(adapter)).not.toContain("places");
+    expect(Object.keys(adapter)).not.toContain("reviews");
+    expect(Object.keys(adapter)).not.toContain("tastes");
     expect(Object.keys(adapter).sort()).toEqual(api.filter((cle) => !(PROPRES_A_API as readonly string[]).includes(cle)).sort());
     void creerLectureVoyages;
   });

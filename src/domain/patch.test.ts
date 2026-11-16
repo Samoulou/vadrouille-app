@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   ApiErrorSchema,
   PatchResultSchema,
+  TripPatchSchema,
   TripSnapshotSchema,
   type DaySnapshot,
   type Pace,
@@ -863,6 +864,55 @@ describe("changements: M5-C (décision 0147 § 5.2)", () => {
     // Un `revert` rétablit la marque telle quelle.
     const suivant = reussi(appliquerPatch(entree(base, patch(4, [{ op: "revert", toVersion: 3 }]), { versionCourante: 4, versionsAnterieures: new Map([[3, instantane]]) })));
     expect(etape(suivant.instantane, (stop) => stop.id === "ajout-1").addedBy).toBe("person");
+  });
+
+  // M8b (ticket 1111 ; décision 0160 § 1.4 point 4 ; spécification M8 § 4.3 et § 6.4, critère M8b-5).
+  it("add pose la marque reçue en entrée (`marqueAjout`) : discovered pour une adresse découverte ; person par défaut ; le patch n'a aucun champ pour elle", () => {
+    const base = version2();
+    const operations = [
+      { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time: "21:00", name: "Trouvé sur place", placeId: place("proche") },
+      { op: "lock", stopId: "ajout-1" },
+    ] as const;
+    const decouvert = reussi(appliquerPatch(entree(base, patch(2, [...operations]), { marqueAjout: "discovered" })));
+    expect(etape(decouvert.instantane, (stop) => stop.id === "ajout-1")).toMatchObject({ addedBy: "discovered", locked: true, name: "Trouvé sur place" });
+    expect(decouvert.instantane.days.flatMap(etapes).filter((stop) => stop.addedBy !== undefined).map((stop) => stop.id)).toEqual(["ajout-1"]);
+    const explicite = reussi(appliquerPatch(entree(base, patch(2, [...operations]), { marqueAjout: "person" })));
+    expect(etape(explicite.instantane, (stop) => stop.id === "ajout-1").addedBy).toBe("person");
+    // Hors de la marque, les deux versions sont identiques : même programme, même résultat.
+    const sansMarque = (s: typeof decouvert.instantane) => JSON.stringify(s).replace(/"addedBy":"[a-z]+"/g, "");
+    expect(sansMarque(decouvert.instantane)).toBe(sansMarque(explicite.instantane));
+    expect(decouvert.resultat).toEqual(explicite.resultat);
+    // Aucune valeur du client ne choisit la marque : le schéma strict du patch refuse le champ.
+    expect(TripPatchSchema.safeParse(patch(2, [{ ...operations[0], addedBy: "discovered" } as never])).success).toBe(false);
+    expect(TripPatchSchema.safeParse({ ...patch(2, [...operations]), marqueAjout: "discovered" }).success).toBe(false);
+  });
+
+  it("une adresse découverte de la base compte comme un ajout de la personne et survit à un revert (comme un lieu à soi)", () => {
+    const base = version2();
+    const ajout = (marqueAjout: "person" | "discovered") =>
+      reussi(
+        appliquerPatch(
+          entree(base, patch(2, [
+            { op: "add", stopId: "ajout-1", kind: "activity", day: 2, time: "21:00", name: "Trouvé sur place", placeId: place("proche") },
+            { op: "lock", stopId: "ajout-1" },
+          ]), { marqueAjout }),
+        ),
+      ).instantane;
+    const v3 = ajout("discovered");
+    // Un `revert` vers la version qui la contient la rétablit telle quelle, marque comprise.
+    const retour = reussi(appliquerPatch(entree(base, patch(4, [{ op: "revert", toVersion: 3 }]), { versionCourante: 4, versionsAnterieures: new Map([[3, v3]]) })));
+    expect(etape(retour.instantane, (stop) => stop.id === "ajout-1")).toMatchObject({ addedBy: "discovered", locked: true, name: "Trouvé sur place" });
+    // Un patch suivant sur la base qui la contient, sans paramètre `ajouts` : même résultat que pour un lieu à soi `person`.
+    const suite = (instantane: typeof v3) => appliquerPatch(entree(instantane, patch(3, [{ op: "unlock", stopId: "ajout-1" }]), { versionCourante: 3 }));
+    const pourDecouvert = suite(v3);
+    const pourPerson = suite(ajout("person"));
+    expect(pourDecouvert.ok).toBe(pourPerson.ok);
+    if (pourDecouvert.ok && pourPerson.ok) {
+      expect(pourDecouvert.resultat).toEqual(pourPerson.resultat);
+      expect(etape(pourDecouvert.instantane, (stop) => stop.id === "ajout-1").addedBy).toBe("discovered");
+    } else if (!pourDecouvert.ok && !pourPerson.ok) {
+      expect(pourDecouvert.code).toBe(pourPerson.code);
+    }
   });
 });
 

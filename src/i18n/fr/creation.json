@@ -175,6 +175,12 @@
       "deplacements": {
         "titre": "Déplacements"
       },
+      "gouts": {
+        "titre": "Tes goûts retenus",
+        "aide": "Retenus après tes voyages précédents. Coche ceux qui valent pour ce voyage.",
+        "dejaDansCeVoyage": "Déjà dans ce voyage",
+        "contraire": "Contraire à ce voyage"
+      },
       "limiter": {
         "titre": "À limiter",
         "indisponibles": "Les envies déjà choisies ne peuvent pas être limitées.",

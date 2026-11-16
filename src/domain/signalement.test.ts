@@ -30,6 +30,10 @@ describe("signalement: étapes signalables", () => {
     expect(etapeSignalable({ id: "a", placeId: "p" })).toBe(true);
     expect(etapeSignalable({ id: "a", commitment: "ticket" })).toBe(false);
     expect(etapeSignalable({ id: "a", addedBy: "person" })).toBe(false);
+    // M8b (ticket 1111 ; critère M8b-5) : une adresse découverte ne se signale pas non plus.
+    expect(etapeSignalable({ id: "a", placeId: "p", addedBy: "discovered" })).toBe(false);
+    const decouverte = [{ items: [{ type: "stop", stop: { id: "ajout-2", placeId: "p-decouvert", addedBy: "discovered" as const } }], events: [] }];
+    expect(situerEtapeSignalee(decouverte, "ajout-2")).toEqual({ type: "non_signalable" });
   });
 
   it("situe l'étape : signalable avec son placeId (ou null), non signalable (événement, engagement, lieu à soi), absente", () => {

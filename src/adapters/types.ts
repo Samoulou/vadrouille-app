@@ -35,7 +35,10 @@ import type {
   ShareStatus,
   SharedDayView,
   SharedTripView,
+  RetainedTaste,
+  StopReview,
   Trip,
+  TripReview,
   TripRequest,
   TripSummary,
 } from "@/contracts";
@@ -105,6 +108,17 @@ export interface TripAdapter {
    */
   readonly reports?: StopReportAdapter;
   /**
+   * Écran 16 « Après le voyage » (tâche M8a, ticket 1062 ; décision 0160 § 1.2 point 5) : présent sur `api` (table
+   * `stop_reviews`, `src/server/avis/`). `mock` sert sa lecture par `getTripReview` de `@/adapters` (horloge de la portée)
+   * et tient ses avis dans la mémoire de l'onglet ; `prototype` n'en a pas (404).
+   */
+  readonly reviews?: TripReviewAdapter;
+  /**
+   * Goûts retenus (M8c-1, ticket 1121 ; décision 0160 § 3.5) : `api` seulement (table `preferences`, `src/server/gouts/`).
+   * `mock` tient ses goûts dans la mémoire de l'onglet ; `prototype` n'en a pas.
+   */
+  readonly tastes?: TasteAdapter;
+  /**
    * Versions du programme et retour à une version (tâche M5b, ticket 934 ; décision 0147 § 5.3) : présent sur `api`
    * (`trip_versions`). `mock` tient un historique simulé dans la portée de simulation (`versionsDuVoyage` de
    * `@/adapters`) ; `prototype` n'en a pas. Entrées reçues en `unknown`, revalidées par le cas d'usage.
@@ -159,6 +173,36 @@ export interface TripVersionsAdapter {
   listTripVersions(ctx: AdapterContext | null, input: unknown): Promise<Result<TripVersionPage>>;
   previewRevert(ctx: AdapterContext | null, input: unknown): Promise<Result<RevertPreview>>;
   applyRevert(ctx: AdapterContext | null, input: unknown): Promise<Result<PatchResult>>;
+}
+
+/**
+ * Après le voyage sur `api` (M8a ; décision 0160 § 1.1, § 1.2 et § 1.5) :
+ *
+ * - `getTripReview` : `TripReview` du voyage, `null` pour un voyage inconnu, d'une autre organisation, non débloqué ou d'une
+ *   autre personne que la propriétaire (404 de la page) ; accès calculé par le serveur ;
+ * - `rateStop` (`StopReviewRequest` → `StopReview`, ou `null` quand l'avis est effacé) : contexte **de la session**
+ *   (`null` : `unauthenticated`), entrée reçue en `unknown` ; `not_found` hors de l'accès `open` ; limite `avis`.
+ */
+/**
+ * Goûts retenus de la personne (M8c-1, ticket 1121 ; spécification M8 § 5.2 et § 5.3 ; décision 0160 § 1.2 point 6) :
+ * - `listRetainedTastes` : « Tes goûts retenus » de la personne de la session, dans l'ordre où ils ont été retenus ;
+ * - `retainTastes` (`RetainTastesRequest` → goûts nouvellement retenus) : `not_found` hors de l'accès `open`,
+ *   `validation_failed` pour une clé qui n'est pas un candidat recalculé, limite `gouts` ;
+ * - `removeTaste` (`RemoveTasteRequest` → le goût supprimé) et `removeAllTastes` : jamais refusés par la limite ;
+ * - `restoreTaste` (`RestoreTasteRequest`) : « Annuler » un retrait.
+ * Contexte **de la session** (`null` : `unauthenticated`), entrée reçue en `unknown`.
+ */
+export interface TasteAdapter {
+  listRetainedTastes(ctx: AdapterContext): Promise<RetainedTaste[]>;
+  retainTastes(ctx: AdapterContext | null, input: unknown): Promise<Result<RetainedTaste[]>>;
+  removeTaste(ctx: AdapterContext | null, input: unknown): Promise<Result<RetainedTaste>>;
+  restoreTaste(ctx: AdapterContext | null, input: unknown): Promise<Result<void>>;
+  removeAllTastes(ctx: AdapterContext | null, input: unknown): Promise<Result<void>>;
+}
+
+export interface TripReviewAdapter {
+  getTripReview(ctx: AdapterContext, tripId: string): Promise<TripReview | null>;
+  rateStop(ctx: AdapterContext | null, input: unknown): Promise<Result<StopReview | null>>;
 }
 
 /**

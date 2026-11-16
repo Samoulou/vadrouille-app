@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ADDED_BY } from "@/contracts/values";
 import * as domaine from "@/domain/signalement";
 import { etapeSignalableSurFiche } from "@/features/sejour/signalement";
 import { edimbourg } from "@/mocks/edimbourg";
@@ -18,11 +19,15 @@ describe("signalement: règles partagées", () => {
 
   it("signalement: la règle de la fiche (navigateur) est celle du serveur, sur toutes les combinaisons et les étapes du jeu simulé", () => {
     const commitments = [undefined, { kind: "booking" }] as const;
-    const auteurs = [undefined, "person"] as const;
+    // M8b (ticket 1111 ; critère M8b-5) : équivalence étendue à l'adresse découverte (`discovered`), chaque valeur de `ADDED_BY`.
+    const auteurs = [undefined, ...ADDED_BY] as const;
+    expect(auteurs).toContain("discovered");
     for (const commitment of commitments) {
       for (const addedBy of auteurs) {
         const stop = { id: "j1-1", ...(commitment === undefined ? {} : { commitment }), ...(addedBy === undefined ? {} : { addedBy }) } as Parameters<typeof domaine.etapeSignalable>[0];
         expect(etapeSignalableSurFiche(stop), JSON.stringify(stop)).toBe(domaine.etapeSignalable(stop));
+        // Seule une étape sans engagement ni marque se signale, sur la fiche comme sur le serveur.
+        expect(etapeSignalableSurFiche(stop), JSON.stringify(stop)).toBe(commitment === undefined && addedBy === undefined);
       }
     }
     const etapes = edimbourg.days.flatMap((jour) => jour.items.flatMap((ligne) => (ligne.type === "stop" ? [ligne.stop] : [])));
